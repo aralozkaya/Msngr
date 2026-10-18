@@ -10,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
@@ -32,7 +33,7 @@ private val displayPictureBitmapCache = object : LruCache<String, Bitmap>(
 }
 private val pendingAvatarDecodes = ConcurrentHashMap<String, CompletableDeferred<Bitmap?>>()
 
-/** Converts a persisted document URI into the compact square PNG advertised through MSNP. */
+/** Preserves GIF animation; converts other documents to the compact square PNG used by MSNP. */
 internal suspend fun Context.loadDisplayPictureBytes(uri: String?): ByteArray? =
     withContext(Dispatchers.IO) {
         if (uri.isNullOrBlank()) return@withContext null
@@ -41,6 +42,11 @@ internal suspend fun Context.loadDisplayPictureBytes(uri: String?): ByteArray? =
         runCatching {
             val inlineBytes = uri.inlineImageBytes()
             val parsedUri = if (inlineBytes == null) uri.toUri() else null
+            val gif = loadAvatarGifBytes(uri)
+            if (gif != null) {
+                requireNotNull(GifDisplayPicture.parse(gif)) { "Unsupported animated profile picture." }
+                return@runCatching gif
+            }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             if (inlineBytes != null) {
                 BitmapFactory.decodeByteArray(inlineBytes, 0, inlineBytes.size, bounds)
@@ -157,7 +163,7 @@ private fun Context.decodeSampledAvatar(uri: String, highResolution: Boolean): B
     }
 }
 
-private fun String.inlineImageBytes(): ByteArray? {
+internal fun String.inlineImageBytes(): ByteArray? {
     if (!startsWith("data:image/", ignoreCase = true)) return null
     val marker = ";base64,"
     val markerIndex = indexOf(marker, ignoreCase = true)
@@ -170,4 +176,31 @@ private fun String.inlineImageBytes(): ByteArray? {
         .also { bytes ->
             require(bytes.size <= MAX_INLINE_IMAGE_BYTES) { "Inline display picture is too large." }
         }
+}
+
+/** Reads GIF data with a hard limit, including document providers that misreport their MIME type. */
+internal fun Context.loadAvatarGifBytes(uri: String?): ByteArray? {
+    if (uri.isNullOrBlank()) return null
+    uri.inlineImageBytes()?.let { return it.takeIf(GifDisplayPicture::hasSignature) }
+    return contentResolver.openInputStream(uri.toUri())?.use { input ->
+        val header = ByteArray(6)
+        var offset = 0
+        while (offset < header.size) {
+            val count = input.read(header, offset, header.size - offset)
+            if (count <= 0) return@use null
+            offset += count
+        }
+        if (!GifDisplayPicture.hasSignature(header)) return@use null
+        ByteArrayOutputStream().use { output ->
+            output.write(header)
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                require(count <= GifDisplayPicture.MAX_BYTES - output.size()) { "GIF is too large." }
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        }
+    }
 }

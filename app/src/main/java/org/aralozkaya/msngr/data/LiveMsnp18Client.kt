@@ -1967,6 +1967,9 @@ internal class LiveMsnp18Client(
     }
 
     private suspend fun pollContactTile(contactId: String, force: Boolean = false): Boolean {
+        synchronized(contactDisplayPictureStateLock) {
+            if (hasVerifiedAnimatedContactPicture(contactId)) return true
+        }
         val accountEmail = signedInEmail.takeIf(String::isNotBlank) ?: return false
         val storageAccount = signedInStorageAccount
         val endpointGuid = machineGuid
@@ -1989,6 +1992,9 @@ internal class LiveMsnp18Client(
         val hash = bytes.sha256()
         val accepted = synchronized(contactDisplayPictureStateLock) {
             if (signedInEmail != accountEmail || machineGuid != endpointGuid) return@synchronized false
+            // A P2P GIF can finish while the static HTTP fallback is in flight. WLM's Soccer
+            // does not update Escargot's static tile, so that older image must not replace it.
+            if (hasVerifiedAnimatedContactPicture(contactId)) return true
             removedContactTileHashes[contactId]?.let { removedHash ->
                 if (removedHash == hash) {
                     pictureTrace("STORAGE ignored stale tile after removal")
@@ -2024,6 +2030,15 @@ internal class LiveMsnp18Client(
             }
         }
         return accepted
+    }
+
+    /** Called under contactDisplayPictureStateLock; a new MSNObject still permits replacement. */
+    private fun hasVerifiedAnimatedContactPicture(contactId: String): Boolean {
+        val displayedHash = displayedContactDisplayPictureHashes[contactId] ?: return false
+        val announcedHash = contactDisplayPictures[contactId]?.sha1d
+        return (announcedHash == null || announcedHash == displayedHash) &&
+            mutableContacts.value.resolveContact(contactId)?.avatarUri
+                ?.startsWith("data:image/gif;") == true
     }
 
     private suspend fun fetchContactTile(storageId: String, size: String): ByteArray? {

@@ -30,13 +30,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -54,12 +52,10 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
-    var loading by remember(pictureUri) { mutableStateOf(true) }
-    val bitmap by produceState<Bitmap?>(initialValue = null, pictureUri) {
-        value = context.loadAvatarBitmap(pictureUri, highResolution = true)
-        loading = false
-    }
-    val savePicture = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { destination ->
+    val image = rememberAvatarImage(pictureUri, highResolution = true)
+    val painter = image.painter
+    val mimeType = if (image.isGif) "image/gif" else "image/png"
+    val savePicture = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { destination ->
         if (destination != null) {
             scope.launch {
                 saving = true
@@ -95,23 +91,25 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                 modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             ) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    val image = bitmap
                     when {
-                        image != null -> Image(
-                            bitmap = image.asImageBitmap(),
+                        painter != null -> Image(
+                            painter = painter,
                             contentDescription = "$name profile picture",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
-                        loading -> CircularProgressIndicator()
+                        image.isLoading -> CircularProgressIndicator()
                         else -> Text("This profile picture could not be loaded.")
                     }
                 }
                 FilledTonalButton(
                     onClick = {
-                        if (!saving) savePicture.launch("${profilePictureFileStem(name)}-profile-picture.png")
+                        if (!saving) {
+                            val extension = if (image.isGif) "gif" else "png"
+                            savePicture.launch("${profilePictureFileStem(name)}-profile-picture.$extension")
+                        }
                     },
-                    enabled = bitmap != null,
+                    enabled = painter != null && !image.isLoading,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 ) {
@@ -130,11 +128,14 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
 }
 
 internal suspend fun Context.saveContactPicture(pictureUri: String, destination: Uri): Boolean {
-    val image = loadAvatarBitmap(pictureUri, highResolution = true) ?: return false
     return withContext(Dispatchers.IO) {
         runCatching {
+            val gif = loadAvatarGifBytes(pictureUri)
+            val image = if (gif == null) loadAvatarBitmap(pictureUri, highResolution = true) else null
+            require(gif != null || image != null)
             contentResolver.openOutputStream(destination, "w")?.use { output ->
-                check(image.compress(Bitmap.CompressFormat.PNG, 100, output))
+                if (gif != null) output.write(gif)
+                else check(requireNotNull(image).compress(Bitmap.CompressFormat.PNG, 100, output))
             } ?: error("Unable to open destination")
         }.isSuccess
     }
