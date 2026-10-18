@@ -45,13 +45,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -69,10 +67,9 @@ import org.aralozkaya.msngr.MessengerPlusText
 import org.aralozkaya.msngr.MsnEmoticonText
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.avatarInitial
-import org.aralozkaya.msngr.cachedAvatarBitmap
+import org.aralozkaya.msngr.rememberAvatarImage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.loadAvatarBitmap
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.ui.theme.ProfileCardCornerRadius
 import org.aralozkaya.msngr.ui.theme.ProfileCardPressedCornerRadius
@@ -399,15 +396,7 @@ fun Avatar(
     shape: Shape = MaterialTheme.shapes.avatar,
     highResolution: Boolean = false,
 ) {
-    val context = LocalContext.current
-    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(
-        initialValue = cachedAvatarBitmap(avatarUri, highResolution)?.asImageBitmap(),
-        key1 = avatarUri,
-        key2 = imageVersion,
-        key3 = highResolution,
-    ) {
-        value = context.loadAvatarBitmap(avatarUri, highResolution)?.asImageBitmap()
-    }
+    val painter = rememberAvatarImage(avatarUri, highResolution, imageVersion).painter
 
     Box(modifier = modifier.size(56.dp)) {
         Surface(
@@ -415,9 +404,9 @@ fun Avatar(
             shape = shape,
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
-            if (bitmap != null) {
+            if (painter != null) {
                 Image(
-                    bitmap = bitmap!!,
+                    painter = painter,
                     contentDescription = "$name profile picture",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

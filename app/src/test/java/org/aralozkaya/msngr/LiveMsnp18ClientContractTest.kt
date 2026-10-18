@@ -531,6 +531,68 @@ class LiveMsnp18ClientContractTest {
     }
 
     @Test
+    fun staticStorageCannotOverwriteAnAnimatedObjectThatArrivesDuringRefresh() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val gif = requireNotNull(javaClass.getResourceAsStream("/animated-profile/two-frame.gif"))
+            .use { it.readBytes() }
+        val stalePng = mockDisplayPictureBytes()
+        val newPng = stalePng + byteArrayOf(1, 2, 3)
+        val storageStarted = CompletableDeferred<Unit>()
+        val releaseStorage = CompletableDeferred<Unit>()
+        var storageReads = 0
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact),
+                contactStorageIds = mapOf(contact.id to "stored-contact")) },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            fetchDisplayPicture = { url, _ -> when {
+                url.endsWith("/small") -> byteArrayOf(1)
+                url.endsWith("/static") -> {
+                    storageReads++
+                    storageStarted.complete(Unit)
+                    releaseStorage.await()
+                    stalePng
+                }
+                url.endsWith("animated.gif") -> gif
+                url.endsWith("new.png") -> newPng
+                else -> null
+            } },
+            initialContactPictureRefreshDelayMillis = 60_000,
+        )
+        fun announce(bytes: ByteArray, url: String) = notification.deliver(MsnpCommand("NLN",
+            parameters = listOf("NLN", "1:${contact.email}", "Contact", Msnp18Protocol.CLIENT_IDENTITY,
+                MsnDisplayPicture.create(contact.email, bytes).copy(url1 = url).toEncodedValue())))
+        try {
+            client.setAppInForeground(false)
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val refresh = async { client.refreshContactPicture(contact.id) }
+            withTimeout(1_000) { storageStarted.await() }
+            announce(gif, "https://images.example/animated.gif")
+            val animatedUri = withTimeout(1_000) {
+                client.contacts.first { it.single().avatarUri?.startsWith("data:image/gif;") == true }
+                    .single().avatarUri
+            }
+            releaseStorage.complete(Unit)
+            refresh.await()
+            assertEquals(animatedUri, client.contacts.value.single().avatarUri)
+            client.refreshContactPicture(contact.id)
+            assertEquals(animatedUri, client.contacts.value.single().avatarUri)
+            assertEquals(1, storageReads)
+
+            // A newly advertised picture must still replace the GIF normally.
+            announce(newPng, "https://images.example/new.png")
+            withTimeout(1_000) {
+                client.contacts.first { it.single().avatarUri?.startsWith("data:image/png;") == true }
+            }
+            Unit
+        } finally {
+            releaseStorage.complete(Unit)
+            client.close()
+        }
+    }
+
+    @Test
     fun cachedPictureIsImmediateAndRemoteRelogRefreshStartsImmediately() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val cachedBytes = mockDisplayPictureBytes()
