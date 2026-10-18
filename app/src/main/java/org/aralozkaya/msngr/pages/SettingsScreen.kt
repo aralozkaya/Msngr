@@ -56,6 +56,7 @@ import org.aralozkaya.msngr.ThemeMode
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
 import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.updates.updateManager
 
 enum class SettingsDestination(
     val title: String,
@@ -67,6 +68,7 @@ enum class SettingsDestination(
     ContactInvitations("Contact Invitations"),
     Connection("Connection"),
     ConnectionInformation("Connection information", parent = Connection),
+    Updates("App updates"),
     About("About"),
 }
 
@@ -113,6 +115,12 @@ internal enum class SettingsCategory(
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.About,
     ),
+    Updates(
+        title = "App updates",
+        presentation = SettingsCategoryPresentation.Destination,
+        destination = SettingsDestination.Updates,
+        testTag = "update-settings",
+    ),
     SignOutOtherSessions(
         title = "Sign me out of all other places when I sign in to Msngr",
         presentation = SettingsCategoryPresentation.Toggle,
@@ -142,6 +150,7 @@ private val primarySettingsCategories = listOf(
     SettingsCategory.MessengerPlus,
     SettingsCategory.ContactInvitations,
     SettingsCategory.Connection,
+    SettingsCategory.Updates,
     SettingsCategory.About,
 )
 
@@ -273,6 +282,12 @@ private fun LazyListScope.settingsCategory(
                 shapes = ListItemDefaults.segmentedShapes(index, count),
                 modifier = modifier,
                 content = { Text(category.title) },
+                trailingContent = if (category == SettingsCategory.Updates) {
+                    {
+                        val updateState by LocalContext.current.updateManager.state.collectAsState()
+                        if (updateState.hasUpdate) UpdateBadge(Modifier.testTag("updates-settings-badge"))
+                    }
+                } else null,
             )
             SettingsCategoryPresentation.Toggle -> SegmentedListItem(
                 checked = toggleChecked,

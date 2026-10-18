@@ -31,6 +31,7 @@ import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
 import org.aralozkaya.msngr.pages.SettingsScreen
+import org.aralozkaya.msngr.pages.UpdateSettingsScreen
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 
@@ -146,6 +147,10 @@ private fun SettingsRoute(
                     scrollBehavior = scrollBehavior,
                 )
                 SettingsDestination.About -> AboutSettingsScreen(
+                    innerPadding = innerPadding,
+                    scrollBehavior = scrollBehavior,
+                )
+                SettingsDestination.Updates -> UpdateSettingsScreen(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,
                 )

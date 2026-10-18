@@ -42,7 +42,7 @@ class NotificationConfigurationInstrumentedTest {
             val channelIds = NotificationChannels.userConfigurable +
                 NotificationChannels.BACKGROUND_CONNECTION
 
-            assertEquals(7, channelIds.toSet().size)
+            assertEquals(8, channelIds.toSet().size)
             channelIds.forEach { channelId ->
                 assertNotNull(
                     "Missing notification channel $channelId",
@@ -85,18 +85,19 @@ class NotificationConfigurationInstrumentedTest {
         }
 
         var notificationsByChannel = emptyMap<String, android.service.notification.StatusBarNotification>()
+        val eventChannels = NotificationChannels.userConfigurable - NotificationChannels.APP_UPDATES
         for (attempt in 0 until 20) {
             notificationsByChannel = systemManager.activeNotifications.associateBy {
                 it.notification.channelId
             }
-            if (NotificationChannels.userConfigurable.all(notificationsByChannel::containsKey)) {
+            if (eventChannels.all(notificationsByChannel::containsKey)) {
                 break
             }
             SystemClock.sleep(100)
         }
         assertEquals(
-            NotificationChannels.userConfigurable.toSet(),
-            notificationsByChannel.keys.intersect(NotificationChannels.userConfigurable.toSet()),
+            eventChannels.toSet(),
+            notificationsByChannel.keys.intersect(eventChannels.toSet()),
         )
         val messageNotification = notificationsByChannel.getValue(
             NotificationChannels.MESSAGES,
