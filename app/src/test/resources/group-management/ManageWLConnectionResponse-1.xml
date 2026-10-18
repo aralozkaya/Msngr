@@ -1,0 +1,60 @@
+<ns0:Envelope xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.msn.com/webservices/AddressBook">
+	<ns0:Header>
+		<ns1:ServiceHeader>
+			<ns1:Version>15.01.1408.0000</ns1:Version>
+			<ns1:CacheKey>REDACTED</ns1:CacheKey>
+			<ns1:CacheKeyChanged>true</ns1:CacheKeyChanged>
+			<ns1:PreferredHostName>ds.escargot.nina.chat</ns1:PreferredHostName>
+			<ns1:SessionId>11111111-2222-4333-8444-abc000000020</ns1:SessionId>
+		</ns1:ServiceHeader>
+	</ns0:Header>
+	<ns0:Body>
+		<ns1:ManageWLConnectionResponse>
+			<ns1:ManageWLConnectionResult><ns1:clientErrorData />
+					<ns1:contactId>11111111-2222-4333-8444-abc000000017</ns1:contactId>
+					<ns1:contactInfo>
+						<ns1:contactType>LivePending</ns1:contactType>
+						<ns1:quickName>peer@example.test</ns1:quickName>
+						<ns1:passportName>peer@example.test</ns1:passportName>
+						<ns1:IsPassportNameHidden>false</ns1:IsPassportNameHidden>
+						<ns1:displayName>peer@example.test</ns1:displayName>
+						<ns1:puid>0</ns1:puid>
+						<ns1:CID>-1000000000000000004</ns1:CID>
+						<ns1:IsNotMobileVisible>false</ns1:IsNotMobileVisible>
+						<ns1:isMobileIMEnabled>false</ns1:isMobileIMEnabled>
+						<ns1:isMessengerUser>false</ns1:isMessengerUser>
+						<ns1:isFavorite>false</ns1:isFavorite>
+						<ns1:isSmtp>false</ns1:isSmtp>
+						<ns1:hasSpace>false</ns1:hasSpace>
+						<ns1:spotWatchState>NoDevice</ns1:spotWatchState>
+						<ns1:birthdate>0001-01-01T00:00:00</ns1:birthdate>
+						<ns1:primaryEmailType>ContactEmailPersonal</ns1:primaryEmailType>
+						<ns1:PrimaryLocation>ContactLocationPersonal</ns1:PrimaryLocation>
+						<ns1:PrimaryPhone>ContactPhonePersonal</ns1:PrimaryPhone>
+						<ns1:IsPrivate>false</ns1:IsPrivate>
+						<ns1:IsHidden>false</ns1:IsHidden>
+						<ns1:Gender>Unspecified</ns1:Gender>
+						<ns1:TimeZone>None</ns1:TimeZone><ns1:NetworkInfoList>
+								<ns1:NetworkInfo>
+									<ns1:DomainId>1</ns1:DomainId>
+									<ns1:SourceId>WL</ns1:SourceId><ns1:RelationshipType>5</ns1:RelationshipType>
+									<ns1:RelationshipState>2</ns1:RelationshipState>
+									<ns1:RelationshipStateDate>2026-10-14T18:49:31Z</ns1:RelationshipStateDate>
+									<ns1:RelationshipRole>3</ns1:RelationshipRole>
+									<ns1:NDRCount>0</ns1:NDRCount><ns1:InviterCID>1000000000000000002</ns1:InviterCID><ns1:InviterName>owner</ns1:InviterName><ns1:InviterEmail>owner@example.test</ns1:InviterEmail><ns1:CreateDate>2026-10-14T18:49:31Z</ns1:CreateDate>
+									<ns1:LastUpdated>2026-10-14T18:49:31Z</ns1:LastUpdated>
+									<ns1:PropertiesChanged />
+								</ns1:NetworkInfo>
+							</ns1:NetworkInfoList><ns1:IsAutoUpdateDisabled>false</ns1:IsAutoUpdateDisabled>
+						<ns1:IsShellContact>false</ns1:IsShellContact>
+						<ns1:TrustLevel>0</ns1:TrustLevel>
+						<ns1:PropertiesChanged />
+					</ns1:contactInfo>
+					<ns1:propertiesChanged />
+					<ns1:fDeleted>false</ns1:fDeleted>
+					<ns1:CreateDate>2026-10-14T18:49:31Z</ns1:CreateDate>
+					<ns1:lastChange>2026-10-14T18:49:31Z</ns1:lastChange>
+					<ns1:CreatedBy>96</ns1:CreatedBy></ns1:ManageWLConnectionResult>
+		</ns1:ManageWLConnectionResponse>
+	</ns0:Body>
+</ns0:Envelope>

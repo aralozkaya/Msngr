@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-feature
+        android:name="android.hardware.sensor.accelerometer"
+        android:required="false" />
+
+    <application
+        android:name=".MsngrApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Msngr">
+        <service
+            android:name=".notifications.MessengerConnectionService"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging"
+            android:stopWithTask="false" />
+        <receiver
+            android:name=".notifications.NotificationReplyReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notifications.NotificationMarkReadReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notifications.NotificationNudgeReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notifications.BackgroundConnectionBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <activity
+            android:name=".BlockedContactsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".RequestsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+        <activity
+            android:name=".StatusShortcutActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:finishOnTaskLaunch="true"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:taskAffinity="org.aralozkaya.msngr.statusShortcut"
+            android:theme="@style/Theme.Msngr.ShortcutDialog"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ContactProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".GroupDetailsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ReconnectActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Msngr" />
+    </application>
+
+</manifest>

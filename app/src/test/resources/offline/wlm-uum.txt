@@ -1,0 +1,7 @@
+UUM 25 peer@example.test 1 1 203
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI; EF=; CO=0; CS=1; PF=0
+Dest-Agent: client
+
+Msngr offline protocol test 2026-10-11: Merhaba, çığ öşü (Y)

@@ -1,0 +1,11 @@
+<resources>
+    <item type="id" name="messenger_plus_selection_actions" />
+    <item type="id" name="emoticon_selection_actions" />
+    <item type="id" name="insert_emoticon" />
+    <item type="id" name="format_bold" />
+    <item type="id" name="format_italic" />
+    <item type="id" name="format_strikethrough" />
+    <item type="id" name="format_underline" />
+    <item type="id" name="format_clear" />
+    <item type="id" name="format_colors" />
+</resources>

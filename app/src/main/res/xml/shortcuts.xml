@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <shortcut
+        android:shortcutId="change_status"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_change_status"
+        android:shortcutShortLabel="@string/shortcut_change_status_short"
+        android:shortcutLongLabel="@string/shortcut_change_status_long"
+        tools:targetApi="25">
+        <intent
+            android:action="org.aralozkaya.msngr.action.CHANGE_STATUS"
+            android:targetPackage="org.aralozkaya.msngr"
+            android:targetClass="org.aralozkaya.msngr.StatusShortcutActivity" />
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,71 @@
+<Envelope xmlns:ns0="http://www.msn.com/webservices/AddressBook" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><ns0:FindMembershipResponse>
+			<ns0:FindMembershipResult>
+				<ns0:Services>
+					<ns0:Service>
+						<ns0:Memberships><ns0:Membership>
+									<ns0:MemberRole>Allow</ns0:MemberRole>
+									<ns0:Members /><ns0:MembershipIsComplete>true</ns0:MembershipIsComplete>
+								</ns0:Membership><ns0:Membership>
+									<ns0:MemberRole>Block</ns0:MemberRole>
+									<ns0:Members /><ns0:MembershipIsComplete>true</ns0:MembershipIsComplete>
+								</ns0:Membership><ns0:Membership>
+									<ns0:MemberRole>Reverse</ns0:MemberRole>
+									<ns0:Members /><ns0:MembershipIsComplete>true</ns0:MembershipIsComplete>
+								</ns0:Membership><ns0:Membership>
+								<ns0:MemberRole>Pending</ns0:MemberRole>
+								<ns0:Members><ns0:Member xsi:type="PassportMember">
+												<ns0:MembershipId>Pending/11111111-2222-4333-8444-abc000000016</ns0:MembershipId>
+												<ns0:Type>Passport</ns0:Type>
+												<ns0:State>Accepted</ns0:State>
+												<ns0:Deleted>false</ns0:Deleted>
+												<ns0:LastChanged>2026-10-13T19:49:32Z</ns0:LastChanged>
+												<ns0:JoinedDate>2024-11-04T14:54:07Z</ns0:JoinedDate>
+												<ns0:ExpirationDate>0001-01-01T00:00:00</ns0:ExpirationDate>
+												<ns0:Changes />
+												<ns0:PassportName>peer@example.test</ns0:PassportName>
+												<ns0:IsPassportNameHidden>false</ns0:IsPassportNameHidden>
+												<ns0:PassportId>0</ns0:PassportId>
+												<ns0:CID>0</ns0:CID>
+												<ns0:PassportChanges />
+												<ns0:LookedupByCID>false</ns0:LookedupByCID>
+											</ns0:Member></ns0:Members>
+								<ns0:MembershipIsComplete>true</ns0:MembershipIsComplete>
+							</ns0:Membership>
+						</ns0:Memberships>
+						<ns0:Info>
+							<ns0:Handle>
+								<ns0:Id>1</ns0:Id>
+								<ns0:Type>Messenger</ns0:Type>
+								<ns0:ForeignId />
+							</ns0:Handle>
+							<ns0:InverseRequired>false</ns0:InverseRequired>
+							<ns0:AuthorizationCriteria>Everyone</ns0:AuthorizationCriteria>
+							<ns0:IsBot>false</ns0:IsBot>
+						</ns0:Info>
+						<ns0:Changes />
+						<ns0:LastChange>2026-10-13T19:49:32Z</ns0:LastChange>
+						<ns0:Deleted>false</ns0:Deleted>
+					</ns0:Service>
+				</ns0:Services>
+				<ns0:OwnerNamespace>
+					<ns0:Info>
+						<ns0:Handle>
+							<ns0:Id>00000000-0000-0000-0000-000000000000</ns0:Id>
+							<ns0:IsPassportNameHidden>false</ns0:IsPassportNameHidden>
+							<ns0:CID>0</ns0:CID>
+						</ns0:Handle>
+						<ns0:CreatorPuid>0</ns0:CreatorPuid>
+						<ns0:CreatorCID>0</ns0:CreatorCID>
+						<ns0:CreatorPassportName>owner@example.test</ns0:CreatorPassportName>
+						<ns0:CircleAttributes>
+							<ns0:IsPresenceEnabled>false</ns0:IsPresenceEnabled>
+							<ns0:Domain>WindowsLive</ns0:Domain>
+						</ns0:CircleAttributes>
+						<ns0:MessengerApplicationServiceCreated>false</ns0:MessengerApplicationServiceCreated>
+					</ns0:Info>
+					<ns0:Changes />
+					<ns0:CreateDate>2026-10-13T19:49:32Z</ns0:CreateDate>
+					<ns0:LastChange>2026-10-13T19:49:32Z</ns0:LastChange>
+				</ns0:OwnerNamespace>
+			</ns0:FindMembershipResult>
+		</ns0:FindMembershipResponse></Envelope>

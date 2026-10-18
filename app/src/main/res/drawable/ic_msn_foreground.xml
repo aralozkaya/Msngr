@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:name="messenger_artwork" android:scaleX="0.25" android:scaleY="0.25" android:translateX="22.5" android:translateY="22.5">
+    <path android:name="rear_orbit" android:pathData="M30 168 C13 164 8 150 12 139 C16 127 31 116 49 115 C91 109 134 140 179 136 C207 137 228 121 240 100" android:strokeColor="#FFCB57" android:strokeWidth="4.7" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:name="rear_highlight" android:pathData="M30 168 C13 164 8 150 12 139 C16 127 31 116 49 115 C91 109 134 140 179 136 C207 137 228 121 240 100" android:strokeColor="#FFF4B9" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeAlpha="0.7"/>
+    <group android:name="green_body">
+      <clip-path android:name="green_body_clip" android:pathData="M63 94 C52 96 40 108 35 122 C30 134 28 149 28 164 C28 171 33 174 41 171 L41 181 C41 188 61 191 80 191 C93 191 104 189 111 187 C115 163 117 136 122 119 C119 107 109 97 99 94 C89 93 74 93 63 94Z"/>
+      <path android:name="green_solid_shading" android:pathData="M63 94 C52 96 40 108 35 122 C30 134 28 149 28 164 C28 171 33 174 41 171 L41 181 C41 188 61 191 80 191 C93 191 104 189 111 187 C115 163 117 136 122 119 C119 107 109 97 99 94 C89 93 74 93 63 94Z" android:fillColor="#86CC73"/>
+      <path android:name="green_sleeve" android:pathData="M49 110 C34 119 28 145 28 164 C28 171 34 174 41 171 L43 133 C43 122 46 116 49 110Z" android:fillColor="#75BD64"/>
+    </group>
+    <group android:name="blue_body">
+      <clip-path android:name="blue_body_clip" android:pathData="M137 94 C126 99 115 110 111 126 C107 139 105 157 105 177 C105 182 107 184 111 183 L111 201 C111 211 133 214 157 213 C183 213 201 209 202 202 L202 195 C209 197 214 195 213 189 C213 165 210 141 203 123 C197 108 187 99 174 94 C163 93 147 93 137 94Z"/>
+      <path android:name="blue_solid_shading" android:pathData="M137 94 C126 99 115 110 111 126 C107 139 105 157 105 177 C105 182 107 184 111 183 L111 201 C111 211 133 214 157 213 C183 213 201 209 202 202 L202 195 C209 197 214 195 213 189 C213 165 210 141 203 123 C197 108 187 99 174 94 C163 93 147 93 137 94Z" android:fillColor="#6DB1D3"/>
+      <path android:name="blue_left_sleeve" android:pathData="M128 101 C112 114 105 145 105 177 C105 182 107 184 111 183 C110 163 112 139 117 124 C120 114 124 108 128 101Z" android:fillColor="#4F9AC3"/>
+      <path android:name="blue_right_sleeve" android:pathData="M178 121 C184 133 188 150 189 170 C190 183 190 190 202 195 C209 197 214 195 213 189 C213 165 210 141 203 123 C198 113 184 106 178 121Z" android:fillColor="#5597C1"/>
+    </group>
+    <path android:name="green_head" android:pathData="M81 35 C98 35 111.5 48.3 111.5 65 C111.5 82.3 98.8 95 81.1 95 C63.7 95 50.5 82.8 50.5 65.3 C50.5 48.5 63.1 35 81 35Z" android:fillColor="#83CA6E"/>
+    <path android:name="blue_head" android:pathData="M155 22 C176.9 22 192.8 37.6 192.8 58.6 C192.8 79.8 176.9 94.7 155.5 94.7 C134.8 94.7 117.7 80.5 117.7 59 C117.7 37.6 133.9 22 155 22Z" android:fillColor="#70B3D7"/>
+    <path android:name="front_orbit" android:pathData="M17 157 C5 145 14 130 33 120 C47 113 57 115 72 121 C111 136 151 157 191 170 C208 175 227 176 240 175" android:strokeColor="#FFCE66" android:strokeWidth="7.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:name="front_lower_edge" android:pathData="M18 155 C7 144 17 130 35 120 C47 115 57 117 72 123 C112 139 151 159 191 172 C209 178 227 178 240 177" android:strokeColor="#F4A542" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeAlpha="0.5"/>
+    <path android:name="front_highlight" android:pathData="M18 153 C8 142 18 129 35 120 C47 113 58 116 73 122 C112 137 152 157 192 169 C209 175 227 176 240 175" android:strokeColor="#FFF6BC" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeAlpha="0.85"/>
+  </group>
+</vector>

@@ -1,0 +1,4 @@
+# This fixture is a byte-exact MSNP frame; preserve its CRLF framing on every platform.
+wlm-uum.txt -text whitespace=cr-at-eol
+# The captured MIME Subject header has an empty value with a trailing space.
+wlm-get-message.xml whitespace=-blank-at-eol

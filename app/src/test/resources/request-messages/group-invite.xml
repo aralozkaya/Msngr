@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Envelope xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.msn.com/webservices/AddressBook"><ns0:Body><ns1:ManageWLConnection>
+  <ns1:abHandle>
+    <ns1:ABId>00000000-0000-0000-0009-abc000000001</ns1:ABId>
+    <ns1:Puid>0</ns1:Puid>
+    <ns1:Cid>0</ns1:Cid>
+  </ns1:abHandle>
+  <ns1:contactId>11111111-2222-4333-8444-abc000000017</ns1:contactId>
+  <ns1:connection>true</ns1:connection>
+  <ns1:presence>false</ns1:presence>
+  <ns1:action>1</ns1:action>
+  <ns1:relationshipType>5</ns1:relationshipType>
+  <ns1:relationshipRole>3</ns1:relationshipRole>
+  <ns1:annotations>
+    <ns1:Annotation>
+      <ns1:Name>MSN.IM.InviteMessage</ns1:Name>
+      <ns1:Value>Group-A: Merhaba &amp; &lt;hello&gt; "friends" — ğüşi 🙂</ns1:Value>
+    </ns1:Annotation>
+  </ns1:annotations>
+</ns1:ManageWLConnection></ns0:Body></ns0:Envelope>

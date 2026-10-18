@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Base.Theme.Msngr" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/msngr_brand_primary</item>
+        <item name="android:windowBackground">@color/msngr_window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Msngr" parent="Base.Theme.Msngr" />
+    <style name="Theme.Msngr.ShortcutDialog" parent="Theme.Msngr">
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:backgroundDimAmount">0.4</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowMinWidthMajor">50%</item>
+        <item name="android:windowMinWidthMinor">88%</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

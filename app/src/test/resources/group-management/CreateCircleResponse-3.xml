@@ -1,0 +1,18 @@
+<ns0:Envelope xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.msn.com/webservices/AddressBook">
+	<ns0:Header>
+		<ns1:ServiceHeader>
+			<ns1:Version>15.01.1408.0000</ns1:Version>
+			<ns1:CacheKey>REDACTED</ns1:CacheKey>
+			<ns1:CacheKeyChanged>true</ns1:CacheKeyChanged>
+			<ns1:PreferredHostName>ds.escargot.nina.chat</ns1:PreferredHostName>
+			<ns1:SessionId>11111111-2222-4333-8444-abc000000019</ns1:SessionId>
+		</ns1:ServiceHeader>
+	</ns0:Header>
+	<ns0:Body>
+		<ns1:CreateCircleResponse>
+			<ns1:CreateCircleResult>
+				<ns1:Id>00000000-0000-0000-0009-abc000000003</ns1:Id>
+			</ns1:CreateCircleResult>
+		</ns1:CreateCircleResponse>
+	</ns0:Body>
+</ns0:Envelope>

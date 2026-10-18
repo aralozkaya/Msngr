@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Envelope xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.msn.com/webservices/AddressBook"><ns0:Body><ns1:ABContactAdd>
+  <ns1:abId>00000000-0000-0000-0000-000000000000</ns1:abId>
+  <ns1:contacts>
+    <ns1:Contact>
+      <ns1:contactInfo>
+        <ns1:passportName>peer@example.test</ns1:passportName>
+        <ns1:isMessengerUser>true</ns1:isMessengerUser>
+        <ns1:MessengerMemberInfo>
+          <ns1:PendingAnnotations>
+            <ns1:Annotation>
+              <ns1:Name>MSN.IM.InviteMessage</ns1:Name>
+              <ns1:Value>Contact-C: Merhaba &amp; &lt;contact&gt; "hello" — ğüşi 🙂</ns1:Value>
+            </ns1:Annotation>
+          </ns1:PendingAnnotations>
+          <ns1:DisplayName>owner</ns1:DisplayName>
+        </ns1:MessengerMemberInfo>
+      </ns1:contactInfo>
+    </ns1:Contact>
+  </ns1:contacts>
+  <ns1:options>
+    <ns1:EnableAllowListManagement>true</ns1:EnableAllowListManagement>
+  </ns1:options>
+</ns1:ABContactAdd></ns0:Body></ns0:Envelope>

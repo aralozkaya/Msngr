@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Base.Theme.Msngr" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorAccent">@color/msngr_brand_primary</item>
+        <item name="android:windowBackground">@color/msngr_window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="Theme.Msngr" parent="Base.Theme.Msngr" />
+</resources>

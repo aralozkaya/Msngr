@@ -1,0 +1,307 @@
+package org.aralozkaya.msngr
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
+import org.aralozkaya.msngr.pages.components.KeyboardSheetTile
+import org.aralozkaya.msngr.pages.components.KeyboardSheetTileGrid
+
+/**
+ * Remembers the selection that opened the color sheet so closing the selection toolbar does not
+ * lose the range being colored.
+ */
+internal class MessengerPlusColorSheetState {
+    private var controller: MessengerPlusEditorController? = null
+    private var selectedValue by mutableStateOf<TextFieldValue?>(null)
+    val visible: Boolean get() = selectedValue != null
+    val hasSelection: Boolean get() = selectedValue?.selection?.collapsed == false
+    var initialStyle by mutableStateOf(MessengerPlusStyle())
+        private set
+
+    /** The keyboard sheet scaffold closes the keyboard once the sheet has taken its slot. */
+    fun open(controller: MessengerPlusEditorController) {
+        this.controller = controller
+        selectedValue = controller.snapshot()
+        initialStyle = controller.activeStyle
+    }
+
+    fun dismiss() {
+        selectedValue = null
+        controller = null
+    }
+
+    fun applyForeground(color: MessengerPlusColorValue) = apply { applyForeground(color) }
+
+    fun applyBackground(color: MessengerPlusColorValue) = apply { applyBackground(color) }
+
+    fun applyGradient(start: MessengerPlusColorValue, end: MessengerPlusColorValue, background: Boolean) =
+        apply { applyGradient(start, end, background) }
+
+    private fun apply(action: MessengerPlusEditorController.() -> Unit) {
+        val target = controller ?: return
+        val selection = selectedValue ?: return
+        if (target.snapshot().text != selection.text) {
+            dismiss()
+            return
+        }
+        target.restoreSelection(selection.selection)
+        target.action()
+        selectedValue = target.snapshot()
+    }
+}
+
+@Composable
+internal fun rememberMessengerPlusColorSheetState(): MessengerPlusColorSheetState =
+    remember { MessengerPlusColorSheetState() }
+
+/** Shows the color options in the keyboard's slot, through the page's keyboard sheet scaffold. */
+@Composable
+internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
+    var background by rememberSaveable { mutableStateOf(false) }
+    var gradient by rememberSaveable { mutableStateOf(false) }
+    var gradientStartInput by rememberSaveable { mutableStateOf("04") }
+    var gradientEndInput by rememberSaveable { mutableStateOf("12") }
+    // The options don't fit the keyboard's height, so the sheet may grow up to twice that.
+    KeyboardPickerSheet(
+        visible = state.visible,
+        onDismissRequest = state::dismiss,
+        paneTitle = "Text colors",
+        testTag = MESSENGER_PLUS_COLOR_SHEET_TAG,
+        expandable = true,
+        keepOpenOnInputTap = true,
+        footer = if (gradient) {
+            {
+                val gradientStart = MessengerPlusTextCodec.colorValue(gradientStartInput)
+                val gradientEnd = MessengerPlusTextCodec.colorValue(gradientEndInput)
+                HorizontalDivider()
+                FilledTonalButton(
+                    onClick = {
+                        if (gradientStart != null && gradientEnd != null) {
+                            state.applyGradient(gradientStart, gradientEnd, background)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.hasSelection && gradientStart != null && gradientEnd != null,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text("Apply gradient to selection")
+                }
+                if (!state.hasSelection) {
+                    Text(
+                        "Select text to apply a gradient.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            null
+        },
+    ) {
+        MessengerPlusColorOptions(
+            state = state,
+            background = background,
+            onBackgroundChange = { background = it },
+            gradient = gradient,
+            onGradientChange = { gradient = it },
+            gradientStartInput = gradientStartInput,
+            onGradientStartChange = { gradientStartInput = it },
+            gradientEndInput = gradientEndInput,
+            onGradientEndChange = { gradientEndInput = it },
+        )
+    }
+}
+
+@Composable
+private fun MessengerPlusColorOptions(
+    state: MessengerPlusColorSheetState,
+    background: Boolean,
+    onBackgroundChange: (Boolean) -> Unit,
+    gradient: Boolean,
+    onGradientChange: (Boolean) -> Unit,
+    gradientStartInput: String,
+    onGradientStartChange: (String) -> Unit,
+    gradientEndInput: String,
+    onGradientEndChange: (String) -> Unit,
+) {
+    var textColorInput by rememberSaveable {
+        mutableStateOf(state.initialStyle.foreground?.wireToken ?: "#FF0000")
+    }
+    var backgroundColorInput by rememberSaveable {
+        mutableStateOf(state.initialStyle.background?.wireToken ?: "#FFFF00")
+    }
+    var selectingGradientEnd by rememberSaveable { mutableStateOf(false) }
+    var customColor by rememberSaveable { mutableStateOf(false) }
+    val colorInput = if (background) backgroundColorInput else textColorInput
+    val color = MessengerPlusTextCodec.colorValue(colorInput)
+    val gradientStart = MessengerPlusTextCodec.colorValue(gradientStartInput)
+    val gradientEnd = MessengerPlusTextCodec.colorValue(gradientEndInput)
+    val selectedColor = if (gradient) {
+        if (selectingGradientEnd) gradientEnd else gradientStart
+    } else {
+        color
+    }
+    fun chooseColor(selected: MessengerPlusColorValue) {
+        if (gradient) {
+            if (selectingGradientEnd) onGradientEndChange(selected.wireToken)
+            else onGradientStartChange(selected.wireToken)
+        } else if (background) {
+            backgroundColorInput = selected.wireToken
+            state.applyBackground(selected)
+        } else {
+            textColorInput = selected.wireToken
+            state.applyForeground(selected)
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Colors",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        FilterChip(
+            selected = gradient,
+            onClick = { onGradientChange(!gradient) },
+            label = { Text("Gradient") },
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(
+            selected = !background,
+            onClick = { onBackgroundChange(false) },
+            label = { Text("Text color") },
+        )
+        FilterChip(
+            selected = background,
+            onClick = { onBackgroundChange(true) },
+            label = { Text("Background color") },
+        )
+    }
+    if (gradient) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MessengerPlusGradientEndpoint(
+                label = "Start",
+                color = gradientStart,
+                selected = !selectingGradientEnd,
+                onClick = { selectingGradientEnd = false },
+                modifier = Modifier.weight(1f).testTag(MESSENGER_PLUS_GRADIENT_START_TAG),
+            )
+            MessengerPlusGradientEndpoint(
+                label = "End",
+                color = gradientEnd,
+                selected = selectingGradientEnd,
+                onClick = { selectingGradientEnd = true },
+                modifier = Modifier.weight(1f).testTag(MESSENGER_PLUS_GRADIENT_END_TAG),
+            )
+        }
+    }
+    MessengerPlusPaletteGrid(
+        selectedColor = selectedColor,
+        onColorSelected = { chooseColor(it.asValue()) },
+        onCustomColor = { customColor = true },
+    )
+    if (customColor) {
+        MessengerPlusCustomColorDialog(
+            initialColor = selectedColor ?: checkNotNull(MessengerPlusTextCodec.paletteColor(4)),
+            applyLabel = if (gradient) {
+                if (selectingGradientEnd) "Use for end" else "Use for start"
+            } else "Apply color",
+            onColorSelected = {
+                chooseColor(it)
+                customColor = false
+            },
+            onDismissRequest = { customColor = false },
+        )
+    }
+}
+
+@Composable
+private fun MessengerPlusGradientEndpoint(
+    label: String,
+    color: MessengerPlusColorValue?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text("$label: ${color?.wireToken.orEmpty()}") },
+        leadingIcon = {
+            Box(
+                Modifier.size(20.dp)
+                    .background(color?.let { Color(it.argb) } ?: Color.Transparent, CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+            )
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MessengerPlusPaletteGrid(
+    selectedColor: MessengerPlusColorValue?,
+    onColorSelected: (MessengerPlusPaletteColor) -> Unit,
+    onCustomColor: () -> Unit,
+) {
+    val tiles = listOf<MessengerPlusPaletteColor?>(null) + MessengerPlusTextCodec.palette
+    val customSelected = selectedColor != null &&
+        MessengerPlusTextCodec.palette.none { it.argb == selectedColor.argb }
+    KeyboardSheetTileGrid(items = tiles) { color ->
+        val swatch = color?.let { Color(it.argb) }
+            ?: if (customSelected) Color(checkNotNull(selectedColor).argb)
+            else MaterialTheme.colorScheme.secondaryContainer
+        val isSelected = if (color == null) customSelected else selectedColor?.argb == color.argb
+        KeyboardSheetTile(
+            description = color?.let { "${it.wireToken} ${it.label}" } ?: "Custom color",
+            isSelected = isSelected,
+            color = swatch,
+            contentColor = if (swatch.luminance() > 0.45f) Color.Black else Color.White,
+            border = BorderStroke(
+                if (isSelected) 3.dp else 1.dp,
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            ),
+            onClick = { if (color == null) onCustomColor() else onColorSelected(color) },
+        ) {
+            Text(color?.wireToken ?: "Custom", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+internal const val MESSENGER_PLUS_COLOR_SHEET_TAG = "messenger_plus_color_sheet"
+internal val MESSENGER_PLUS_COLOR_SHEET_HEIGHT = 420.dp
+internal const val MESSENGER_PLUS_GRADIENT_START_TAG = "messenger_plus_gradient_start"
+internal const val MESSENGER_PLUS_GRADIENT_END_TAG = "messenger_plus_gradient_end"

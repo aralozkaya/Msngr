@@ -1,0 +1,61 @@
+# Android and Gradle generated files
+.gradle/
+.kotlin/
+**/build/
+.externalNativeBuild/
+.cxx/
+*.iml
+local.properties
+
+# Editor and machine-specific state
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local credentials and signing material
+.env
+.env.*
+*.creds
+*.credentials
+*credentials*.json
+*tickets*.json
+*service-account*.json
+google-services.json
+GoogleService-Info.plist
+keystore.properties
+signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Private diagnostics and local test output
+captures/
+*.pcap
+*.pcapng
+*.etl
+*.har
+*.log
+*.jsonl
+*.hprof
+*.heapdump
+
+# AI assistant state, internal instructions, and memory
+.codex/
+.claude/
+.cursor/
+.windsurf/
+.aider*
+.agent/
+.agents/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+MEMORY.md
+memory.md
+copilot-instructions.md

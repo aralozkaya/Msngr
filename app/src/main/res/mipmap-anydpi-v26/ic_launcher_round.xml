@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <background android:drawable="@drawable/ic_msn_background"/>
+  <foreground android:drawable="@drawable/ic_msn_foreground"/>
+  <monochrome android:drawable="@drawable/ic_msn_monochrome"/>
+</adaptive-icon>

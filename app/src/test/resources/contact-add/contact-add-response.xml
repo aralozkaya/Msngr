@@ -1,0 +1,5 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ABContactAddResponse xmlns="http://www.msn.com/webservices/AddressBook">
+			<ABContactAddResult>
+				<guid>11111111-2222-4333-8444-abc000000005</guid>
+			</ABContactAddResult>
+		</ABContactAddResponse></soap:Body></soap:Envelope>
