@@ -31,15 +31,17 @@ class MessengerPlusNativeCompatibilityTest(
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun cases(): List<Array<String>> = checkNotNull(
-            MessengerPlusNativeCompatibilityTest::class.java.getResourceAsStream(
-                "/messenger-plus/native-5.02.712-plain.tsv",
-            ),
-        ).bufferedReader().useLines { lines ->
-            lines.filter { !it.startsWith('#') }.map { line ->
-                val columns = line.split('\t')
-                arrayOf(columns[0], decode(columns[1]), decode(columns[2]))
-            }.toList()
+        fun cases(): List<Array<String>> = listOf(
+            "native-5.02.712-plain.tsv",
+            "native-5.02.712-chat-subsets.tsv",
+        ).flatMap { file ->
+            checkNotNull(MessengerPlusNativeCompatibilityTest::class.java.getResourceAsStream("/messenger-plus/$file"))
+                .bufferedReader().useLines { lines ->
+                    lines.filter { !it.startsWith('#') }.map { line ->
+                        val columns = line.split('\t')
+                        arrayOf(columns[0], decode(columns[1]), decode(columns[2]))
+                    }.toList()
+                }
         }
 
         private fun decode(value: String): String = String(Base64.getDecoder().decode(value), Charsets.UTF_8)

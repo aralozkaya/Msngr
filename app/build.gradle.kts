@@ -65,6 +65,10 @@ android {
         compose = true
         buildConfig = true
     }
+    sourceSets {
+        getByName("test").kotlin.directories.add("src/sharedTest/java")
+        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
+    }
 }
 
 dependencies {
