@@ -12,6 +12,15 @@ Encoding keeps control bytes, tabs, newlines, and Unicode intact. The palette
 JSON contains the 68 RGB entries from this version's native palette lookup;
 its values were also checked against the rendered palette examples.
 
+`native-5.02.712-chat-subsets.tsv` adds 512 live chat captures from 2026-10-19:
+256 formatting subsets sent from the native desktop typing field to Android,
+and the same 256 returned through Android's real chat composer and send button.
+Both clients' rendered histories were checked, with every desktop receipt also
+recorded by the native script. The receive-script callback masks consumed tags
+with NBSP; these synthetic masking characters were removed when recording plain
+text. The matrix, device checks, and opt-in live procedure are documented in
+`tools/messenger-plus/README.md` at the repository root.
+
 The text fixtures cover all control bytes from U+0000 through U+001F, palette
 indices 0–99, all native named colors, malformed color arguments, legacy nickname
 controls, matched and unmatched tags, crossing and nested tags, literal regions,

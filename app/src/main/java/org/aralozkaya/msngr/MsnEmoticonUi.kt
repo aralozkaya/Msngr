@@ -577,7 +577,19 @@ internal class MessengerPlusEditorController(
         hasSelection = start != end
         hasContent = source.isNotEmpty()
         hasFormatting = MessengerPlusTextCodec.removeFormatting(source).text != source
-        activeStyle = MessengerPlusTextCodec.styleAt(source, start.coerceAtLeast(0))
+        val parsed = MessengerPlusTextCodec.parse(source)
+        val selected = if (hasSelection) parsed.glyphs.filter {
+            it.sourceStart < maxOf(start, end) && it.sourceEndExclusive > minOf(start, end)
+        } else emptyList()
+        // Selections can start on hidden opening tags (notably Select all).
+        // Inspect the visible selection, and only show a decoration as active
+        // when it applies throughout; toggling a mixed selection applies it.
+        activeStyle = selected.firstOrNull()?.style?.copy(
+            bold = selected.all { it.style.bold },
+            italic = selected.all { it.style.italic },
+            underline = selected.all { it.style.underline },
+            strikeout = selected.all { it.style.strikeout },
+        ) ?: parsed.sourceStyles[start.coerceIn(0, source.length)]
     }
 }
 
