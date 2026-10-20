@@ -40,7 +40,9 @@ internal object MsnpP2pUtil {
     ): LocalDisplayPicture? {
         val context = requestBody.field("Context") ?: return null
         val requestedObject = runCatching {
+            // Native WLM Base64-encodes a NUL-terminated XML string in its Context field.
             val xml = String(MsnBase64.decode(context) ?: return null, StandardCharsets.UTF_8)
+                .trimEnd('\u0000')
             MsnDisplayPicture.parse(xml)
         }.getOrNull() ?: return null
         return localPicture?.takeIf { picture ->

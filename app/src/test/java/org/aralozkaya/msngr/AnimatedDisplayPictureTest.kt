@@ -3,6 +3,7 @@ package org.aralozkaya.msngr
 import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.data.LocalDisplayPicture
 import org.aralozkaya.msngr.data.MsnpP2pSession
+import org.aralozkaya.msngr.data.MsnpP2pUtil
 import org.aralozkaya.msngr.data.MsnpStorageService
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnBase64
@@ -13,6 +14,15 @@ import org.junit.Test
 class AnimatedDisplayPictureTest {
     private fun gif() = requireNotNull(javaClass.getResourceAsStream("/animated-profile/two-frame.gif"))
         .use { it.readBytes() }
+
+    @Test fun acceptsNativeMessengersNulTerminatedObjectContext() {
+        val bytes = gif()
+        val picture = MsnDisplayPicture.create("sender@example.com", bytes)
+        val local = LocalDisplayPicture(picture, bytes)
+        val context = MsnBase64.encode((picture.toXml() + "\u0000").toByteArray(Charsets.UTF_8))
+        assertSame(local, MsnpP2pUtil.matchingLocalPicture("Context: $context\r\n\r\n", local))
+        assertNull(MsnpP2pUtil.matchingLocalPicture("Context: $context\r\n\r\n", null))
+    }
 
     @Test fun readsGifCanvasAndFrameTiming() {
         val info = requireNotNull(GifDisplayPicture.parse(gif()))

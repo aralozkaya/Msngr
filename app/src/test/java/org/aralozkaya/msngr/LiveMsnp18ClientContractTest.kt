@@ -30,6 +30,7 @@ import org.aralozkaya.msngr.data.SwitchboardMimeMessage
 import org.aralozkaya.msngr.data.parseSwitchboardMime
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
@@ -590,6 +591,44 @@ class LiveMsnp18ClientContractTest {
             releaseStorage.complete(Unit)
             client.close()
         }
+    }
+
+    @Test
+    fun staticStorageCannotOverwriteTheVerifiedOriginalPngDuringRefresh() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val original = mockDisplayPictureBytes() + byteArrayOf(1, 2, 3)
+        val storageStarted = CompletableDeferred<Unit>()
+        val releaseStorage = CompletableDeferred<Unit>()
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact),
+                contactStorageIds = mapOf(contact.id to "stored-contact")) },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            fetchDisplayPicture = { url, _ -> when {
+                url.endsWith("/small") -> byteArrayOf(1)
+                url.endsWith("/static") -> { storageStarted.complete(Unit); releaseStorage.await(); mockDisplayPictureBytes() }
+                url.endsWith("original.png") -> original
+                else -> null
+            } },
+            initialContactPictureRefreshDelayMillis = 60_000,
+        )
+        try {
+            client.setAppInForeground(false)
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val refresh = async { client.refreshContactPicture(contact.id) }
+            withTimeout(1_000) { storageStarted.await() }
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:${contact.email}", "Contact",
+                Msnp18Protocol.CLIENT_IDENTITY, MsnDisplayPicture.create(contact.email, original)
+                    .copy(url1 = "https://images.example/original.png").toEncodedValue())))
+            val uri = withTimeout(1_000) {
+                client.contacts.first { it.single().avatarUri?.endsWith(MsnBase64.encode(original)) == true }.single().avatarUri
+            }
+            releaseStorage.complete(Unit); refresh.await()
+            assertEquals(uri, client.contacts.value.single().avatarUri)
+            client.refreshContactPicture(contact.id)
+            assertEquals(uri, client.contacts.value.single().avatarUri)
+        } finally { releaseStorage.complete(Unit); client.close() }
     }
 
     @Test

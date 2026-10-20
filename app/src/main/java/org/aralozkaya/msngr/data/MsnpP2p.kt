@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger
 internal class MsnpP2pSession(
     private val localEmail: String,
     private val remoteEmail: String,
-    private val sendPacket: suspend (ByteArray) -> Unit,
+    @Volatile private var sendPacket: suspend (ByteArray) -> Unit,
     private val localPicture: () -> LocalDisplayPicture?,
     private val onDisplayPicture: (ByteArray) -> Unit,
     localEndpointId: String = "",
@@ -22,12 +22,16 @@ internal class MsnpP2pSession(
             localEndpointId = localEndpointId,
             remoteEmail = remoteEmail,
             remoteEndpointId = it,
-            sendPacket = sendPacket,
+            sendPacket = { packet -> sendPacket(packet) },
             localPicture = localPicture,
             onDisplayPicture = onDisplayPicture,
         )
     }
     val destination: String get() = v2?.destination ?: remoteEmail
+
+    fun bindPacketSender(sender: suspend (ByteArray) -> Unit) {
+        sendPacket = sender
+    }
     private val ids = AtomicInteger(1_000)
     private val incoming = ConcurrentHashMap<Pair<Int, Int>, IncomingP2pMessage>()
     private val pendingCalls = ConcurrentHashMap<Int, PendingDisplayPicture>()
@@ -80,8 +84,8 @@ internal class MsnpP2pSession(
         val message = if (packet.header.offset == 0L) {
             if (incoming.size >= MAX_INCOMING_MESSAGES) return
             val maxSize = if (packet.header.sessionId == 0) MAX_SLP_BYTES else MAX_PICTURE_BYTES
+            if (packet.header.totalSize !in 0..maxSize.toLong()) return
             val totalSize = packet.header.totalSize.toInt()
-            if (totalSize !in 0..maxSize) return
             IncomingP2pMessage(packet.header, ByteArray(totalSize)).also { incoming[key] = it }
         } else {
             incoming[key] ?: return
@@ -265,7 +269,7 @@ internal class MsnpP2pSession(
         const val P2P_MSN_OBJECT_DATA = 0x20
         const val MAX_CHUNK_BYTES = 1_202
         const val MAX_SLP_BYTES = 16 * 1024
-        const val MAX_PICTURE_BYTES = 200 * 1024
+        const val MAX_PICTURE_BYTES = org.aralozkaya.msngr.protocol.DisplayPictureLimits.MAX_BYTES
         const val MAX_INCOMING_MESSAGES = 8
         const val MAX_PENDING_CALLS = 8
         const val REQUEST_TIMEOUT_NANOS = 30_000_000_000L

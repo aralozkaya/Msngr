@@ -136,7 +136,9 @@ internal class MsnpP2pV2Session(
             sessionId = sessionId,
             firstTf = TF_MSN_OBJECT or TF_FIRST,
             operationCode = OP_NONE,
-            footer = 1,
+            // P2Pv2 keeps the bridge footer zero, including MSNObject data.
+            // The application identifier in the footer belongs to P2Pv1 only.
+            footer = 0,
             packageNumber = packageNumbers.incrementAndGet() and 0xffff,
             body = picture.bytes,
         )
@@ -246,7 +248,7 @@ internal class MsnpP2pV2Session(
         const val TF_MSN_OBJECT = 4
         const val MAX_CHUNK_BYTES = 1_100
         const val MAX_SLP_BYTES = 16 * 1024
-        const val MAX_PICTURE_BYTES = 200 * 1024
+        const val MAX_PICTURE_BYTES = org.aralozkaya.msngr.protocol.DisplayPictureLimits.MAX_BYTES
         const val MAX_INCOMING_MESSAGES = 8
         const val MAX_PENDING_CALLS = 8
         const val REQUEST_TIMEOUT_NANOS = 30_000_000_000L

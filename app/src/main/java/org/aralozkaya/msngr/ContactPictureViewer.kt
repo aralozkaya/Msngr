@@ -2,7 +2,6 @@
 
 package org.aralozkaya.msngr
 
-import android.graphics.Bitmap
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
@@ -31,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +46,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
+import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 
 @Composable
 internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: () -> Unit) {
@@ -54,7 +55,12 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
     var saving by remember { mutableStateOf(false) }
     val image = rememberAvatarImage(pictureUri, highResolution = true)
     val painter = image.painter
-    val mimeType = if (image.isGif) "image/gif" else "image/png"
+    val format by produceState<DisplayPictureFormat?>(null, pictureUri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { DisplayPictureFormat.detect(context.readProfilePictureBytes(pictureUri)) }.getOrNull()
+        }
+    }
+    val mimeType = format?.mimeType ?: "image/png"
     val savePicture = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { destination ->
         if (destination != null) {
             scope.launch {
@@ -105,11 +111,11 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                 FilledTonalButton(
                     onClick = {
                         if (!saving) {
-                            val extension = if (image.isGif) "gif" else "png"
+                            val extension = format?.extension ?: return@FilledTonalButton
                             savePicture.launch("${profilePictureFileStem(name)}-profile-picture.$extension")
                         }
                     },
-                    enabled = painter != null && !image.isLoading,
+                    enabled = painter != null && !image.isLoading && format != null,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 ) {
@@ -130,12 +136,10 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
 internal suspend fun Context.saveContactPicture(pictureUri: String, destination: Uri): Boolean {
     return withContext(Dispatchers.IO) {
         runCatching {
-            val gif = loadAvatarGifBytes(pictureUri)
-            val image = if (gif == null) loadAvatarBitmap(pictureUri, highResolution = true) else null
-            require(gif != null || image != null)
-            contentResolver.openOutputStream(destination, "w")?.use { output ->
-                if (gif != null) output.write(gif)
-                else check(requireNotNull(image).compress(Bitmap.CompressFormat.PNG, 100, output))
+            val bytes = readProfilePictureBytes(pictureUri)
+            requireNotNull(DisplayPictureFormat.detect(bytes))
+            contentResolver.openOutputStream(destination, "wt")?.use { output ->
+                output.write(bytes)
             } ?: error("Unable to open destination")
         }.isSuccess
     }
