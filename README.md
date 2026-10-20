@@ -206,6 +206,9 @@ mode. Credential encryption does not provide end-to-end chat encryption.
 - The main screen consumes live `StateFlow` contact data, follows presence changes, sorts by status
   or name, hides offline contacts, edits presence, and routes contact taps to chat. Its profile card
   opens a dedicated editor for the user's picture, display name, and personal message.
+- GIF profile pictures animate across the app and retain their animation when selected, restored,
+  cached, transferred, or downloaded. See [animated-picture compatibility](docs/ANIMATED_PROFILE_PICTURES.md)
+  for the native Messenger Soccer packet investigation and decoder details.
 - The contacts FAB adds contacts by IM email address, using the native Messenger SOAP and MSNP
   invitation flow with an optional message, validation, loading, failure, and success feedback. Mobile numbers
   and categories are not included. See [`docs/ADDING_CONTACTS.md`](docs/ADDING_CONTACTS.md).

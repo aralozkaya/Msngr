@@ -15,6 +15,44 @@ import org.junit.Test
 
 class MsnpP2pV2Test {
     @Test
+    fun switchboardHandoverKeepsSequenceNumbersAndAnIncompletePicture() = runBlocking {
+        val bytes = ByteArray(8_000) { (it * 17).toByte() }
+        val picture = MsnDisplayPicture.create("sender@example.com", bytes)
+        val originalBridge = mutableListOf<ByteArray>()
+        val nextBridge = mutableListOf<ByteArray>()
+        val response = mutableListOf<ByteArray>()
+        var received: ByteArray? = null
+        val receiver = MsnpP2pSession(
+            localEmail = "receiver@example.com", remoteEmail = "sender@example.com",
+            localEndpointId = "11111111-1111-1111-1111-111111111111",
+            remoteEndpointId = "22222222-2222-2222-2222-222222222222",
+            sendPacket = originalBridge::add, localPicture = { null },
+            onDisplayPicture = { received = it },
+        )
+        val sender = MsnpP2pSession(
+            localEmail = "sender@example.com", remoteEmail = "receiver@example.com",
+            localEndpointId = "22222222-2222-2222-2222-222222222222",
+            remoteEndpointId = "11111111-1111-1111-1111-111111111111",
+            sendPacket = response::add, localPicture = { LocalDisplayPicture(picture, bytes) },
+            onDisplayPicture = {},
+        )
+        receiver.requestDisplayPicture(picture)
+        val invitation = requireNotNull(P2pV2Packet.parse(originalBridge.single()))
+        sender.handle(originalBridge.single())
+        val firstData = response.indexOfFirst { requireNotNull(P2pV2Packet.parse(it)).tfCombination == 5 }
+        response.take(firstData + 1).forEach { receiver.handle(it) }
+        receiver.bindPacketSender(nextBridge::add)
+        response.drop(firstData + 1).forEach { receiver.handle(it) }
+        assertArrayEquals(bytes, received)
+
+        val lastSent = requireNotNull(P2pV2Packet.parse(originalBridge.last()))
+        receiver.requestDisplayPicture(MsnDisplayPicture.create("sender@example.com", byteArrayOf(1, 2, 3)))
+        val next = requireNotNull(P2pV2Packet.parse(nextBridge.last()))
+        assertEquals(lastSent.identifier + lastSent.messageSize, next.identifier)
+        assertTrue(next.identifier >= invitation.identifier + invitation.messageSize)
+    }
+
+    @Test
     fun v2PacketRoundTripsBigEndianHeadersAndDataRemaining() {
         val encoded = P2pV2Packet(
             operationCode = 3,
@@ -61,7 +99,10 @@ class MsnpP2pV2Test {
             remoteEmail = "receiver@example.com",
             localEndpointId = "22222222-2222-2222-2222-222222222222",
             remoteEndpointId = "11111111-1111-1111-1111-111111111111",
-            sendPacket = { receiver.handle(it) },
+            sendPacket = {
+                assertEquals(0, requireNotNull(P2pV2Packet.parse(it)).footer)
+                receiver.handle(it)
+            },
             localPicture = { LocalDisplayPicture(picture, bytes) },
             onDisplayPicture = {},
         )

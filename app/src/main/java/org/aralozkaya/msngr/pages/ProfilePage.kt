@@ -2,7 +2,6 @@
 
 package org.aralozkaya.msngr.pages
 
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -60,6 +60,10 @@ import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.loadDisplayPictureBytes
+import org.aralozkaya.msngr.DisplayPictureSelection
+import org.aralozkaya.msngr.inspectDisplayPicture
+import org.aralozkaya.msngr.resizeDisplayPicture
+import kotlinx.coroutines.CancellationException
 import org.aralozkaya.msngr.LocalMessengerPlusEnabled
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -98,6 +102,7 @@ fun ProfilePage(
     var showDisplayPictureOptions by rememberSaveable { mutableStateOf(false) }
     var expandedPictureUri by rememberSaveable { mutableStateOf<String?>(null) }
     var processingDisplayPicture by remember { mutableStateOf(false) }
+    var pendingPictureResize by remember { mutableStateOf<DisplayPictureSelection?>(null) }
     var savingProfile by remember { mutableStateOf(false) }
     var profileSaveError by rememberSaveable { mutableStateOf<String?>(null) }
     val usernameEditorController = remember {
@@ -131,29 +136,52 @@ fun ProfilePage(
     val hasChanges = normalizedUsername != initial.username ||
         normalizedStatusMessage != initial.statusMessage ||
         avatarUri != initial.avatarUri || displayPictureChanged
+    fun acceptPicture(picture: DisplayPictureSelection) {
+        // Store the actual upload, so previews, exports and sign-in restoration use identical bytes.
+        avatarUri = picture.dataUri
+        displayPictureBytes = picture.bytes
+        displayPictureChanged = true
+        avatarImageVersion++
+    }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             processingDisplayPicture = true
             profileSaveError = null
             scope.launch {
-                val bytes = context.loadDisplayPictureBytes(uri.toString())
-                if (bytes != null) {
-                    runCatching {
-                        context.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
-                    avatarUri = uri.toString()
-                    displayPictureBytes = bytes
-                    displayPictureChanged = true
-                    avatarImageVersion++
-                } else {
-                    profileSaveError = "That image could not be read."
+                try {
+                    val picture = context.inspectDisplayPicture(uri.toString())
+                    if (picture.requiresResize) pendingPictureResize = picture else acceptPicture(picture)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    profileSaveError = error.message ?: "That image could not be read."
+                } finally {
+                    processingDisplayPicture = false
                 }
-                processingDisplayPicture = false
             }
         }
+    }
+
+    pendingPictureResize?.let { picture ->
+        DisplayPictureResizeDialog(
+            picture = picture,
+            onCancel = { pendingPictureResize = null },
+            onResize = {
+                pendingPictureResize = null
+                processingDisplayPicture = true
+                scope.launch {
+                    try {
+                        acceptPicture(resizeDisplayPicture(picture))
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        profileSaveError = error.message ?: "This picture could not be resized."
+                    } finally {
+                        processingDisplayPicture = false
+                    }
+                }
+            },
+        )
     }
 
     if (showDisplayPictureOptions) {
@@ -245,9 +273,14 @@ fun ProfilePage(
                                 shape = MaterialTheme.shapes.extraLarge,
                                 imageVersion = avatarImageVersion,
                             )
+                            if (processingDisplayPicture) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.align(Alignment.Center).testTag("picture-processing"),
+                                )
+                            }
                             FilledIconButton(
                                 onClick = { showDisplayPictureOptions = true },
-                                enabled = !savingProfile,
+                                enabled = !savingProfile && !processingDisplayPicture,
                                 shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier.align(Alignment.BottomEnd),
                             ) {
@@ -324,7 +357,7 @@ fun ProfilePage(
                         )
                         Button(
                             enabled = normalizedUsername.isNotEmpty() && hasChanges &&
-                                !processingDisplayPicture,
+                                !processingDisplayPicture && pendingPictureResize == null,
                             shapes = ButtonDefaults.shapes(),
                             onClick = {
                                 if (savingProfile) return@Button

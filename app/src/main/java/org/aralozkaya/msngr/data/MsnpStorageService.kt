@@ -1,6 +1,7 @@
 package org.aralozkaya.msngr.data
 
 import kotlinx.coroutines.Dispatchers
+import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.w3c.dom.Element
@@ -117,7 +118,7 @@ internal object MsnpStorageService {
             <DocumentStreams>
               <DocumentStream xsi:type="PhotoStream">
                 <DataSize>0</DataSize>
-                <MimeType>image/png</MimeType>
+                <MimeType>${DisplayPictureFormat.detect(image)?.mimeType ?: "image/png"}</MimeType>
                 <DocumentStreamType>UserTileStatic</DocumentStreamType>
                 <Data>$data</Data>
               </DocumentStream>
@@ -146,7 +147,7 @@ internal object MsnpStorageService {
             <DocumentStreams>
               <DocumentStream xsi:type="PhotoStream">
                 <DataSize>0</DataSize>
-                <MimeType>image/png</MimeType>
+                <MimeType>${DisplayPictureFormat.detect(image)?.mimeType ?: "image/png"}</MimeType>
                 <DocumentStreamType>UserTileStatic</DocumentStreamType>
                 <Data>$data</Data>
               </DocumentStream>
