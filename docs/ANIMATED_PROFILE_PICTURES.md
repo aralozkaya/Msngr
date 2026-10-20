@@ -1,9 +1,55 @@
 # Animated profile pictures
 
-Msngr preserves and plays GIF display pictures in contact lists, chats, profiles, and the
-full-size picture viewer. Selecting, restoring, transferring, caching, and downloading a GIF
-keeps its original bytes. Other selected images continue to become 96×96 square PNGs.
-Notifications and Android shortcuts use a still poster frame.
+Msngr preserves the original PNG, JPEG, BMP, or GIF when it fits the native Messenger user-tile
+budget of **less than 200 KB (at most 199,999 bytes)**. It does not crop static pictures to 96×96, upscale small
+pictures, or recompress compatible originals. GIFs animate in contact lists, chats, profiles,
+and the full-size viewer. Notifications and Android shortcuts use a still poster frame.
+
+## Selection, quality, and download requirements
+
+| Property | Behavior |
+| --- | --- |
+| Static formats | PNG, JPEG, BMP, and single-frame GIF; detected from bytes, then decoded |
+| Animated format | GIF87a/GIF89a; unsupported animation formats are rejected, never flattened |
+| Upload budget | 199,999 bytes, shared with P2Pv1, P2Pv2, and direct object downloads |
+| Dimensions | Preserve the original aspect ratio and dimensions; 96×96 is a native thumbnail convention, not a wire constraint |
+| Oversized selection | Show source dimensions and size, then offer **Resize and continue** or **Cancel** before changing the draft |
+| Static resize | Filtered scaling, no crop, no enlargement, lossless PNG output |
+| Animated resize | Composited full frames, adaptive palettes (256 colors, or 255 plus transparency), GIF LZW, original frame count, delays and loop extension |
+| Resize budget search | Binary search over the longest edge for the largest fitting candidate; compressed sizes can be non-monotonic, so this is not a mathematical global optimum |
+| Preview/restoration | Use the prepared upload bytes, including after saving/reopening the profile |
+| Download | Export the complete original bytes with their actual MIME type and extension, independent of the UI bitmap/thumbnail |
+
+Input reads are bounded to 32 MiB and 16 megapixels; GIFs also have a 500-frame and
+128-million total source-pixel work budget. Playback/upload canvases are limited to
+1,048,576 pixels. These are explicit application resource guards, not additional MSNP wire
+requirements. A larger decodable canvas requires the same resize consent. Files exceeding the
+source guards receive an actionable error. A new source is never modified on disk.
+
+Native Windows Live Messenger 14.0.8117.0416 was checked on 20 October 2026. Its chooser
+accepted a valid 199,999-byte GIF and rejected the same GIF padded with valid comment blocks
+to 200,000 bytes, with the explicit “smaller than 200 KB” message. A
+192×192 GIF of 8,643 bytes was accepted and stored byte-for-byte in `ObjectStore/UserTile`.
+The supplied `knock-knock-knock.gif` is valid GIF89a, 416×326, 39 frames, 1,850,182 bytes.
+The Android resize path produced **113×88, 39 frames, 197,204 bytes**, preserving all frame
+delays. The source file remains private and is not bundled or committed.
+
+Native WLM's MSNSLP `Context` contains Base64 XML followed by a NUL byte. Receivers must
+strip the terminator before XML parsing; rejecting it caused otherwise valid native download
+requests to be declined. Both P2P versions share this context validation.
+
+P2Pv2 picture data uses a zero bridge footer; the application-ID footer belongs to P2Pv1.
+Native WLM can move an existing P2P session to another switchboard and keep that session
+after closing a switchboard. Msngr retains its identifiers, pending requests, and partial
+objects per remote endpoint, rebinds outgoing packets to the current connection, and lets
+the previous receiver finish its remaining packets. All connections close on sign-out,
+blocking, or contact removal. A manual/initial refresh still retries the announced original
+when public storage supplies only a stale or smaller fallback.
+
+Escargot's legacy presence generator advertises the MSNObject from the **first signed-in
+session** of an account. When that account is also running in native WLM, later app uploads
+can be masked by the older native object's metadata. A live upload probe must account for
+this server behavior; successful storage submission alone does not prove native receipt.
 
 ## Native Windows Live Messenger Soccer investigation
 
@@ -50,7 +96,7 @@ The existing P2Pv1 and P2Pv2 sessions already transfer and hash-validate the com
 ## Decoding and refresh behavior
 
 `GifDisplayPicture` inspects the GIF structure, logical canvas, frame rectangles, and graphic
-control delays before animation. It limits inputs to 200 KiB, 1,048,576 canvas pixels, and
+control delays before animation. It limits inputs to 199,999 bytes, 1,048,576 canvas pixels, and
 500 frames. Pixel decoding, transparency, LZW decompression, and frame disposal belong to the
 platform decoder:
 
@@ -63,19 +109,33 @@ platform decoder:
 Each visible instance owns its animation state. Playback stops when its lifecycle stops or
 it leaves composition. Static poster bitmaps remain shared through the existing bitmap cache.
 The full-size viewer exports GIF bytes as `image/gif` with a `.gif` filename. Roaming profile
-storage also advertises `image/gif` for GIF uploads.
+storage advertises the actual detected MIME type for every supported format.
 
 The live check exposed an Escargot fallback problem: after native Messenger selected Soccer,
 the public `static` tile still returned the account's previous PNG. Opening a profile or
 polling storage could overwrite the successfully received GIF. A verified displayed GIF now
 takes precedence over that fallback, including an HTTP request already in flight when P2P
-finishes. A new MSNObject or explicit picture removal still permits replacement. Cached GIFs
+finishes. This also protects a verified static original from a smaller/stale fallback while
+its MSNObject remains current. A new MSNObject or explicit picture removal permits replacement. Cached GIFs
 also remain available while presence metadata is absent.
 
 ## Verification
 
-Run `:app:testDebugUnitTest` for GIF structure/limits, both P2P versions, roaming-storage MIME,
-and the static-refresh race. `AnimatedAvatarInstrumentedTest` checks distinct decoded frames,
+Live interoperability was checked on 20 October 2026 against the two running native WLM
+instances. The native instance sharing the app's account was temporarily signed out to avoid
+Escargot's first-session metadata rule. The other instance displayed the app's 512×384 PNG
+(4,605 bytes), 512×384 JPEG (97,536 bytes), and the resized attachment (113×88 GIF, 39 frames,
+197,204 bytes). Two native observations showed different GIF frames. Reassembled outgoing
+P2P object bytes matched the input files; incoming/exported native Soccer bytes matched its
+57,148-byte original. No private image or credential is bundled with these tests.
+
+Run `:app:testDebugUnitTest` for GIF structure/limits, independent ImageIO decoding of the GIF
+encoder (including LZW dictionary growth/reset, transparency, palette quality, timing, and
+loops), both P2P versions, native NUL-terminated requests, roaming-storage MIME, and both
+static/animated refresh races. `ProfilePictureInstrumentedTest` covers consent, resize,
+original PNG/JPEG bytes, MIME, restore, and export. Its optional private GIF test runs when
+`files/profile-picture-validation/knock-knock-knock.gif` exists in the debug app.
+`AnimatedAvatarInstrumentedTest` checks distinct decoded frames,
 visible animation, lifecycle pause/resume, byte-preserving selection/restoration/export, and
 the still poster used by notifications. `ContactProfileInstrumentedTest` covers the existing
 profile and viewer behavior.
@@ -83,3 +143,12 @@ profile and viewer behavior.
 Live verification uses the private account and native Soccer picture, compares received bytes
 with the native cache, opens the contact profile, and checks the animation survives refresh.
 Credentials and packet captures stay in ignored local storage.
+
+`ProfilePictureLiveInteropInstrumentedTest` is explicitly opt-in (`-e pictureInterop true`).
+It reads a private `files/profile-picture-validation/live.credentials` JSON with `email`,
+`password`, and `peer`, plus `static-original.png`, `static-original.jpg`, and
+`knock-resized.gif` fixtures. It publishes each for 60 seconds (overridable with
+`-e picturePhaseMillis`; use `-e pictureFixtures knock-resized.gif` for a single fixture)
+and exports the peer's native GIF. Compare native receipt and the
+reassembled P2P object with each fixture separately; the probe itself does not
+assert native receipt. It restores the prior roaming picture and removes its credential file.

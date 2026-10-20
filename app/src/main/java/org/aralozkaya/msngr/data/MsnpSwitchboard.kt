@@ -48,6 +48,7 @@ internal class MsnpSwitchboardSession(
     private val localPicture: () -> LocalDisplayPicture? = { null },
     private val remoteEndpointId: String? = null,
     private val handshakeTimeoutMillis: Long = DEFAULT_HANDSHAKE_TIMEOUT_MILLIS,
+    sharedPictureSession: MsnpP2pSession? = null,
 ) : AutoCloseable {
     private val transactionIds = AtomicInteger(0)
     private val sendMutex = Mutex()
@@ -55,8 +56,7 @@ internal class MsnpSwitchboardSession(
     private val participants = mutableSetOf<String>()
     private val outgoingP2pPackets = Channel<ByteArray>(Channel.UNLIMITED)
     private val pendingMessageAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
-    private val p2pSession by lazy {
-        MsnpP2pSession(
+    internal val pictureSession = sharedPictureSession ?: MsnpP2pSession(
             localEmail = signedInEmail,
             remoteEmail = contactEmail,
             sendPacket = { packet ->
@@ -69,6 +69,11 @@ internal class MsnpSwitchboardSession(
             localEndpointId = machineGuid,
             remoteEndpointId = remoteEndpointId,
         )
+
+    init { resumePictureTransfers() }
+
+    internal fun resumePictureTransfers() {
+        pictureSession.bindPacketSender { packet -> outgoingP2pPackets.send(packet) }
     }
     private var receiverJob: Job? = null
     private var p2pSenderJob: Job? = null
@@ -111,7 +116,7 @@ internal class MsnpSwitchboardSession(
     }
 
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture) {
-        p2pSession.requestDisplayPicture(picture)
+        pictureSession.requestDisplayPicture(picture)
     }
 
     override fun close() {
@@ -235,7 +240,7 @@ internal class MsnpSwitchboardSession(
                     message.destination.normalizedSwitchboardIdentity() ==
                     signedInEmail.normalizedSwitchboardIdentity()
                 ) {
-                    p2pSession.handle(message.bytes)
+                    pictureSession.handle(message.bytes)
                 }
             }
             SwitchboardMimeMessage.Unsupported -> Unit
@@ -251,7 +256,7 @@ internal class MsnpSwitchboardSession(
     }
 
     private suspend fun sendP2pPacket(packet: ByteArray) {
-        val payload = Msnp18Protocol.p2pPayload(p2pSession.destination, packet)
+        val payload = Msnp18Protocol.p2pPayload(pictureSession.destination, packet)
         val transactionId = nextTransactionId()
         val acknowledgement = CompletableDeferred<Unit>()
         check(pendingMessageAcks.putIfAbsent(transactionId, acknowledgement) == null)

@@ -14,14 +14,23 @@ object NotificationChannels {
     const val CONTACT_REQUESTS = "contact_requests"
     const val GROUP_INVITATIONS = "group_invitations"
     const val BACKGROUND_CONNECTION = "background_connection"
+    const val APP_UPDATES = "app_updates"
 
-    val userConfigurable = listOf(MESSAGES, NUDGES, FRIENDS_ONLINE, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS)
+    val userConfigurable = listOf(MESSAGES, NUDGES, FRIENDS_ONLINE, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS, APP_UPDATES)
 
     fun createAll(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
             listOf(
+                NotificationChannel(
+                    APP_UPDATES,
+                    context.getString(R.string.update_notification_channel),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    description = context.getString(R.string.update_notification_channel_description)
+                    setShowBadge(true)
+                },
                 NotificationChannel(
                     MESSAGES,
                     context.getString(R.string.notification_channel_messages),

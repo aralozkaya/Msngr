@@ -20,6 +20,7 @@ import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
 import java.io.File
 
 class MsngrApplication : Application() {
+    val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
     internal val visibilityTracker = AppVisibilityTracker { isForeground ->
         runCatching { container.messengerRepository }
             .getOrNull()
@@ -74,6 +75,7 @@ class MsngrApplication : Application() {
         super.onCreate()
         registerActivityLifecycleCallbacks(visibilityTracker)
         NotificationChannels.createAll(this)
+        updateManager.initialize(this)
         AppShortcuts.refresh(this)
     }
 }

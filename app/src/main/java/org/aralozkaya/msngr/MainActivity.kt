@@ -87,6 +87,8 @@ import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.pages.components.SessionsDialog
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
+import org.aralozkaya.msngr.pages.UpdateBadge
+import org.aralozkaya.msngr.updates.updateManager
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -241,6 +243,7 @@ private fun MsngrApp(
     onLogout: () -> Unit,
 ) {
     val context = LocalContext.current
+    val updateState by context.updateManager.state.collectAsState()
     val resources = LocalResources.current
     val contacts by repository.contacts.collectAsState()
     val drafts by repository.drafts.collectAsState()
@@ -304,7 +307,8 @@ private fun MsngrApp(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             BadgedBox(badge = {
-                                if (requestCount > 0) RequestCountBadge(requestCount, "requests-icon-badge")
+                                if (updateState.hasUpdate) UpdateBadge(Modifier.testTag("updates-icon-badge"))
+                                else if (requestCount > 0) RequestCountBadge(requestCount, "requests-icon-badge")
                             }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Open menu")
                             }
@@ -339,6 +343,9 @@ private fun MsngrApp(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Settings") },
+                                    trailingIcon = if (updateState.hasUpdate) {
+                                        { UpdateBadge(Modifier.testTag("updates-settings-menu-badge")) }
+                                    } else null,
                                     leadingIcon = {
                                         Icon(Icons.Default.Settings, contentDescription = null)
                                     },

@@ -171,6 +171,8 @@ internal class LiveMsnp18Client(
     private val pendingNotificationTransactions =
         ConcurrentHashMap<Int, CompletableDeferred<MsnpCommand>>()
     private val switchboards = ConcurrentHashMap<String, MsnpSwitchboardSession>()
+    private val activeSwitchboards = ConcurrentHashMap.newKeySet<MsnpSwitchboardSession>()
+    private val pictureSessions = ConcurrentHashMap<String, MsnpP2pSession>()
     private val circleDeliveries = ConcurrentHashMap<Int, Pair<String, Long>>()
     private val typingJobs = ConcurrentHashMap<String, Job>()
     private val lastTypingSentAt = ConcurrentHashMap<String, Long>()
@@ -866,7 +868,7 @@ internal class LiveMsnp18Client(
         // SOAP has persisted the deletion. Keep late presence and conversation events off the roster.
         deletedContactIds.add(id)
         updateContact(id) { it?.copy(isForwardListContact = false) }
-        switchboards.remove(id)?.close()
+        closeSwitchboards(id)
         typingJobs.remove(id)?.cancel()
         contactDisplayPictureJobs.remove(id)?.cancel()
         mutableTyping.update { it - id }
@@ -1131,7 +1133,7 @@ internal class LiveMsnp18Client(
             }
         }
         if (blocked) {
-            switchboards.remove(id)?.close()
+            closeSwitchboards(id)
             typingJobs.remove(id)?.cancel()
             mutableTyping.value = mutableTyping.value - id
         }
@@ -1405,7 +1407,7 @@ internal class LiveMsnp18Client(
                             val refreshed = mutableContacts.value
                             val updatedIds = refreshed.map(Contact::id).toSet()
                             (previousIds - updatedIds).forEach { id ->
-                                switchboards.remove(id)?.close()
+                                closeSwitchboards(id)
                                 typingJobs.remove(id)?.cancel()
                                 mutableTyping.update { it - id }
                             }
@@ -1824,7 +1826,7 @@ internal class LiveMsnp18Client(
         contactDisplayPictureJobs.remove(id)?.cancel()
         contactEndpointWaiters.remove(id)?.cancel()
         contactDisplayPictures.remove(id)
-        switchboards.remove(id)?.close()
+        closeSwitchboards(id)
         updateContact(email) { existing -> existing?.copy(presence = Presence.Offline) }
         if (previousPresence != null && previousPresence != Presence.Offline &&
             (!initialPresenceSync || restoringContactPresence)
@@ -1937,10 +1939,10 @@ internal class LiveMsnp18Client(
             .filter { it.presence.isOnline && !it.isBlocked }
             .forEach { contact ->
                 launch {
-                    val fetchedFromStorage = displayPictureRequestSemaphore.withPermit {
+                    displayPictureRequestSemaphore.withPermit {
                         pollContactTile(contact.id, force = true)
                     }
-                    if (!fetchedFromStorage) {
+                    if (!hasVerifiedContactPicture(contact.id)) {
                         contactDisplayPictures[contact.id]?.let { picture ->
                             updateContactDisplayPicture(
                                 email = contact.email,
@@ -1956,10 +1958,11 @@ internal class LiveMsnp18Client(
     override suspend fun refreshContactPicture(contactId: String) {
         val contact = mutableContacts.value.resolveContact(contactId) ?: return
         // Public storage is available independently of a contact's MSNP presence.
-        val fetched = displayPictureRequestSemaphore.withPermit {
+        displayPictureRequestSemaphore.withPermit {
             pollContactTile(contactId, force = true)
         }
-        if (!fetched && contact.presence.isOnline) {
+        // A storage thumbnail can be stale or smaller than the announced original.
+        if (!hasVerifiedContactPicture(contactId) && contact.presence.isOnline) {
             contactDisplayPictures[contactId]?.let { picture ->
                 updateContactDisplayPicture(contact.email, picture.toEncodedValue(), force = true)
             }
@@ -1968,7 +1971,7 @@ internal class LiveMsnp18Client(
 
     private suspend fun pollContactTile(contactId: String, force: Boolean = false): Boolean {
         synchronized(contactDisplayPictureStateLock) {
-            if (hasVerifiedAnimatedContactPicture(contactId)) return true
+            if (hasVerifiedContactPicture(contactId)) return true
         }
         val accountEmail = signedInEmail.takeIf(String::isNotBlank) ?: return false
         val storageAccount = signedInStorageAccount
@@ -1992,9 +1995,8 @@ internal class LiveMsnp18Client(
         val hash = bytes.sha256()
         val accepted = synchronized(contactDisplayPictureStateLock) {
             if (signedInEmail != accountEmail || machineGuid != endpointGuid) return@synchronized false
-            // A P2P GIF can finish while the static HTTP fallback is in flight. WLM's Soccer
-            // does not update Escargot's static tile, so that older image must not replace it.
-            if (hasVerifiedAnimatedContactPicture(contactId)) return true
+            // An exact MSNObject can finish while an older or smaller HTTP fallback is in flight.
+            if (hasVerifiedContactPicture(contactId)) return true
             removedContactTileHashes[contactId]?.let { removedHash ->
                 if (removedHash == hash) {
                     pictureTrace("STORAGE ignored stale tile after removal")
@@ -2033,12 +2035,12 @@ internal class LiveMsnp18Client(
     }
 
     /** Called under contactDisplayPictureStateLock; a new MSNObject still permits replacement. */
-    private fun hasVerifiedAnimatedContactPicture(contactId: String): Boolean {
+    private fun hasVerifiedContactPicture(contactId: String): Boolean {
         val displayedHash = displayedContactDisplayPictureHashes[contactId] ?: return false
         val announcedHash = contactDisplayPictures[contactId]?.sha1d
-        return (announcedHash == null || announcedHash == displayedHash) &&
-            mutableContacts.value.resolveContact(contactId)?.avatarUri
-                ?.startsWith("data:image/gif;") == true
+        val uri = mutableContacts.value.resolveContact(contactId)?.avatarUri ?: return false
+        return announcedHash == displayedHash ||
+            (announcedHash == null && uri.startsWith("data:image/gif;"))
     }
 
     private suspend fun fetchContactTile(storageId: String, size: String): ByteArray? {
@@ -2076,7 +2078,10 @@ internal class LiveMsnp18Client(
                 eventSink = { event -> handleSwitchboardEvent(id, session, event) },
                 localPicture = ::localDisplayPictureSnapshot,
                 remoteEndpointId = contactEndpointIds[id],
+                sharedPictureSession = reusablePictureSession(id),
             )
+            pictureSessions[id] = session.pictureSession
+            activeSwitchboards.add(session)
             try {
                 session.connect()
                 pictureTrace(
@@ -2179,6 +2184,7 @@ internal class LiveMsnp18Client(
             )
         }
         lateinit var session: MsnpSwitchboardSession
+        val previousSession = switchboards[id]
         session = MsnpSwitchboardSession(
             signedInEmail = signedInEmail,
             machineGuid = machineGuid,
@@ -2195,10 +2201,18 @@ internal class LiveMsnp18Client(
             eventSink = { event -> handleSwitchboardEvent(id, session, event) },
             localPicture = ::localDisplayPictureSnapshot,
             remoteEndpointId = contactEndpointIds[id],
+            sharedPictureSession = reusablePictureSession(id),
         )
+        pictureSessions[id] = session.pictureSession
+        activeSwitchboards.add(session)
         runCatching { session.connect() }
-            .onSuccess { switchboards.put(id, session)?.close() }
-            .onFailure { session.close() }
+            // Native WLM can move an existing P2P bridge to a second switchboard. Keep
+            // the old receiver alive for its remaining packets and retain sequence state.
+            .onSuccess { switchboards[id] = session }
+            .onFailure {
+                session.close()
+                if (switchboards[id] === previousSession) previousSession?.resumePictureTransfers()
+            }
     }
 
     private fun handleSwitchboardEvent(
@@ -2259,6 +2273,7 @@ internal class LiveMsnp18Client(
                 }
             }
             SwitchboardEvent.Closed -> {
+                activeSwitchboards.remove(session)
                 switchboards.remove(contactId, session)
                 typingJobs.remove(contactId)?.cancel()
                 mutableTyping.value = mutableTyping.value + (contactId to false)
@@ -2345,7 +2360,20 @@ internal class LiveMsnp18Client(
     }
 
     private fun discardSwitchboard(email: String) {
-        switchboards.remove(email.lowercase())?.close()
+        closeSwitchboards(email.lowercase())
+    }
+
+    private fun closeSwitchboards(contactId: String) {
+        switchboards.remove(contactId)?.close()
+        activeSwitchboards.filter { it.contactEmail.equals(contactId, ignoreCase = true) }
+            .forEach(MsnpSwitchboardSession::close)
+    }
+
+    private fun reusablePictureSession(contactId: String): MsnpP2pSession? {
+        val session = pictureSessions[contactId] ?: return null
+        val endpoint = contactEndpointIds[contactId]
+        val destinationEndpoint = session.destination.substringAfter(';', "").trim('{', '}')
+        return session.takeIf { destinationEndpoint.equals(endpoint?.trim('{', '}').orEmpty(), ignoreCase = true) }
     }
 
     private fun reportConnectionLoss(error: Throwable, force: Boolean = false) {
@@ -2434,7 +2462,9 @@ internal class LiveMsnp18Client(
         initialContactPictureRefreshSignal = null
         pendingNotificationTransactions.values.forEach { it.cancel() }
         pendingNotificationTransactions.clear()
-        switchboards.values.toList().forEach(MsnpSwitchboardSession::close)
+        activeSwitchboards.toList().forEach(MsnpSwitchboardSession::close)
+        activeSwitchboards.clear()
+        pictureSessions.clear()
         circleDeliveries.clear()
         switchboards.clear()
         switchboardMutexes.clear()
@@ -2529,7 +2559,7 @@ internal class LiveMsnp18Client(
         const val TYPING_SEND_INTERVAL_MILLIS = 5_000L
         const val TYPING_DISPLAY_MILLIS = 6_000L
         const val NOTIFICATION_HEARTBEAT_MILLIS = 45_000L
-        const val MAX_DISPLAY_PICTURE_BYTES = 200 * 1024
+        const val MAX_DISPLAY_PICTURE_BYTES = org.aralozkaya.msngr.protocol.DisplayPictureLimits.MAX_BYTES
         const val MAX_CONTACT_TILE_BYTES = 1024 * 1024
         const val DISPLAY_PICTURE_ENDPOINT_TIMEOUT_MILLIS = 500L
         const val MAX_CONCURRENT_DISPLAY_PICTURE_REQUESTS = 6

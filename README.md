@@ -42,6 +42,9 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 - **Manage your sessions.** View connected devices and their presence. Sign out an individual
   device, all other sessions, or all sessions. An optional setting signs out other sessions
   whenever Msngr signs in. See [session support](docs/MULTI_PRESENCE.md).
+- **Keep Msngr updated.** Signed release builds check GitHub releases on app startup and at a
+  configurable interval. Review release notes, opt into prereleases, skip versions, and install
+  an update or save its APK. See [app updates](docs/APP_UPDATES.md).
 
 ## Screenshots
 
