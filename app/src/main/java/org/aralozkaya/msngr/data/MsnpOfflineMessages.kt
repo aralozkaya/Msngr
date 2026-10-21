@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,15 +37,18 @@ internal object MsnpOfflineMessages : OfflineMessageService {
     const val NAMESPACE = "http://www.hotmail.msn.com/ws/2004/09/oim/rsi"
     private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
-    fun send(transactionId: Int, email: String, text: String): MsnpCommand {
+    fun send(transactionId: Int, email: String, text: String,
+        style: NativeTextStyle = NativeTextStyle()): MsnpCommand {
         require(email.contains('@') && email.none { it.isWhitespace() || it == ';' }) {
             "The offline message recipient is invalid."
         }
         require(text.toByteArray(Charsets.UTF_8).size <= 1200) {
             "Offline message is too long (maximum 1,200 UTF-8 bytes)."
         }
+        val format = if (style.copy(size = NativeTextStyle.DEFAULT_SIZE) == NativeTextStyle())
+            "FN=Segoe%20UI; EF=; CO=0; CS=1; PF=0" else style.toFormatHeader()
         val payload = ("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n" +
-            "X-MMS-IM-Format: FN=Segoe%20UI; EF=; CO=0; CS=1; PF=0\r\n" +
+            "X-MMS-IM-Format: $format\r\n" +
             "Dest-Agent: client\r\n\r\n$text").toByteArray(Charsets.UTF_8)
         return MsnpCommand("UUM", transactionId, listOf(email, "1", "1", payload.size.toString()), payload)
     }
@@ -115,7 +120,8 @@ internal object MsnpOfflineMessages : OfflineMessageService {
             .digest(metadata.id.lowercase(Locale.ROOT).toByteArray(Charsets.UTF_8))).long or Long.MIN_VALUE
         return ChatMessage(id, metadata.sender, MessageAuthor.Contact, String(bytes, charset),
             metadata.sentAtMillis ?: parseOfflineTimestamp(headers["date"].orEmpty()) ?: System.currentTimeMillis(),
-            senderEmail = metadata.sender, senderName = metadata.senderName)
+            senderEmail = metadata.sender, senderName = metadata.senderName,
+            nativeStyle = NativeTextStyle.fromFormatHeader(headers["x-mms-im-format"]))
     }
 
     fun buildRequest(action: String, ticket: String, id: String? = null): String {

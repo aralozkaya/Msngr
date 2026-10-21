@@ -11,19 +11,18 @@ import org.junit.Test
 
 class MessengerPlusSelectionMenuTest {
     private val formattingIds = listOf(
-        R.id.format_bold, R.id.format_italic, R.id.format_strikethrough,
-        R.id.format_underline, R.id.format_clear,
+        R.id.format_plus,
     )
 
     @Test
     fun repeatedRefreshesKeepOneOfEachActionWithSystemItemsInterleaved() {
         val fixture = MenuFixture()
-        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true))
+        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true))
         fixture.addSystemActions()
         val originalItems = fixture.items.toList()
 
         repeat(20) {
-            assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, true))
+            assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true))
             formattingIds.forEach { id ->
                 assertEquals(1, fixture.items.count { it.itemId == id })
             }
@@ -44,25 +43,25 @@ class MessengerPlusSelectionMenuTest {
             }
         }
 
-        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true))
+        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true))
         formattingIds.forEach { id -> assertEquals(1, fixture.items.count { it.itemId == id }) }
-        assertEquals(7, fixture.items.size)
+        assertEquals(3, fixture.items.size)
         assertTrue(fixture.menu.findItem(android.R.id.copy) != null)
         assertTrue(fixture.menu.findItem(android.R.id.paste) != null)
-        assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, true))
+        assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true))
     }
 
     @Test
     fun disablingFormattingRemovesEveryCustomActionAndCanBeReenabled() {
         val fixture = MenuFixture()
         fixture.addSystemActions()
-        synchronizeMessengerPlusSelectionMenu(fixture.menu, true)
+        synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true)
 
         assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, false))
         assertEquals(listOf(android.R.id.copy, android.R.id.paste), fixture.items.map { it.itemId })
         assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, false))
-        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true))
-        assertEquals(7, fixture.items.size)
+        assertTrue(synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true))
+        assertEquals(3, fixture.items.size)
     }
 
     @Test
@@ -76,6 +75,18 @@ class MessengerPlusSelectionMenuTest {
             assertTrue(fixture.menu.findItem(android.R.id.copy) != null)
             assertTrue(fixture.menu.findItem(android.R.id.paste) != null)
         }
+    }
+
+    @Test fun nativeStyleIsIndependentOfPlusAndAvailableAtTheCursorOnlyWhenRequested() {
+        val fixture = MenuFixture()
+        fixture.addSystemActions()
+        synchronizeMessengerPlusSelectionMenu(fixture.menu, false, showTextStyle = true)
+        assertTrue(fixture.menu.findItem(R.id.format_native) != null)
+        assertTrue(fixture.menu.findItem(R.id.format_plus) == null)
+        assertFalse(synchronizeMessengerPlusSelectionMenu(fixture.menu, false, showTextStyle = true))
+        synchronizeMessengerPlusSelectionMenu(fixture.menu, true, showColors = true)
+        assertTrue(fixture.menu.findItem(R.id.format_native) == null)
+        assertTrue(fixture.menu.findItem(R.id.format_plus) != null)
     }
 
     /** Platform menu interfaces can be exercised on the JVM without a device or Android UI. */

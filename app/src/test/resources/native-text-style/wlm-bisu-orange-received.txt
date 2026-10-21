@@ -1,0 +1,6 @@
+MSG peer@example.test Peer 154
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI; EF=BISU; CO=80ff; CS=0; PF=22
+
+NATIVE-STYLE BIUS orange 18pt

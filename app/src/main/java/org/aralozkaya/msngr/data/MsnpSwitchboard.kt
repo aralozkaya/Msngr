@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -29,7 +31,7 @@ internal data class SwitchboardInvitation(
 )
 
 internal sealed interface SwitchboardEvent {
-    data class Text(val senderEmail: String, val text: String) : SwitchboardEvent
+    data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
     data class Typing(val senderEmail: String) : SwitchboardEvent
     data class Nudge(val senderEmail: String) : SwitchboardEvent
     data class DisplayPicture(val senderEmail: String, val bytes: ByteArray) : SwitchboardEvent
@@ -100,11 +102,11 @@ internal class MsnpSwitchboardSession(
         }
     }
 
-    suspend fun sendText(text: String) {
+    suspend fun sendText(text: String, style: NativeTextStyle = NativeTextStyle()) {
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(text)
         val normalized = encoded.trimMessengerPlusWhitespace().text
         if (normalized.isEmpty()) return
-        sendPayload(Msnp18Protocol.textPayload(normalized), acknowledgement = "A")
+        sendPayload(Msnp18Protocol.textPayload(normalized, style), acknowledgement = "A")
     }
 
     suspend fun sendTyping() {
@@ -232,7 +234,7 @@ internal class MsnpSwitchboardSession(
         val sender = command.parameters.firstOrNull()?.normalizedSwitchboardIdentity().orEmpty()
         if (sender.isEmpty() || sender == signedInEmail.normalizedSwitchboardIdentity()) return
         when (val message = parseSwitchboardMime(command.payload ?: return)) {
-            is SwitchboardMimeMessage.Text -> eventSink(SwitchboardEvent.Text(sender, message.value))
+            is SwitchboardMimeMessage.Text -> eventSink(SwitchboardEvent.Text(sender, message.value, message.style))
             SwitchboardMimeMessage.Typing -> eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))
             is SwitchboardMimeMessage.P2p -> {
@@ -289,7 +291,7 @@ internal class MsnpSwitchboardSession(
 internal class SwitchboardException(message: String, val protocolCode: Int? = null) : Exception(message)
 
 internal sealed interface SwitchboardMimeMessage {
-    data class Text(val value: String) : SwitchboardMimeMessage
+    data class Text(val value: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardMimeMessage
     data class P2p(val destination: String?, val bytes: ByteArray) : SwitchboardMimeMessage
     data object Typing : SwitchboardMimeMessage
     data object Nudge : SwitchboardMimeMessage
@@ -316,7 +318,8 @@ internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
     val body = payload.copyOfRange(bodyStart, payload.size)
 
     return when (contentType) {
-        "text/plain" -> SwitchboardMimeMessage.Text(String(body, StandardCharsets.UTF_8))
+        "text/plain" -> SwitchboardMimeMessage.Text(String(body, StandardCharsets.UTF_8),
+            NativeTextStyle.fromFormatHeader(headers["x-mms-im-format"]))
         Msnp18Protocol.TYPING_CONTENT_TYPE -> SwitchboardMimeMessage.Typing
         Msnp18Protocol.NUDGE_CONTENT_TYPE -> if (
             String(body, StandardCharsets.UTF_8)

@@ -5,6 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.SystemClock
+import android.os.Build
+import android.text.TextPaint
+import android.text.style.MetricAffectingSpan
 import android.text.Editable
 import android.text.Spanned
 import android.text.TextWatcher
@@ -89,6 +92,7 @@ internal fun MsnEmoticonText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     linkify: Boolean = false,
+    nativeStyle: NativeTextStyle = NativeTextStyle(),
 ) {
     val adaptiveColor = MaterialTheme.colorScheme.primary.toArgb()
     val parsed = remember(text, messengerPlusEnabled, hideControlCharacters, adaptiveColor) {
@@ -109,8 +113,8 @@ internal fun MsnEmoticonText(
         }
     }
     val linkColor = MaterialTheme.colorScheme.primary
-    val annotatedText = remember(parsed, matches, useOriginalEmoticons, links, linkColor) {
-        parsed.present(matches, useOriginalEmoticons, links, linkColor)
+    val annotatedText = remember(parsed, matches, useOriginalEmoticons, links, linkColor, nativeStyle) {
+        parsed.present(matches, useOriginalEmoticons, links, linkColor, nativeStyle)
     }
     val emoticonSizeSp = with(LocalDensity.current) { MSN_EMOTICON_SIZE_DP.toSp() }
     val inlineContent = matches.mapIndexed { index, match ->
@@ -128,11 +132,15 @@ internal fun MsnEmoticonText(
             )
         }
     }.toMap()
+    val sizeScale = nativeStyle.size.toFloat() / NativeTextStyle.DEFAULT_SIZE
     Text(
         text = annotatedText,
         modifier = modifier,
         color = color,
-        style = style,
+        style = style.copy(
+            fontSize = (if (style.fontSize == TextUnit.Unspecified) 16.sp else style.fontSize) * sizeScale,
+            lineHeight = if (style.lineHeight == TextUnit.Unspecified) TextUnit.Unspecified else style.lineHeight * sizeScale,
+        ),
         inlineContent = if (useOriginalEmoticons) inlineContent else emptyMap(),
         maxLines = maxLines,
         overflow = overflow,
@@ -208,6 +216,8 @@ internal fun MsnEmoticonEditor(
     onSearch: (() -> Unit)? = null,
     onSelectionChanged: (TextRange) -> Unit = {},
     onColors: (() -> Unit)? = null,
+    onTextStyle: (() -> Unit)? = null,
+    nativeStyle: NativeTextStyle = NativeTextStyle(),
 ) {
     val currentMessengerPlusEnabled by rememberUpdatedState(messengerPlusEnabled)
     val currentOnFocusChanged by rememberUpdatedState(onFocusChanged)
@@ -215,6 +225,7 @@ internal fun MsnEmoticonEditor(
     val currentOnSearch by rememberUpdatedState(onSearch)
     val currentOnSelectionChanged by rememberUpdatedState(onSelectionChanged)
     val currentOnColors by rememberUpdatedState(onColors)
+    val currentOnTextStyle by rememberUpdatedState(onTextStyle)
     var editorFocused by remember { mutableStateOf(false) }
     val keepSheetOpenOnTap = LocalKeyboardSheetHost.current?.keepOpenOnInputTap == true
     val contentColor = LocalContentColor.current
@@ -243,6 +254,7 @@ internal fun MsnEmoticonEditor(
                     controller = controller,
                     isEnabled = { currentMessengerPlusEnabled },
                     onColors = { currentOnColors },
+                    onTextStyle = { currentOnTextStyle },
                 )
                 editor.customSelectionActionModeCallback = actionModeCallback
                 editor.customInsertionActionModeCallback = actionModeCallback
@@ -311,8 +323,8 @@ internal fun MsnEmoticonEditor(
                 )
             }
             editor.setTextAppearance(
-                color = contentColor.toArgb(),
-                textSizePixels = textSizePixels,
+                color = if (nativeStyle.colorRgb == 0) contentColor.toArgb() else 0xFF000000.toInt() or nativeStyle.colorRgb,
+                textSizePixels = textSizePixels * nativeStyle.size / NativeTextStyle.DEFAULT_SIZE,
                 adaptiveColor = adaptiveColor,
             )
             editor.setEmoticonAppearance(
@@ -321,6 +333,7 @@ internal fun MsnEmoticonEditor(
                 messengerPlusEnabled = messengerPlusEnabled,
                 hideControlCharacters = messengerPlusEnabled || hideControlCharacters,
             )
+            editor.setNativeStyle(nativeStyle)
             editor.setExternalValue(value)
             controller.attach(editor) { currentOnSelectionChanged(it) }
         },
@@ -606,6 +619,7 @@ private fun MessengerPlusParsedText.present(
     useOriginalEmoticons: Boolean,
     links: List<ChatMessageLink> = emptyList(),
     linkColor: Color = Color.Unspecified,
+    nativeStyle: NativeTextStyle = NativeTextStyle(),
 ): AnnotatedString {
     val renderedBoundary = IntArray(text.length + 1)
     val annotated = buildAnnotatedString {
@@ -629,11 +643,14 @@ private fun MessengerPlusParsedText.present(
             sourceOffset = match.range.endExclusive
         }
         appendMappedText(text, sourceOffset, text.length, renderedBoundary)
+        if (styleSpans.isEmpty() && length > 0) {
+            addStyle(MessengerPlusStyle().toComposeSpanStyle(nativeStyle), 0, length)
+        }
         styleSpans.forEach { span ->
             val renderedStart = renderedBoundary[span.range.start]
             val renderedEnd = renderedBoundary[span.range.endExclusive]
             if (renderedEnd > renderedStart) {
-                addStyle(span.style.toComposeSpanStyle(), renderedStart, renderedEnd)
+                addStyle(span.style.toComposeSpanStyle(nativeStyle), renderedStart, renderedEnd)
             }
         }
         links.forEach { link ->
@@ -665,15 +682,18 @@ private fun AnnotatedString.Builder.appendMappedText(
     boundaryMap[endExclusive] = length
 }
 
-private fun MessengerPlusStyle.toComposeSpanStyle(): SpanStyle {
+private fun MessengerPlusStyle.toComposeSpanStyle(nativeStyle: NativeTextStyle = NativeTextStyle()): SpanStyle {
     val decorations = buildList {
-        if (underline) add(TextDecoration.Underline)
-        if (strikeout) add(TextDecoration.LineThrough)
+        if (underline || nativeStyle.underline) add(TextDecoration.Underline)
+        if (strikeout || nativeStyle.strikeout) add(TextDecoration.LineThrough)
     }
     return SpanStyle(
-        fontWeight = if (bold) FontWeight.Bold else null,
-        fontStyle = if (italic) FontStyle.Italic else null,
-        color = foreground?.let { Color(it.argb) } ?: Color.Unspecified,
+        fontWeight = if (nativeStyle.fontFace != NativeFontFace.Regular) {
+            FontWeight(if (bold) maxOf(700, nativeStyle.fontWeight) else nativeStyle.fontWeight)
+        } else if (bold || nativeStyle.bold) FontWeight.Bold else null,
+        fontStyle = if (italic || nativeStyle.italic) FontStyle.Italic else null,
+        color = foreground?.let { Color(it.argb) } ?: if (nativeStyle.colorRgb != 0)
+            Color(0xFF000000.toInt() or nativeStyle.colorRgb) else Color.Unspecified,
         background = background?.let { Color(it.argb) } ?: Color.Unspecified,
         textDecoration = decorations.takeIf(List<TextDecoration>::isNotEmpty)
             ?.let(TextDecoration::combine),
@@ -683,6 +703,13 @@ private fun MessengerPlusStyle.toComposeSpanStyle(): SpanStyle {
 private fun inlineContentKey(index: Int): String = "msn-emoticon-$index"
 
 internal class MsnEditText(context: Context) : EditText(context) {
+    private var nativeStyle = NativeTextStyle()
+
+    fun setNativeStyle(style: NativeTextStyle) {
+        if (nativeStyle == style) return
+        nativeStyle = style
+        renderEmoticons()
+    }
     var onValueChanged: (String) -> Unit = {}
     var onSelectionChangedListener: ((Int, Int) -> Unit)? = null
     var allowUnicodeEmoji = false
@@ -904,6 +931,14 @@ internal class MsnEditText(context: Context) : EditText(context) {
         editable.getSpans(0, editable.length, MsnGlyphSpan::class.java).forEach(editable::removeSpan)
         messengerPlusSpans.forEach(editable::removeSpan)
         messengerPlusSpans.clear()
+        val entireText = MessengerPlusTextRange(0, editable.length)
+        if (nativeStyle.bold) editable.addMessengerPlusSpan(StyleSpan(Typeface.BOLD), entireText)
+        if (nativeStyle.italic) editable.addMessengerPlusSpan(StyleSpan(Typeface.ITALIC), entireText)
+        if (nativeStyle.fontFace != NativeFontFace.Regular) {
+            editable.addMessengerPlusSpan(NativeFontWeightSpan(nativeStyle.fontWeight, nativeStyle.italic), entireText)
+        }
+        if (nativeStyle.underline) editable.addMessengerPlusSpan(UnderlineSpan(), entireText)
+        if (nativeStyle.strikeout) editable.addMessengerPlusSpan(StrikethroughSpan(), entireText)
         val parsed = MessengerPlusTextCodec.parse(editable.toString(), adaptiveColor)
         if (messengerPlusEnabled || hideControlCharacters) {
             parsed.controlRanges.forEach { range ->
@@ -916,6 +951,12 @@ internal class MsnEditText(context: Context) : EditText(context) {
                 if (style.bold) editable.addMessengerPlusSpan(StyleSpan(Typeface.BOLD), span.range)
                 if (style.italic) {
                     editable.addMessengerPlusSpan(StyleSpan(Typeface.ITALIC), span.range)
+                }
+                if (nativeStyle.fontFace != NativeFontFace.Regular) {
+                    editable.addMessengerPlusSpan(NativeFontWeightSpan(
+                        if (style.bold) maxOf(700, nativeStyle.fontWeight) else nativeStyle.fontWeight,
+                        nativeStyle.italic || style.italic,
+                    ), span.range)
                 }
                 if (style.underline) {
                     editable.addMessengerPlusSpan(UnderlineSpan(), span.range)
@@ -973,6 +1014,26 @@ internal class MsnEditText(context: Context) : EditText(context) {
         if (range.endExclusive <= range.start || range.endExclusive > length) return
         setSpan(span, range.start, range.endExclusive, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         messengerPlusSpans += span
+    }
+}
+
+/** Uses numeric weights so Light, Semilight, Semibold and Black are not reduced to bold/regular. */
+internal class NativeFontWeightSpan(private val weight: Int, private val italic: Boolean) : MetricAffectingSpan() {
+    override fun updateDrawState(paint: TextPaint) = applyWeight(paint)
+    override fun updateMeasureState(paint: TextPaint) = applyWeight(paint)
+
+    private fun applyWeight(paint: TextPaint) {
+        paint.typeface = if (Build.VERSION.SDK_INT >= 28) {
+            Typeface.create(paint.typeface ?: Typeface.DEFAULT, weight, italic)
+        } else {
+            val family = when {
+                weight <= 350 -> "sans-serif-light"
+                weight == 600 -> "sans-serif-medium"
+                weight >= 900 -> "sans-serif-black"
+                else -> "sans-serif"
+            }
+            Typeface.create(family, if (italic) Typeface.ITALIC else Typeface.NORMAL)
+        }
     }
 }
 

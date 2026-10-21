@@ -1476,13 +1476,15 @@ class LiveMsnp18ClientContractTest {
         assertTrue(client.messages.value.getValue(contact.id).last().isNudge)
 
         switchboard.rejectText = true
-        val failedSend = client.sendMessageWithResult(contact.id, "Keep this failed message")
+        val nativeStyle = NativeTextStyle(true, true, true, true, 0xFF8000, 18)
+        val failedSend = client.sendStyledMessage(contact.id, "Keep this failed message", null, nativeStyle)
         assertTrue(failedSend.isFailure)
         val messages = client.messages.value.getValue(contact.id)
         assertEquals(4, messages.size)
         val failed = messages.last()
         assertEquals(MessageAuthor.Me, failed.author)
         assertEquals("Keep this failed message", failed.text)
+        assertEquals(nativeStyle, failed.nativeStyle)
         assertFalse(failed.isSending)
         assertTrue(failed.deliveryError.orEmpty().isNotBlank())
 
@@ -1506,6 +1508,7 @@ class LiveMsnp18ClientContractTest {
         withTimeout(1_000) { retrying.await().getOrThrow() }
         val retried = client.messages.value.getValue(contact.id).last()
         assertEquals(failed.copy(deliveryError = null), retried)
+        assertTrue(switchboard.sent.any { it.payload?.toString(Charsets.UTF_8)?.contains(nativeStyle.toFormatHeader()) == true })
         assertEquals(4, client.messages.value.getValue(contact.id).size)
         client.retryMessage(failed).getOrThrow()
         assertEquals(1, switchboard.sent.count { it.verb == "MSG" && it.parameters.firstOrNull() == "A" })

@@ -164,6 +164,7 @@ private fun ChatRoute(
 ) {
     val context = LocalContext.current
     val drafts by repository.drafts.collectAsState()
+    val textStyles by repository.textStyles.collectAsState()
     val profile by repository.profile.collectAsState()
     val contact by repository.contact(contactId).collectAsState(initial = null)
     var lastKnownContact by remember(contactId) { mutableStateOf<Contact?>(null) }
@@ -207,6 +208,9 @@ private fun ChatRoute(
     }
 
     ChatScreen(
+        nativeStyle = textStyles[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
+        onNativeStyleChange = { repository.updateTextStyle(contactId, it) },
+        onSizeNoticeRequested = { repository.markTextSizeNoticeShown(contactId) },
         draft = drafts[contactId].orEmpty(),
         onDraftChange = { repository.updateDraft(contactId, it) },
         contact = contact ?: lastKnownContact?.copy(presence = Presence.Offline),
@@ -242,6 +246,9 @@ internal fun ChatScreen(
     onSendTyping: () -> Unit,
     onSendNudge: () -> Unit,
     onLoadOlderMessages: suspend () -> Unit,
+    nativeStyle: NativeTextStyle = NativeTextStyle(),
+    onNativeStyleChange: (NativeTextStyle) -> Unit = {},
+    onSizeNoticeRequested: () -> Boolean = { false },
 ) {
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
@@ -368,6 +375,9 @@ internal fun ChatScreen(
         },
         bottomBar = {
             MessageComposer(
+                nativeStyle = nativeStyle,
+                onNativeStyleChange = onNativeStyleChange,
+                onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false,
                 draft = draft,
@@ -399,6 +409,7 @@ internal fun ChatScreen(
             isGroup = contact?.isGroup == true,
             isHistoryLoaded = isHistoryLoaded,
             onRetryMessage = onRetryMessage,
+            textSize = nativeStyle.size,
         )
     }
 }
@@ -431,6 +442,7 @@ internal fun ChatMessageList(
     isGroup: Boolean = false,
     isHistoryLoaded: Boolean = true,
     onRetryMessage: (ChatMessage) -> Unit = {},
+    textSize: Int = NativeTextStyle.DEFAULT_SIZE,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     // Index zero is the bottom anchor, even when history arrives after composition.
@@ -466,6 +478,7 @@ internal fun ChatMessageList(
             val joinsNext = message.groupsWith(newestFirst.getOrNull(index - 1))
             MessageBubble(
                 message = message,
+                textSize = textSize,
                 useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                 showSenderName = isGroup,
                 joinsPrevious = joinsPrevious,
@@ -493,13 +506,18 @@ private fun MessageComposer(
     onSendNudge: () -> Unit,
     emoticonSettings: EmoticonSettings,
     messengerPlusEnabled: Boolean,
+    nativeStyle: NativeTextStyle,
+    onNativeStyleChange: (NativeTextStyle) -> Unit,
+    onSizeNoticeRequested: () -> Boolean,
 ) {
     val editorController = remember { MessengerPlusEditorController() }
     val emoticonSheet = rememberEmoticonSheetState()
     val colorSheet = rememberMessengerPlusColorSheetState()
+    var showTextStyle by remember { mutableStateOf(false) }
     LaunchedEffect(enabled, messengerPlusEnabled) {
         if (!enabled || !messengerPlusEnabled) colorSheet.dismiss()
         if (!enabled) {
+            showTextStyle = false
             emoticonSheet.dismiss()
             editorController.hideKeyboard()
         }
@@ -511,6 +529,12 @@ private fun MessageComposer(
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
     MessengerPlusColorSheet(colorSheet)
+    if (showTextStyle) NativeTextStyleSheet(
+        style = nativeStyle,
+        onStyleChange = onNativeStyleChange,
+        onSizeNoticeRequested = onSizeNoticeRequested,
+        onDismissRequest = { showTextStyle = false },
+    )
     val density = LocalDensity.current
     val composerBackgroundColor = MaterialTheme.colorScheme.surface
     val composerBackground = remember(composerBackgroundColor, density) {
@@ -585,6 +609,13 @@ private fun MessageComposer(
                         }
                     }
                     MsnEmoticonEditor(
+                        nativeStyle = nativeStyle,
+                        onTextStyle = {
+                            colorSheet.dismiss()
+                            emoticonSheet.dismiss()
+                            editorController.hideKeyboard()
+                            showTextStyle = true
+                        },
                         enabled = enabled,
                         value = draft,
                         onValueChange = onDraftChange,
@@ -812,6 +843,7 @@ internal fun MessageBubble(
     joinsNext: Boolean = false,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
+    textSize: Int = NativeTextStyle.DEFAULT_SIZE,
 ) {
     var showDeliveryError by rememberSaveable(message.id) { mutableStateOf(false) }
     val deliveryError = message.deliveryError
@@ -883,6 +915,8 @@ internal fun MessageBubble(
                 }
                 MsnEmoticonText(
                     text = message.text,
+                    nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
+                        else message.nativeStyle.copy(size = textSize),
                     useOriginalEmoticons = useOriginalEmoticons,
                     renderedShortcutRanges = message.renderedEmoticonRanges,
                     linkify = true,

@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.AccountIdentity
 import org.aralozkaya.msngr.MsnEmoticonRange
+import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.MessengerPlusTextCodec
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -104,6 +105,7 @@ data class ChatMessage(
     val deliveryError: String? = null,
     val senderEmail: String? = null,
     val senderName: String? = null,
+    val nativeStyle: NativeTextStyle = NativeTextStyle(),
 )
 
 data class ConversationState(
@@ -163,6 +165,10 @@ interface MsnpClient {
         text: String,
         renderedEmoticonRanges: List<MsnEmoticonRange>? = null,
     ): Result<Unit> = runCatching { sendMessage(contactId, text, renderedEmoticonRanges) }
+    suspend fun sendStyledMessage(
+        contactId: String, text: String, renderedEmoticonRanges: List<MsnEmoticonRange>?,
+        style: NativeTextStyle,
+    ): Result<Unit> = sendMessageWithResult(contactId, text, renderedEmoticonRanges)
     suspend fun retryMessage(message: ChatMessage): Result<Unit> =
         Result.failure(UnsupportedOperationException("Message retry is not supported."))
     suspend fun sendTyping(contactId: String)
@@ -398,11 +404,18 @@ class MockMsnp18Client(
         text: String,
         renderedEmoticonRanges: List<MsnEmoticonRange>?,
     ) {
+        sendStyledMessage(contactId, text, renderedEmoticonRanges, NativeTextStyle())
+    }
+
+    override suspend fun sendStyledMessage(
+        contactId: String, text: String, renderedEmoticonRanges: List<MsnEmoticonRange>?,
+        style: NativeTextStyle,
+    ): Result<Unit> {
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(
             text.withoutUnicodeEmoji(),
         )
         val normalized = encoded.trimMessengerPlusWhitespace().text
-        if (normalized.isEmpty()) return
+        if (normalized.isEmpty()) return Result.success(Unit)
         appendMessage(
             ChatMessage(
                 id = ids.incrementAndGet(),
@@ -411,6 +424,7 @@ class MockMsnp18Client(
                 text = normalized,
                 timestampMillis = System.currentTimeMillis(),
                 renderedEmoticonRanges = renderedEmoticonRanges,
+                nativeStyle = style,
             ),
         )
         scope.launch {
@@ -429,6 +443,7 @@ class MockMsnp18Client(
             incrementUnread(contactId)
             mutableEvents.emit(MessengerEvent.IncomingMessage(contactId, incoming.id))
         }
+        return Result.success(Unit)
     }
 
     override suspend fun sendTyping(contactId: String) {
@@ -571,6 +586,7 @@ class MessengerRepository(
     private val useMockServer: Boolean = client is MockMsnp18Client,
     private val onRemoteSignOut: () -> Unit = {},
     private val signOutOtherSessionsOnSignIn: (AccountIdentity) -> Boolean = { false },
+    private val styleStore: ConversationStyleStore = ConversationStyleStore(),
 ) {
     private var nicknameJob: Job? = null
     private var personalMessageJob: Job? = null
@@ -590,6 +606,7 @@ class MessengerRepository(
 
     val profile: StateFlow<UserProfileSnapshot> = mutableProfile.asStateFlow()
     val drafts: StateFlow<Map<String, String>> = draftStore.drafts
+    val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
     val contactRequests: StateFlow<List<ContactRequest>> = client.contactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> = client.groupInvitations
@@ -652,6 +669,7 @@ class MessengerRepository(
                     historyMutationMutex.withLock {
                         val account = AccountIdentity.forServer(request.email, request.serverConfig, useMockServer)
                         draftStore.selectAccount(account.storageId)
+                        styleStore.selectAccount(account.storageId)
                         historyStore.selectAccount(account.storageId)
                         historyStore.merge(client.messages.value)
                     }
@@ -828,13 +846,16 @@ class MessengerRepository(
         renderedEmoticonRanges: List<MsnEmoticonRange>? = null,
     ) {
         val outgoing = prepareOutgoingMessage(text, renderedEmoticonRanges)
-        scope.launch { client.sendMessage(contactId, outgoing.first, outgoing.second) }
+        val style = textStyles.value[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle()
+        scope.launch { client.sendStyledMessage(contactId, outgoing.first, outgoing.second, style) }
     }
 
     suspend fun sendMessageNow(contactId: String, text: String): Result<Unit> =
-        client.sendMessageWithResult(
+        client.sendStyledMessage(
             contactId,
             text.withoutMessengerPlusFormattingIfDisabled(),
+            null,
+            textStyles.value[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
         )
 
     fun retryMessage(contactId: String, messageId: Long) {
@@ -861,6 +882,8 @@ class MessengerRepository(
         if (messengerPlusEnabled()) this else messengerPlusPlainText()
 
     fun updateDraft(contactId: String, text: String) = draftStore.update(contactId, text)
+    fun updateTextStyle(contactId: String, style: NativeTextStyle) = styleStore.update(contactId, style)
+    fun markTextSizeNoticeShown(contactId: String): Boolean = styleStore.markSizeNoticeShown(contactId)
 
     fun sendTyping(contactId: String) {
         scope.launch { client.sendTyping(contactId) }
@@ -1005,6 +1028,7 @@ class MessengerRepository(
         displayPictureJob = null
         lastSignInRequest = null
         draftStore.deselectAccount()
+        styleStore.deselectAccount()
         mutableConnectionIssue.value = null
         client.close()
         mutableProfile.value = UserProfileSnapshot("You", "", Presence.Online)

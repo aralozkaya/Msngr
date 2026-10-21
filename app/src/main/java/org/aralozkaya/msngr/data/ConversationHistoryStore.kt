@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -499,6 +501,8 @@ private fun DataInputStream.readChatMessage(contactId: String, version: Int = 1)
         deliveryError = if (version >= 2 && readBoolean()) readSizedString() else null,
         senderEmail = if (version >= 3 && readBoolean()) readSizedString() else null,
         senderName = if (version >= 3 && readBoolean()) readSizedString() else null,
+        nativeStyle = if (version >= 4) NativeTextStyle.fromFormatHeader(readSizedString())
+            .copy(size = readInt()) else NativeTextStyle(),
     )
 }
 
@@ -524,6 +528,8 @@ private fun DataOutputStream.writeChatMessage(message: ChatMessage) {
     message.senderEmail?.let(::writeSizedString)
     writeBoolean(message.senderName != null)
     message.senderName?.let(::writeSizedString)
+    writeSizedString(message.nativeStyle.toFormatHeader())
+    writeInt(message.nativeStyle.size)
 }
 
 private fun writeHistoryChunk(file: File, contactId: String, messages: List<ChatMessage>) =
@@ -586,7 +592,7 @@ private val CHAT_MESSAGE_COMPARATOR = compareBy(ChatMessage::timestampMillis, Ch
 private val CHUNK_FILE_REGEX = Regex("chunk-(\\d{8})\\.bin")
 private const val DEFAULT_PAGE_SIZE = 200
 private const val CHUNK_MAGIC = 0x4D534743
-private const val CHUNK_VERSION = 3
+private const val CHUNK_VERSION = 4
 private const val LEGACY_FILE_MAGIC = 0x4D534748
 private const val LEGACY_FILE_VERSION = 1
 private const val MAX_ENTRY_COUNT = 1_000_000

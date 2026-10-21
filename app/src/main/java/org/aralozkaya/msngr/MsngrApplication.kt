@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import org.aralozkaya.msngr.data.ConversationDraftStore
 import org.aralozkaya.msngr.data.persistentConversationDraftStore
+import org.aralozkaya.msngr.data.ConversationStyleStore
+import org.aralozkaya.msngr.data.persistentConversationStyleStore
 import org.aralozkaya.msngr.data.ConversationHistoryStore
 import org.aralozkaya.msngr.data.FileContactDisplayPictureCache
 import org.aralozkaya.msngr.data.FileConversationHistoryStore
@@ -57,6 +59,7 @@ class MsngrApplication : Application() {
             ),
             messengerPlusEnabled = { MessengerPlusPrefs.isEnabled(this) },
             conversationDraftStore = persistentConversationDraftStore(this),
+            conversationStyleStore = persistentConversationStyleStore(this),
             onConversationRead = notificationManager::dismissConversation,
             onRemoteSignOut = {
                 // A remote sign-out must survive process restart and background service restore.
@@ -93,6 +96,7 @@ class AppContainer(
     private val onConversationRead: (String) -> Unit = {},
     private val onRemoteSignOut: () -> Unit = {},
     private val signOutOtherSessionsOnSignIn: (AccountIdentity) -> Boolean = { false },
+    private val conversationStyleStore: ConversationStyleStore = ConversationStyleStore(),
 ) {
     private var repository: MessengerRepository? = null
     private var repositoryUsesMockServer: Boolean? = null
@@ -108,6 +112,7 @@ class AppContainer(
             awaitNetworkAccess = awaitNetworkAccess,
             historyStore = conversationHistoryStore,
             draftStore = conversationDraftStore,
+            styleStore = conversationStyleStore,
             messengerPlusEnabled = messengerPlusEnabled,
             onConversationRead = onConversationRead,
             useMockServer = useMockServer,

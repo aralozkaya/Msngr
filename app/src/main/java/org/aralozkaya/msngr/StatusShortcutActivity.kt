@@ -157,6 +157,11 @@ internal fun StatusShortcutWindow(
     val statusMessageController = remember {
         MessengerPlusEditorController(MessengerPlusEditorSyntax.PROFILE_MARKUP)
     }
+    val formattingSheet = rememberMessengerPlusColorSheetState()
+    LaunchedEffect(messengerPlusEnabled, applying) {
+        if (!messengerPlusEnabled || applying) formattingSheet.dismiss()
+    }
+    MessengerPlusColorSheet(formattingSheet)
     var presenceMenuOpen by rememberSaveable { mutableStateOf(false) }
     val menuInteractionSource = remember { MutableInteractionSource() }
     // Null preserves the exact saved message when only presence changes.
@@ -237,6 +242,9 @@ internal fun StatusShortcutWindow(
                         )
                     },
                     controller = statusMessageController,
+                    onColors = if (messengerPlusEnabled && !applying) {
+                        { formattingSheet.open(statusMessageController) }
+                    } else null,
                     label = stringResource(R.string.shortcut_status_message_label),
                     emoticonSettings = emoticonSettings,
                     messengerPlusEnabled = messengerPlusEnabled,

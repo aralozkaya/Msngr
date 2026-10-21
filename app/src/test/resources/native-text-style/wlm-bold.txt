@@ -1,0 +1,6 @@
+MSG 7947 N 143
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI; EF=B; CO=0; CS=0; PF=22
+
+NATIVE-STYLE dialog bold

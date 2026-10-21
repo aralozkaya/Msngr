@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package org.aralozkaya.msngr
 
 import androidx.compose.foundation.BorderStroke
@@ -5,16 +7,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTile
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTileGrid
+import org.aralozkaya.msngr.pages.components.LocalKeyboardSheetHost
 
 /**
  * Remembers the selection that opened the color sheet so closing the selection toolbar does not
@@ -59,6 +69,8 @@ internal class MessengerPlusColorSheetState {
     }
 
     fun applyForeground(color: MessengerPlusColorValue) = apply { applyForeground(color) }
+    fun toggle(control: Char) = apply { toggle(control) }
+    fun clearFormatting() = apply { removeAllFormatting() }
 
     fun applyBackground(color: MessengerPlusColorValue) = apply { applyBackground(color) }
 
@@ -75,6 +87,7 @@ internal class MessengerPlusColorSheetState {
         target.restoreSelection(selection.selection)
         target.action()
         selectedValue = target.snapshot()
+        initialStyle = target.activeStyle
     }
 }
 
@@ -82,22 +95,14 @@ internal class MessengerPlusColorSheetState {
 internal fun rememberMessengerPlusColorSheetState(): MessengerPlusColorSheetState =
     remember { MessengerPlusColorSheetState() }
 
-/** Shows the color options in the keyboard's slot, through the page's keyboard sheet scaffold. */
+/** Selection-scoped Plus! decorations, colors and gradients, hosted in the keyboard slot. */
 @Composable
 internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
     var background by rememberSaveable { mutableStateOf(false) }
     var gradient by rememberSaveable { mutableStateOf(false) }
     var gradientStartInput by rememberSaveable { mutableStateOf("04") }
     var gradientEndInput by rememberSaveable { mutableStateOf("12") }
-    // The options don't fit the keyboard's height, so the sheet may grow up to twice that.
-    KeyboardPickerSheet(
-        visible = state.visible,
-        onDismissRequest = state::dismiss,
-        paneTitle = "Text colors",
-        testTag = MESSENGER_PLUS_COLOR_SHEET_TAG,
-        expandable = true,
-        keepOpenOnInputTap = true,
-        footer = if (gradient) {
+    val footer: (@Composable ColumnScope.() -> Unit)? = if (gradient) {
             {
                 val gradientStart = MessengerPlusTextCodec.colorValue(gradientStartInput)
                 val gradientEnd = MessengerPlusTextCodec.colorValue(gradientEndInput)
@@ -124,8 +129,26 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
             }
         } else {
             null
-        },
-    ) {
+        }
+    val content: @Composable ColumnScope.() -> Unit = {
+        Text("Plus! Formatting", style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.semantics { heading() })
+        val decorations = listOf(
+            Triple("Bold", MessengerPlusTextCodec.BOLD_CONTROL, state.initialStyle.bold),
+            Triple("Italic", MessengerPlusTextCodec.ITALIC_CONTROL, state.initialStyle.italic),
+            Triple("Strikeout", MessengerPlusTextCodec.STRIKEOUT_CONTROL, state.initialStyle.strikeout),
+            Triple("Underline", MessengerPlusTextCodec.UNDERLINE_CONTROL, state.initialStyle.underline),
+        )
+        decorations.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (label, control, active) ->
+                    FilterChip(selected = active, onClick = { state.toggle(control) },
+                        label = { Text(label) }, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        TextButton(onClick = state::clearFormatting) { Text("Clear formatting") }
+        HorizontalDivider()
         MessengerPlusColorOptions(
             state = state,
             background = background,
@@ -136,6 +159,27 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
             onGradientStartChange = { gradientStartInput = it },
             gradientEndInput = gradientEndInput,
             onGradientEndChange = { gradientEndInput = it },
+        )
+    }
+    if (LocalKeyboardSheetHost.current == null) {
+        // Compact status windows do not have a page-level keyboard sheet host.
+        if (state.visible) ModalBottomSheet(onDismissRequest = state::dismiss) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                content()
+                footer?.invoke(this)
+            }
+        }
+    } else {
+        KeyboardPickerSheet(
+            visible = state.visible,
+            onDismissRequest = state::dismiss,
+            paneTitle = "Plus! Formatting",
+            testTag = MESSENGER_PLUS_COLOR_SHEET_TAG,
+            expandable = true,
+            keepOpenOnInputTap = true,
+            footer = footer,
+            content = content,
         )
     }
 }

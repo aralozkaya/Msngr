@@ -162,7 +162,7 @@ fun KeyboardSheetScaffold(content: @Composable () -> Unit) {
         )
     }
     LaunchedEffect(host, density, heightStore, windowInfo) {
-        host.observeKeyboard(density, windowInfo) { heightStore.save(it, density) }
+        host.observeKeyboard(density, windowInfo, view::hideSoftwareKeyboard) { heightStore.save(it, density) }
     }
 
     CompositionLocalProvider(LocalKeyboardSheetHost provides host) {
@@ -662,6 +662,7 @@ internal class KeyboardSheetHostState(
     internal suspend fun observeKeyboard(
         density: Density,
         windowInfo: WindowInfo,
+        hideKeyboard: () -> Unit,
         onKeyboardMeasured: (Int) -> Unit,
     ) {
         snapshotFlow {
@@ -682,8 +683,13 @@ internal class KeyboardSheetHostState(
                 frame.entry == null -> keyboardReleased = false
                 !shown -> keyboardReleased = true
                 // Covered by a keyboard opened outside the sheet: remove it once that settles.
-                keyboardReleased && settled && frame.windowFocused && !frame.sheetFocused ->
-                    dismiss(instant = frame.height >= visibleSheetHeight(density))
+                keyboardReleased && settled && frame.windowFocused && !frame.sheetFocused -> {
+                    // An IME show already queued by the editor can finish after the sheet
+                    // takes its slot. Honor sheets that explicitly keep editor taps inside
+                    // the sheet workflow instead of dismissing them during that handoff.
+                    if (frame.entry.keepOpenOnInputTap) hideKeyboard()
+                    else dismiss(instant = frame.height >= visibleSheetHeight(density))
+                }
             }
         }
     }

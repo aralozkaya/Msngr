@@ -284,8 +284,8 @@ class MessengerPlusColorSheetInstrumentedTest {
             val callback = checkNotNull(editor.customSelectionActionModeCallback)
             val mode = checkNotNull(editor.startActionMode(callback, ActionMode.TYPE_FLOATING))
             callback.onPrepareActionMode(mode, mode.menu)
-            val colors = checkNotNull(mode.menu.findItem(R.id.format_colors)) {
-                "The selection toolbar should offer Colors"
+            val colors = checkNotNull(mode.menu.findItem(R.id.format_plus)) {
+                "The selection toolbar should offer Plus! Formatting"
             }
             assertTrue(callback.onActionItemClicked(mode, colors))
         }
