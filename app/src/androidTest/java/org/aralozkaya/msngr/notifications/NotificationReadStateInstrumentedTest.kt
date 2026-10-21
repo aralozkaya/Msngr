@@ -48,7 +48,7 @@ class NotificationReadStateInstrumentedTest {
             val events = listOf(
                 NotificationEvent(NotificationEventType.Message, contact.id, contact.displayName, messageText = "Hello"),
                 NotificationEvent(NotificationEventType.Nudge, contact.id, contact.displayName),
-                NotificationEvent(NotificationEventType.FriendOnline, contact.id, contact.displayName),
+                NotificationEvent(NotificationEventType.ContactSignedIn, contact.id, contact.displayName),
                 NotificationEvent(NotificationEventType.Message, other.id, other.displayName, messageText = "Still unread"),
             )
             events.forEach { notifications.show(it) }

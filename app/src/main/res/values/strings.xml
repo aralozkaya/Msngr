@@ -49,8 +49,9 @@
     <string name="notification_channel_messages_description">New Messenger conversations and direct replies</string>
     <string name="notification_channel_nudges">Nudges</string>
     <string name="notification_channel_nudges_description">Attention-grabbing Messenger nudges</string>
-    <string name="notification_channel_friends_online">Friends online</string>
-    <string name="notification_channel_friends_online_description">Friends who have just come online</string>
+    <string name="notification_channel_contact_signed_in">Contact signed in</string>
+    <string name="notification_channel_contact_signed_in_description">Contacts who have just signed in</string>
+    <string name="notification_contact_signed_in">%1$s has just signed in.</string>
     <string name="notification_channel_offline_messages">Offline messages</string>
     <string name="notification_channel_offline_messages_description">A notice when instant messages are received from your offline period</string>
     <string name="notification_offline_messages_received">You received instant messages while you were offline.</string>

@@ -117,7 +117,11 @@ sealed interface MessengerEvent {
     data class IncomingMessage(val contactId: String, val messageId: Long, val isOffline: Boolean = false) : MessengerEvent
     data object OfflineMessagesReceived : MessengerEvent
     data class IncomingNudge(val contactId: String) : MessengerEvent
-    data class PresenceChanged(val contactId: String, val presence: Presence) : MessengerEvent
+    data class PresenceChanged(
+        val contactId: String,
+        val presence: Presence,
+        val previousPresence: Presence,
+    ) : MessengerEvent
     data class ConnectionLost(val reason: String?) : MessengerEvent
     data class SignedOut(val reason: String) : MessengerEvent
 }
@@ -552,7 +556,7 @@ class MockMsnp18Client(
                 mutableContacts.update { list ->
                     list.map { if (it.id == contact.id) it.copy(presence = next) else it }
                 }
-                mutableEvents.emit(MessengerEvent.PresenceChanged(contact.id, next))
+                mutableEvents.emit(MessengerEvent.PresenceChanged(contact.id, next, contact.presence))
                 cursor++
             }
         }

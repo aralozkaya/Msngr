@@ -70,12 +70,13 @@ internal class RealtimeNotificationBridge(
                         )
                     }
                     is MessengerEvent.PresenceChanged -> {
-                        if (event.presence != Presence.Online) return@collect
+                        if (event.previousPresence != Presence.Offline ||
+                            event.presence == Presence.Offline) return@collect
                         val contact = repository.contactSnapshot(event.contactId) ?: return@collect
                         if (contact.isBlocked || !contact.isForwardListContact ||
                             repository.contactRequests.value.any { it.id == contact.id }) return@collect
                         NotificationEvent(
-                            type = NotificationEventType.FriendOnline,
+                            type = NotificationEventType.ContactSignedIn,
                             contactId = event.contactId,
                             contactName = contact.displayName.messengerPlusPlainText(),
                             contactAvatarUri = contact.avatarUri,

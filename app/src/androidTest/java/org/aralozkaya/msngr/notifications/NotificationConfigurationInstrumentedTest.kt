@@ -49,7 +49,25 @@ class NotificationConfigurationInstrumentedTest {
                     manager.getNotificationChannel(channelId),
                 )
             }
+            val signedInChannel = manager.getNotificationChannel(NotificationChannels.CONTACT_SIGNED_IN)
+            assertEquals("Contact signed in", signedInChannel.name.toString())
+            assertEquals("Contacts who have just signed in", signedInChannel.description)
         }
+    }
+
+    @Test
+    fun replacedFriendsOnlineChannelIsRemovedFromExistingInstallations() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(android.app.NotificationChannel(
+            "friends_online", "Friends online", NotificationManager.IMPORTANCE_DEFAULT,
+        ))
+
+        NotificationChannels.createAll(context)
+
+        assertNull(manager.getNotificationChannel("friends_online"))
+        assertNotNull(manager.getNotificationChannel(NotificationChannels.CONTACT_SIGNED_IN))
     }
 
     @Test
@@ -76,7 +94,7 @@ class NotificationConfigurationInstrumentedTest {
                 ),
             )
             renderer.show(event(NotificationEventType.Nudge, "nudge-event"))
-            renderer.show(event(NotificationEventType.FriendOnline, "online-event"))
+            renderer.show(event(NotificationEventType.ContactSignedIn, "signed-in-event"))
             renderer.showOfflineMessagesReceived()
             renderer.syncContactRequests(org.aralozkaya.msngr.data.ContactRequestInbox("test-account",
                 listOf(org.aralozkaya.msngr.data.ContactRequest("peer@example.test", "Pending/test"))))
@@ -132,25 +150,25 @@ class NotificationConfigurationInstrumentedTest {
                 markReadAction.semanticAction,
             )
         }
-        val onlineNotification = notificationsByChannel.getValue(
-            NotificationChannels.FRIENDS_ONLINE,
+        val signedInNotification = notificationsByChannel.getValue(
+            NotificationChannels.CONTACT_SIGNED_IN,
         ).notification
-        assertNull(onlineNotification.getLargeIcon())
-        val onlineStyle = NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(onlineNotification)
-        assertEquals("is now online", onlineStyle?.messages?.single()?.text?.toString())
-        assertEquals("Test contact", onlineStyle?.messages?.single()?.person?.name?.toString())
-        assertNotNull(onlineStyle?.messages?.single()?.person?.icon)
+        assertNull(signedInNotification.getLargeIcon())
+        val signedInStyle = NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(signedInNotification)
+        assertEquals("Test contact has just signed in.", signedInStyle?.messages?.single()?.text?.toString())
+        assertEquals("Test contact", signedInStyle?.messages?.single()?.person?.name?.toString())
+        assertNotNull(signedInStyle?.messages?.single()?.person?.icon)
         assertEquals(
-            MsngrNotificationManager.conversationShortcutId("online-event@example.com"),
-            NotificationCompat.getShortcutId(onlineNotification),
+            MsngrNotificationManager.conversationShortcutId("signed-in-event@example.com"),
+            NotificationCompat.getShortcutId(signedInNotification),
         )
-        val onlineNudgeAction = onlineNotification.actions.orEmpty().single()
+        val signedInNudgeAction = signedInNotification.actions.orEmpty().single()
         assertEquals(
             context.getString(R.string.notification_nudge_label),
-            onlineNudgeAction.title.toString(),
+            signedInNudgeAction.title.toString(),
         )
-        assertTrue(onlineNudgeAction.remoteInputs.isNullOrEmpty())
+        assertTrue(signedInNudgeAction.remoteInputs.isNullOrEmpty())
         val receivedNudgeNotification = notificationsByChannel.getValue(
             NotificationChannels.NUDGES,
         ).notification
@@ -175,7 +193,7 @@ class NotificationConfigurationInstrumentedTest {
         }
         assertTrue(systemManager.activeNotifications.none { it.id == messageId })
         assertTrue(systemManager.activeNotifications.any {
-            it.notification.channelId == NotificationChannels.FRIENDS_ONLINE
+            it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
         })
         assertTrue(systemManager.activeNotifications.any {
             it.notification.channelId == NotificationChannels.NUDGES
@@ -214,7 +232,7 @@ class NotificationConfigurationInstrumentedTest {
         val renderer = MsngrNotificationManager(context)
         val contactPictureId = "contact-picture@example.com"
         val fallbackId = "fallback-picture@example.com"
-        val onlineSentAtMillis = System.currentTimeMillis()
+        val signedInSentAtMillis = System.currentTimeMillis()
 
         renderer.show(
             NotificationEvent(
@@ -234,11 +252,11 @@ class NotificationConfigurationInstrumentedTest {
         )
         renderer.show(
             NotificationEvent(
-                type = NotificationEventType.FriendOnline,
+                type = NotificationEventType.ContactSignedIn,
                 contactId = contactPictureId,
                 contactName = "Contact with picture",
                 contactAvatarUri = profilePictureDataUri(),
-                sentAtMillis = onlineSentAtMillis,
+                sentAtMillis = signedInSentAtMillis,
             ),
         )
 
@@ -248,7 +266,7 @@ class NotificationConfigurationInstrumentedTest {
                 contactPictureId,
             ),
             MsngrNotificationManager.notificationId(NotificationEventType.Nudge, fallbackId),
-            MsngrNotificationManager.notificationId(NotificationEventType.FriendOnline, contactPictureId),
+            MsngrNotificationManager.notificationId(NotificationEventType.ContactSignedIn, contactPictureId),
         )
         var notifications = emptyMap<Int, android.service.notification.StatusBarNotification>()
         for (attempt in 0 until 20) {
@@ -265,8 +283,8 @@ class NotificationConfigurationInstrumentedTest {
         val fallbackNotification = notifications.getValue(
             MsngrNotificationManager.notificationId(NotificationEventType.Nudge, fallbackId),
         ).notification
-        val onlineNotification = notifications.getValue(
-            MsngrNotificationManager.notificationId(NotificationEventType.FriendOnline, contactPictureId),
+        val signedInNotification = notifications.getValue(
+            MsngrNotificationManager.notificationId(NotificationEventType.ContactSignedIn, contactPictureId),
         ).notification
 
         assertNull(contactPictureNotification.getLargeIcon())
@@ -284,21 +302,21 @@ class NotificationConfigurationInstrumentedTest {
             ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId },
         )
         assertNotNull(fallbackNotification.getLargeIcon())
-        assertNull(onlineNotification.getLargeIcon())
-        val onlineStyle = NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(onlineNotification)
-        assertEquals(context.getString(R.string.notification_self_name), onlineStyle?.user?.name)
-        assertEquals(false, onlineStyle?.isGroupConversation)
-        val onlineMessage = onlineStyle?.messages?.single()
-        assertEquals("is now online", onlineMessage?.text?.toString())
-        assertEquals(onlineSentAtMillis, onlineMessage?.timestamp)
-        assertEquals("Contact with picture", onlineMessage?.person?.name?.toString())
-        assertEquals(contactPictureId, onlineMessage?.person?.key)
-        val onlinePicture = onlineMessage?.person?.icon?.loadDrawable(context)?.toBitmap()
-        assertNotNull(onlinePicture)
-        requireNotNull(onlinePicture)
-        assertEquals(Color.MAGENTA, onlinePicture.getPixel(onlinePicture.width / 2, onlinePicture.height / 2))
-        assertEquals(shortcutId, NotificationCompat.getShortcutId(onlineNotification))
+        assertNull(signedInNotification.getLargeIcon())
+        val signedInStyle = NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(signedInNotification)
+        assertEquals(context.getString(R.string.notification_self_name), signedInStyle?.user?.name)
+        assertEquals(false, signedInStyle?.isGroupConversation)
+        val signedInMessage = signedInStyle?.messages?.single()
+        assertEquals("Contact with picture has just signed in.", signedInMessage?.text?.toString())
+        assertEquals(signedInSentAtMillis, signedInMessage?.timestamp)
+        assertEquals("Contact with picture", signedInMessage?.person?.name?.toString())
+        assertEquals(contactPictureId, signedInMessage?.person?.key)
+        val signedInPicture = signedInMessage?.person?.icon?.loadDrawable(context)?.toBitmap()
+        assertNotNull(signedInPicture)
+        requireNotNull(signedInPicture)
+        assertEquals(Color.MAGENTA, signedInPicture.getPixel(signedInPicture.width / 2, signedInPicture.height / 2))
+        assertEquals(shortcutId, NotificationCompat.getShortcutId(signedInNotification))
         ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId))
         systemManager.cancelAll()
     }
