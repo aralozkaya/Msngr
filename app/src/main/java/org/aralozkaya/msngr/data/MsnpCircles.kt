@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
@@ -31,6 +33,7 @@ internal object MsnpCircles {
     fun message(
         transactionId: Int, groupEmail: String, senderEmail: String, endpointId: String,
         text: String = "", type: String = "Text",
+        style: NativeTextStyle = NativeTextStyle(),
     ): MsnpCommand {
         require(listOf(groupEmail, senderEmail, endpointId).none { '\r' in it || '\n' in it })
         val body = when (type) {
@@ -47,7 +50,7 @@ internal object MsnpCircles {
             append("Content-Type: ${if (type == "Control") "text/x-msmsgscontrol" else "text/plain; charset=UTF-8"}\r\n")
             append("Content-Transfer-Encoding: 7bit\r\nMessage-Type: $type\r\nMIME-Version: 1.0\r\n")
             if (type == "Control") append("Message-Subtype: Typing\r\nTypingUser: $senderEmail\r\n")
-            if (type == "Text") append("X-MMS-IM-Format: FN=Segoe%20UI; EF=; CO=0; CS=1; PF=0\r\n")
+            if (type == "Text") append("X-MMS-IM-Format: ${style.toFormatHeader()}\r\n")
             append("\r\n")
         }.toByteArray(Charsets.UTF_8)
         return payloadCommand("SDG", transactionId, headers + body)

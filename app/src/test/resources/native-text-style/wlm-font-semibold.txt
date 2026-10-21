@@ -1,0 +1,6 @@
+MSG 21125 N 149
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI%20Semibold; EF=; CO=0; CS=0; PF=22
+
+NATIVE-FONT Semibold

@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.CancellationException
@@ -592,6 +594,13 @@ internal class LiveMsnp18Client(
         contactId: String,
         text: String,
         renderedEmoticonRanges: List<MsnEmoticonRange>?,
+    ): Result<Unit> = sendStyledMessage(contactId, text, renderedEmoticonRanges, NativeTextStyle())
+
+    override suspend fun sendStyledMessage(
+        contactId: String,
+        text: String,
+        renderedEmoticonRanges: List<MsnEmoticonRange>?,
+        style: NativeTextStyle,
     ): Result<Unit> {
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(
             text.withoutUnicodeEmoji(),
@@ -607,6 +616,7 @@ internal class LiveMsnp18Client(
             timestampMillis = System.currentTimeMillis(),
             renderedEmoticonRanges = renderedEmoticonRanges,
             isSending = true,
+            nativeStyle = style,
         )
         appendMessage(message)
         return deliverMessage(message)
@@ -647,7 +657,7 @@ internal class LiveMsnp18Client(
                 "Messages cannot be sent to a blocked contact."
             }
             if (isGroup(email)) {
-                val command = MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, message.text)
+                val command = MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, message.text, style = message.nativeStyle)
                 val transaction = checkNotNull(command.transactionId)
                 circleDeliveries[transaction] = message.contactId to message.id
                 try {
@@ -671,7 +681,7 @@ internal class LiveMsnp18Client(
                     sendOfflineMessage(email, message)
                     null
                 }
-                board?.sendText(message.text)
+                board?.sendText(message.text, message.nativeStyle)
             }
             Unit
         }
@@ -699,7 +709,7 @@ internal class LiveMsnp18Client(
     }
 
     private suspend fun sendOfflineMessage(email: String, message: ChatMessage) {
-        val command = MsnpOfflineMessages.send(nextTransactionId(), email, message.text)
+        val command = MsnpOfflineMessages.send(nextTransactionId(), email, message.text, message.nativeStyle)
         val transaction = checkNotNull(command.transactionId)
         circleDeliveries[transaction] = message.contactId to message.id
         try { send(command) } catch (error: Exception) {
@@ -1558,6 +1568,8 @@ internal class LiveMsnp18Client(
                 else String(envelope.body, StandardCharsets.UTF_8),
             timestampMillis = System.currentTimeMillis(), isNudge = nudge,
             senderEmail = sender, senderName = senderName,
+            nativeStyle = if (nudge) NativeTextStyle() else
+                NativeTextStyle.fromFormatHeader(envelope.headers["x-mms-im-format"]),
         )
         appendMessage(message)
         typingJobs.remove(id)?.cancel()
@@ -2227,6 +2239,7 @@ internal class LiveMsnp18Client(
                     contactId = contactId,
                     author = MessageAuthor.Contact,
                     text = event.text,
+                    nativeStyle = event.style,
                     timestampMillis = System.currentTimeMillis(),
                 )
                 appendMessage(message)

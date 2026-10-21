@@ -56,7 +56,7 @@ class AppShortcutStatusMenuInstrumentedTest {
     }
 
     @Test
-    fun statusShortcutOmitsPickersAndSavesTheStyledSelection() {
+    fun statusShortcutOpensPlusFormattingAndSavesTheStyledSelection() {
         var savedMessage: String? = null
         compose.setContent {
             MsngrTheme {
@@ -81,10 +81,11 @@ class AppShortcutStatusMenuInstrumentedTest {
             val mode = checkNotNull(editor.startActionMode(callback, ActionMode.TYPE_FLOATING))
             assertNull(mode.menu.findItem(R.id.format_colors))
             assertNull(mode.menu.findItem(R.id.insert_emoticon))
-            callback.onActionItemClicked(mode, checkNotNull(mode.menu.findItem(R.id.format_bold)))
-            mode.finish()
+            assertNull(mode.menu.findItem(R.id.format_native))
+            callback.onActionItemClicked(mode, checkNotNull(mode.menu.findItem(R.id.format_plus)))
         }
-        compose.onNodeWithTag(MESSENGER_PLUS_COLOR_SHEET_TAG).assertDoesNotExist()
+        compose.onNodeWithText("Bold").performClick()
+        androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithTag("shortcut_status_save").performClick()
         compose.runOnIdle { assertEquals("one [b]two[/b] three", savedMessage) }
     }

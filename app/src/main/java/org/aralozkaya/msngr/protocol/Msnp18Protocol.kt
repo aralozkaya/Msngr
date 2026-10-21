@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.protocol
 
+import org.aralozkaya.msngr.NativeTextStyle
+
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -224,10 +226,10 @@ object Msnp18Protocol {
         body = "ID: 1\r\n".toByteArray(StandardCharsets.UTF_8),
     )
 
-    fun textPayload(message: String): ByteArray = mimePayload(
+    fun textPayload(message: String, style: NativeTextStyle = NativeTextStyle()): ByteArray = mimePayload(
         contentType = "text/plain; charset=UTF-8",
         extraHeaders = mapOf(
-            "X-MMS-IM-Format" to "FN=Segoe%20UI; EF=; CO=0; CS=0; PF=22",
+            "X-MMS-IM-Format" to style.toFormatHeader(),
         ),
         body = message.toByteArray(StandardCharsets.UTF_8),
     )

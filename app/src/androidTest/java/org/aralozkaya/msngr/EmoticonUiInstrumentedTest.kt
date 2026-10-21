@@ -77,9 +77,9 @@ class EmoticonUiInstrumentedTest {
             mode.menu.add(0, android.R.id.copy, 0, "Copy")
             callback.onPrepareActionMode(mode, mode.menu)
             assertTrue(mode.menu.findItem(android.R.id.copy) != null)
-            for (id in listOf(R.id.format_bold, R.id.format_italic,
-                R.id.format_strikethrough, R.id.format_underline)) {
-                assertTrue(callback.onActionItemClicked(mode, mode.menu.findItem(id)))
+            for (control in listOf(MessengerPlusTextCodec.BOLD_CONTROL, MessengerPlusTextCodec.ITALIC_CONTROL,
+                MessengerPlusTextCodec.STRIKEOUT_CONTROL, MessengerPlusTextCodec.UNDERLINE_CONTROL)) {
+                formattingController.toggle(control)
             }
             val result = formattingController.snapshot()
             val parsed = MessengerPlusTextCodec.parse(result.text)
@@ -90,7 +90,7 @@ class EmoticonUiInstrumentedTest {
             assertEquals("two", MessengerPlusTextCodec.plainText(
                 result.text.substring(result.selection.min, result.selection.max),
             ))
-            assertTrue(callback.onActionItemClicked(mode, mode.menu.findItem(R.id.format_clear)))
+            formattingController.removeAllFormatting()
             assertEquals("one two three", formattingController.snapshot().text)
             assertTrue(mode.menu.findItem(android.R.id.copy) != null)
             mode.finish()
@@ -129,7 +129,7 @@ class EmoticonUiInstrumentedTest {
             editor.setSelection(4, 7)
             val callback = checkNotNull(editor.customSelectionActionModeCallback)
             val mode = checkNotNull(editor.startActionMode(callback, ActionMode.TYPE_FLOATING))
-            callback.onActionItemClicked(mode, mode.menu.findItem(R.id.format_bold))
+            formattingController.toggle(MessengerPlusTextCodec.BOLD_CONTROL)
             assertEquals("one [b]two[/b] three", editor.text.toString())
             assertTrue(formattingController.supportsBackgroundFormatting)
             formattingController.applyForeground(checkNotNull(MessengerPlusTextCodec.paletteColor(4)))

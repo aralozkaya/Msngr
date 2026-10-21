@@ -8,4 +8,6 @@
     <item type="id" name="format_underline" />
     <item type="id" name="format_clear" />
     <item type="id" name="format_colors" />
+    <item type="id" name="format_plus" />
+    <item type="id" name="format_native" />
 </resources>

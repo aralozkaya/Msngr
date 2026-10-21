@@ -30,6 +30,36 @@ import org.junit.Test
 import java.io.IOException
 
 class MessengerRepositoryTest {
+    @Test fun savedNativeStyleAppliesToEverySendAndSurvivesDraftClearingAndLogout() = runBlocking {
+        val client = MockMsnp18Client(signInDelayMillis = 0)
+        val repository = MessengerRepository(client, messengerPlusEnabled = { false })
+        val request = SignInRequest(MockServerData.ACCOUNT_EMAIL, MockServerData.ACCOUNT_PASSWORD,
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        val selected = NativeTextStyle(true, true, true, true, 0x123456, 22)
+        try {
+            repository.signIn(request).getOrThrow()
+            repository.updateTextStyle("selin", selected)
+            repository.updateTextStyle("group@live.com", selected.copy(size = 18))
+            repository.updateDraft("selin", "[b]draft[/b]")
+            repository.updateDraft("selin", "")
+            repository.sendMessageNow("selin", "[b]first[/b]").getOrThrow()
+            repository.sendMessage("selin", "second")
+            withTimeout(2_000) { client.messages.first { it["selin"].orEmpty().count { message -> message.author == org.aralozkaya.msngr.data.MessageAuthor.Me } == 2 } }
+            assertTrue(client.messages.value.getValue("selin").filter { it.author == org.aralozkaya.msngr.data.MessageAuthor.Me }
+                .all { it.nativeStyle == selected })
+            assertEquals("first", client.messages.value.getValue("selin").first().text)
+            repository.sendMessageNow("mert", "default").getOrThrow()
+            assertEquals(NativeTextStyle(), client.messages.value.getValue("mert").first().nativeStyle)
+            repository.sendMessageNow("group@live.com", "group").getOrThrow()
+            assertEquals(selected.copy(size = 18), client.messages.value.getValue("group@live.com").first().nativeStyle)
+            repository.logout()
+            assertTrue(repository.textStyles.value.isEmpty())
+            repository.signIn(request).getOrThrow()
+            assertEquals(selected, repository.textStyles.value["selin"])
+            repository.sendMessageNow("selin", "after login").getOrThrow()
+            assertEquals(selected, client.messages.value.getValue("selin").first().nativeStyle)
+        } finally { repository.logout() }
+    }
     private val currentSession = org.aralozkaya.msngr.data.AccountSession("current", "Phone", true)
     private val remoteSessions = listOf(
         org.aralozkaya.msngr.data.AccountSession("laptop", "Laptop"),

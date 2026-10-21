@@ -1,0 +1,6 @@
+MSG 22150 N 152
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI%20Black; EF=BI; CO=0; CS=0; PF=22
+
+NATIVE-FONT Black Italic

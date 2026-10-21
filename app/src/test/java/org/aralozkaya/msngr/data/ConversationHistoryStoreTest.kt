@@ -12,6 +12,22 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 
 class ConversationHistoryStoreTest {
+    @Test fun nativeMessageStyleSurvivesRestart() {
+        withHistoryDirectory("msngr-history-native-style") { directory ->
+            val styled = message(1).copy(nativeStyle = org.aralozkaya.msngr.NativeTextStyle(
+                strikeout = true, underline = true, colorRgb = 0x123456, size = 24)
+                .withFontStyle(org.aralozkaya.msngr.NativeFontStyle.BlackItalic))
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(styled)))
+            }
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertEquals(styled, messages.value.getValue(CONTACT).single())
+            }
+        }
+    }
     @Test
     fun offlineMessagesOlderThanLoadedPagesAreDurableAndDeduplicatedAcrossRestart() {
         withHistoryDirectory("msngr-history-offline") { directory ->
