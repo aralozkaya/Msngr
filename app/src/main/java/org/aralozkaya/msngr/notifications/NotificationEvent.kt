@@ -3,7 +3,7 @@ package org.aralozkaya.msngr.notifications
 internal enum class NotificationEventType {
     Message,
     Nudge,
-    FriendOnline,
+    ContactSignedIn,
 }
 
 internal data class NotificationEvent(

@@ -237,7 +237,7 @@ mode. Credential encryption does not provide end-to-end chat encryption.
   Expressive cards and pull-to-refresh. Group invitations have their own Android notification channel.
   See [`docs/GROUP_CREATION.md`](docs/GROUP_CREATION.md). Custom invitation messages and the current
   Escargot contact-message limitation are documented in [`docs/REQUEST_MESSAGES.md`](docs/REQUEST_MESSAGES.md).
-- Android notifications use independent Messages, Nudges, Friends online, and Offline messages channels. A standard
+- Android notifications use independent Messages, Nudges, Contact signed in, and Offline messages channels. A standard
   remote-messaging foreground service keeps the direct MSNP connection alive in the background.
   Message notifications support inline replies and interrupted sessions reconnect with capped,
   network-aware backoff.

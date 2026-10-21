@@ -138,7 +138,7 @@ internal class MsngrNotificationManager(private val context: Context) {
         when (displayEvent.type) {
             NotificationEventType.Message -> showMessage(displayEvent, contact, contactIcon)
             NotificationEventType.Nudge -> showNudge(displayEvent, contact, contactAvatar)
-            NotificationEventType.FriendOnline -> showFriendOnline(displayEvent, contact, contactIcon)
+            NotificationEventType.ContactSignedIn -> showContactSignedIn(displayEvent, contact, contactIcon)
         }
     }
 
@@ -310,14 +310,18 @@ internal class MsngrNotificationManager(private val context: Context) {
         notify(notificationId, notification)
     }
 
-    private fun showFriendOnline(event: NotificationEvent, contact: Person, contactIcon: IconCompat) {
-        val notificationId = notificationId(NotificationEventType.FriendOnline, event.contactId)
+    private fun showContactSignedIn(event: NotificationEvent, contact: Person, contactIcon: IconCompat) {
+        val notificationId = notificationId(NotificationEventType.ContactSignedIn, event.contactId)
         val shortcut = publishConversationShortcut(event, contact, contactIcon)
         val style = messagingStyle()
             .setGroupConversation(false)
-            .addMessage("is now online", event.sentAtMillis, contact)
+            .addMessage(
+                context.getString(R.string.notification_contact_signed_in, event.contactName),
+                event.sentAtMillis,
+                contact,
+            )
         val notification = baseBuilder(
-            NotificationChannels.FRIENDS_ONLINE,
+            NotificationChannels.CONTACT_SIGNED_IN,
             event.contactId,
             event.contactName,
             contact,
@@ -331,7 +335,7 @@ internal class MsngrNotificationManager(private val context: Context) {
                 nudgeAction(
                     event = event,
                     notificationId = notificationId,
-                    channelId = NotificationChannels.FRIENDS_ONLINE,
+                    channelId = NotificationChannels.CONTACT_SIGNED_IN,
                     label = context.getString(R.string.notification_nudge_label),
                 ),
             )
@@ -469,7 +473,7 @@ internal class MsngrNotificationManager(private val context: Context) {
             val typePrefix = when (type) {
                 NotificationEventType.Message -> 100_000
                 NotificationEventType.Nudge -> 200_000
-                NotificationEventType.FriendOnline -> 300_000
+                NotificationEventType.ContactSignedIn -> 300_000
             }
             return typePrefix + (contactId.hashCode() and 0x7fffffff) % 90_000
         }

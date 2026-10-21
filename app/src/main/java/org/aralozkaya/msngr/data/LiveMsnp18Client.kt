@@ -1685,7 +1685,7 @@ internal class LiveMsnp18Client(
             (!initialPresenceSync || restoringContactPresence) &&
             (command.verb != "ILN" || restoringContactPresence)
         ) {
-            mutableEvents.tryEmit(MessengerEvent.PresenceChanged(email.lowercase(), presence))
+            mutableEvents.tryEmit(MessengerEvent.PresenceChanged(email.lowercase(), presence, previousPresence))
         }
     }
 
@@ -1843,7 +1843,7 @@ internal class LiveMsnp18Client(
         if (previousPresence != null && previousPresence != Presence.Offline &&
             (!initialPresenceSync || restoringContactPresence)
         ) {
-            mutableEvents.tryEmit(MessengerEvent.PresenceChanged(id, Presence.Offline))
+            mutableEvents.tryEmit(MessengerEvent.PresenceChanged(id, Presence.Offline, previousPresence))
         }
     }
 

@@ -68,7 +68,7 @@ internal class NudgeContactWorker(
         private val ALLOWED_CHANNEL_IDS = setOf(
             NotificationChannels.MESSAGES,
             NotificationChannels.NUDGES,
-            NotificationChannels.FRIENDS_ONLINE,
+            NotificationChannels.CONTACT_SIGNED_IN,
         )
     }
 }

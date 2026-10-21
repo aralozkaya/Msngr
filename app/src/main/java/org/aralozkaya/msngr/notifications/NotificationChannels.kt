@@ -9,14 +9,14 @@ import org.aralozkaya.msngr.R
 object NotificationChannels {
     const val MESSAGES = "messages"
     const val NUDGES = "nudges"
-    const val FRIENDS_ONLINE = "friends_online"
+    const val CONTACT_SIGNED_IN = "contact_signed_in"
     const val OFFLINE_MESSAGES = "offline_messages"
     const val CONTACT_REQUESTS = "contact_requests"
     const val GROUP_INVITATIONS = "group_invitations"
     const val BACKGROUND_CONNECTION = "background_connection"
     const val APP_UPDATES = "app_updates"
 
-    val userConfigurable = listOf(MESSAGES, NUDGES, FRIENDS_ONLINE, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS, APP_UPDATES)
+    val userConfigurable = listOf(MESSAGES, NUDGES, CONTACT_SIGNED_IN, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS, APP_UPDATES)
 
     fun createAll(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -52,12 +52,12 @@ object NotificationChannels {
                     vibrationPattern = longArrayOf(0, 120, 80, 160, 80, 220)
                 },
                 NotificationChannel(
-                    FRIENDS_ONLINE,
-                    context.getString(R.string.notification_channel_friends_online),
+                    CONTACT_SIGNED_IN,
+                    context.getString(R.string.notification_channel_contact_signed_in),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
                     description = context.getString(
-                        R.string.notification_channel_friends_online_description,
+                        R.string.notification_channel_contact_signed_in_description,
                     )
                 },
                 NotificationChannel(
@@ -97,5 +97,7 @@ object NotificationChannels {
                 },
             ),
         )
+        // Remove the replaced channel from Android settings on existing installations.
+        manager.deleteNotificationChannel("friends_online")
     }
 }

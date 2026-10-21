@@ -200,6 +200,46 @@ class LiveMsnp18ClientContractTest {
         } finally { h.close() }
     }
 
+    @Test fun presenceEventsKeepBothStatusesForEveryTransition() = runBlocking {
+        for (previous in Presence.entries) {
+            for (next in Presence.entries) {
+                val h = PresenceHarness()
+                try {
+                    h.signIn()
+                    h.announce("ILN", previous)
+                    h.completeSync()
+                    if (next == Presence.Offline) h.offline() else h.announce("NLN", next)
+                    val expected = if (previous == next) emptyList() else listOf(
+                        MessengerEvent.PresenceChanged(contact.id, next, previous),
+                    )
+                    assertEquals("$previous -> $next", expected, h.presenceEvents)
+                } finally { h.close() }
+            }
+        }
+    }
+
+    @Test fun reconnectPresenceEventsKeepTheLastObservedStatus() = runBlocking {
+        for (verb in listOf("ILN", "NLN")) {
+            for (previous in Presence.entries) {
+                val next = if (previous == Presence.Busy) Presence.Away else Presence.Busy
+                val h = PresenceHarness()
+                try {
+                    h.signIn()
+                    h.announce("ILN", previous)
+                    h.completeSync()
+                    h.disconnect()
+                    h.signIn()
+                    h.announce(verb, next)
+                    h.completeSync()
+                    assertEquals(
+                        listOf(MessengerEvent.PresenceChanged(contact.id, next, previous)),
+                        h.presenceEvents,
+                    )
+                } finally { h.close() }
+            }
+        }
+    }
+
     @Test fun reconnectReportsOnlyContactsWhoChangedFromOfflineToOnlineDuringTheOutage() = runBlocking {
         for (verb in listOf("ILN", "NLN")) {
             val h = PresenceHarness()
@@ -214,7 +254,7 @@ class LiveMsnp18ClientContractTest {
                 h.announce("NLN", Presence.Online, h.otherContact.id)
                 h.completeSync()
                 assertEquals(
-                    listOf(MessengerEvent.PresenceChanged(h.otherContact.id, Presence.Online)),
+                    listOf(MessengerEvent.PresenceChanged(h.otherContact.id, Presence.Online, Presence.Offline)),
                     h.presenceEvents,
                 )
             } finally { h.close() }
@@ -236,7 +276,7 @@ class LiveMsnp18ClientContractTest {
             h.announce("ILN", Presence.Online, h.otherContact.id)
             h.completeSync()
             assertEquals(
-                listOf(MessengerEvent.PresenceChanged(h.otherContact.id, Presence.Online)),
+                listOf(MessengerEvent.PresenceChanged(h.otherContact.id, Presence.Online, Presence.Offline)),
                 h.presenceEvents,
             )
         } finally { h.close() }
@@ -252,7 +292,7 @@ class LiveMsnp18ClientContractTest {
             h.signIn()
             h.completeSync() // Offline contacts need not receive an explicit FLN.
             h.announce("NLN", Presence.Online)
-            assertEquals(listOf(MessengerEvent.PresenceChanged(contact.id, Presence.Online)), h.presenceEvents)
+            assertEquals(listOf(MessengerEvent.PresenceChanged(contact.id, Presence.Online, Presence.Offline)), h.presenceEvents)
 
             // Keep that observation through another reconnect too.
             h.disconnect()

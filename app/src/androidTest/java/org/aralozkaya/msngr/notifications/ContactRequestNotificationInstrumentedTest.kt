@@ -15,7 +15,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ContactRequestNotificationInstrumentedTest {
-    @Test fun pendingAndDeclinedPeopleAreNotAnnouncedAsFriendsOnline() = runBlocking {
+    @Test fun pendingAndDeclinedPeopleDoNotTriggerContactSignedInNotifications() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation
@@ -36,7 +36,7 @@ class ContactRequestNotificationInstrumentedTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val repository = MessengerRepository(client, scope, useMockServer = true)
         val bridge = RealtimeNotificationBridge(AppVisibilityTracker(), MsngrNotificationManager(context), scope)
-        val friendId = MsngrNotificationManager.notificationId(NotificationEventType.FriendOnline, peer)
+        val signedInId = MsngrNotificationManager.notificationId(NotificationEventType.ContactSignedIn, peer)
         try {
             bridge.attach(repository)
             repository.signIn(SignInRequest("owner@example.test", "mock-only",
@@ -45,17 +45,17 @@ class ContactRequestNotificationInstrumentedTest {
             withTimeout(3000) {
                 while (manager.activeNotifications.none { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID }) delay(50)
             }
-            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online))
+            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online, Presence.Offline))
             delay(200)
             assertTrue(manager.activeNotifications.any { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID })
-            assertTrue(manager.activeNotifications.none { it.id == friendId })
+            assertTrue(manager.activeNotifications.none { it.id == signedInId })
             requests.value = emptyList() // Declining leaves the person outside the forward list.
-            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online))
+            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online, Presence.Offline))
             delay(200)
-            assertTrue(manager.activeNotifications.none { it.id == friendId })
+            assertTrue(manager.activeNotifications.none { it.id == signedInId })
             contacts.value = listOf(contact.copy(isForwardListContact = true))
-            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online))
-            withTimeout(3000) { while (manager.activeNotifications.none { it.id == friendId }) delay(50) }
+            events.emit(MessengerEvent.PresenceChanged(peer, Presence.Online, Presence.Offline))
+            withTimeout(3000) { while (manager.activeNotifications.none { it.id == signedInId }) delay(50) }
         } finally { repository.logout(); scope.cancel(); manager.cancelAll() }
     }
 }

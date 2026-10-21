@@ -14,13 +14,16 @@ launches it again.
 - Android 13+ notification permission is requested once, after a successful sign-in.
 - The connection service uses a low-priority, ongoing **Background connection** channel and Android's
   `remoteMessaging` foreground-service type.
-- `messages`, `nudges`, `friends_online`, and `offline_messages` are independent Android notification
+- `messages`, `nudges`, `contact_signed_in`, and `offline_messages` are independent Android notification
   channels. Android's app notification settings control the general offline-receipt notice
   separately from individual message notifications.
 - Message notifications offer `RemoteInput` replies and a one-tap **Nudge** action. Both are queued
   as expedited WorkManager tasks with a network constraint. Their workers use the active MSNP
   session, reconnect it, or sign back in from encrypted remembered credentials.
 - Incoming nudge notifications offer a **Nudge back** action through the same delivery path.
+- **Contact signed in** notifications say `<contact> has just signed in.` and are sent only when
+  a contact changes from Offline to Online, Busy, or Away. Changes between non-offline statuses
+  do not send notifications.
 - Tapping an event notification goes through the authenticated entry point and opens the matching
   conversation, including after process death.
 - Lost connections retry with capped exponential backoff. Retries suspend while Android reports that
@@ -41,13 +44,13 @@ under **Play Console > Policy > App content**. The manifest service type and per
 implemented.
 
 Users must grant the notification permission on Android 13 or newer. They may configure Messages,
-Nudges, Friends online, Offline messages, and Background connection independently in Android settings.
+Nudges, Contact signed in, Offline messages, and Background connection independently in Android settings.
 
 ## Device verification
 
 Test on a physical device with a real community-service account:
 
-1. Receive a message, nudge, and offline-to-online presence transition with the app backgrounded and
+1. Receive a message, nudge, and offline-to-non-offline presence transition with the app backgrounded and
    removed from Recents. Confirm that the ongoing Background connection notification remains present.
 2. Disable each event channel in Android settings and confirm that the other channels still work.
 3. Reply from a message notification with an active connection, after a forced network reconnect, and
