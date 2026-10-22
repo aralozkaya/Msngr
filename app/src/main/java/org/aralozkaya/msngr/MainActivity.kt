@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.annotation.PluralsRes
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -252,6 +253,7 @@ private fun MsngrApp(
     val contactRequests by repository.contactRequests.collectAsState()
     val groupInvitations by repository.groupInvitations.collectAsState()
     val requestCount = contactRequests.size + groupInvitations.size
+    val pendingCount = requestCount + if (updateState.hasUpdate) 1 else 0
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
     var showLogoutConfirmation by rememberSaveable { mutableStateOf(false) }
     var showSessions by rememberSaveable { mutableStateOf(false) }
@@ -307,8 +309,9 @@ private fun MsngrApp(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             BadgedBox(badge = {
-                                if (updateState.hasUpdate) UpdateBadge(Modifier.testTag("updates-icon-badge"))
-                                else if (requestCount > 0) RequestCountBadge(requestCount, "requests-icon-badge")
+                                if (pendingCount > 0) {
+                                    CountBadge(pendingCount, "requests-icon-badge", R.plurals.pending_items_badge)
+                                }
                             }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Open menu")
                             }
@@ -325,7 +328,7 @@ private fun MsngrApp(
                                     text = { Text(stringResource(R.string.requests_title)) },
                                     leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
                                     trailingIcon = if (requestCount > 0) {
-                                        { RequestCountBadge(requestCount, "requests-menu-badge") }
+                                        { CountBadge(requestCount, "requests-menu-badge") }
                                     } else null,
                                     onClick = { menuExpanded = false; onOpenRequests() },
                                     shape = MenuDefaults.leadingItemShape,
@@ -533,8 +536,8 @@ private fun MsngrApp(
 }
 
 @Composable
-private fun RequestCountBadge(count: Int, tag: String) {
-    val description = pluralStringResource(R.plurals.requests_badge, count, count)
+private fun CountBadge(count: Int, tag: String, @PluralsRes descriptionRes: Int = R.plurals.requests_badge) {
+    val description = pluralStringResource(descriptionRes, count, count)
     Badge(Modifier.testTag(tag).semantics { contentDescription = description }) {
         Text(if (count > 99) "99+" else count.toString())
     }

@@ -14,6 +14,10 @@
         <item quantity="one">%d pending request or invitation</item>
         <item quantity="other">%d pending requests and invitations</item>
     </plurals>
+    <plurals name="pending_items_badge">
+        <item quantity="one">%d pending item</item>
+        <item quantity="other">%d pending items</item>
+    </plurals>
     <string name="contact_requests_title">Contact requests</string>
     <string name="contact_request_message">Wants to add you to Messenger.</string>
     <string name="contact_request_accept">Accept</string>
