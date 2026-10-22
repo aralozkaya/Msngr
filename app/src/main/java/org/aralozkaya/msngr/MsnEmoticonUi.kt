@@ -312,7 +312,9 @@ internal fun MsnEmoticonEditor(
             editor.showSoftInputOnFocus = !keepSheetOpenOnTap
             editor.configureSingleLine(singleLine)
             if (onSearch != null) editor.imeOptions = EditorInfo.IME_ACTION_SEARCH
-            editor.hint = hint
+            // Even an unchanged hint rebuilds TextView's layout and dismisses its
+            // selection handles and action mode when selection triggers recomposition.
+            if (!TextUtils.equals(editor.hint, hint)) editor.hint = hint
             editor.contentDescription = contentDescription
             with(density) {
                 editor.setPaddingRelative(
