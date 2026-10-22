@@ -32,12 +32,14 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             EXTRA_NOTIFICATION_ID,
             MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId),
         )
+        val notifications = MsngrNotificationManager(context)
+        val previousNotification = notifications.activeNotification(notificationId)
         // Mark the conversation read when the reply is submitted, before network
         // work can be delayed or retried and newer messages can arrive.
         runCatching { context.appContainer.messengerRepository }.getOrNull()?.markRead(contactId)
-        MsngrNotificationManager(context).apply {
+        notifications.apply {
             dismissConversation(contactId)
-            markReplying(contactId, contactName, notificationId)
+            markReplying(contactId, contactName, notificationId, previousNotification)
         }
         val input = Data.Builder()
             .putString(ReplyMessageWorker.KEY_CONTACT_ID, contactId)

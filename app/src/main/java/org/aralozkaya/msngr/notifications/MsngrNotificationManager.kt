@@ -137,18 +137,24 @@ internal class MsngrNotificationManager(private val context: Context) {
         val contact = contactPerson(displayEvent, contactIcon)
         when (displayEvent.type) {
             NotificationEventType.Message -> showMessage(displayEvent, contact, contactIcon)
-            NotificationEventType.Nudge -> showNudge(displayEvent, contact, contactAvatar)
+            NotificationEventType.Nudge -> showNudge(displayEvent, contact, contactIcon)
             NotificationEventType.ContactSignedIn -> showContactSignedIn(displayEvent, contact, contactIcon)
         }
     }
 
-    fun markReplying(contactId: String, contactName: String, notificationId: Int) {
+    fun markReplying(
+        contactId: String,
+        contactName: String,
+        notificationId: Int,
+        previousNotification: Notification? = activeNotification(notificationId),
+    ) {
         if (!canPostNotifications()) return
         notify(
             notificationId,
-            baseBuilder(NotificationChannels.MESSAGES, contactId, contactName)
-                .setContentTitle(contactName)
-                .setContentText("Sending reply…")
+            actionStatusBuilder(
+                NotificationChannels.MESSAGES, contactId, contactName, "Sending reply…",
+                previousNotification,
+            )
                 .setProgress(0, 0, true)
                 .setOnlyAlertOnce(true)
                 .build(),
@@ -159,9 +165,11 @@ internal class MsngrNotificationManager(private val context: Context) {
         if (!canPostNotifications()) return
         notify(
             notificationId,
-            baseBuilder(NotificationChannels.MESSAGES, contactId, contactName)
-                .setContentTitle("Reply not sent")
-                .setContentText("Open Msngr to reconnect and try again.")
+            actionStatusBuilder(
+                NotificationChannels.MESSAGES, contactId, contactName,
+                "Reply not sent. Open Msngr to reconnect and try again.",
+                activeNotification(notificationId),
+            )
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build(),
@@ -177,9 +185,11 @@ internal class MsngrNotificationManager(private val context: Context) {
         if (!canPostNotifications()) return
         notify(
             notificationId,
-            baseBuilder(channelId, contactId, contactName)
-                .setContentTitle(contactName)
-                .setContentText(context.getString(R.string.notification_sending_nudge))
+            actionStatusBuilder(
+                channelId, contactId, contactName,
+                context.getString(R.string.notification_sending_nudge),
+                activeNotification(notificationId),
+            )
                 .setProgress(0, 0, true)
                 .setOnlyAlertOnce(true)
                 .build(),
@@ -195,9 +205,12 @@ internal class MsngrNotificationManager(private val context: Context) {
         if (!canPostNotifications()) return
         notify(
             notificationId,
-            baseBuilder(channelId, contactId, contactName)
-                .setContentTitle(context.getString(R.string.notification_nudge_failed_title))
-                .setContentText("Open Msngr to reconnect and try again.")
+            actionStatusBuilder(
+                channelId, contactId, contactName,
+                "${context.getString(R.string.notification_nudge_failed_title)}. " +
+                    "Open Msngr to reconnect and try again.",
+                activeNotification(notificationId),
+            )
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build(),
@@ -207,6 +220,10 @@ internal class MsngrNotificationManager(private val context: Context) {
     fun dismiss(notificationId: Int) {
         NotificationManagerCompat.from(context).cancel(notificationId)
     }
+
+    internal fun activeNotification(notificationId: Int): Notification? =
+        NotificationManagerCompat.from(context).activeNotifications
+            .firstOrNull { it.id == notificationId }?.notification
 
     fun dismissConversation(contactId: String) {
         dismiss(notificationId(NotificationEventType.Message, contactId))
@@ -245,9 +262,8 @@ internal class MsngrNotificationManager(private val context: Context) {
             channelId = NotificationChannels.MESSAGES,
             label = context.getString(R.string.notification_nudge_label),
         )
-        val style = messagingStyle().also { messagingStyle ->
+        val style = messagingStyle().setGroupConversation(event.isGroup).also { messagingStyle ->
             if (event.isGroup) {
-                messagingStyle.setGroupConversation(true)
                 messagingStyle.setConversationTitle(event.contactName)
             }
             val messageSender = if (event.isGroup) Person.Builder()
@@ -283,17 +299,21 @@ internal class MsngrNotificationManager(private val context: Context) {
         notify(notificationId, notification)
     }
 
-    private fun showNudge(event: NotificationEvent, contact: Person, contactAvatar: Bitmap) {
+    private fun showNudge(event: NotificationEvent, contact: Person, contactIcon: IconCompat) {
         val notificationId = notificationId(NotificationEventType.Nudge, event.contactId)
+        val shortcut = publishConversationShortcut(event, contact, contactIcon)
+        val style = messagingStyle()
+            .setGroupConversation(event.isGroup)
+            .also { if (event.isGroup) it.setConversationTitle(event.contactName) }
+            .addMessage("You received a nudge!", event.sentAtMillis, contact)
         val notification = baseBuilder(
             NotificationChannels.NUDGES,
             event.contactId,
             event.contactName,
             contact,
         )
-            .setContentTitle(event.contactName)
-            .setContentText("You received a nudge!")
-            .setLargeIcon(contactAvatar)
+            .setShortcutInfo(shortcut)
+            .setStyle(style)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setWhen(event.sentAtMillis)
@@ -351,20 +371,59 @@ internal class MsngrNotificationManager(private val context: Context) {
             .build(),
     )
 
+    private fun actionStatusBuilder(
+        channelId: String,
+        contactId: String,
+        contactName: String,
+        text: String,
+        previousNotification: Notification?,
+    ): NotificationCompat.Builder {
+        val previousStyle = previousNotification?.let {
+            NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it)
+        }
+        val previousContact = previousStyle?.messages?.lastOrNull()?.person
+        val builder: NotificationCompat.Builder
+        val style: NotificationCompat.MessagingStyle
+        val contact: Person
+        if (previousNotification != null && previousStyle != null && previousContact != null) {
+            // Recover the system-held avatar and shortcut, including after process death.
+            builder = NotificationCompat.Builder(context, previousNotification).clearActions()
+            style = previousStyle
+            contact = previousContact
+            style.messages.clear()
+            style.historicMessages.clear()
+        } else {
+            val name = contactName.messengerPlusPlainText()
+            val event = NotificationEvent(NotificationEventType.Message, contactId, name)
+            val icon = previousNotification?.getLargeIcon()?.let {
+                IconCompat.createFromIcon(context, it)
+            } ?: IconCompat.createWithAdaptiveBitmap(context.shortcutAvatarBitmap(name, null))
+            contact = contactPerson(event, icon)
+            builder = baseBuilder(channelId, contactId, name, contact)
+                .setShortcutInfo(publishConversationShortcut(event, contact, icon))
+            style = messagingStyle().setGroupConversation(false)
+        }
+        // MessagingStyle lets Android place the avatar with its app badge in the header.
+        // A large icon on a plain notification is rendered as trailing content instead.
+        return builder
+            .setChannelId(channelId)
+            .setLargeIcon(null as Bitmap?)
+            .setStyle(style.addMessage(text, System.currentTimeMillis(), contact))
+            .setProgress(0, 0, false)
+    }
+
     private fun baseBuilder(
         channelId: String,
         contactId: String,
         contactName: String,
-        contact: Person? = null,
+        contact: Person,
     ): NotificationCompat.Builder = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(R.drawable.ic_notification_msngr)
         .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
         .setContentIntent(contentIntent(contactId, contactName))
         .setColorized(false)
         .setGroup("msngr_events")
-        .apply {
-            contact?.let { addPerson(it) }
-        }
+        .addPerson(contact)
 
     private fun contactPerson(event: NotificationEvent, contactIcon: IconCompat): Person =
         Person.Builder()

@@ -172,7 +172,15 @@ class NotificationConfigurationInstrumentedTest {
         val receivedNudgeNotification = notificationsByChannel.getValue(
             NotificationChannels.NUDGES,
         ).notification
-        assertNotNull(receivedNudgeNotification.getLargeIcon())
+        assertNull(receivedNudgeNotification.getLargeIcon())
+        val receivedNudgeStyle = NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(receivedNudgeNotification)
+        assertEquals("You received a nudge!", receivedNudgeStyle?.messages?.single()?.text?.toString())
+        assertNotNull(receivedNudgeStyle?.messages?.single()?.person?.icon)
+        assertEquals(
+            MsngrNotificationManager.conversationShortcutId("nudge-event@example.com"),
+            NotificationCompat.getShortcutId(receivedNudgeNotification),
+        )
         val nudgeBackAction = receivedNudgeNotification.actions.orEmpty().single()
         assertEquals(
             context.getString(R.string.notification_nudge_back_label),
@@ -301,7 +309,9 @@ class NotificationConfigurationInstrumentedTest {
         assertTrue(
             ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId },
         )
-        assertNotNull(fallbackNotification.getLargeIcon())
+        assertNull(fallbackNotification.getLargeIcon())
+        assertNotNull(NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(fallbackNotification)?.messages?.single()?.person?.icon)
         assertNull(signedInNotification.getLargeIcon())
         val signedInStyle = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(signedInNotification)
@@ -358,30 +368,22 @@ class NotificationConfigurationInstrumentedTest {
                         SystemClock.sleep(100)
                     }
                     val posted = requireNotNull(notification)
-                    val actual = if (type == NotificationEventType.Nudge) {
-                        posted.getLargeIcon()?.loadDrawable(context)?.toBitmap(128, 128)
-                    } else {
-                        NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)
-                            ?.messages?.single()?.person?.icon?.loadDrawable(context)?.toBitmap(128, 128)
-                    }
+                    assertConversationIcon(posted, contactId)
+                    val actual = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)
+                        ?.messages?.single()?.person?.icon?.loadDrawable(context)?.toBitmap(128, 128)
                     assertNotNull("Missing avatar for $type ($uri)", actual)
                     requireNotNull(actual)
                     if (uri?.startsWith("data:") == true) {
                         assertEquals(Color.MAGENTA, actual.getPixel(64, 64))
                     } else {
                         val initial = context.shortcutAvatarBitmap("Alice", null)
-                        val expected = if (type == NotificationEventType.Nudge) initial else {
-                            requireNotNull(IconCompat.createWithAdaptiveBitmap(initial)
-                                .loadDrawable(context)).toBitmap(128, 128)
-                        }
+                        val expected = requireNotNull(IconCompat.createWithAdaptiveBitmap(initial)
+                            .loadDrawable(context)).toBitmap(128, 128)
                         assertTrue("Wrong initial avatar for $type ($uri)", expected.sameAs(actual))
-                        if (type != NotificationEventType.Nudge) {
-                            val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context)
-                                .single { it.id == shortcutId }
-                            assertEquals("  alice example  ", shortcut.shortLabel.toString())
-                            assertEquals(shortcutId, NotificationCompat.getShortcutId(posted))
-                        }
                     }
+                    val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context)
+                        .single { it.id == shortcutId }
+                    assertEquals("  alice example  ", shortcut.shortLabel.toString())
                     systemManager.cancel(notificationId)
                     for (attempt in 0 until 20) {
                         if (systemManager.activeNotifications.none { it.id == notificationId }) break
@@ -394,6 +396,136 @@ class NotificationConfigurationInstrumentedTest {
             ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId))
             systemManager.cancelAll()
         }
+    }
+
+    @Test
+    fun actionStatusUpdatesKeepConversationPhotoAfterRendererRecreation() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                context.packageName, Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+        NotificationChannels.createAll(context)
+        val systemManager = context.getSystemService(NotificationManager::class.java)
+        val contactId = "action-avatar@example.test"
+        val contactName = "Action contact"
+        systemManager.cancelAll()
+        try {
+            for (type in NotificationEventType.entries) {
+                val id = MsngrNotificationManager.notificationId(type, contactId)
+                val channelId = when (type) {
+                    NotificationEventType.Message -> NotificationChannels.MESSAGES
+                    NotificationEventType.Nudge -> NotificationChannels.NUDGES
+                    NotificationEventType.ContactSignedIn -> NotificationChannels.CONTACT_SIGNED_IN
+                }
+                MsngrNotificationManager(context).show(NotificationEvent(
+                    type, contactId, contactName, profilePictureDataUri(), messageText = "Hello",
+                ))
+                val previous = awaitNotification(id) { true }
+                if (type == NotificationEventType.Message) {
+                    // Reply submission marks the chat read and cancels its original notification.
+                    systemManager.cancel(id)
+                    MsngrNotificationManager(context).markReplying(contactId, contactName, id, previous)
+                } else {
+                    MsngrNotificationManager(context).markNudging(contactId, contactName, id, channelId)
+                }
+                val sendingText = if (type == NotificationEventType.Message) "Sending reply…"
+                    else context.getString(R.string.notification_sending_nudge)
+                val sending = awaitNotification(id) { messageText(it) == sendingText }
+                assertConversationPhoto(sending, contactId)
+                assertTrue(sending.extras.getBoolean(android.app.Notification.EXTRA_PROGRESS_INDETERMINATE))
+                assertTrue(sending.actions.isNullOrEmpty())
+
+                if (type == NotificationEventType.Message) {
+                    MsngrNotificationManager(context).markReplyFailed(contactId, contactName, id)
+                } else {
+                    MsngrNotificationManager(context).markNudgeFailed(contactId, contactName, id, channelId)
+                }
+                val failed = awaitNotification(id) { messageText(it)?.contains("reconnect") == true }
+                assertConversationPhoto(failed, contactId)
+                assertEquals(channelId, failed.channelId)
+                assertFalse(failed.extras.getBoolean(android.app.Notification.EXTRA_PROGRESS_INDETERMINATE))
+            }
+
+            // A restored worker can still post an initial avatar if the original was dismissed.
+            val fallbackId = MsngrNotificationManager.notificationId(NotificationEventType.Message, "missing")
+            MsngrNotificationManager(context).markReplyFailed("missing", "Missing contact", fallbackId)
+            assertConversationIcon(awaitNotification(fallbackId) { true }, "missing")
+        } finally {
+            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(
+                MsngrNotificationManager.conversationShortcutId(contactId),
+                MsngrNotificationManager.conversationShortcutId("missing"),
+            ))
+            systemManager.cancelAll()
+        }
+    }
+
+    @Test
+    fun groupMessagesKeepGroupConversationIconAndMemberAttribution() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                context.packageName, Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+        NotificationChannels.createAll(context)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val contactId = "group-avatar@live.com"
+        val id = MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId)
+        try {
+            MsngrNotificationManager(context).show(NotificationEvent(
+                NotificationEventType.Message, contactId, "Group with picture", profilePictureDataUri(),
+                messageText = "From a member", isGroup = true, senderName = "Alice", senderEmail = "alice@example.test",
+            ))
+            val notification = awaitNotification(id) { messageText(it) == "From a member" }
+            assertConversationIcon(notification, contactId)
+            val style = requireNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+            assertTrue(style.isGroupConversation)
+            assertEquals("Group with picture", style.conversationTitle.toString())
+            assertEquals("Alice", style.messages.single().person?.name.toString())
+        } finally {
+            manager.cancel(id)
+            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(MsngrNotificationManager.conversationShortcutId(contactId)))
+        }
+    }
+
+    private fun awaitNotification(
+        id: Int,
+        matches: (android.app.Notification) -> Boolean,
+    ): android.app.Notification {
+        val manager = InstrumentationRegistry.getInstrumentation().targetContext
+            .getSystemService(NotificationManager::class.java)
+        repeat(30) {
+            manager.activeNotifications.firstOrNull { it.id == id }?.notification
+                ?.takeIf(matches)?.let { return it }
+            SystemClock.sleep(100)
+        }
+        error("Notification $id did not reach the expected state")
+    }
+
+    private fun messageText(notification: android.app.Notification): String? =
+        NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+            ?.messages?.singleOrNull()?.text?.toString()
+
+    private fun assertConversationIcon(notification: android.app.Notification, contactId: String) {
+        assertEquals(R.drawable.ic_notification_msngr, notification.smallIcon.resId)
+        assertNull(notification.getLargeIcon())
+        assertFalse(notification.extras.containsKey(android.app.Notification.EXTRA_PICTURE))
+        assertEquals(MsngrNotificationManager.conversationShortcutId(contactId), NotificationCompat.getShortcutId(notification))
+        val style = requireNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertNull(style.messages.single().dataUri)
+    }
+
+    private fun assertConversationPhoto(notification: android.app.Notification, contactId: String) {
+        assertConversationIcon(notification, contactId)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val icon = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+            ?.messages?.single()?.person?.icon
+        val bitmap = requireNotNull(icon?.loadDrawable(context)).toBitmap(128, 128)
+        assertEquals(Color.MAGENTA, bitmap.getPixel(64, 64))
     }
 
     @Test
