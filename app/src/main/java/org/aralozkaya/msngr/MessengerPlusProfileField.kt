@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Keyboard
@@ -63,12 +64,20 @@ internal fun MessengerPlusProfileField(
     val combinedTrailingIcon: (@Composable () -> Unit)? =
         if (trailingIcon != null || emoticonSheet != null) {
             {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     trailingIcon?.invoke()
                     if (emoticonSheet != null) {
                         val emoticonsOpen = emoticonSheet.isOpenFor(controller)
                         IconButton(
                             onClick = { emoticonSheet.toggle(controller) },
+                            modifier = Modifier.size(
+                                IconButtonDefaults.smallContainerSize(
+                                    widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow,
+                                ),
+                            ),
                             enabled = enabled,
                             shapes = IconButtonDefaults.shapes(),
                         ) {
