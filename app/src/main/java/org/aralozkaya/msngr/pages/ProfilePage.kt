@@ -336,6 +336,11 @@ fun ProfilePage(
                                 {
                                     IconButton(
                                         onClick = { statusMessageEditorValue = TextFieldValue("") },
+                                        modifier = Modifier.size(
+                                            IconButtonDefaults.smallContainerSize(
+                                                widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow,
+                                            ),
+                                        ),
                                         enabled = !savingProfile,
                                         shapes = IconButtonDefaults.shapes(),
                                     ) {
