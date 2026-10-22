@@ -15,6 +15,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -178,8 +180,11 @@ class NativeTextStyleInstrumentedTest {
     @Test fun plusDecorationsMovedIntoTheSheetAndStillAffectOnlyTheSelectedText() {
         showChat(true)
         openMenu(native = false)
+        compose.onNodeWithText("Plus! Formatting").assertDoesNotExist()
+        compose.onNodeWithText("Clear formatting").assertDoesNotExist()
         for (label in listOf("Bold", "Italic", "Strikeout", "Underline")) {
-            compose.onNodeWithText(label).performScrollTo().performClick()
+            compose.onNodeWithText(label).assertDoesNotExist()
+            compose.onNodeWithContentDescription(label).assertIsOff().performClick().assertIsOn()
         }
         compose.runOnIdle {
             val parsed = MessengerPlusTextCodec.parse(draft.value)
@@ -189,8 +194,11 @@ class NativeTextStyleInstrumentedTest {
             assertTrue(decorated.style.italic && decorated.style.strikeout && decorated.style.underline)
             assertEquals(NativeTextStyle(), style.value)
         }
-        compose.onNodeWithText("Clear formatting").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Clear formatting").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("one two three", draft.value) }
+        for (label in listOf("Bold", "Italic", "Strikeout", "Underline")) {
+            compose.onNodeWithContentDescription(label).assertIsOff()
+        }
     }
 
     @Test fun preferencesRestorePerContactAndPerGroupStylesAfterRecreation() {

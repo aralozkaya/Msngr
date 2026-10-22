@@ -14,16 +14,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.FormatClear
+import androidx.compose.material.icons.filled.FormatItalic
+import androidx.compose.material.icons.filled.FormatStrikethrough
+import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -131,23 +152,25 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
             null
         }
     val content: @Composable ColumnScope.() -> Unit = {
-        Text("Plus! Formatting", style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() })
-        val decorations = listOf(
-            Triple("Bold", MessengerPlusTextCodec.BOLD_CONTROL, state.initialStyle.bold),
-            Triple("Italic", MessengerPlusTextCodec.ITALIC_CONTROL, state.initialStyle.italic),
-            Triple("Strikeout", MessengerPlusTextCodec.STRIKEOUT_CONTROL, state.initialStyle.strikeout),
-            Triple("Underline", MessengerPlusTextCodec.UNDERLINE_CONTROL, state.initialStyle.underline),
-        )
-        decorations.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (label, control, active) ->
-                    FilterChip(selected = active, onClick = { state.toggle(control) },
-                        label = { Text(label) }, modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MessengerPlusDecorationButtons(state, modifier = Modifier.weight(1f))
+            MessengerPlusFormattingTooltip("Clear formatting") {
+                FilledIconButton(
+                    onClick = state::clearFormatting,
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    ),
+                ) {
+                    Icon(Icons.Default.FormatClear, contentDescription = "Clear formatting")
                 }
             }
         }
-        TextButton(onClick = state::clearFormatting) { Text("Clear formatting") }
         HorizontalDivider()
         MessengerPlusColorOptions(
             state = state,
@@ -181,6 +204,75 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
             footer = footer,
             content = content,
         )
+    }
+}
+
+@Composable
+private fun MessengerPlusFormattingTooltip(label: String, content: @Composable () -> Unit) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun MessengerPlusDecorationButtons(
+    state: MessengerPlusColorSheetState,
+    modifier: Modifier = Modifier,
+) {
+    val decorations = listOf(
+        Triple("Bold", MessengerPlusTextCodec.BOLD_CONTROL, state.initialStyle.bold),
+        Triple("Italic", MessengerPlusTextCodec.ITALIC_CONTROL, state.initialStyle.italic),
+        Triple("Strikeout", MessengerPlusTextCodec.STRIKEOUT_CONTROL, state.initialStyle.strikeout),
+        Triple("Underline", MessengerPlusTextCodec.UNDERLINE_CONTROL, state.initialStyle.underline),
+    )
+    val icons = listOf(
+        Icons.Default.FormatBold,
+        Icons.Default.FormatItalic,
+        Icons.Default.FormatStrikethrough,
+        Icons.Default.FormatUnderlined,
+    )
+    ButtonGroup(
+        overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) },
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        expandedRatio = 0f,
+    ) {
+        decorations.forEachIndexed { index, (label, control, active) ->
+            customItem(
+                buttonGroupContent = {
+                    MessengerPlusFormattingTooltip(label) {
+                        ToggleButton(
+                            checked = active,
+                            onCheckedChange = { state.toggle(control) },
+                            shapes = when (index) {
+                                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                decorations.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                            },
+                        ) {
+                            Icon(icons[index], contentDescription = label)
+                        }
+                    }
+                },
+                menuContent = { menuState ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        leadingIcon = { Icon(icons[index], contentDescription = null) },
+                        trailingIcon = if (active) {
+                            { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                        } else null,
+                        onClick = {
+                            state.toggle(control)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -242,17 +334,26 @@ private fun MessengerPlusColorOptions(
             label = { Text("Gradient") },
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = !background,
-            onClick = { onBackgroundChange(false) },
-            label = { Text("Text color") },
-        )
-        FilterChip(
-            selected = background,
-            onClick = { onBackgroundChange(true) },
-            label = { Text("Background color") },
-        )
+    Row(
+        modifier = Modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    ) {
+        ToggleButton(
+            checked = !background,
+            onCheckedChange = { onBackgroundChange(false) },
+            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+            modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+        ) {
+            Text("Text")
+        }
+        ToggleButton(
+            checked = background,
+            onCheckedChange = { onBackgroundChange(true) },
+            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+            modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+        ) {
+            Text("Background")
+        }
     }
     if (gradient) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
