@@ -14,24 +14,28 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.platform.app.InstrumentationRegistry
 import org.aralozkaya.msngr.data.Contact
@@ -100,9 +104,9 @@ class NativeTextStyleInstrumentedTest {
         compose.onNodeWithTag("native_text_size_input").performTextReplacement("24")
         compose.runOnIdle { assertEquals(NativeTextStyle(true, true, true, true, size = 24), style.value) }
         compose.onNodeWithContentDescription("Text size").performSemanticsAction(SemanticsActions.SetProgress) { it(32f) }
-        compose.onNodeWithTag("native_text_size_input").assertTextContains("32")
+        compose.onNodeWithTag("native_text_size_input").assertTextContains("36")
         compose.onNodeWithTag("native_text_size_input").performTextReplacement("999")
-        compose.runOnIdle { assertEquals(32, style.value.size) }
+        compose.runOnIdle { assertEquals(36, style.value.size) }
         compose.onNodeWithText("Enter a size from 8 to 72.").assertExists()
         compose.onNodeWithTag("native_text_size_input").performTextReplacement("18")
         compose.onNodeWithText("Color").performClick()
@@ -110,8 +114,7 @@ class NativeTextStyleInstrumentedTest {
         compose.onNodeWithText("Color code").performTextReplacement("#123456")
         compose.onNodeWithText("Apply color").performClick()
         compose.runOnIdle { assertEquals(0x123456, style.value.colorRgb) }
-        pressBack()
-        compose.waitForIdle()
+        closeNativeSheet()
         onView(withContentDescription("Message input")).check { view, error ->
             if (error != null) throw error
             val editor = view as EditText
@@ -130,6 +133,46 @@ class NativeTextStyleInstrumentedTest {
             assertEquals(NativeTextStyle(), style.value)
             assertEquals("one two three", draft.value)
         }
+    }
+
+    @Test fun nativeColorAndSwitchRowsHaveMatchingBounds() {
+        showChat(false)
+        openMenu(native = true)
+        val strikeoutBounds = compose.onNodeWithText("Strikeout").fetchSemanticsNode().boundsInRoot
+        val underlineBounds = compose.onNodeWithText("Underline").fetchSemanticsNode().boundsInRoot
+        val colorBounds = compose.onNodeWithText("Color").fetchSemanticsNode().boundsInRoot
+        assertEquals(strikeoutBounds.left, colorBounds.left, 0.5f)
+        assertEquals(strikeoutBounds.right, colorBounds.right, 0.5f)
+        assertEquals(strikeoutBounds.height, colorBounds.height, 0.5f)
+        assertEquals(strikeoutBounds.width, underlineBounds.width, 0.5f)
+
+    }
+
+    @Test fun nativeSizeSliderStopsEveryTwelvePointsAndNumberInputKeepsExactSizes() {
+        showChat(false)
+        openMenu(native = true)
+        val slider = compose.onNodeWithContentDescription("Text size").performScrollTo().assertIsDisplayed()
+        val stops = listOf(8, 12, 24, 36, 48, 60, 72)
+        stops.forEachIndexed { index, size ->
+            slider.performTouchInput {
+                swipe(center, Offset((width * index.toFloat() / stops.lastIndex).coerceIn(1f, width - 1f), centerY))
+            }
+            val actualSize = compose.runOnIdle { style.value.size }
+            assertEquals("Stop $index: ${slider.fetchSemanticsNode().boundsInRoot}", size, actualSize)
+            compose.onNodeWithTag("native_text_size_input").assertTextContains(size.toString())
+        }
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(31f) }
+        compose.runOnIdle { assertEquals(36, style.value.size) }
+        compose.onNodeWithTag("native_text_size_input").performTextReplacement("19")
+        compose.runOnIdle { assertEquals(19, style.value.size) }
+        val progress = slider.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(19f, progress.current)
+        assertEquals(8f..72f, progress.range)
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(12f) }
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(15f) }
+        compose.runOnIdle { assertEquals(24, style.value.size) }
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(21f) }
+        compose.runOnIdle { assertEquals(12, style.value.size) }
     }
 
     @Test fun plusDecorationsMovedIntoTheSheetAndStillAffectOnlyTheSelectedText() {
@@ -190,8 +233,7 @@ class NativeTextStyleInstrumentedTest {
         compose.onNodeWithContentDescription("Text size")
             .performSemanticsAction(SemanticsActions.SetProgress) { it(32f) }
         compose.onNodeWithText(notice).assertDoesNotExist()
-        pressBack()
-        compose.waitForIdle()
+        closeNativeSheet()
         openMenu(native = true)
         compose.onNodeWithText("Reset styling").performScrollTo().performClick()
         compose.onNodeWithText(notice).assertDoesNotExist()
@@ -257,6 +299,14 @@ class NativeTextStyleInstrumentedTest {
     private fun chooseFontStyle(option: NativeFontStyle) {
         compose.onNodeWithTag("native_font_style_dropdown").performClick()
         compose.onNodeWithTag("native_font_style_${option.name}").performScrollTo().performClick()
+    }
+
+    private fun closeNativeSheet() {
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss) { it() }
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("native_text_style_sheet").fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test fun dropdownOffersEveryOriginalMessengerFontStyleAndRendersItsWeight() {

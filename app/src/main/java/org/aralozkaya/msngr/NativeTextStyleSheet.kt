@@ -43,6 +43,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,9 +56,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -65,7 +70,10 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.showActionSnackbar
+import kotlin.math.abs
 import kotlin.math.roundToInt
+
+private val NativeTextSizeStops = listOf(NativeTextStyle.MIN_SIZE) + (12..NativeTextStyle.MAX_SIZE step 12)
 
 @Composable
 internal fun NativeTextStyleSheet(
@@ -119,10 +127,11 @@ internal fun NativeTextStyleSheet(
                 }
                 Row(
                     modifier = Modifier
-                        .clickable(role = Role.Button) { choosingColor = true }
                         .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .clickable(role = Role.Button) { choosingColor = true }
                         .height(56.dp)
-                        .padding(horizontal = 24.dp),
+                        .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("Color", modifier = Modifier.weight(1f))
@@ -157,18 +166,15 @@ internal fun NativeTextStyleSheet(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                 }
-                Slider(
-                    value = style.size.toFloat(),
-                    onValueChange = {
-                        val size = it.roundToInt()
+                NativeTextSizeSlider(
+                    size = style.size,
+                    onSizeChange = { size ->
                         sizeInput = size.toString()
                         updateSize(style.copy(size = size))
                     },
-                    valueRange = NativeTextStyle.MIN_SIZE.toFloat()..NativeTextStyle.MAX_SIZE.toFloat(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .semantics { contentDescription = "Text size" },
+                        .padding(horizontal = 24.dp),
                 )
                 if (!validSize) {
                     Text(
@@ -204,6 +210,49 @@ internal fun NativeTextStyleSheet(
             onDismissRequest = { choosingColor = false },
         )
     }
+}
+
+@Composable
+private fun NativeTextSizeSlider(size: Int, onSizeChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    // The 8pt minimum is an extra stop before the regular 12pt intervals.
+    val lowerIndex = NativeTextSizeStops.indexOfLast { it <= size }
+    val upperSize = NativeTextSizeStops.getOrElse(lowerIndex + 1) { size }
+    val position = lowerIndex + if (upperSize == size) 0f else {
+        (size - NativeTextSizeStops[lowerIndex]).toFloat() / (upperSize - NativeTextSizeStops[lowerIndex])
+    }
+    val sliderState = rememberSliderState(
+        steps = NativeTextSizeStops.size - 2,
+        valueRange = 0f..NativeTextSizeStops.lastIndex.toFloat(),
+    ).apply {
+        // Keep exact values from the number field visible between slider stops.
+        shouldAutoSnap = false
+        value = position
+        onValueChange = { onSizeChange(NativeTextSizeStops[it.roundToInt()]) }
+    }
+    Slider(
+        state = sliderState,
+        modifier = modifier.semantics {
+            contentDescription = "Text size"
+            stateDescription = "$size pt"
+            progressBarRangeInfo = ProgressBarRangeInfo(
+                size.toFloat(),
+                NativeTextStyle.MIN_SIZE.toFloat()..NativeTextStyle.MAX_SIZE.toFloat(),
+            )
+            setProgress { requested ->
+                val closest = NativeTextSizeStops.minBy { abs(it - requested) }
+                // Accessibility services may request a small increment within one interval.
+                val updated = when {
+                    closest != size || requested == size.toFloat() -> closest
+                    requested > size -> NativeTextSizeStops.firstOrNull { it > size } ?: size
+                    else -> NativeTextSizeStops.lastOrNull { it < size } ?: size
+                }
+                if (updated == size) false else {
+                    onSizeChange(updated)
+                    true
+                }
+            }
+        },
+    )
 }
 
 @Composable
