@@ -64,6 +64,9 @@ import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.MessengerPlusText
+import org.aralozkaya.msngr.LocalMessengerScene
+import org.aralozkaya.msngr.SceneBackdrop
+import org.aralozkaya.msngr.sceneContentColor
 import org.aralozkaya.msngr.MsnEmoticonText
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.avatarInitial
@@ -87,93 +90,100 @@ fun LoggedInUserProfileCard(
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     var presenceMenuExpanded by rememberSaveable { mutableStateOf(false) }
     val groupInteractionSource = remember { MutableInteractionSource() }
+    val scene = LocalMessengerScene.current
+    val sceneInk = sceneContentColor()
 
     ElevatedCard(
         onClick = onEditProfile,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Avatar(
-                name = profile.username.messengerPlusPlainText(),
-                avatarUri = profile.avatarUri,
-                presence = profile.presence,
-                showPresenceIndicator = false,
-                shape = MaterialTheme.shapes.ownDisplayPicture,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        SceneBackdrop(scene, Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Avatar(
+                    name = profile.username.messengerPlusPlainText(),
+                    avatarUri = profile.avatarUri,
+                    presence = profile.presence,
+                    showPresenceIndicator = false,
+                    shape = MaterialTheme.shapes.ownDisplayPicture,
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    MessengerPlusText(
-                        text = profile.username,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                        ),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MessengerPlusText(
+                            text = profile.username,
+                            sceneGlow = scene != null,
+                            color = if (scene != null) sceneInk else androidx.compose.ui.graphics.Color.Unspecified,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit profile",
+                            tint = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    MsnEmoticonText(
+                        text = profile.statusMessage.ifBlank { "No personal message" },
+                        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                        sceneGlow = scene != null,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit profile",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                MsnEmoticonText(
-                    text = profile.statusMessage.ifBlank { "No personal message" },
-                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Box {
-                    FilledTonalButton(
-                        onClick = { presenceMenuExpanded = true },
-                        shapes = ButtonDefaults.shapes(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                    Box {
+                        FilledTonalButton(
+                            onClick = { presenceMenuExpanded = true },
+                            shapes = ButtonDefaults.shapes(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
                         ) {
-                            PresenceDot(profile.presence, modifier = Modifier.size(9.dp))
-                            Text(profile.presence.ownStatusLabel(), style = MaterialTheme.typography.labelLarge)
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = "Change status",
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                    DropdownMenuPopup(
-                        expanded = presenceMenuExpanded,
-                        onDismissRequest = { presenceMenuExpanded = false },
-                    ) {
-                        DropdownMenuGroup(
-                            shapes = MenuDefaults.groupShape(0, 1),
-                            interactionSource = groupInteractionSource,
-                        ) {
-                            Presence.entries.forEachIndexed { index, presence ->
-                                DropdownMenuItem(
-                                    text = { Text(presence.ownStatusLabel()) },
-                                    onClick = {
-                                        presenceMenuExpanded = false
-                                        onPresenceSelected(presence)
-                                    },
-                                    shape = MenuDefaults.itemShape(index, Presence.entries.size).shape
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                PresenceDot(profile.presence, modifier = Modifier.size(9.dp))
+                                Text(profile.presence.ownStatusLabel(), style = MaterialTheme.typography.labelLarge)
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Change status",
+                                    modifier = Modifier.size(18.dp),
                                 )
+                            }
+                        }
+                        DropdownMenuPopup(
+                            expanded = presenceMenuExpanded,
+                            onDismissRequest = { presenceMenuExpanded = false },
+                        ) {
+                            DropdownMenuGroup(
+                                shapes = MenuDefaults.groupShape(0, 1),
+                                interactionSource = groupInteractionSource,
+                            ) {
+                                Presence.entries.forEachIndexed { index, presence ->
+                                    DropdownMenuItem(
+                                        text = { Text(presence.ownStatusLabel()) },
+                                        onClick = {
+                                            presenceMenuExpanded = false
+                                            onPresenceSelected(presence)
+                                        },
+                                        shape = MenuDefaults.itemShape(index, Presence.entries.size).shape
+                                    )
+                                }
                             }
                         }
                     }

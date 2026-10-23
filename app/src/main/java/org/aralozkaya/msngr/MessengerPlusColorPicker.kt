@@ -81,7 +81,7 @@ internal fun MessengerPlusCustomColorDialog(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MessengerPlusColorWheel(
+                ColorWheel(
                     hue = hue,
                     saturation = saturation,
                     brightness = brightness,
@@ -149,19 +149,20 @@ internal fun MessengerPlusCustomColorDialog(
 
 /** Hue runs clockwise from red at the right edge; saturation increases toward the rim. */
 @Composable
-private fun MessengerPlusColorWheel(
+internal fun ColorWheel(
     hue: Float,
     saturation: Float,
     brightness: Float,
     onColorChanged: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
+    testTag: String = MESSENGER_PLUS_COLOR_WHEEL_TAG,
 ) {
     val currentOnColorChanged by rememberUpdatedState(onColorChanged)
     val hueColors = (0..6).map { Color.hsv(it * 60f, 1f, brightness) }
     Canvas(
         modifier = modifier
             .size(200.dp)
-            .testTag(MESSENGER_PLUS_COLOR_WHEEL_TAG)
+            .testTag(testTag)
             .semantics {
                 contentDescription = "Color wheel"
                 stateDescription = "Hue ${hue.toInt()} degrees, saturation ${(saturation * 100).toInt()} percent"
