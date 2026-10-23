@@ -46,6 +46,88 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class LiveMsnp18ClientContractTest {
+    @Test fun ownPictureRefreshFetchesCurrentStorageBytesWithoutUploadingAndCanAdoptTheIncomingObject() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val original = mockDisplayPictureBytes()
+        val incoming = requireNotNull(javaClass.getResourceAsStream("/animated-profile/two-frame.gif")).use { it.readBytes() }
+        val remote = AtomicReference(original)
+        var downloads = 0
+        var uploads = 0
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { host, ticket ->
+                assertEquals(serverConfig.storageServer, host)
+                assertEquals("storage", ticket)
+                StorageProfile(profileResourceId = "profile", expressionProfileResourceId = "expression",
+                    photoResourceId = "photo", displayPictureUrl = "https://example.test/current.gif")
+            },
+            fetchDisplayPicture = { _, _ -> downloads++; remote.get().copyOf() },
+            updateStorageDisplayPicture = { _, _, _, _ -> uploads++ })
+        try {
+            val signedIn = client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            assertTrue(signedIn.displayPictureFetched)
+            remote.set(incoming)
+            val fetched = client.fetchOwnDisplayPicture()
+            assertTrue(fetched.fetched)
+            assertArrayEquals(incoming, fetched.bytes)
+            assertEquals(2, downloads)
+            assertEquals(0, uploads)
+            client.adoptIncomingDisplayPicture(fetched.bytes)
+            assertEquals(0, uploads)
+            assertTrue(requireNotNull(MsnDisplayPicture.parse(notification.sent.last { it.verb == "CHG" }.parameters[2])).matches(incoming))
+        } finally { client.close() }
+    }
+
+    @Test fun keepingLocalAfterRemoteChangeUploadsEvenWhenTheAdvertisedLocalObjectHasNotChanged() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val original = mockDisplayPictureBytes()
+        val remote = AtomicReference(original)
+        var uploads = 0
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> StorageProfile(profileResourceId = "profile", photoResourceId = "photo",
+                displayPictureUrl = "https://example.test/current.png") },
+            fetchDisplayPicture = { _, _ -> remote.get().copyOf() },
+            updateStorageDisplayPicture = { _, _, _, bytes -> uploads++; remote.set(bytes.copyOf()) })
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            remote.set(original + byteArrayOf(1, 2, 3))
+            assertTrue(client.fetchOwnDisplayPicture().fetched)
+            client.changeDisplayPicture(original)
+            assertEquals(1, uploads)
+            assertArrayEquals(original, remote.get())
+        } finally { client.close() }
+    }
+
+    @Test fun ownPictureFetchDistinguishesProfileAndDownloadFailuresFromServerRemoval() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        var profileFails = true
+        var imageFails = true
+        var hasImage = true
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ ->
+                if (profileFails) throw IOException("storage offline")
+                StorageProfile(displayPictureUrl = if (hasImage) "https://example.test/current.png" else null)
+            },
+            fetchDisplayPicture = { _, _ -> if (imageFails) null else mockDisplayPictureBytes() })
+        try {
+            assertFalse(client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow().displayPictureFetched)
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            profileFails = false
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            imageFails = false
+            assertTrue(client.fetchOwnDisplayPicture().fetched)
+            hasImage = false
+            val removed = client.fetchOwnDisplayPicture()
+            assertTrue(removed.fetched)
+            assertNull(removed.bytes)
+        } finally { client.close() }
+    }
+
     private fun sessionClient(notification: ContractNotificationTransport) = LiveMsnp18Client(
         transport = notification,
         endpointName = { "Phone" },

@@ -77,6 +77,7 @@ import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.ContactRequestInbox
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.pages.ContactsPage
+import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
 import org.aralozkaya.msngr.pages.components.ContactsActionMenu
 import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
@@ -124,6 +125,7 @@ class MainActivity : MsngrActivity() {
         }
         setContent {
             MsngrTheme {
+                DisplayPictureSyncHost(repository)
                 MsngrApp(
                     repository = repository,
                     snackbarHostState = snackbarHostState,
@@ -161,6 +163,7 @@ class MainActivity : MsngrActivity() {
             }
         }
         showGroupLeftNotice(intent)
+        if (savedInstanceState == null) displayPictureSync.requestRefresh(repository)
         requestNotificationPermissionOnce()
         BackgroundConnectionController.startIfEnabled(this)
     }

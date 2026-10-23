@@ -11,31 +11,21 @@ internal suspend fun Context.restoreSignedInProfile(
 ) {
     val mergedProfile = SessionPrefs.mergeServerProfile(this, serverProfile)
         .copy(presence = presence)
-    val localPictureBytes = loadDisplayPictureBytes(mergedProfile.avatarUri)
-    val serverPictureBytes = if (
-        mergedProfile.avatarUri != null &&
-        localPictureBytes == null &&
-        mergedProfile.avatarUri != serverProfile.avatarUri
-    ) {
-        loadDisplayPictureBytes(serverProfile.avatarUri)
-    } else {
-        null
-    }
-    val localProfile = if (serverPictureBytes != null) {
-        mergedProfile.copy(avatarUri = serverProfile.avatarUri)
-    } else {
-        mergedProfile
-    }
+    repository.setLocalProfile(
+        profile = mergedProfile,
+        publishStoredSettings = true,
+        // Fetch and compare before publishing a local picture over the server's one.
+        publishDisplayPicture = false,
+    )
+    displayPictureSync.restore(repository, serverProfile,
+        skipNextRefresh = (applicationContext as MsngrApplication).visibilityTracker.isForeground)
+    val localProfile = repository.profile.value
     SessionPrefs.saveUserProfile(
         context = this,
         username = localProfile.username,
         presence = presence,
         avatarUri = localProfile.avatarUri,
         statusMessage = localProfile.statusMessage,
-    )
-    repository.setLocalProfile(
-        profile = localProfile,
-        publishStoredSettings = true,
-        displayPictureBytes = localPictureBytes ?: serverPictureBytes,
+        saveDisplayPicture = false,
     )
 }

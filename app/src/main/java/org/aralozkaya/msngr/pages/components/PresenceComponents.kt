@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.ui.theme.avatar
 import org.aralozkaya.msngr.ui.theme.pill
 
 private val OnlineIndicatorColor = Color(0xFF2E7D32)
@@ -76,7 +75,7 @@ fun PresenceLabel(presence: Presence) {
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .clip(MaterialTheme.shapes.avatar)
+                .clip(MaterialTheme.shapes.pill)
                 .background(presenceColor(presence)),
         )
         Text(
@@ -94,7 +93,7 @@ fun PresenceDot(
 ) {
     Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.avatar)
+            .clip(MaterialTheme.shapes.pill)
             .background(
                 if (isBlocked) {
                     BusyIndicatorColor

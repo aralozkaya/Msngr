@@ -221,6 +221,7 @@ internal class LiveMsnp18Client(
     private var storageExpressionProfileResourceId: String? = null
     private var storagePhotoResourceId: String? = null
     private var storageDisplayPictureAttached = false
+    private var storageDisplayPictureHash: String? = null
     @Volatile
     private var localDisplayPicture: LocalDisplayPicture? = null
     @Volatile
@@ -323,6 +324,7 @@ internal class LiveMsnp18Client(
         storageExpressionProfileResourceId = storageProfile?.expressionProfileResourceId
         storagePhotoResourceId = storageProfile?.photoResourceId
         storageDisplayPictureAttached = storageProfile?.displayPictureUrl != null
+        storageDisplayPictureHash = storedDisplayPicture?.sha256()
         currentPersonalMessage = storageProfile?.personalStatus.orEmpty()
         localDisplayPicture = storedDisplayPicture
             ?.takeIf(ByteArray::isNotEmpty)
@@ -422,6 +424,8 @@ internal class LiveMsnp18Client(
             presence = request.initialPresence,
             avatarUri = storedDisplayPicture?.toImageDataUri(),
             statusMessage = storageProfile?.personalStatus.orEmpty(),
+            displayPictureFetched = signInData.storage.available && storageProfile != null &&
+                (storageProfile.displayPictureUrl == null || storedDisplayPicture?.isNotEmpty() == true),
         )
     }.onFailure {
         val accountId = AccountIdentity.forServer(request.email, request.serverConfig, false).storageId
@@ -462,14 +466,35 @@ internal class LiveMsnp18Client(
         }
     }
 
+    override suspend fun fetchOwnDisplayPicture(): org.aralozkaya.msngr.IncomingDisplayPicture {
+        if (signedInEmail.isBlank()) return org.aralozkaya.msngr.IncomingDisplayPicture()
+        val endpoint = machineGuid
+        val account = signedInStorageAccount
+        return try {
+            val profile = fetchStorageProfile(storageServer, storageTicket)
+                ?: return org.aralozkaya.msngr.IncomingDisplayPicture()
+            val bytes = profile.displayPictureUrl?.let { url ->
+                fetchDisplayPicture(url, MAX_DISPLAY_PICTURE_BYTES)?.takeIf { it.isNotEmpty() }
+                    ?: return org.aralozkaya.msngr.IncomingDisplayPicture()
+            }
+            if (endpoint != machineGuid || account != signedInStorageAccount) return org.aralozkaya.msngr.IncomingDisplayPicture()
+            storageAvailable = true
+            storageProfileResourceId = profile.profileResourceId
+            storageExpressionProfileResourceId = profile.expressionProfileResourceId
+            storagePhotoResourceId = profile.photoResourceId
+            storageDisplayPictureAttached = profile.displayPictureUrl != null
+            storageDisplayPictureHash = bytes?.sha256()
+            org.aralozkaya.msngr.IncomingDisplayPicture(bytes, fetched = true)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { org.aralozkaya.msngr.IncomingDisplayPicture() }
+    }
+
     override suspend fun changeDisplayPicture(image: ByteArray?) {
         if (signedInEmail.isEmpty()) return
         val normalized = image?.takeIf(ByteArray::isNotEmpty)?.copyOf()
-        val currentPicture = localDisplayPicture
         val pictureContentChanged = when {
-            normalized == null -> currentPicture != null || storageDisplayPictureAttached
-            currentPicture == null -> true
-            else -> !normalized.contentEquals(currentPicture.bytes)
+            normalized == null -> storageDisplayPictureAttached
+            else -> normalized.sha256() != storageDisplayPictureHash
         }
         if (pictureContentChanged && storageAvailable) {
             if (normalized == null) {
@@ -520,13 +545,21 @@ internal class LiveMsnp18Client(
                 }
                 storageDisplayPictureAttached = true
             }
+            storageDisplayPictureHash = normalized?.sha256()
         }
+        adoptIncomingDisplayPicture(normalized)
+    }
+
+    override suspend fun adoptIncomingDisplayPicture(image: ByteArray?) {
+        if (signedInEmail.isEmpty()) return
+        val normalized = image?.takeIf(ByteArray::isNotEmpty)?.copyOf()
         localDisplayPicture = normalized
             ?.takeIf(ByteArray::isNotEmpty)
             ?.let { bytes ->
                 LocalDisplayPicture(MsnDisplayPicture.create(signedInEmail, bytes), bytes)
             }
         val advertisedHash = localDisplayPicture?.metadata?.sha1d
+        val pictureContentChanged = advertisedHash != lastAdvertisedDisplayPictureHash
         if (advertisedHash == lastAdvertisedDisplayPictureHash) return
         if (pictureContentChanged) {
             // Escargot stores a new MSNObject from a same-status CHG without notifying contacts.
@@ -2512,6 +2545,7 @@ internal class LiveMsnp18Client(
         storageExpressionProfileResourceId = null
         storagePhotoResourceId = null
         storageDisplayPictureAttached = false
+        storageDisplayPictureHash = null
         localDisplayPicture = null
         lastAdvertisedDisplayPictureHash = null
         switchboardFallbackPort = DEFAULT_SWITCHBOARD_PORT

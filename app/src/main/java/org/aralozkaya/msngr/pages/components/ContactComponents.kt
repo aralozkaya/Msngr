@@ -50,7 +50,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -74,6 +73,7 @@ import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.ui.theme.ProfileCardCornerRadius
 import org.aralozkaya.msngr.ui.theme.ProfileCardPressedCornerRadius
 import org.aralozkaya.msngr.ui.theme.avatar
+import org.aralozkaya.msngr.ui.theme.pill
 
 @Composable
 fun LoggedInUserProfileCard(
@@ -393,7 +393,6 @@ fun Avatar(
     modifier: Modifier = Modifier,
     showPresenceIndicator: Boolean = true,
     imageVersion: Int = 0,
-    shape: Shape = MaterialTheme.shapes.avatar,
     highResolution: Boolean = false,
 ) {
     val painter = rememberAvatarImage(avatarUri, highResolution, imageVersion).painter
@@ -401,13 +400,13 @@ fun Avatar(
     Box(modifier = modifier.size(56.dp)) {
         Surface(
             modifier = Modifier.matchParentSize(),
-            shape = shape,
+            shape = MaterialTheme.shapes.avatar,
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
             if (painter != null) {
                 Image(
                     painter = painter,
-                    contentDescription = "$name profile picture",
+                    contentDescription = "$name display picture",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -431,7 +430,7 @@ fun Avatar(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .size(18.dp),
-                shape = MaterialTheme.shapes.avatar,
+                shape = MaterialTheme.shapes.pill,
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 PresenceDot(

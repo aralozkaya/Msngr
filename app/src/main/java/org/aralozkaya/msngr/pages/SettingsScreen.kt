@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,6 +41,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,10 @@ import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.ContactInvitationPrefs
+import org.aralozkaya.msngr.DisplayPictureSyncBehavior
+import org.aralozkaya.msngr.DisplayPictureSyncPrefs
+import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.MESSENGER_PLUS_DISCLAIMER
 import org.aralozkaya.msngr.MessengerPlusPrefs
@@ -213,6 +221,9 @@ fun ConnectionSettingsScreen(
     onDestinationSelected: (SettingsDestination) -> Unit,
 ) {
     val context = LocalContext.current
+    val account = SessionPrefs.preferenceAccount(context)
+    var pictureBehavior by remember(account) { mutableStateOf(DisplayPictureSyncPrefs.behavior(context)) }
+    var showPictureBehavior by rememberSaveable { mutableStateOf(false) }
     var keepsBackgroundConnection by rememberSaveable {
         mutableStateOf(BackgroundDeliveryPrefs.keepsConnectionAlive(context))
     }
@@ -260,6 +271,46 @@ fun ConnectionSettingsScreen(
                 },
             )
         }
+        settingsSectionSpacer()
+        item(key = "display-picture-sync") {
+            SegmentedListItem(
+                onClick = { showPictureBehavior = true },
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                modifier = Modifier.settingsRow().testTag("display-picture-sync-setting"),
+                supportingContent = { Text(pictureBehavior.label) },
+            ) { Text("Display picture changes") }
+        }
+    }
+    if (showPictureBehavior) {
+        AlertDialog(
+            onDismissRequest = { showPictureBehavior = false },
+            title = { Text("Display picture changes") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("When the picture from Messenger differs from the one saved on this device:")
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                        DisplayPictureSyncBehavior.entries.forEachIndexed { index, behavior ->
+                            SegmentedListItem(
+                                onClick = {
+                                    DisplayPictureSyncPrefs.setBehavior(context, behavior)
+                                    pictureBehavior = behavior
+                                    showPictureBehavior = false
+                                    runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
+                                        context.displayPictureSync.requestRefresh(it)
+                                    }
+                                },
+                                shapes = ListItemDefaults.segmentedShapes(index, DisplayPictureSyncBehavior.entries.size),
+                                modifier = Modifier.fillMaxWidth().testTag("picture-sync-${behavior.name}")
+                                    .semantics { role = Role.RadioButton; selected = pictureBehavior == behavior },
+                                leadingContent = { RadioButton(selected = pictureBehavior == behavior, onClick = null) },
+                                supportingContent = if (behavior == DisplayPictureSyncBehavior.AskEveryTime) ({ Text("Default") }) else null,
+                            ) { Text(behavior.label) }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showPictureBehavior = false }, shapes = ButtonDefaults.shapes()) { Text("Cancel") } },
+        )
     }
 }
 

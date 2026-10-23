@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import org.aralozkaya.msngr.protocol.DisplayPictureLimits
@@ -30,6 +31,14 @@ private val displayPictureBitmapCache = object : LruCache<String, Bitmap>(
         (value.allocationByteCount / 1024).coerceAtLeast(1)
 }
 private val pendingAvatarDecodes = ConcurrentHashMap<String, CompletableDeferred<Bitmap?>>()
+
+/** Bundled originals and Android picker URIs share the same decoding and upload path. */
+internal fun Context.openDisplayPictureInputStream(uri: String): InputStream? =
+    if (uri.startsWith(DEFAULT_DISPLAY_PICTURE_URI_PREFIX)) {
+        val file = uri.removePrefix(DEFAULT_DISPLAY_PICTURE_URI_PREFIX)
+        require('/' !in file && '\\' !in file && file != "." && file != "..")
+        assets.open("display_pictures/$file")
+    } else contentResolver.openInputStream(uri.toUri())
 
 /** Restoration must never silently resize a previously selected picture. */
 internal suspend fun Context.loadDisplayPictureBytes(uri: String?): ByteArray? =
@@ -71,12 +80,11 @@ private fun avatarCacheKey(uri: String, highResolution: Boolean): String =
 
 private fun Context.decodeSampledAvatar(uri: String, highResolution: Boolean): Bitmap? {
     val inlineBytes = uri.inlineImageBytes()
-    val parsedUri = if (inlineBytes == null) uri.toUri() else null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     if (inlineBytes != null) {
         BitmapFactory.decodeByteArray(inlineBytes, 0, inlineBytes.size, bounds)
     } else {
-        contentResolver.openInputStream(requireNotNull(parsedUri))?.use { input ->
+        openDisplayPictureInputStream(uri)?.use { input ->
             BitmapFactory.decodeStream(input, null, bounds)
         }
     }
@@ -98,7 +106,7 @@ private fun Context.decodeSampledAvatar(uri: String, highResolution: Boolean): B
     return if (inlineBytes != null) {
         BitmapFactory.decodeByteArray(inlineBytes, 0, inlineBytes.size, options)
     } else {
-        contentResolver.openInputStream(requireNotNull(parsedUri))?.use { input ->
+        openDisplayPictureInputStream(uri)?.use { input ->
             BitmapFactory.decodeStream(input, null, options)
         }
     }
@@ -123,7 +131,7 @@ internal fun String.inlineImageBytes(): ByteArray? {
 internal fun Context.loadAvatarGifBytes(uri: String?): ByteArray? {
     if (uri.isNullOrBlank()) return null
     uri.inlineImageBytes()?.let { return it.takeIf(GifDisplayPicture::hasSignature) }
-    return contentResolver.openInputStream(uri.toUri())?.use { input ->
+    return openDisplayPictureInputStream(uri)?.use { input ->
         val header = ByteArray(6)
         var offset = 0
         while (offset < header.size) {

@@ -22,11 +22,13 @@ import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
 import java.io.File
 
 class MsngrApplication : Application() {
+    internal val displayPictureSync by lazy { DisplayPictureSync(this) }
     val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
     internal val visibilityTracker = AppVisibilityTracker { isForeground ->
-        runCatching { container.messengerRepository }
-            .getOrNull()
-            ?.setAppInForeground(isForeground)
+        runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
+            repository.setAppInForeground(isForeground)
+            if (isForeground && SessionPrefs.canOpenAuthenticatedScreens(this)) displayPictureSync.requestRefresh(repository)
+        }
     }
     internal val notificationManager by lazy { MsngrNotificationManager(this) }
     private val realtimeNotificationBridge by lazy {

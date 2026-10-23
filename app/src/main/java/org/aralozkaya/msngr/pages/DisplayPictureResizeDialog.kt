@@ -10,7 +10,7 @@ import org.aralozkaya.msngr.DisplayPictureSelection
 internal fun DisplayPictureResizeDialog(picture: DisplayPictureSelection, onResize: () -> Unit, onCancel: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Resize profile picture?") },
+        title = { Text("Resize display picture?") },
         text = {
             Text("This picture is ${picture.width}×${picture.height} and ${(picture.bytes.size + 1023) / 1024} KiB. " +
                 "Messenger pictures must be smaller than 200 KB (200,000 bytes). The app also limits pictures to 1 megapixel for playback. " +

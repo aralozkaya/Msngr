@@ -56,14 +56,14 @@ class ContactProfileInstrumentedTest {
         compose.onNodeWithText("Away").assertExists()
         compose.onNodeWithText("friend@example.com").performScrollTo().assertExists()
         compose.onNodeWithText("Back soon").performScrollTo().assertExists()
-        compose.onNodeWithContentDescription("View profile picture").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("View display picture").assertIsNotEnabled()
     }
 
     @Test
     fun tappingPictureOpensDownloadableViewerAndCloseReturnsToProfile() {
         showProfile(contact.copy(avatarUri = imageUri()))
-        compose.onNodeWithContentDescription("View profile picture").performClick()
-        compose.onNodeWithText("Profile picture").assertExists()
+        compose.onNodeWithContentDescription("View display picture").performClick()
+        compose.onNodeWithText("Display picture").assertExists()
         compose.waitUntil(timeoutMillis = 5_000) {
             runCatching { compose.onNodeWithText("Download picture").assertIsEnabled() }.isSuccess
         }

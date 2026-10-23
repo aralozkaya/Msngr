@@ -152,6 +152,10 @@ interface MsnpClient {
     suspend fun changeNickname(nickname: String)
     suspend fun changePersonalMessage(statusMessage: String)
     suspend fun changeDisplayPicture(image: ByteArray?)
+    suspend fun fetchOwnDisplayPicture(): org.aralozkaya.msngr.IncomingDisplayPicture =
+        org.aralozkaya.msngr.IncomingDisplayPicture()
+    /** Announce a downloaded server picture without writing it back to roaming storage. */
+    suspend fun adoptIncomingDisplayPicture(image: ByteArray?) = Unit
     suspend fun refreshContactPicture(contactId: String) = Unit
     suspend fun logOutSession(sessionId: String) {
         throw UnsupportedOperationException("Session management is not supported by this client.")
@@ -253,6 +257,7 @@ class MockMsnp18Client(
     private val ids = AtomicLong(System.currentTimeMillis() shl 16)
     private var presenceJob: Job? = null
     private var signedInEmail = ""
+    private var ownDisplayPicture: ByteArray? = null
     private var sessionGeneration = 0L
     private val contactAdditionMutex = Mutex()
 
@@ -278,6 +283,7 @@ class MockMsnp18Client(
         sessionGeneration++
         if (!signedInEmail.equals(request.email, true)) mutableContactRequests.value = requestFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) mutableGroupInvitations.value = groupInvitationFixtures(request.email)
+        if (!signedInEmail.equals(request.email, true)) ownDisplayPicture = null
         signedInEmail = request.email
         mutableContacts.value = MockServerData.contacts()
         mutableSessions.value = listOf(AccountSession("mock-current", "This device", isCurrent = true,
@@ -289,6 +295,10 @@ class MockMsnp18Client(
                 username = request.email.substringBefore('@').ifBlank { "You" },
                 email = request.email,
                 presence = request.initialPresence,
+                avatarUri = ownDisplayPicture?.let { bytes ->
+                    "data:${org.aralozkaya.msngr.protocol.DisplayPictureFormat.detect(bytes)?.mimeType};base64," +
+                        org.aralozkaya.msngr.protocol.MsnBase64.encode(bytes)
+                },
             ),
         )
     }
@@ -298,6 +308,11 @@ class MockMsnp18Client(
         delay(80)
         mutableSessions.update { it.map { session -> session.copy(presence = presence) } }
     }
+
+    override suspend fun fetchOwnDisplayPicture() =
+        org.aralozkaya.msngr.IncomingDisplayPicture(ownDisplayPicture?.copyOf(), fetched = signedInEmail.isNotBlank())
+
+    override suspend fun adoptIncomingDisplayPicture(image: ByteArray?) { ownDisplayPicture = image?.copyOf() }
 
     override suspend fun createGroup(name: String): String = contactAdditionMutex.withLock {
         check(signedInEmail.isNotBlank()) { "Sign in before creating a group." }
@@ -399,6 +414,7 @@ class MockMsnp18Client(
     }
 
     override suspend fun changeDisplayPicture(image: ByteArray?) {
+        ownDisplayPicture = image?.copyOf()
         // A live client advertises a type-3 MSNObject in CHG and serves it over MSNSLP/P2P.
         delay(80)
     }
@@ -625,6 +641,9 @@ class MessengerRepository(
     val signOutReason: StateFlow<String?> = mutableSignOutReason.asStateFlow()
     val connectionIssue: StateFlow<String?> = mutableConnectionIssue.asStateFlow()
     val hasSignedInSession: Boolean get() = lastSignInRequest != null
+    val signedInAccountIdentity: AccountIdentity? get() = lastSignInRequest?.let {
+        AccountIdentity.forServer(it.email, it.serverConfig, useMockServer)
+    }
     val contactRequestAccountId: String? get() = mutableRequestAccount.value
 
     init {
@@ -754,6 +773,7 @@ class MessengerRepository(
         profile: UserProfileSnapshot,
         publishStoredSettings: Boolean = false,
         displayPictureBytes: ByteArray? = null,
+        publishDisplayPicture: Boolean = true,
     ) {
         mutableProfile.value = profile
         if (publishStoredSettings) {
@@ -769,7 +789,7 @@ class MessengerRepository(
                     profile.statusMessage.trim().withoutMessengerPlusFormattingIfDisabled(),
                 )
             }
-            if (displayPictureBytes != null || profile.avatarUri == null) {
+            if (publishDisplayPicture && (displayPictureBytes != null || profile.avatarUri == null)) {
                 displayPictureJob?.cancel()
                 displayPictureJob = scope.launch {
                     runCatching { client.changeDisplayPicture(displayPictureBytes) }
@@ -823,6 +843,25 @@ class MessengerRepository(
         contacts.combine(profile) { list, currentProfile -> list.resolveContact(contactId, currentProfile) }
 
     suspend fun refreshContactPicture(contactId: String) = client.refreshContactPicture(contactId)
+
+    suspend fun fetchOwnDisplayPicture(): org.aralozkaya.msngr.IncomingDisplayPicture =
+        client.fetchOwnDisplayPicture()
+
+    internal fun showStoredDisplayPicture(avatarUri: String?, account: AccountIdentity) {
+        mutableProfile.update { current ->
+            if (signedInAccountIdentity == account && current.email.trim().equals(account.email, ignoreCase = true))
+                current.copy(avatarUri = avatarUri)
+            else current
+        }
+    }
+
+    /** Reconciliation changes only the picture; it must not overwrite newer profile text edits. */
+    suspend fun useDisplayPicture(avatarUri: String?, bytes: ByteArray?, publish: Boolean, account: AccountIdentity) = connectionMutex.withLock {
+        check(signedInAccountIdentity == account) { "The signed-in account changed. Please try again." }
+        displayPictureJob?.cancel()
+        if (publish) client.changeDisplayPicture(bytes) else client.adoptIncomingDisplayPicture(bytes)
+        mutableProfile.update { it.copy(avatarUri = avatarUri) }
+    }
 
     fun conversation(contactId: String): Flow<ConversationState> =
         combine(historyStore.messages, client.typing, historyStore.pageStates) {

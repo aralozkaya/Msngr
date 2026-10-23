@@ -3,6 +3,7 @@ package org.aralozkaya.msngr.notifications
 import android.content.Context
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.SessionPrefs
+import org.aralozkaya.msngr.restoreSignedInProfile
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.SignInRequest
 
@@ -19,7 +20,13 @@ internal suspend fun Context.connectedRepositoryForNotificationAction(): Messeng
     ) {
         return existing
     }
-    if (existing?.hasSignedInSession == true && existing.reconnect().isSuccess) return existing
+    if (existing?.hasSignedInSession == true) {
+        val refreshed = existing.reconnect().getOrNull()
+        if (refreshed != null) {
+            appContext.restoreSignedInProfile(existing, refreshed, refreshed.presence)
+            return existing
+        }
+    }
 
     val snapshot = SessionPrefs.readLoginSnapshot(appContext)
     if (!snapshot.savePassword || snapshot.email.isBlank() || snapshot.password.isEmpty()) {
@@ -36,8 +43,7 @@ internal suspend fun Context.connectedRepositoryForNotificationAction(): Messeng
     )
     if (signedIn.isFailure) return null
     SessionPrefs.activateRememberedSession(appContext)
-    repository.setLocalProfile(
-        SessionPrefs.mergeServerProfile(appContext, signedIn.getOrThrow()),
-    )
+    val profile = signedIn.getOrThrow()
+    appContext.restoreSignedInProfile(repository, profile, profile.presence)
     return repository
 }

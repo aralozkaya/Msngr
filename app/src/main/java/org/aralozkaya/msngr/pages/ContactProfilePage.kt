@@ -64,6 +64,7 @@ import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.ProfileDetailCard
 import org.aralozkaya.msngr.pages.components.PresenceLabel
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
+import org.aralozkaya.msngr.ui.theme.avatar
 
 @Composable
 fun ContactProfilePage(
@@ -99,9 +100,9 @@ fun ContactProfilePage(
                         Surface(
                             onClick = { expandedPictureUri = contact.avatarUri },
                             enabled = !contact.avatarUri.isNullOrBlank(),
-                            shape = MaterialTheme.shapes.extraLarge,
+                            shape = MaterialTheme.shapes.avatar,
                             modifier = Modifier.size(144.dp).semantics {
-                                contentDescription = "View profile picture"
+                                contentDescription = "View display picture"
                                 role = Role.Button
                             },
                         ) {
@@ -111,13 +112,12 @@ fun ContactProfilePage(
                                 presence = contact.presence,
                                 modifier = Modifier.size(144.dp),
                                 showPresenceIndicator = false,
-                                shape = MaterialTheme.shapes.extraLarge,
                                 highResolution = true,
                             )
                         }
                         if (contact.avatarUri.isNullOrBlank()) {
                             Text(
-                                "No profile picture",
+                                "No display picture",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

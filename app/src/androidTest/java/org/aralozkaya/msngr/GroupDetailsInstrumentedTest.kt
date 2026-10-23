@@ -81,7 +81,7 @@ class GroupDetailsInstrumentedTest {
             }
         }
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithContentDescription("Alice profile picture", useUnmergedTree = true)
+            compose.onAllNodesWithContentDescription("Alice display picture", useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithContentDescription("View Alice's profile").performTouchInput { click() }

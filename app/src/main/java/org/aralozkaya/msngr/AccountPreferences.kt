@@ -43,6 +43,7 @@ internal object AccountPreferences {
     fun clear(context: Context, account: AccountIdentity?) {
         if (account == null || account.email.isBlank()) return
         names.forEach { name -> forAccount(context, name, account).edit { clear() } }
+        OwnDisplayPictureStore.clear(context, account)
     }
 
     /** Shared and email-only preferences cannot prove which service originally saved them. */
