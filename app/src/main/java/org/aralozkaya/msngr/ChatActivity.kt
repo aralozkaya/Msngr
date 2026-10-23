@@ -78,6 +78,7 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +94,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -252,6 +254,16 @@ internal fun ChatScreen(
 ) {
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
+    val scenePresentation = LocalScenePresentation.current
+    val scene = LocalMessengerScene.current.takeIf { scenePresentation.showInConversations }
+    val sceneInk = sceneContentColor()
+    val sceneView = LocalView.current
+    SideEffect {
+        (sceneView.context as? android.app.Activity)?.window?.let { window ->
+            androidx.core.view.WindowCompat.getInsetsController(window, sceneView)
+                .isAppearanceLightStatusBars = if (scene != null) !scenePresentation.darkTint else !scenePresentation.isDark
+        }
+    }
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     val messengerPlusEnabled = LocalMessengerPlusEnabled.current
@@ -294,82 +306,89 @@ internal fun ChatScreen(
         snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable) },
         topBar = {
             Column {
-                TopAppBar(
-                    modifier = Modifier.clickable(
-                        enabled = contact != null && isConversationAvailable,
-                        onClickLabel = if (contact?.isGroup == true) "View group members" else "View contact profile",
-                        role = androidx.compose.ui.semantics.Role.Button,
-                    ) {
-                        contact?.let {
-                            if (it.isGroup) context.startActivity(GroupDetailsActivity.createIntent(context, it.id))
-                            else context.startActivity(
-                                ContactProfileActivity.createIntent(
-                                    context,
-                                    it.id
-                                )
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = topBarColor,
-                    ),
-                    navigationIcon = {
-                        IconButton(
-                            onClick = onBack,
-                            shapes = IconButtonDefaults.shapes(),
+                SceneBackdrop(scene) {
+                    TopAppBar(
+                        modifier = Modifier.clickable(
+                            enabled = contact != null && isConversationAvailable,
+                            onClickLabel = if (contact?.isGroup == true) "View group members" else "View contact profile",
+                            role = androidx.compose.ui.semantics.Role.Button,
                         ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                            )
-                        }
-                    },
-                    title = {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Avatar(
-                                name = contact?.displayName?.messengerPlusPlainText() ?: "Contact",
-                                avatarUri = contact?.avatarUri,
-                                presence = contact?.presence ?: Presence.Offline,
-                                modifier = Modifier.size(42.dp),
-                                showPresenceIndicator = false,
-                            )
-                            Column {
-                                MessengerPlusText(
-                                    text = contact?.displayName ?: "Conversation",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                    ),
+                            contact?.let {
+                                if (it.isGroup) context.startActivity(GroupDetailsActivity.createIntent(context, it.id))
+                                else context.startActivity(
+                                    ContactProfileActivity.createIntent(
+                                        context,
+                                        it.id
+                                    )
                                 )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    PresenceDot(
-                                        presence = contact?.presence ?: Presence.Offline,
-                                        modifier = Modifier.size(7.dp),
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = if (scene != null) Color.Transparent else topBarColor,
+                            scrolledContainerColor = if (scene != null) Color.Transparent else topBarColor,
+                            navigationIconContentColor = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurface,
+                            titleContentColor = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurface,
+                        ),
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onBack,
+                                shapes = IconButtonDefaults.shapes(),
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                )
+                            }
+                        },
+                        title = {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Avatar(
+                                    name = contact?.displayName?.messengerPlusPlainText() ?: "Contact",
+                                    avatarUri = contact?.avatarUri,
+                                    presence = contact?.presence ?: Presence.Offline,
+                                    modifier = Modifier.size(42.dp),
+                                    showPresenceIndicator = false,
+                                )
+                                Column {
+                                    MessengerPlusText(
+                                        text = contact?.displayName ?: "Conversation",
+                                        sceneGlow = scene != null,
+                                        color = if (scene != null) sceneInk else Color.Unspecified,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                        ),
                                     )
-                                    Text(
-                                        text = if (isTyping) {
-                                            "typing…"
-                                        } else if (contact?.isGroup == true) {
-                                            "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}"
-                                        } else {
-                                            contact?.presence?.label ?: "Offline"
-                                        },
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        PresenceDot(
+                                            presence = contact?.presence ?: Presence.Offline,
+                                            modifier = Modifier.size(7.dp),
+                                        )
+                                        SceneText(
+                                            text = if (isTyping) {
+                                                "typing…"
+                                            } else if (contact?.isGroup == true) {
+                                                "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}"
+                                            } else {
+                                                contact?.presence?.label ?: "Offline"
+                                            },
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
                 if (SessionPrefs.isMockServerActive()) MockServerBanner()
             }
         },

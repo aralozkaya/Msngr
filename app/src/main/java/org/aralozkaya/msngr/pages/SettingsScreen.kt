@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.AppearancePrefs
+import org.aralozkaya.msngr.AppearanceColorOption
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.ContactInvitationPrefs
@@ -475,7 +476,9 @@ fun AppearanceSettingsScreen(
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     val context = LocalContext.current
-    val appearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
+    val savedAppearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
+    val appearance = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && savedAppearance.colorMode == ColorMode.Dynamic)
+        savedAppearance.copy(colorMode = ColorMode.Default) else savedAppearance
 
     PageContentList(
         innerPadding = innerPadding,
@@ -500,24 +503,13 @@ fun AppearanceSettingsScreen(
                 )
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        run {
             settingsSectionSpacer()
             settingsSectionHeader("Color scheme")
-            ColorMode.entries.forEachIndexed { index, mode ->
+            val colorModes = ColorMode.entries.filter { it != ColorMode.Dynamic || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
+            colorModes.forEachIndexed { index, mode ->
                 item(key = "color-${mode.name}") {
-                    SegmentedListItem(
-                        selected = appearance.colorMode == mode,
-                        onClick = { AppearancePrefs.setColorMode(context, mode) },
-                        shapes = ListItemDefaults.segmentedShapes(index, ColorMode.entries.size),
-                        modifier = Modifier.settingsRow(),
-                        trailingContent = {
-                            RadioButton(
-                                selected = appearance.colorMode == mode,
-                                onClick = null,
-                            )
-                        },
-                        content = { Text(mode.label) },
-                    )
+                    AppearanceColorOption(mode, index, colorModes.size, appearance)
                 }
             }
         }

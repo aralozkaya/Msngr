@@ -90,6 +90,7 @@ internal fun MsnEmoticonText(
     overflow: TextOverflow = TextOverflow.Clip,
     linkify: Boolean = false,
     nativeStyle: NativeTextStyle = NativeTextStyle(),
+    sceneGlow: Boolean = false,
 ) {
     val adaptiveColor = MaterialTheme.colorScheme.primary.toArgb()
     val parsed = remember(text, messengerPlusEnabled, hideControlCharacters, adaptiveColor) {
@@ -130,9 +131,11 @@ internal fun MsnEmoticonText(
         }
     }.toMap()
     val sizeScale = nativeStyle.size.toFloat() / NativeTextStyle.DEFAULT_SIZE
+    var sceneLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     Text(
         text = annotatedText,
-        modifier = modifier,
+        modifier = modifier.sceneTextGlow(sceneLayout, sceneGlow, LocalScenePresentation.current.darkTint),
+        onTextLayout = { if (sceneGlow) sceneLayout = it },
         color = color,
         style = style.copy(
             fontSize = (if (style.fontSize == TextUnit.Unspecified) 16.sp else style.fontSize) * sizeScale,
@@ -154,6 +157,7 @@ internal fun MessengerPlusText(
     style: TextStyle = LocalTextStyle.current,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
+    sceneGlow: Boolean = false,
 ) {
     val adaptiveColor = MaterialTheme.colorScheme.primary.toArgb()
     val parsed = remember(text, messengerPlusEnabled, hideControlCharacters, adaptiveColor) {
@@ -162,9 +166,11 @@ internal fun MessengerPlusText(
     val annotated = remember(parsed, style.fontWeight) {
         parsed.present(emptyList(), useOriginalEmoticons = false, baseFontWeight = style.fontWeight?.weight ?: 400)
     }
+    var sceneLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     Text(
         text = annotated,
-        modifier = modifier,
+        modifier = modifier.sceneTextGlow(sceneLayout, sceneGlow, LocalScenePresentation.current.darkTint),
+        onTextLayout = { if (sceneGlow) sceneLayout = it },
         color = color,
         style = style,
         maxLines = maxLines,

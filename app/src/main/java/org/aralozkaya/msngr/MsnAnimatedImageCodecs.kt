@@ -634,10 +634,11 @@ internal object ApngCodec {
 
     /**
      * Composites every frame of [animation] according to its blend and disposal operations, then
-     * centers the result on the 19x19 Messenger emoticon canvas when smaller.
+     * optionally centers the result on the 19x19 Messenger emoticon canvas when smaller.
      */
     fun composite(
         animation: ApngAnimation,
+        padToGrid: Boolean = true,
         decodeFramePixels: (ApngFrame) -> IntArray,
     ): RasterAnimation {
         val width = animation.width
@@ -675,7 +676,8 @@ internal object ApngCodec {
                 DISPOSE_PREVIOUS -> restore?.copyInto(canvas)
             }
         }
-        return RasterAnimation(width, height, compositedFrames, delays).padToEmoticonGrid()
+        val result = RasterAnimation(width, height, compositedFrames, delays)
+        return if (padToGrid) result.padToEmoticonGrid() else result
     }
 
     private class FrameControl(
@@ -746,8 +748,8 @@ internal object ApngCodec {
 }
 
 internal object GifCodec {
-    /** Decodes and composites every frame of a GIF87a/GIF89a file, padded to the 19x19 emoticon grid. */
-    fun decode(bytes: ByteArray): RasterAnimation {
+    /** Decodes and composites GIF frames, with optional 19x19 padding for emoticons. */
+    fun decode(bytes: ByteArray, padToGrid: Boolean = true): RasterAnimation {
         val reader = GifReader(bytes)
         val signature = reader.ascii(6)
         require(signature == "GIF87a" || signature == "GIF89a") { "Not a GIF file." }
@@ -827,7 +829,8 @@ internal object GifCodec {
             }
         }
         require(frames.isNotEmpty()) { "GIF has no frames." }
-        return RasterAnimation(width, height, frames, delays.toIntArray()).padToEmoticonGrid()
+        val result = RasterAnimation(width, height, frames, delays.toIntArray())
+        return if (padToGrid) result.padToEmoticonGrid() else result
     }
 
     /** Variable-length-code LZW decoder; returns color table indices, padding truncated data with 0. */

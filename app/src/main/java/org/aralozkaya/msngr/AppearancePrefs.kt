@@ -15,17 +15,28 @@ enum class ThemeMode(val label: String) {
 enum class ColorMode(val label: String) {
     Default("Default"),
     Dynamic("Dynamic"),
+    Scenes("Scenes"),
 }
 
 data class AppAppearance(
     val themeMode: ThemeMode = ThemeMode.System,
     val colorMode: ColorMode = ColorMode.Dynamic,
+    val sceneId: String = "daisyhill",
+    val customColorArgb: Int? = null,
+    val sceneColorArgb: Int? = null,
+    val showSceneInConversations: Boolean = true,
+    val darkenScenesInDarkMode: Boolean = true,
 )
 
 object AppearancePrefs {
     private const val PREFS_NAME = "msngr_appearance"
     private const val KEY_THEME = "theme"
     private const val KEY_COLOR = "color"
+    private const val KEY_SCENE = "scene"
+    private const val KEY_CUSTOM_COLOR = "custom_color"
+    private const val KEY_SCENE_COLOR = "scene_color"
+    private const val KEY_SCENE_IN_CONVERSATIONS = "scene_in_conversations"
+    private const val KEY_DARKEN_SCENES = "darken_scenes"
     private val mutableAppearance = MutableStateFlow(AppAppearance())
 
     fun state(context: Context): StateFlow<AppAppearance> {
@@ -49,11 +60,46 @@ object AppearancePrefs {
         AppShortcuts.refresh(context)
     }
 
+    fun setScene(context: Context, sceneId: String) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(colorMode = ColorMode.Scenes,
+            sceneId = sceneId, sceneColorArgb = null))
+    }
+
+    /** In scene mode a manual seed keeps the artwork; reset restores its own palette. */
+    fun setMainColor(context: Context, argb: Int?) {
+        reload(context)
+        val current = mutableAppearance.value
+        update(context, if (current.colorMode == ColorMode.Scenes) current.copy(sceneColorArgb = argb?.or(0xFF000000.toInt()))
+            else current.copy(colorMode = ColorMode.Default, customColorArgb = argb?.or(0xFF000000.toInt())))
+    }
+
+    fun setShowSceneInConversations(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(showSceneInConversations = enabled))
+    }
+
+    fun setDarkenScenesInDarkMode(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(darkenScenesInDarkMode = enabled))
+    }
+
+    private fun update(context: Context, appearance: AppAppearance) {
+        mutableAppearance.value = appearance
+        persist(context, appearance)
+        AppShortcuts.refresh(context)
+    }
+
     internal fun reload(context: Context) {
         val prefs = AccountPreferences.preferences(context, PREFS_NAME)
         mutableAppearance.value = AppAppearance(
             themeMode = enumValueOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.System),
             colorMode = enumValueOrDefault(prefs.getString(KEY_COLOR, null), ColorMode.Dynamic),
+            sceneId = messengerScene(prefs.getString(KEY_SCENE, null) ?: "daisyhill").id,
+            customColorArgb = if (prefs.contains(KEY_CUSTOM_COLOR)) prefs.getInt(KEY_CUSTOM_COLOR, 0) else null,
+            sceneColorArgb = if (prefs.contains(KEY_SCENE_COLOR)) prefs.getInt(KEY_SCENE_COLOR, 0) else null,
+            showSceneInConversations = prefs.getBoolean(KEY_SCENE_IN_CONVERSATIONS, true),
+            darkenScenesInDarkMode = prefs.getBoolean(KEY_DARKEN_SCENES, true),
         )
     }
 
@@ -61,6 +107,11 @@ object AppearancePrefs {
         AccountPreferences.preferences(context, PREFS_NAME).edit {
             putString(KEY_THEME, appearance.themeMode.name)
             putString(KEY_COLOR, appearance.colorMode.name)
+            putString(KEY_SCENE, appearance.sceneId)
+            putBoolean(KEY_SCENE_IN_CONVERSATIONS, appearance.showSceneInConversations)
+            putBoolean(KEY_DARKEN_SCENES, appearance.darkenScenesInDarkMode)
+            appearance.customColorArgb?.let { putInt(KEY_CUSTOM_COLOR, it) } ?: remove(KEY_CUSTOM_COLOR)
+            appearance.sceneColorArgb?.let { putInt(KEY_SCENE_COLOR, it) } ?: remove(KEY_SCENE_COLOR)
         }
     }
 

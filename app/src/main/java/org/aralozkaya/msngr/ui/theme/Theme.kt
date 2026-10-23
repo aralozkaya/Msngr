@@ -31,6 +31,10 @@ import org.aralozkaya.msngr.LocalMessengerPlusEnabled
 import org.aralozkaya.msngr.LocalMessengerPlusHideControlCharacters
 import org.aralozkaya.msngr.MessengerPlusPrefs
 import org.aralozkaya.msngr.ThemeMode
+import org.aralozkaya.msngr.LocalMessengerScene
+import org.aralozkaya.msngr.LocalScenePresentation
+import org.aralozkaya.msngr.ScenePresentation
+import org.aralozkaya.msngr.messengerScene
 import org.aralozkaya.msngr.pages.components.KeyboardSheetScaffold
 
 internal val DarkColorScheme = darkColorScheme(
@@ -151,7 +155,7 @@ fun MsngrTheme(
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
-    val colorScheme = msngrColorScheme(context, appearance, isDark)
+    val colorScheme = remember(context, appearance, isDark) { msngrColorScheme(context, appearance, isDark) }
     val view = LocalView.current
 
     if (!view.isInEditMode) {
@@ -165,6 +169,12 @@ fun MsngrTheme(
     }
 
     CompositionLocalProvider(
+        LocalMessengerScene provides if (appearance.colorMode == ColorMode.Scenes) messengerScene(appearance.sceneId) else null,
+        LocalScenePresentation provides ScenePresentation(
+            showInConversations = appearance.showSceneInConversations,
+            darkTint = isDark && appearance.darkenScenesInDarkMode,
+            isDark = isDark,
+        ),
         LocalMessengerPlusEnabled provides messengerPlusSettings.enabled,
         LocalMessengerPlusHideControlCharacters provides messengerPlusSettings.shouldHideControlCharacters,
     ) {
@@ -195,6 +205,10 @@ internal fun msngrColorScheme(
     val useDynamic = appearance.colorMode == ColorMode.Dynamic &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     return when {
+        appearance.colorMode == ColorMode.Scenes -> seededColorScheme(
+            appearance.sceneColorArgb ?: messengerScene(appearance.sceneId).seedArgb, isDark)
+        appearance.colorMode == ColorMode.Default && appearance.customColorArgb != null ->
+            seededColorScheme(appearance.customColorArgb, isDark)
         useDynamic && isDark -> dynamicDarkColorScheme(context)
         useDynamic -> dynamicLightColorScheme(context)
         isDark -> DarkColorScheme

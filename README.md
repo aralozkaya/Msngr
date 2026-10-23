@@ -36,8 +36,9 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 - **Stay connected on Android.** Receive message, nudge, presence, request, and invitation
   notifications. Reply to messages from notifications. An optional foreground service maintains
   the connection in the background and reconnects after network interruptions.
-- **Choose your setup.** Use light, dark, or system appearance and dynamic colors on supported
-  Android versions. Remember accounts with separate preferences and history for each account
+- **Choose your setup.** Use light, dark, or system appearance, dynamic colors, or
+  [classic Messenger scenes](docs/SCENES.md) with matching Material palettes. Choose a main color
+  from Messenger swatches or a color wheel. Remember accounts with separate preferences and history for each account
   and service, and choose automatic sign-in.
 - **Manage your sessions.** View connected devices and their presence. Sign out an individual
   device, all other sessions, or all sessions. An optional setting signs out other sessions
