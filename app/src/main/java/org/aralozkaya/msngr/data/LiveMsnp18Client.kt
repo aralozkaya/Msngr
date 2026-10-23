@@ -207,6 +207,7 @@ internal class LiveMsnp18Client(
     private var initialContactPictureRefreshJob: Job? = null
     private var initialContactPictureRefreshSignal: CompletableDeferred<Unit>? = null
     private var signedInEmail = ""
+    private var signedInAtMillis = 0L
     private var signedInStorageAccount = ""
     private var machineGuid = ""
     private var switchboardFallbackPort = DEFAULT_SWITCHBOARD_PORT
@@ -278,6 +279,7 @@ internal class LiveMsnp18Client(
         }
 
         signedInEmail = email
+        signedInAtMillis = System.currentTimeMillis()
         signedInStorageAccount = AccountIdentity.forServer(email, request.serverConfig, false).storageId
         machineGuid = endpointGuid
         accountSessionsReceived = CompletableDeferred()
@@ -1226,6 +1228,7 @@ internal class LiveMsnp18Client(
         val host = offlineServer
         val ticket = offlineTicket
         val owner = signedInEmail
+        val signedInAt = signedInAtMillis
         if (ticket.isBlank()) return
         offlineReceiverJob = scope.launch {
             val published = mutableSetOf<String>()
@@ -1257,7 +1260,10 @@ internal class LiveMsnp18Client(
                                     ) }
                                     if (isNew && mutableContacts.value.firstOrNull { it.id == entry.sender }?.isBlocked != true) {
                                         incrementUnread(entry.sender)
-                                        if (!announcedOfflineMessages) {
+                                        // Invisible sessions also receive live messages through this queue.
+                                        // Server timestamps have second precision; only announce older messages.
+                                        val receivedWhileSignedOut = message.timestampMillis / 1000 < signedInAt / 1000
+                                        if (receivedWhileSignedOut && !announcedOfflineMessages) {
                                             mutableEvents.emit(MessengerEvent.OfflineMessagesReceived)
                                             announcedOfflineMessages = true
                                         }
@@ -2496,6 +2502,7 @@ internal class LiveMsnp18Client(
         contactEndpointWaiters.values.forEach { it.cancel() }
         contactEndpointWaiters.clear()
         signedInEmail = ""
+        signedInAtMillis = 0L
         signedInStorageAccount = ""
         machineGuid = ""
         accountSessionsReceived?.completeExceptionally(LiveMsnpException("This session has already ended."))
