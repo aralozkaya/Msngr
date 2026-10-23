@@ -45,7 +45,7 @@ import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.rememberAvatarImage
-import org.aralozkaya.msngr.ui.theme.avatar
+import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 
 @Composable
 internal fun DisplayPictureSyncHost(repository: MessengerRepository) {
@@ -110,7 +110,7 @@ private fun ComparisonPicture(title: String, subtitle: String, uri: String?, mod
     val image = rememberAvatarImage(uri, highResolution = true)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(title, style = MaterialTheme.typography.titleSmall)
-        Surface(shape = MaterialTheme.shapes.avatar, color = MaterialTheme.colorScheme.secondaryContainer,
+        Surface(shape = MaterialTheme.shapes.ownDisplayPicture, color = MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
             Box(contentAlignment = Alignment.Center) {
                 image.painter?.let { Image(it, contentDescription = title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }

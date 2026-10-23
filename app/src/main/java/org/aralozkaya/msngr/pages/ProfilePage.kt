@@ -78,6 +78,7 @@ import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.ProfileDetailCard
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
+import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 
 @Composable
 fun ProfilePage(
@@ -278,6 +279,7 @@ fun ProfilePage(
                                 modifier = Modifier.matchParentSize(),
                                 showPresenceIndicator = false,
                                 imageVersion = avatarImageVersion,
+                                shape = MaterialTheme.shapes.ownDisplayPicture,
                             )
                             if (processingDisplayPicture) {
                                 CircularProgressIndicator(
