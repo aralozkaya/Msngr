@@ -158,12 +158,63 @@ class LiveOfflineMessagesTest {
             }
         }
         try {
-            client.signIn(SignInRequest(owner, "test", config)).getOrThrow()
+            client.signIn(SignInRequest(owner, "test", config, initialPresence = Presence.Offline)).getOrThrow()
             client.startOfflineMessageDelivery { true }
             withTimeout(2000) { while (deleted.size != 2 || received.get() != 2) delay(10) }
             assertEquals(1, notices.get())
             assertEquals(2, client.contacts.value.single().unreadCount)
             assertEquals(2, client.messages.value.getValue(peer).size)
+        } finally { collector.cancel(); client.close(); job.cancel() }
+    }
+
+    @Test fun signingInInvisibleDoesNotAnnounceLiveQueuedMessagesAsOffline() = runBlocking {
+        assertInvisibleLiveMessagesDoNotAnnounceOffline(Presence.Offline)
+    }
+
+    @Test fun switchingToInvisibleDoesNotAnnounceLiveQueuedMessagesAsOffline() = runBlocking {
+        assertInvisibleLiveMessagesDoNotAnnounceOffline(Presence.Online)
+    }
+
+    private suspend fun assertInvisibleLiveMessagesDoNotAnnounceOffline(initialPresence: Presence) = coroutineScope {
+        val job = SupervisorJob()
+        val transport = OfflineNotificationTransport(owner)
+        val first = MsnpOfflineMessages.parseMetadata(fixture("wlm-metadata.xml")).single()
+        val queued = CopyOnWriteArrayList<OfflineMessageMetadata>()
+        val deleted = CopyOnWriteArrayList<String>()
+        val events = CopyOnWriteArrayList<MessengerEvent.IncomingMessage>()
+        val notices = AtomicInteger()
+        val service = object : OfflineMessageService {
+            override suspend fun metadata(host: String, ticket: String) = queued.filter { it.id !in deleted }
+            override suspend fun message(host: String, ticket: String, id: String) = fixture("wlm-get-message.xml")
+            override suspend fun delete(host: String, ticket: String, id: String) { deleted += id }
+        }
+        val client = client(CoroutineScope(job + Dispatchers.Default), transport, service = service)
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+            client.events.collect {
+                if (it is MessengerEvent.OfflineMessagesReceived) notices.incrementAndGet()
+                if (it is MessengerEvent.IncomingMessage) events += it
+            }
+        }
+        try {
+            client.signIn(SignInRequest(owner, "test", config, initialPresence = initialPresence)).getOrThrow()
+            if (initialPresence != Presence.Offline) client.changePresence(Presence.Offline)
+            // OIM metadata rounds send times to seconds, including messages sent just after login.
+            val sentAt = System.currentTimeMillis() / 1000 * 1000
+            queued += first.copy(sentAtMillis = sentAt)
+            client.startOfflineMessageDelivery { true }
+            withTimeout(2000) { while (deleted.size != 1 || events.size != 1) delay(10) }
+            assertEquals(0, notices.get())
+
+            // Later queue notifications must keep delivering messages without another offline notice.
+            queued += first.copy(id = "2390D51C-619F-4729-814C-F85FCB88203B", sentAtMillis = sentAt)
+            transport.deliver(MsnpCommand("MSG", payload = (
+                "Content-Type: text/x-msmsgsoimnotification\r\n\r\nMail-Data: too-large\r\n"
+            ).toByteArray()))
+            withTimeout(2000) { while (deleted.size != 2 || events.size != 2) delay(10) }
+            assertEquals(0, notices.get())
+            assertEquals(2, client.contacts.value.single().unreadCount)
+            assertEquals(2, client.messages.value.getValue(peer).size)
+            assertTrue(events.all { it.isOffline })
         } finally { collector.cancel(); client.close(); job.cancel() }
     }
 

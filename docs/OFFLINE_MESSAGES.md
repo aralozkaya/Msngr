@@ -8,12 +8,16 @@ Received messages retain the sender and original send time, increment unread cou
 Android Messages notification channel, including during foreground login. Notification delivery
 still follows the account's notification settings and Android permission/channel settings.
 
-The first newly saved, unblocked message in a received batch also posts the general notice
-**You received instant messages while you were offline.** on the separate **Offline messages**
+The first newly saved, unblocked message in a received batch that predates the current sign-in
+also posts the general notice **You received instant messages while you were offline.** on the
+separate **Offline messages**
 channel. It appears during foreground login as well as in the background. Retries and redelivery
 of messages already saved do not announce another batch. The notice uses one stable notification
 ID, opens Msngr when tapped, and can be dismissed independently of conversation notifications.
 Reading a chat clears its message notifications without clearing this general notice.
+
+Messages sent while connected and appearing offline still arrive normally, without this general
+notice. Messages queued before sign-in can still trigger the notice when signing in as invisible.
 
 Disable or customize the notice in **Android Settings > Apps > Msngr > Notifications > Offline
 messages**. Disabling it does not disable the Messages channel or message retrieval. Android
