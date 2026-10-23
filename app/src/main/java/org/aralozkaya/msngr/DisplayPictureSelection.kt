@@ -10,7 +10,6 @@ import android.graphics.Color
 import android.graphics.Movie
 import android.graphics.Paint
 import android.graphics.Rect
-import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -37,7 +36,7 @@ internal data class DisplayPictureSelection(
 
 internal fun Context.readProfilePictureBytes(uri: String): ByteArray {
     uri.inlineImageBytes()?.let { return it }
-    return requireNotNull(contentResolver.openInputStream(uri.toUri())) { "That image could not be opened." }.use { input ->
+    return requireNotNull(openDisplayPictureInputStream(uri)) { "That image could not be opened." }.use { input ->
         ByteArrayOutputStream().use { output ->
             val buffer = ByteArray(8192)
             while (true) {

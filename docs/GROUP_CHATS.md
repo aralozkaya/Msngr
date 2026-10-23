@@ -2,7 +2,7 @@
 
 Msngr supports existing, accepted MSNP18 circles on Escargot. They appear in the Groups section;
 tapping a row opens its conversation and tapping its avatar or conversation header opens Group details.
-The dedicated page searches display names and email addresses and shows members' profile pictures.
+The dedicated page searches display names and email addresses and shows members' display pictures.
 It uses the same toolbar and back navigation as contact profiles. Returning from a member's chat
 or profile restores Group details.
 Member names use the shared emoticon renderer and retain Messenger Plus formatting.

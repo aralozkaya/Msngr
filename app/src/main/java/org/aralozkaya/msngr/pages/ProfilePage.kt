@@ -2,7 +2,9 @@
 
 package org.aralozkaya.msngr.pages
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
@@ -26,7 +27,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +48,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.ContactPictureViewer
 import org.aralozkaya.msngr.EmoticonPanel
 import org.aralozkaya.msngr.MessengerPlusColorSheet
@@ -62,6 +64,9 @@ import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.loadDisplayPictureBytes
 import org.aralozkaya.msngr.DisplayPictureSelection
 import org.aralozkaya.msngr.inspectDisplayPicture
+import org.aralozkaya.msngr.inspectCapturedDisplayPicture
+import org.aralozkaya.msngr.createDisplayPictureCaptureUri
+import org.aralozkaya.msngr.deleteDisplayPictureCapture
 import org.aralozkaya.msngr.resizeDisplayPicture
 import kotlinx.coroutines.CancellationException
 import org.aralozkaya.msngr.LocalMessengerPlusEnabled
@@ -100,6 +105,8 @@ fun ProfilePage(
     var displayPictureChanged by rememberSaveable { mutableStateOf(false) }
     var avatarImageVersion by remember { mutableIntStateOf(0) }
     var showDisplayPictureOptions by rememberSaveable { mutableStateOf(false) }
+    var showDefaultDisplayPictures by rememberSaveable { mutableStateOf(false) }
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedPictureUri by rememberSaveable { mutableStateOf<String?>(null) }
     var processingDisplayPicture by remember { mutableStateOf(false) }
     var pendingPictureResize by remember { mutableStateOf<DisplayPictureSelection?>(null) }
@@ -143,22 +150,33 @@ fun ProfilePage(
         displayPictureChanged = true
         avatarImageVersion++
     }
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            processingDisplayPicture = true
-            profileSaveError = null
-            scope.launch {
-                try {
-                    val picture = context.inspectDisplayPicture(uri.toString())
-                    if (picture.requiresResize) pendingPictureResize = picture else acceptPicture(picture)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    profileSaveError = error.message ?: "That image could not be read."
-                } finally {
-                    processingDisplayPicture = false
-                }
+    fun selectPicture(uri: String, captured: Boolean = false) {
+        processingDisplayPicture = true
+        profileSaveError = null
+        scope.launch {
+            try {
+                val picture = if (captured) context.inspectCapturedDisplayPicture(uri)
+                    else context.inspectDisplayPicture(uri)
+                if (picture.requiresResize) pendingPictureResize = picture else acceptPicture(picture)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                profileSaveError = error.message ?: "That image could not be read."
+            } finally {
+                if (captured) context.deleteDisplayPictureCapture(Uri.parse(uri))
+                processingDisplayPicture = false
             }
+        }
+    }
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { selectPicture(it.toString()) }
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = pendingCameraUri
+        pendingCameraUri = null
+        if (uri != null) {
+            if (success) selectPicture(uri, captured = true)
+            else context.deleteDisplayPictureCapture(Uri.parse(uri))
         }
     }
 
@@ -185,61 +203,50 @@ fun ProfilePage(
     }
 
     if (showDisplayPictureOptions) {
-        AlertDialog(
-            onDismissRequest = { showDisplayPictureOptions = false },
-            title = { Text("Profile picture") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(
-                        onClick = {
-                            expandedPictureUri = avatarUri
-                            showDisplayPictureOptions = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = avatarUri != null,
-                    ) {
-                        Text("View current picture")
-                    }
-                    Button(
-                        onClick = {
-                            showDisplayPictureOptions = false
-                            imagePicker.launch(arrayOf("image/*"))
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Select a picture")
-                    }
-                    Button(
-                        onClick = {
-                            avatarUri = null
-                            displayPictureBytes = null
-                            displayPictureChanged = initial.avatarUri != null
-                            avatarImageVersion++
-                            profileSaveError = null
-                            showDisplayPictureOptions = false
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = avatarUri != null,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
-                        ),
-                    ) {
-                        Text("Remove current picture")
-                    }
+        DisplayPictureOptionsDialog(
+            name = usernameDraft.messengerPlusPlainText(),
+            pictureUri = avatarUri,
+            onTakePhoto = {
+                showDisplayPictureOptions = false
+                profileSaveError = null
+                try {
+                    val uri = context.createDisplayPictureCaptureUri()
+                    pendingCameraUri = uri.toString()
+                    camera.launch(uri)
+                } catch (_: Exception) {
+                    pendingCameraUri?.let { context.deleteDisplayPictureCapture(Uri.parse(it)) }
+                    pendingCameraUri = null
+                    profileSaveError = "The camera could not be opened. Try selecting a photo instead."
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = { showDisplayPictureOptions = false },
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Text("Cancel")
+            onSelectPhoto = {
+                showDisplayPictureOptions = false
+                profileSaveError = null
+                try {
+                    // ImageOnly includes image/gif; do not limit this to JPEG/PNG.
+                    imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                } catch (_: Exception) {
+                    profileSaveError = "The photo picker could not be opened. Please try again."
                 }
             },
+            onDefaultPhoto = { showDisplayPictureOptions = false; showDefaultDisplayPictures = true },
+            onViewPicture = { expandedPictureUri = avatarUri; showDisplayPictureOptions = false },
+            onRemovePicture = {
+                avatarUri = null
+                displayPictureBytes = null
+                displayPictureChanged = initial.avatarUri != null
+                avatarImageVersion++
+                profileSaveError = null
+                showDisplayPictureOptions = false
+            },
+            onDismiss = { showDisplayPictureOptions = false },
+        )
+    }
+
+    if (showDefaultDisplayPictures) {
+        DefaultDisplayPictureDialog(
+            onSelect = { picture -> showDefaultDisplayPictures = false; selectPicture(picture.uri) },
+            onDismiss = { showDefaultDisplayPictures = false },
         )
     }
 
@@ -270,7 +277,6 @@ fun ProfilePage(
                                 presence = initial.presence,
                                 modifier = Modifier.matchParentSize(),
                                 showPresenceIndicator = false,
-                                shape = MaterialTheme.shapes.extraLarge,
                                 imageVersion = avatarImageVersion,
                             )
                             if (processingDisplayPicture) {
@@ -286,7 +292,7 @@ fun ProfilePage(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
-                                    contentDescription = "Change profile picture",
+                                    contentDescription = "Change display picture",
                                 )
                             }
                         }
@@ -388,19 +394,28 @@ fun ProfilePage(
                                         avatarUri = avatarUri,
                                         displayPictureBytes = bytesToUpload,
                                     ).onSuccess {
-                                        SessionPrefs.saveUserProfile(
-                                            context = context,
-                                            username = normalizedUsername,
-                                            presence = initial.presence,
-                                            avatarUri = avatarUri,
-                                            statusMessage = normalizedStatusMessage,
-                                        )
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                SessionPrefs.saveUserProfile(
+                                                    context = context,
+                                                    username = normalizedUsername,
+                                                    presence = initial.presence,
+                                                    avatarUri = avatarUri,
+                                                    statusMessage = normalizedStatusMessage,
+                                                )
+                                            }
+                                        } catch (cancelled: CancellationException) { throw cancelled }
+                                        catch (_: Exception) {
+                                            profileSaveError = "Your profile was sent, but its local copy could not be saved. Please try again."
+                                            savingProfile = false
+                                            return@launch
+                                        }
                                         repository.setStatusMessage(normalizedStatusMessage)
                                         savingProfile = false
                                         onProfileSaved()
                                     }.onFailure { error ->
                                         profileSaveError = error.message
-                                            ?: "The profile picture could not be saved to the server."
+                                            ?: "The display picture could not be saved to the server."
                                         savingProfile = false
                                     }
                                 }

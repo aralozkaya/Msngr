@@ -1,4 +1,4 @@
-# Animated profile pictures
+# Animated display pictures
 
 Msngr preserves the original PNG, JPEG, BMP, or GIF when it fits the native Messenger user-tile
 budget of **less than 200 KB (at most 199,999 bytes)**. It does not crop static pictures to 96×96, upscale small
@@ -6,6 +6,49 @@ pictures, or recompress compatible originals. GIFs animate in contact lists, cha
 and the full-size viewer. Notifications and Android shortcuts use a still poster frame.
 
 ## Selection, quality, and download requirements
+
+### Incoming display pictures and the local copy
+
+Sign-in downloads the account's own picture from Messenger's authenticated roaming
+profile service. Foreground launches also refresh it when an MSNP session is already
+running in the background. The app compares the complete image bytes with an atomic,
+account-specific local snapshot (email plus notification service), rather than comparing
+URI strings or thumbnails. Original GIF animation remains intact in both previews.
+
+On the first successful picture fetch, use the server picture directly, including a
+profile with no picture. Later differences follow **Settings → Connection → Display
+picture changes**: **Always use incoming one**, **Always use local one**, or **Ask every
+time** (default). The choice modal shows the old local picture on the left, an arrow,
+and the incoming picture on the right. **Keep local** publishes the saved original
+back to Messenger; **Use incoming** adopts the downloaded original without uploading
+it again. **Not now** retains the local snapshot and asks again on a later launch.
+Identical bytes never prompt, even if their URIs differ. A failed/invalid download is
+not a picture removal and does not erase or initialize the local snapshot.
+
+Background session restoration preserves unresolved choices until the foreground UI
+can show them. Upload failures keep the old snapshot and allow retrying the choice.
+Explicit local/server removals are valid choices. Account switching discards stale
+fetch results, and forgetting an account removes its snapshot and sync preference.
+
+### Choosing a picture
+
+The display picture editor offers **Take a photo**, **Select a photo**, and
+**Use a default photo**, in that order. The Android photo picker requests `image/*`
+so GIFs remain selectable; AndroidX falls back to the system document picker on
+devices without a photo picker. Full-resolution camera captures use a dedicated
+temporary FileProvider directory, normalize EXIF orientation, and are deleted on
+success, cancellation, or read failure. Every source uses the existing inspection,
+resize-consent, draft, and save flow.
+
+The default-photo modal bundles all 45 unique originals listed in the source wiki's
+display-picture tables: 11 from 6.1–8.5, 30 introduced in 2009, and 4 introduced in
+2011–2012. Nine are animated GIFs; none of the source display pictures are APNG.
+The modal groups additions by era, previews animations, and requires **Use photo**
+before changing the draft. Cancelling preserves the previous picture. Bundled images
+work offline, and their original bytes survive selection, restore, and export.
+See `app/src/main/assets/display_pictures/README.md` and `catalog.json` for source
+URLs, credits, and hashes. Re-run `python tools/download_display_pictures.py` to
+reproduce the collection. Scenes and backgrounds are excluded.
 
 | Property | Behavior |
 | --- | --- |
@@ -69,8 +112,8 @@ native account supplied the contact picture.
 
 Soccer is a regular animated GIF display picture. The `.dt2` suffix does not imply a separate
 image codec. This change does not implement the separate CAB/Flash dynamic-content system.
-The original Microsoft artwork and captures are not included in the repository; regression
-tests use an original two-color GIF.
+The default-picture collection now includes the wiki's original Soccer GIF. Private
+captures remain excluded; protocol regression tests use an original two-color GIF.
 
 ## Transfer on the wire
 
@@ -139,6 +182,23 @@ original PNG/JPEG bytes, MIME, restore, and export. Its optional private GIF tes
 visible animation, lifecycle pause/resume, byte-preserving selection/restoration/export, and
 the still poster used by notifications. `ContactProfileInstrumentedTest` covers the existing
 profile and viewer behavior.
+
+`DisplayPicturePickerInstrumentedTest` verifies every bundled hash and decoded image,
+all nine GIFs' distinct frames and byte-preserving restoration/export, the three
+source actions, version filters, preview/confirmation/cancellation, draft removal,
+Android's image-picker contract and GIF result, full-resolution camera output,
+EXIF orientation, and capture cleanup.
+
+`DisplayPictureSyncPolicyTest` covers all three incoming-picture policies, first
+login, identical byte content, removals, and unavailable fetches. The own-picture
+contracts in `LiveMsnp18ClientContractTest` verify fresh roaming downloads, adopting
+the incoming MSNObject without re-uploading it, keeping a local object after the
+remote storage content changes, and distinguishing a failed fetch from removal.
+`DisplayPictureSyncInstrumentedTest` covers durable original bytes, account
+isolation, upload retries, deferred choices, first-login behavior, and the setting
+and comparison UI. `DisplayPictureSyncLaunchInstrumentedTest` exercises the actual
+authenticated MainActivity launch, background/foreground return, and resolved
+picture restoration with the mock server. These tests do not use live credentials.
 
 Live verification uses the private account and native Soccer picture, compares received bytes
 with the native cache, opens the contact profile, and checks the animation survives refresh.

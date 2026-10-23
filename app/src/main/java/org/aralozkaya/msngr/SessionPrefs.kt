@@ -143,6 +143,8 @@ data class UserProfileSnapshot(
     val presence: Presence,
     val avatarUri: String? = null,
     val statusMessage: String = "",
+    /** False when sign-in could not fetch the server's display picture (including its removal). */
+    val displayPictureFetched: Boolean = true,
 )
 
 object ProviderOptions {
@@ -449,10 +451,11 @@ object SessionPrefs {
         if (storedAvatar != null && localAvatar == null) {
             profilePrefs.edit { remove(KEY_AVATAR_URI) }
         }
+        val savedPicture = OwnDisplayPictureStore.reference(context, account)
         return serverProfile.copy(
             username = username,
             presence = presence,
-            avatarUri = localAvatar ?: serverProfile.avatarUri,
+            avatarUri = if (savedPicture.initialized) savedPicture.uri else localAvatar ?: serverProfile.avatarUri,
             statusMessage = statusMessage,
         )
     }
@@ -463,8 +466,16 @@ object SessionPrefs {
         presence: Presence,
         avatarUri: String? = readUserProfile(context).avatarUri,
         statusMessage: String = readUserProfile(context).statusMessage,
+        saveDisplayPicture: Boolean = true,
     ) {
-        if (preferenceAccount(context) == null) return
+        val account = preferenceAccount(context) ?: return
+        if (saveDisplayPicture) {
+            when {
+                avatarUri.isNullOrBlank() -> OwnDisplayPictureStore.write(context, account, null)
+                avatarUri.isInlineDisplayPicture() -> OwnDisplayPictureStore.write(context, account, avatarUri.inlineImageBytes())
+                avatarUri != OwnDisplayPictureStore.reference(context, account).uri -> OwnDisplayPictureStore.clear(context, account)
+            }
+        }
         AccountPreferences.preferences(context, PROFILE_PREFS).edit {
             putString(KEY_USERNAME, username.trim())
             putString(KEY_PRESENCE, presence.name)
@@ -472,10 +483,12 @@ object SessionPrefs {
                 KEY_STATUS_MESSAGE,
                 statusMessage.replace('\r', ' ').replace('\n', ' ').trim(),
             )
-            if (avatarUri.isNullOrBlank() || avatarUri.isInlineDisplayPicture()) {
-                remove(KEY_AVATAR_URI)
-            } else {
-                putString(KEY_AVATAR_URI, avatarUri)
+            if (saveDisplayPicture) {
+                if (avatarUri.isNullOrBlank() || avatarUri.isInlineDisplayPicture()) {
+                    remove(KEY_AVATAR_URI)
+                } else {
+                    putString(KEY_AVATAR_URI, avatarUri)
+                }
             }
         }
     }

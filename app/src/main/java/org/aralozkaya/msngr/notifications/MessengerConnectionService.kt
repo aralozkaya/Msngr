@@ -22,6 +22,7 @@ import org.aralozkaya.msngr.LoginActivity
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
+import org.aralozkaya.msngr.restoreSignedInProfile
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.SignInRequest
 
@@ -93,7 +94,7 @@ class MessengerConnectionService : Service() {
         )
         val serverProfile = result.getOrNull() ?: return null
         SessionPrefs.activateRememberedSession(this)
-        restored.setLocalProfile(SessionPrefs.mergeServerProfile(this, serverProfile))
+        restoreSignedInProfile(restored, serverProfile, serverProfile.presence)
         return restored
     }
 

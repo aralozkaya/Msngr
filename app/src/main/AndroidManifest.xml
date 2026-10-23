@@ -12,6 +12,7 @@
     <uses-feature
         android:name="android.hardware.sensor.accelerometer"
         android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:name=".MsngrApplication"
@@ -23,6 +24,15 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Msngr">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.display-pictures"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/display_picture_paths" />
+        </provider>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"

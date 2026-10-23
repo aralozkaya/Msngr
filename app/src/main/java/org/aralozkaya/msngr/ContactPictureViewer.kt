@@ -69,7 +69,7 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                 saving = false
                 Toast.makeText(
                     context,
-                    if (saved) "Profile picture saved" else "Could not save profile picture. Please try again.",
+                    if (saved) "Display picture saved" else "Could not save display picture. Please try again.",
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -84,7 +84,7 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { Text("Profile picture") },
+                    title = { Text("Display picture") },
                     navigationIcon = {
                         IconButton(onClick = onDismiss, enabled = !saving, shapes = IconButtonDefaults.shapes()) {
                             Icon(Icons.Default.Close, contentDescription = "Close picture")
@@ -100,19 +100,19 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                     when {
                         painter != null -> Image(
                             painter = painter,
-                            contentDescription = "$name profile picture",
+                            contentDescription = "$name display picture",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
                         image.isLoading -> CircularProgressIndicator()
-                        else -> Text("This profile picture could not be loaded.")
+                        else -> Text("This display picture could not be loaded.")
                     }
                 }
                 FilledTonalButton(
                     onClick = {
                         if (!saving) {
                             val extension = format?.extension ?: return@FilledTonalButton
-                            savePicture.launch("${profilePictureFileStem(name)}-profile-picture.$extension")
+                            savePicture.launch("${profilePictureFileStem(name)}-display-picture.$extension")
                         }
                     },
                     enabled = painter != null && !image.isLoading && format != null,
