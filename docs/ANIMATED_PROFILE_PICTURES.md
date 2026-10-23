@@ -46,6 +46,9 @@ display-picture tables: 11 from 6.1–8.5, 30 introduced in 2009, and 4 introduc
 The modal groups additions by era, previews animations, and requires **Use photo**
 before changing the draft. Cancelling preserves the previous picture. Bundled images
 work offline, and their original bytes survive selection, restore, and export.
+The account's own picture uses shared 28 dp corners in its profile card, editor,
+source dialog, and sync comparison. Default tiles animate between 16 dp and 28 dp
+corners on selection, with matching image clipping and an inset selection badge.
 See `app/src/main/assets/display_pictures/README.md` and `catalog.json` for source
 URLs, credits, and hashes. Re-run `python tools/download_display_pictures.py` to
 reproduce the collection. Scenes and backgrounds are excluded.

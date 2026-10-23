@@ -63,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -82,7 +83,8 @@ import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.loadDefaultDisplayPictures
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.rememberAvatarImage
-import org.aralozkaya.msngr.ui.theme.avatar
+import org.aralozkaya.msngr.ui.theme.OwnDisplayPictureCornerRadius
+import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 
 @Composable
 internal fun DisplayPictureOptionsDialog(
@@ -108,7 +110,7 @@ internal fun DisplayPictureOptionsDialog(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Avatar(name, pictureUri, Presence.Offline, modifier = Modifier.size(80.dp),
-                        showPresenceIndicator = false)
+                        showPresenceIndicator = false, shape = MaterialTheme.shapes.ownDisplayPicture)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Display picture", style = MaterialTheme.typography.headlineSmall)
                         Text("A little more you.", style = MaterialTheme.typography.bodyMedium,
@@ -236,12 +238,14 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
 
 @Composable
 private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean, onClick: () -> Unit) {
+    val cornerRadius by animateDpAsState(if (checked) OwnDisplayPictureCornerRadius else 16.dp,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "picture selection corners")
     val borderWidth by animateDpAsState(if (checked) 3.dp else 1.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "picture selection border")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Surface(
             onClick = onClick,
-            shape = MaterialTheme.shapes.avatar,
+            shape = RoundedCornerShape(cornerRadius),
             border = BorderStroke(borderWidth,
                 if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth().aspectRatio(1f).testTag("default-picture-${picture.id}")
@@ -252,7 +256,8 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
                 },
         ) {
             Box {
-                DefaultPictureImage(picture, Modifier.fillMaxSize().padding(5.dp))
+                DefaultPictureImage(picture, Modifier.fillMaxSize().padding(5.dp),
+                    shape = RoundedCornerShape((cornerRadius - 5.dp).coerceAtLeast(0.dp)))
                 if (picture.animated) Surface(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(6.dp),
                     shape = MaterialTheme.shapes.small,
@@ -261,7 +266,7 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
                 ) { Text("Animated", Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall) }
                 if (checked) Icon(Icons.Default.CheckCircle, contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(12.dp).clip(RoundedCornerShape(50))
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.surface).size(24.dp))
             }
         }
@@ -271,9 +276,9 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
 }
 
 @Composable
-private fun DefaultPictureImage(picture: DefaultDisplayPicture, modifier: Modifier) {
+private fun DefaultPictureImage(picture: DefaultDisplayPicture, modifier: Modifier, shape: Shape) {
     val image = rememberAvatarImage(picture.uri)
-    Box(modifier.clip(MaterialTheme.shapes.avatar).background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
         image.painter?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
             ?: if (image.isLoading) CircularProgressIndicator(Modifier.size(24.dp)) else
                 Icon(Icons.Default.PhotoSizeSelectActual, contentDescription = "Picture unavailable")

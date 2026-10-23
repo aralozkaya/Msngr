@@ -50,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -73,6 +74,7 @@ import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.ui.theme.ProfileCardCornerRadius
 import org.aralozkaya.msngr.ui.theme.ProfileCardPressedCornerRadius
 import org.aralozkaya.msngr.ui.theme.avatar
+import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 import org.aralozkaya.msngr.ui.theme.pill
 
 @Composable
@@ -102,6 +104,7 @@ fun LoggedInUserProfileCard(
                 avatarUri = profile.avatarUri,
                 presence = profile.presence,
                 showPresenceIndicator = false,
+                shape = MaterialTheme.shapes.ownDisplayPicture,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -394,13 +397,14 @@ fun Avatar(
     showPresenceIndicator: Boolean = true,
     imageVersion: Int = 0,
     highResolution: Boolean = false,
+    shape: Shape = MaterialTheme.shapes.avatar,
 ) {
     val painter = rememberAvatarImage(avatarUri, highResolution, imageVersion).painter
 
     Box(modifier = modifier.size(56.dp)) {
         Surface(
             modifier = Modifier.matchParentSize(),
-            shape = MaterialTheme.shapes.avatar,
+            shape = shape,
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
             if (painter != null) {

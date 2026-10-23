@@ -3,6 +3,7 @@ package org.aralozkaya.msngr.ui.theme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
@@ -11,6 +12,7 @@ internal val MsngrShapes = Shapes()
 
 internal val ProfileCardCornerRadius = 28.dp
 internal val ProfileCardPressedCornerRadius = 16.dp
+internal val OwnDisplayPictureCornerRadius = 28.dp
 
 /** Semantic shape roles used by custom Msngr components. */
 internal val Shapes.contentCard: CornerBasedShape
@@ -18,6 +20,9 @@ internal val Shapes.contentCard: CornerBasedShape
 
 internal val Shapes.avatar: CornerBasedShape
     get() = CircleShape
+
+internal val Shapes.ownDisplayPicture: CornerBasedShape
+    get() = RoundedCornerShape(OwnDisplayPictureCornerRadius)
 
 internal val Shapes.pill: CornerBasedShape
     get() = CircleShape
