@@ -326,14 +326,31 @@ class NativeTextStyleInstrumentedTest {
         }
         openMenu(native = true)
         for (option in NativeFontStyle.entries) {
-            chooseFontStyle(option)
+            compose.onNodeWithTag("native_font_style_dropdown").performClick()
+            val item = compose.onNodeWithTag("native_font_style_${option.name}").performScrollTo()
+            if (option.italic) {
+                item.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                    val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    assertTrue(action(results))
+                    assertRenderedItalic(results.single(), option.weight, option.label)
+                }
+            }
+            item.performClick()
+            if (option.italic) {
+                compose.onNodeWithTag("native_font_style_dropdown")
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                        val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                        assertTrue(action(results))
+                        assertRenderedItalic(results.single(), option.weight, "Selected ${option.label}")
+                    }
+            }
             compose.runOnIdle {
                 assertEquals(option, style.value.fontStyle)
                 val paint = android.text.TextPaint(editor.paint)
                 editor.text.getSpans(0, 1, android.text.style.MetricAffectingSpan::class.java)
                     .forEach { it.updateDrawState(paint) }
                 assertEquals(option.weight, paint.typeface.weight)
-                assertEquals(option.italic, paint.typeface.isItalic)
+                assertEquals(option.italic, paint.typeface.isItalic || paint.textSkewX < 0f)
             }
         }
         compose.onNodeWithText("Strikeout").performClick()

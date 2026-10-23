@@ -13,6 +13,14 @@ Bold, Bold Italic, Black and Black Italic. The six base styles use weights 300, 
 Android uses its system font at the corresponding weight, with the closest named system
 face on Android versions before API 28.
 
+The dropdown previews (including its selected label), composer spans and bubble spans
+share the same cached font resolver. It checks actual glyph output before accepting an
+italic face: if the device returns upright glyphs even though the face reports italic,
+the renderer supplies a slant in both Compose and EditText. Real italic faces keep their
+own outlines without an extra slant. Explicit native styles also resolve their own face
+so an inherited, already loaded typeface cannot silently discard weight or italics.
+Plus! italic labels retain the surrounding typography's weight.
+
 Styles apply to subsequent messages, including notification replies, groups, offline
 messages and failed-message retries. Each message retains its original style in history
 chunk version 4; versions 1–3 remain readable. Clearing a draft or history leaves the
@@ -126,3 +134,24 @@ and incoming/outgoing bubble matrix, reference rendering, status shortcut, emoti
 and compact search checks. The earlier keyboard handoff failure was reproduced and fixed:
 an editor's already queued IME show now closes the keyboard for a sheet that explicitly
 keeps editor taps in its workflow, instead of dismissing that sheet.
+
+### Italic rendering follow-up — 2026-10-23
+
+The reported device is a Samsung Galaxy running Android 17 / One UI 9 with its default
+font. The stock Android 17 emulator rendered italics already, so the regression suite
+also constructs a font that advertises an italic face while retaining upright outlines.
+It verifies the visible fallback in both rendering engines, that applying it twice does
+not double the slant, and that returning to normal clears it. A separate inherited-font
+case failed before the fix because the supplied typeface ignored the requested style.
+
+`NativeTextRenderingInstrumentedTest` compares rendered glyph pixels for all twelve
+choices in the composer and actual incoming/outgoing bubbles, checks distinct native
+weights, and protects Plus! label weights. The dropdown test now checks rendered glyphs
+in both the popup and its selected label, in addition to the actual editor paint. The
+fallback test also checks that glyphs lean right in both engines.
+
+Follow-up verification passed **1,120 unit tests** and **51 Android instrumentation
+tests**, including the 256-subset Plus! matrix, color sheet, selection, emoticons, keyboard
+sheet and search regressions. Both debug and Android test APKs built successfully. These
+checks used the Android 17 emulator and simulated faulty fonts; a physical One UI 9 device
+was not available.

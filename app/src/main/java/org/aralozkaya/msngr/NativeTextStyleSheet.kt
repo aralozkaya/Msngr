@@ -32,6 +32,7 @@ import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -63,8 +64,6 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -269,7 +268,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
                 onClick = { expanded = true },
                 modifier = Modifier.testTag("native_font_style_dropdown"),
             ) {
-                Text(selected.label)
+                NativeFontStyleLabel(selected)
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
             }
             DropdownMenuPopup(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -280,13 +279,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
                 ) {
                     NativeFontStyle.entries.forEachIndexed { index, option ->
                         DropdownMenuItem(
-                            text = {
-                                Text(
-                                    option.label,
-                                    fontWeight = FontWeight(option.weight),
-                                    fontStyle = if (option.italic) FontStyle.Italic else FontStyle.Normal,
-                                )
-                            },
+                            text = { NativeFontStyleLabel(option) },
                             trailingIcon = if (option == selected) {
                                 { Icon(Icons.Default.Check, contentDescription = "Selected") }
                             } else null,
@@ -302,6 +295,16 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
             }
         }
     }
+}
+
+@Composable
+private fun NativeFontStyleLabel(option: NativeFontStyle) {
+    Text(
+        option.label,
+        style = LocalTextStyle.current.merge(
+            nativeFontRendering(option.weight, option.italic).spanStyle(option.weight, option.italic),
+        ),
+    )
 }
 
 @Composable
