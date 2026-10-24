@@ -1,7 +1,6 @@
 package org.aralozkaya.msngr.notifications
 
 import android.Manifest
-import android.app.Activity
 import android.app.Notification
 import android.app.NotificationManager
 import android.os.Build
@@ -20,7 +19,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class OfflineMessageNotificationInstrumentedTest {
-    @Test fun foregroundReceiptShowsOneIndependentNoticeAndReadingChatKeepsIt() = runBlocking {
+    @Test fun backgroundReceiptShowsOneIndependentNoticeAndReadingChatKeepsIt() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
@@ -37,7 +36,6 @@ class OfflineMessageNotificationInstrumentedTest {
         }
         val repository = MessengerRepository(client, scope = scope)
         val visibility = AppVisibilityTracker()
-        withContext(Dispatchers.Main) { visibility.onActivityStarted(Activity()) }
         val bridge = RealtimeNotificationBridge(visibility, renderer, scope)
         manager.cancelAll()
         try {

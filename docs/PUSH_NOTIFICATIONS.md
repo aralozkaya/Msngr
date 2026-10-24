@@ -1,4 +1,43 @@
-# Background notifications
+# Notifications
+
+## In-app notifications
+
+While any Msngr activity is in the foreground, incoming events use Msngr's banner host instead of
+posting Android event notifications. This includes offline messages, contact requests and group
+invitations. The existing background connection service keeps its required ongoing notification.
+Pending request notifications are removed when entering the app and synchronized again when leaving it.
+
+**Settings > In-app notifications** controls banners, vibration, and independent categories for
+messages, group messages, nudges, contacts signing in, offline receipts, contact requests and group
+invitations. Each type has its own named group containing its notification and vibration switches.
+All current types have paired controls, so there is no **Others** group. Everything starts enabled.
+Turning off the general notification switch disables its dependent controls without changing their
+selections. General settings apply to conversations that do not have a custom notification profile.
+
+These preferences do not create Android channels or require Android notification permission. Vibration
+uses [Android's notification vibration usage](https://developer.android.com/reference/android/os/VibrationAttributes#USAGE_NOTIFICATION)
+so device vibration policy applies; silent mode and Do Not Disturb suppress vibration. Bursts are
+limited to one vibration per 750 ms. A banner shows the latest alert for five seconds, can be dismissed,
+and opens its conversation or the requests page when tapped. Banners slide and fade in and out using
+Compose's Material motion; consecutive alerts crossfade with an animated size change. The conversation currently open does
+not produce banners or notification vibration. Other unread conversations contribute to the back
+badge; blocked conversations do not. The back-button count is always enabled, including when alerts
+are muted or turned off, and has no setting. Reading a conversation clears its banner and badge.
+
+The contact detail notification button and **Group details > Group options > Custom notifications**
+open the **Custom notifications** editor. **Use custom settings** creates a saved override from the
+current general settings. Custom profiles take priority over every general in-app setting, including
+the notification, vibration and banner switches. Their own switches still control their dependent
+settings. Turning off **Use custom settings** deletes all saved notification overrides for that
+conversation; enabling it again copies the current general settings as a fresh starting point.
+In-app controls include alerts, banners, vibration and applicable categories.
+Background controls separately allow muting that conversation or making its Android alerts silent;
+Android permissions and channel settings still apply. The **Customized notifications** button inside
+**Settings > In-app notifications** lists every override and supports editing or deleting it. Resetting restores the
+general settings. Preferences are scoped to the signed-in account and service, and are removed with
+the account's other preferences when the account is forgotten.
+
+## Background notifications
 
 Msngr receives notification events over its direct MSNP connection. A user-visible Android
 `remoteMessaging` foreground service owns the process containing that connection while the app UI

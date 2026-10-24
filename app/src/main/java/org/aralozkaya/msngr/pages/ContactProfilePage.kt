@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.ContactPictureViewer
+import org.aralozkaya.msngr.ConversationNotificationSettingsActivity
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.MessengerPlusText
 import org.aralozkaya.msngr.MsnEmoticonText
@@ -163,6 +165,12 @@ fun ContactProfilePage(
             }
         }
         if (contact != null) {
+            item {
+                FilledTonalButton(onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
+                    context, contact.id, contact.displayName.messengerPlusPlainText(), false)) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("contact_notification_settings"),
+                    shapes = ButtonDefaults.shapes()) { Text("Customize Notifications") }
+            }
             item {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),

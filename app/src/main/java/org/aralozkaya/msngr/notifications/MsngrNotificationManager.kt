@@ -24,7 +24,12 @@ import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.shortcutAvatarBitmap
 import java.util.UUID
 
-internal class MsngrNotificationManager(private val context: Context) {
+internal class MsngrNotificationManager(
+    private val context: Context,
+    private val isForeground: () -> Boolean = {
+        (context.applicationContext as? org.aralozkaya.msngr.MsngrApplication)?.visibilityTracker?.isForeground == true
+    },
+) {
     private var requestAccount: String? = null
     private var requestKeys = emptySet<String>()
     private var groupInvitationAccount: String? = null
@@ -32,6 +37,12 @@ internal class MsngrNotificationManager(private val context: Context) {
 
     @Synchronized
     fun syncGroupInvitations(inbox: org.aralozkaya.msngr.data.GroupInvitationInbox) {
+        if (isForeground()) {
+            dismiss(GROUP_INVITATIONS_NOTIFICATION_ID)
+            groupInvitationAccount = inbox.accountId
+            groupInvitationKeys = inbox.invitations.map { it.id }.toSet()
+            return
+        }
         if (inbox.accountId == null || inbox.invitations.isEmpty()) {
             dismiss(GROUP_INVITATIONS_NOTIFICATION_ID)
             groupInvitationAccount = inbox.accountId
@@ -64,6 +75,12 @@ internal class MsngrNotificationManager(private val context: Context) {
 
     @Synchronized
     fun syncContactRequests(inbox: org.aralozkaya.msngr.data.ContactRequestInbox) {
+        if (isForeground()) {
+            dismiss(CONTACT_REQUESTS_NOTIFICATION_ID)
+            requestAccount = inbox.accountId
+            requestKeys = inbox.requests.map { it.membershipId }.toSet()
+            return
+        }
         if (inbox.accountId == null || inbox.requests.isEmpty()) {
             dismiss(CONTACT_REQUESTS_NOTIFICATION_ID)
             requestAccount = inbox.accountId
@@ -126,6 +143,11 @@ internal class MsngrNotificationManager(private val context: Context) {
     }
 
     suspend fun show(event: NotificationEvent) {
+        if (isForeground()) return
+        if (InAppNotificationPrefs.read(context).conversations[event.contactId.notificationKey()]?.backgroundEnabled == false) {
+            dismiss(notificationId(event.type, event.contactId))
+            return
+        }
         if (!canPostNotifications()) return
         val displayEvent = event.copy(
             contactName = event.contactName.messengerPlusPlainText(),
@@ -418,6 +440,7 @@ internal class MsngrNotificationManager(private val context: Context) {
         contactName: String,
         contact: Person,
     ): NotificationCompat.Builder = NotificationCompat.Builder(context, channelId)
+        .setSilent(InAppNotificationPrefs.read(context).conversations[contactId.notificationKey()]?.backgroundSilent == true)
         .setSmallIcon(R.drawable.ic_notification_msngr)
         .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
         .setContentIntent(contentIntent(contactId, contactName))
@@ -511,6 +534,7 @@ internal class MsngrNotificationManager(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun notify(notificationId: Int, notification: Notification) {
+        if (isForeground()) return
         if (!canPostNotifications()) return
         try {
             NotificationManagerCompat.from(context).notify(notificationId, notification)

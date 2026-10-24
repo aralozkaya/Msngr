@@ -143,6 +143,7 @@ internal val LightColorScheme = lightColorScheme(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun MsngrTheme(
     fillWindowSurface: Boolean = true,
+    updateSystemBars: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -158,7 +159,7 @@ fun MsngrTheme(
     val colorScheme = remember(context, appearance, isDark) { msngrColorScheme(context, appearance, isDark) }
     val view = LocalView.current
 
-    if (!view.isInEditMode) {
+    if (updateSystemBars && !view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             WindowCompat.getInsetsController(window, view).apply {

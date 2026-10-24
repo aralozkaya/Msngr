@@ -57,6 +57,8 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
@@ -93,6 +95,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalFocusManager
@@ -103,20 +106,19 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessageAuthor
-import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.notifications.otherUnreadCount
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTile
@@ -131,6 +133,12 @@ import java.text.DateFormat
 import java.util.Date
 
 class ChatActivity : MsngrActivity() {
+    internal val notificationConversationId: String? get() = intent.getStringExtra(EXTRA_CONTACT_ID)
+
+    override fun onResume() {
+        super.onResume()
+        notificationConversationId?.let { (application as MsngrApplication).inAppNotifications.dismissConversation(it) }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (redirectToLoginIfNeeded()) return
@@ -173,7 +181,7 @@ private fun ChatRoute(
     LaunchedEffect(contact) { if (contact != null) lastKnownContact = contact }
     val conversation by repository.conversation(contactId).collectAsState(initial = null)
     val lifecycleOwner = LocalLifecycleOwner.current
-    val haptic = LocalHapticFeedback.current
+    val contacts by repository.contacts.collectAsState()
 
     LaunchedEffect(contactId) {
         repository.loadConversation(contactId)
@@ -191,25 +199,11 @@ private fun ChatRoute(
     }
 
     LaunchedEffect(contactId, lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            repository.events
-                .filter { event ->
-                    when (event) {
-                        is MessengerEvent.IncomingMessage -> event.contactId == contactId
-                        is MessengerEvent.IncomingNudge -> event.contactId == contactId
-                        else -> false
-                    }
-                }.collect {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    repository.markRead(contactId)
-                }
-        }
-    }
-    LaunchedEffect(contactId, lifecycleOwner) {
         observeConversationReadState(repository, contactId, lifecycleOwner.lifecycle)
     }
 
     ChatScreen(
+        otherUnreadCount = otherUnreadCount(contacts, contactId),
         nativeStyle = textStyles[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
         onNativeStyleChange = { repository.updateTextStyle(contactId, it) },
         onSizeNoticeRequested = { repository.markTextSizeNoticeShown(contactId) },
@@ -251,6 +245,7 @@ internal fun ChatScreen(
     nativeStyle: NativeTextStyle = NativeTextStyle(),
     onNativeStyleChange: (NativeTextStyle) -> Unit = {},
     onSizeNoticeRequested: () -> Boolean = { false },
+    otherUnreadCount: Int = 0,
 ) {
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
@@ -333,11 +328,17 @@ internal fun ChatScreen(
                             IconButton(
                                 onClick = onBack,
                                 shapes = IconButtonDefaults.shapes(),
+                                modifier = Modifier.semantics {
+                                    if (otherUnreadCount > 0) stateDescription = "$otherUnreadCount unread messages in other chats"
+                                },
                             ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                )
+                                BadgedBox(badge = {
+                                    if (otherUnreadCount > 0) Badge(Modifier.testTag("other_chats_unread_badge")) {
+                                        Text(if (otherUnreadCount > 99) "99+" else otherUnreadCount.toString())
+                                    }
+                                }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                }
                             }
                         },
                         title = {
