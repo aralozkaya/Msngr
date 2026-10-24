@@ -17,6 +17,8 @@ internal data class StorageProfile(
     val displayName: String? = null,
     val personalStatus: String? = null,
     val displayPictureUrl: String? = null,
+    // Missing/unsupported photo streams must not be mistaken for a confirmed removal.
+    val displayPictureStateKnown: Boolean = true,
 )
 
 /** MSNP18-era roaming profile and UserTileStatic storage operations. */
@@ -25,8 +27,8 @@ internal object MsnpStorageService {
     private const val ENDPOINT_PATH = "/storageservice/SchematizedStore.asmx"
     private const val TIMEOUT_MILLIS = 15_000
 
-    suspend fun fetchProfile(host: String, ticket: String): StorageProfile =
-        post(host, "GetProfile", buildGetProfileRequest(ticket)).let(::parseProfile)
+    suspend fun fetchProfile(host: String, ticket: String, ownerCid: String = "0"): StorageProfile =
+        post(host, "GetProfile", buildGetProfileRequest(ticket, ownerCid)).let(::parseProfile)
 
     suspend fun updateDisplayPicture(
         host: String,
@@ -82,11 +84,11 @@ internal object MsnpStorageService {
         )
     }
 
-    internal fun buildGetProfileRequest(ticket: String): String = envelope(ticket) {
+    internal fun buildGetProfileRequest(ticket: String, ownerCid: String = "0"): String = envelope(ticket) {
         """
         <GetProfile xmlns="$NAMESPACE">
           <profileHandle>
-            <Alias><NameSpace>MyCidStuff</NameSpace><Name>0</Name></Alias>
+            <Alias><NameSpace>MyCidStuff</NameSpace><Name>${ownerCid.storageEscapeXml()}</Name></Alias>
             <RelationshipName>MyProfile</RelationshipName>
           </profileHandle>
           <profileAttributes>
@@ -208,6 +210,13 @@ internal object MsnpStorageService {
                             it.storageFirstText("DocumentStreamName") == "UserTileStatic"
                     }
             }
+        val streams = photo?.getElementsByTagNameNS("*", "DocumentStream")
+        // Escargot can retain a placeholder Photo/ResourceID with only an empty small tile.
+        val emptyPlaceholder = streams != null && streams.length > 0 && (0 until streams.length).all { index ->
+            val stream = streams.item(index) as? Element ?: return@all false
+            stream.storageFirstText("DataSize") == "0" && stream.storageFirstText("MimeType").isBlank() &&
+                stream.storageFirstText("DocumentStreamName") == "UserTileSmall"
+        }
         return StorageProfile(
             profileResourceId = result.storageFirstText("ResourceID").ifBlank { null },
             expressionProfileResourceId = expression?.storageFirstText("ResourceID")
@@ -216,6 +225,8 @@ internal object MsnpStorageService {
             displayName = expression?.storageDirectText("DisplayName")?.ifBlank { null },
             personalStatus = expression?.storageDirectText("PersonalStatus")?.ifBlank { null },
             displayPictureUrl = staticStream?.storageFirstText("PreAuthURL")?.ifBlank { null },
+            displayPictureStateKnown = expression != null &&
+                (photo == null || emptyPlaceholder || !staticStream?.storageFirstText("PreAuthURL").isNullOrBlank()),
         )
     }
 

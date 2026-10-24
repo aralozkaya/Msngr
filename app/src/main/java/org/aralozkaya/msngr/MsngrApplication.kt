@@ -29,6 +29,7 @@ class MsngrApplication : Application() {
         if (!isForeground) inAppNotifications.dismiss()
         runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
             repository.setAppInForeground(isForeground)
+            displayPictureSync.setForeground(isForeground)
             if (isForeground && SessionPrefs.canOpenAuthenticatedScreens(this)) displayPictureSync.requestRefresh(repository)
         }
     }
@@ -55,6 +56,8 @@ class MsngrApplication : Application() {
             },
             onRepositoryCreated = { repository ->
                 realtimeNotificationBridge.attach(repository)
+                displayPictureSync.attach(repository)
+                displayPictureSync.setForeground(visibilityTracker.isForeground)
                 repository.setAppInForeground(visibilityTracker.isForeground)
             },
             awaitNetworkAccess = networkMonitor::awaitInternetAccess,

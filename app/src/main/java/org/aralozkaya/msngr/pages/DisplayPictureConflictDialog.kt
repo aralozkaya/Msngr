@@ -29,6 +29,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import android.widget.Toast
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +54,12 @@ internal fun DisplayPictureSyncHost(repository: MessengerRepository) {
     val context = LocalContext.current
     val sync = remember(context) { context.displayPictureSync }
     val state by sync.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.notice) {
+        state.notice?.let { notice ->
+            Toast.makeText(context, notice, Toast.LENGTH_LONG).show()
+            sync.consumeNotice(notice)
+        }
+    }
     val conflict = state.conflict ?: return
     if (!SessionPrefs.canOpenAuthenticatedScreens(context) || SessionPrefs.preferenceAccount(context) != conflict.account) return
     DisplayPictureConflictDialog(conflict, state,
