@@ -234,9 +234,12 @@ object Msnp18Protocol {
         body = message.toByteArray(StandardCharsets.UTF_8),
     )
 
-    fun p2pPayload(destination: String, packet: ByteArray): ByteArray = mimePayload(
+    fun p2pPayload(destination: String, packet: ByteArray, source: String? = null): ByteArray = mimePayload(
         contentType = P2P_CONTENT_TYPE,
-        extraHeaders = mapOf("P2P-Dest" to destination.lowercase()),
+        extraHeaders = buildMap {
+            put("P2P-Dest", destination.lowercase())
+            if (source != null) put("P2P-Src", source.lowercase())
+        },
         body = packet,
     )
 

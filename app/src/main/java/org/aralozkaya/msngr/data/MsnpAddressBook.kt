@@ -294,6 +294,7 @@ internal data class AddressBookSnapshot(
     val failedBlockedLookup: Boolean = false,
     val contactRequests: List<ContactRequest> = emptyList(),
     val groupInvitations: List<GroupInvitation> = emptyList(),
+    val ownerCid: String? = null,
 )
 
 /** WLM 2009 ContactMsgrAPI request, including the server's opaque Pending membership ID. */
@@ -430,12 +431,14 @@ internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSn
     val contacts = LinkedHashMap<String, Contact>()
     val contactStorageIds = LinkedHashMap<String, String>()
     var ownerDisplayName: String? = null
+    var ownerCid: String? = null
     for (index in 0 until contactNodes.length) {
         val element = contactNodes.item(index) as? Element ?: continue
         if (element.descendantText("fDeleted").equals("true", ignoreCase = true)) continue
         val info = element.getElementsByTagNameNS("*", "contactInfo").item(0) as? Element ?: continue
         if (info.descendantText("contactType").equals("Me", ignoreCase = true)) {
             ownerDisplayName = info.descendantText("displayName").takeIf(String::isNotBlank)
+            ownerCid = info.descendantText("CID").takeIf { it.toLongOrNull() != null }
             continue
         }
         if (info.descendantText("isMessengerUser").equals("false", ignoreCase = true)) continue
@@ -465,6 +468,7 @@ internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSn
     return AddressBookSnapshot(
         contacts = contacts.values.toList() + parseAddressBookCircles(result),
         ownerDisplayName = ownerDisplayName,
+        ownerCid = ownerCid,
         contactStorageIds = contactStorageIds,
         // This is signed XML. Preserve its whitespace when encoding the SHA ticket.
         circleTicket = result.getElementsByTagNameNS("*", "CircleTicket")

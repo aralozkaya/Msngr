@@ -46,6 +46,101 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class LiveMsnp18ClientContractTest {
+    @Test fun acknowledgedButUnappliedStorageRemovalPreservesTheAdvertisedPicture() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val bytes = mockDisplayPictureBytes()
+        var removals = 0
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> StorageProfile(profileResourceId = "profile", expressionProfileResourceId = "expression",
+                photoResourceId = "photo", displayPictureUrl = "https://example.test/tile") },
+            fetchDisplayPicture = { _, _ -> bytes },
+            removeStorageDisplayPicture = { _, _, _, _ -> removals++ })
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val count = notification.sent.count { it.verb == "CHG" }
+            assertTrue(runCatching { client.changeDisplayPicture(null) }.isFailure)
+            assertEquals(1, removals)
+            assertEquals(count, notification.sent.count { it.verb == "CHG" })
+            assertTrue(client.fetchOwnDisplayPicture().bytes!!.contentEquals(bytes))
+        } finally { client.close() }
+    }
+
+    @Test fun pictureMutationRefreshesThePhotoResourceAfterAnotherEndpointReplacesIt() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val bytes = mockDisplayPictureBytes()
+        var resource = "original"
+        var target: String? = null
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> StorageProfile(profileResourceId = "profile", photoResourceId = resource) },
+            updateStorageDisplayPicture = { _, _, id, _ -> target = id })
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            resource = "replaced-by-desktop"
+            client.changeDisplayPicture(bytes)
+            assertEquals(resource, target)
+        } finally { client.close() }
+    }
+
+    @Test fun ownEndpointRemovalRemainsFetchableWhenRoamingStorageIsUnavailable() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val client = LiveMsnp18Client(scope = scope, transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> throw IOException("storage unavailable") })
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val own = client.sessions.value.single().id
+            val other = "11111111-1111-1111-1111-111111111111"
+            fun publish(source: String) = notification.deliver(MsnpCommand("UBX", parameters = listOf("1:$email"),
+                payload = "<Data><PSM>Changed elsewhere</PSM><EndpointData id=\"{$source}\"/><EndpointData id=\"{$own}\"/></Data>".toByteArray()))
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:$email", "You", "0:0", "0")))
+            publish(own)
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            publish(other)
+            // A source change alone does not inherit the previous endpoint's removal.
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:$email", "You", "0:0", "0")))
+            val removed = client.fetchOwnDisplayPicture()
+            assertTrue(removed.fetched)
+            assertNull(removed.bytes)
+            // Presence publication must retain the PSM received from the other session.
+            client.adoptIncomingDisplayPicture(mockDisplayPictureBytes())
+            assertTrue(notification.sent.last { it.verb == "UUX" }.payload!!.toString(Charsets.UTF_8)
+                .contains("<PSM>Changed elsewhere</PSM>"))
+            assertTrue(client.contacts.value.isEmpty())
+        } finally { client.close(); scope.coroutineContext[ kotlinx.coroutines.Job ]?.cancel() }
+    }
+
+    @Test fun incompleteStorageIsUnknownAndAnOutageStillAllowsAnExplicitSessionPicture() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        var available = true
+        var complete = true
+        val client = LiveMsnp18Client(transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ ->
+                if (!available) throw IOException("storage unavailable")
+                StorageProfile(displayPictureStateKnown = complete)
+            })
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            complete = false
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            val before = notification.sent.count { it.verb == "CHG" }
+            available = false
+            val bytes = mockDisplayPictureBytes()
+            client.changeDisplayPicture(bytes)
+            assertTrue(notification.sent.count { it.verb == "CHG" } > before)
+            assertTrue(MsnDisplayPicture.parse(notification.sent.last { it.verb == "CHG" }.parameters[2])!!.matches(bytes))
+            assertTrue(client.displayPictureStorageIssue.value != null)
+        } finally { client.close() }
+    }
+
     @Test fun ownPictureRefreshFetchesCurrentStorageBytesWithoutUploadingAndCanAdoptTheIncomingObject() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val original = mockDisplayPictureBytes()
@@ -572,6 +667,7 @@ class LiveMsnp18ClientContractTest {
     fun failedPictureAdvertisementRetriesWithoutUploadingStorageTwice() = runBlocking {
         val notification = ContractNotificationTransport(email)
         var uploads = 0
+        var storedBytes: ByteArray? = null
         val client = LiveMsnp18Client(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             transport = notification,
@@ -586,8 +682,10 @@ class LiveMsnp18ClientContractTest {
             fetchAddressBook = { _, _, _ ->
                 AddressBookSnapshot(emptyList(), ownerDisplayName = "Mock Server User")
             },
-            fetchStorageProfile = { _, _ -> StorageProfile(photoResourceId = "mock!205") },
-            updateStorageDisplayPicture = { _, _, _, _ -> uploads++ },
+            fetchStorageProfile = { _, _ -> StorageProfile(photoResourceId = "mock!205",
+                displayPictureUrl = storedBytes?.let { "https://example.test/tile" }) },
+            fetchDisplayPicture = { _, _ -> storedBytes },
+            updateStorageDisplayPicture = { _, _, _, bytes -> uploads++; storedBytes = bytes.copyOf() },
         )
 
         try {
@@ -617,6 +715,7 @@ class LiveMsnp18ClientContractTest {
         var removals = 0
         var creations = 0
         var updates = 0
+        var photoId: String? = "mock!205"
         val client = LiveMsnp18Client(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             transport = notification,
@@ -636,8 +735,8 @@ class LiveMsnp18ClientContractTest {
                 StorageProfile(
                     profileResourceId = "mock!106",
                     expressionProfileResourceId = "mock!118",
-                    photoResourceId = "mock!205",
-                    displayPictureUrl = "https://mock-images.example/profile.png",
+                    photoResourceId = photoId,
+                    displayPictureUrl = photoId?.let { "https://mock-images.example/profile.png" },
                 )
             },
             updateStorageDisplayPicture = { _, _, _, _ -> updates++ },
@@ -647,6 +746,7 @@ class LiveMsnp18ClientContractTest {
                 assertEquals("mock!106", profileResourceId)
                 assertArrayEquals(bytes, image)
                 creations++
+                photoId = "mock!206"
                 "mock!206"
             },
             removeStorageDisplayPicture = {
@@ -661,6 +761,7 @@ class LiveMsnp18ClientContractTest {
                 assertEquals("mock!205", photoResourceId)
                 removals++
                 removalFailure?.let { throw it }
+                photoId = null
             },
         )
 

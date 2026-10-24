@@ -58,7 +58,7 @@ class MsnpAddressBookTest {
                         <fDeleted>false</fDeleted>
                       </Contact>
                       <Contact>
-                        <contactInfo><contactType>Me</contactType><passportName>${MockServerData.ACCOUNT_EMAIL}</passportName><displayName>Mock Account</displayName></contactInfo>
+                        <contactInfo><contactType>Me</contactType><passportName>${MockServerData.ACCOUNT_EMAIL}</passportName><displayName>Mock Account</displayName><CID>-1234567890123</CID></contactInfo>
                         <fDeleted>false</fDeleted>
                       </Contact>
                       <Contact>
@@ -87,6 +87,7 @@ class MsnpAddressBookTest {
         assertEquals(fixtures.map { it.nickname }, contacts.map { it.nickname })
         assertTrue(contacts.all { it.presence == Presence.Offline })
         assertEquals("Mock Account", addressBook.ownerDisplayName)
+        assertEquals("-1234567890123", addressBook.ownerCid)
         assertEquals(
             "11111111-2222-3333-4444-555555555555",
             addressBook.contactStorageIds[fixtures[0].email.lowercase()],

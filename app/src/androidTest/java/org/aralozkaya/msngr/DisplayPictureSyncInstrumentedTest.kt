@@ -28,6 +28,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
+import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockMsnp18Client
 import org.aralozkaya.msngr.data.MsnpClient
@@ -77,11 +82,94 @@ class DisplayPictureSyncInstrumentedTest {
     }
 
     @After fun cleanup() {
+        sync.close()
         repository.logout()
         SessionPrefs.rememberedProfiles(context).forEach { SessionPrefs.disableRememberedCredentials(context, account = it.accountIdentity) }
         SessionPrefs.logout()
         directory.deleteRecursively()
         AccountPreferences.reload(compose.activity)
+    }
+
+    @Test fun foregroundPollingDetectsRemovalWithoutRelaunchAndDoesNotReopenDismissedChoice() = runBlocking {
+        val profile = connect(IncomingDisplayPicture(old, true))
+        sync.close()
+        sync = DisplayPictureSync(context, pollIntervalMillis = 30)
+        sync.restore(repository, profile)
+        sync.attach(repository)
+        sync.setForeground(true)
+        client.incoming = IncomingDisplayPicture(null, true)
+        val conflict = withTimeout(3_000) { sync.state.first { it.conflict != null }.conflict!! }
+        assertNull(conflict.incoming.bytes)
+        assertArrayEquals(old, conflict.local.bytes)
+        sync.dismiss(conflict.id)
+        delay(150)
+        assertNull(sync.state.value.conflict)
+        assertArrayEquals(old, OwnDisplayPictureStore.read(context, account).bytes)
+        sync.setForeground(false)
+        val fetches = client.fetches
+        delay(100)
+        assertEquals(fetches, client.fetches)
+    }
+
+    @Test fun accountInvalidationFetchesRemovalInBackgroundAndExplicitSaveRetiresTheConflict() = runBlocking {
+        sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
+        sync.attach(repository)
+        client.incoming = IncomingDisplayPicture(null, true)
+        client.events.emit(MessengerEvent.OwnDisplayPictureChanged(account))
+        withTimeout(3_000) { sync.state.first { it.conflict != null } }
+        sync.saveProfile(repository, "You", new.displayPictureDataUri(), new,
+            pictureChanged = true, statusMessage = "").getOrThrow()
+        assertNull(sync.state.value.conflict)
+        assertArrayEquals(new, OwnDisplayPictureStore.read(context, account).bytes)
+        sync.refresh(repository)
+        assertNull(sync.state.value.conflict)
+        assertEquals(1, client.published.size)
+    }
+
+    @Test fun anInFlightDownloadCannotReplaceANewerLocalSnapshot() = runBlocking {
+        sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
+        DisplayPictureSyncPrefs.setBehavior(context, DisplayPictureSyncBehavior.AlwaysIncoming)
+        client.incoming = IncomingDisplayPicture(null, true)
+        client.fetchStarted = CompletableDeferred()
+        client.fetchGate = CompletableDeferred()
+        val refresh = async(Dispatchers.IO) { sync.refresh(repository) }
+        client.fetchStarted!!.await()
+        OwnDisplayPictureStore.write(context, account, new)
+        client.fetchGate!!.complete(Unit)
+        refresh.await()
+        assertArrayEquals(new, OwnDisplayPictureStore.read(context, account).bytes)
+        assertArrayEquals(new, context.loadDisplayPictureBytes(repository.profile.value.avatarUri))
+        assertNull(sync.state.value.conflict)
+    }
+
+    @Test fun aConflictChoiceIsRecheckedWhenTheOtherEndpointChangesAgain() = runBlocking {
+        sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
+        client.incoming = IncomingDisplayPicture(new, true)
+        sync.refresh(repository)
+        val first = requireNotNull(sync.state.value.conflict)
+        client.incoming = IncomingDisplayPicture(null, true)
+        sync.resolve(repository, first.id, incoming = true)
+        val latest = requireNotNull(sync.state.value.conflict)
+        assertNotEquals(first.id, latest.id)
+        assertNull(latest.incoming.bytes)
+        assertArrayEquals(old, OwnDisplayPictureStore.read(context, account).bytes)
+        assertTrue(client.published.isEmpty())
+        sync.resolve(repository, latest.id, incoming = true)
+        assertNull(sync.state.value.conflict)
+        assertNull(OwnDisplayPictureStore.read(context, account).bytes)
+    }
+
+    @Test fun aTextOnlySaveDoesNotRemoveANewerPictureWhileTheEditorHadAnOlderDraft() = runBlocking {
+        sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
+        val draftAvatar = repository.profile.value.avatarUri
+        DisplayPictureSyncPrefs.setBehavior(context, DisplayPictureSyncBehavior.AlwaysIncoming)
+        client.incoming = IncomingDisplayPicture(new, true)
+        sync.refresh(repository)
+        sync.saveProfile(repository, "Renamed", draftAvatar, null,
+            pictureChanged = false, statusMessage = "").getOrThrow()
+        assertTrue(client.published.isEmpty())
+        assertArrayEquals(new, OwnDisplayPictureStore.read(context, account).bytes)
+        assertArrayEquals(new, context.loadDisplayPictureBytes(repository.profile.value.avatarUri))
     }
 
     @Test fun firstLoginUsesServerDirectlyUnderEveryPolicyIncludingNoPicture() = runBlocking {
@@ -315,6 +403,7 @@ class DisplayPictureSyncInstrumentedTest {
     }
 
     private class PictureClient : MsnpClient by MockMsnp18Client(signInDelayMillis = 0) {
+        override val events = MutableSharedFlow<MessengerEvent>(extraBufferCapacity = 16)
         var incoming = IncomingDisplayPicture()
         var fetches = 0
         var uploadFailure: Exception? = null

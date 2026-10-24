@@ -38,6 +38,7 @@ internal class RealtimeNotificationBridge(
                     (event !is MessengerEvent.IncomingMessage || !event.isOffline)
                 ) return@collect
                 val notificationEvent = when (event) {
+                    is MessengerEvent.OwnDisplayPictureChanged -> return@collect
                     MessengerEvent.OfflineMessagesReceived -> {
                         notificationManager.showOfflineMessagesReceived()
                         return@collect
