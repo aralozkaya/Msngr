@@ -17,6 +17,7 @@ import org.aralozkaya.msngr.data.AddressBookSnapshot
 import org.aralozkaya.msngr.data.CachedContactDisplayPicture
 import org.aralozkaya.msngr.data.ContactDisplayPictureCache
 import org.aralozkaya.msngr.data.LiveMsnp18Client
+import org.aralozkaya.msngr.data.InMemoryConversationHistoryStore
 import org.aralozkaya.msngr.data.LocalDisplayPicture
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerEvent
@@ -46,6 +47,106 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class LiveMsnp18ClientContractTest {
+    private fun syncClient(notification: ContractNotificationTransport, switchboard: ContractSwitchboardTransport,
+        blocked: Boolean = false) = LiveMsnp18Client(
+        transport = notification,
+        switchboardTransportFactory = { switchboard },
+        authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+        fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact.copy(
+            presence = Presence.Online, isBlocked = blocked,
+        ))) },
+        fetchStorageProfile = { _, _ -> StorageProfile() },
+    )
+
+    @Test fun desktopRepliesOnAnExistingChatAreOwnMessagesAndPersistWithoutIncomingAlerts() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard)
+        val history = InMemoryConversationHistoryStore()
+        val repository = MessengerRepository(client, historyStore = history)
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        val style = NativeTextStyle(bold = true, colorRgb = 0x123456)
+        try {
+            repository.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            client.sendMessageWithResult(contact.id, "Phone message").getOrThrow()
+            fun deliver(sender: String, payload: ByteArray) = switchboard.deliver(MsnpCommand("MSG",
+                parameters = listOf(sender, "Name", payload.size.toString()), payload = payload))
+            deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.typingPayload(email))
+            deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.textPayload("Desktop reply", style))
+            deliver(email, Msnp18Protocol.nudgePayload())
+            deliver(contact.email, Msnp18Protocol.textPayload("Contact reply"))
+            val messages = withTimeout(2_000) {
+                history.messages.first { it[contact.id]?.size == 4 }.getValue(contact.id)
+            }
+            withTimeout(1_000) { while (events.none { it is MessengerEvent.IncomingMessage }) yield() }
+            assertEquals(listOf(MessageAuthor.Me, MessageAuthor.Me, MessageAuthor.System, MessageAuthor.Contact),
+                messages.map { it.author })
+            assertEquals(style, messages[1].nativeStyle)
+            assertEquals("You sent a nudge.", messages[2].text)
+            assertTrue(messages[2].isNudge)
+            assertEquals(1, client.contacts.value.single().unreadCount)
+            assertFalse(client.typing.value[contact.id] == true)
+            assertEquals(listOf(MessengerEvent.IncomingMessage(contact.id, messages.last().id)), events.toList())
+        } finally { collector.cancel(); repository.logout() }
+    }
+
+    @Test fun desktopInitiatedChatResolvesItsContactFromRosterOrLaterJoinAndCanBeReused() = runBlocking {
+        for (contactAlreadyJoined in listOf(true, false)) {
+            val notification = ContractNotificationTransport(email)
+            val switchboard = ContractSwitchboardTransport(email, contact.email,
+                initialParticipants = listOf("1:$email;{desktop-endpoint}") +
+                    if (contactAlreadyJoined) listOf("1:${contact.email};{contact-endpoint}") else emptyList())
+            val client = syncClient(notification, switchboard)
+            val events = CopyOnWriteArrayList<MessengerEvent>()
+            val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+            try {
+                client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+                notification.deliver(MsnpCommand("RNG", parameters = listOf("4242",
+                    "mock-switchboard.example:1864", "CKI", "key", "1:${email.uppercase()};{desktop-endpoint}", "Owner")))
+                withTimeout(1_000) { while (switchboard.sent.none { it.verb == "ANS" }) yield() }
+                val payload = Msnp18Protocol.textPayload("Desktop started this chat")
+                switchboard.deliver(MsnpCommand("MSG", parameters = listOf(email, "Owner"), payload = payload))
+                if (!contactAlreadyJoined) switchboard.deliver(MsnpCommand("JOI",
+                    parameters = listOf("1:${contact.email};{contact-endpoint}", "Contact", "0:0")))
+                val own = withTimeout(1_000) {
+                    client.messages.first { it[contact.id]?.size == 1 }.getValue(contact.id).single()
+                }
+                assertEquals(MessageAuthor.Me, own.author)
+                assertEquals("Desktop started this chat", own.text)
+                assertEquals(setOf(contact.id), client.messages.value.keys)
+                assertEquals(listOf(contact.id), client.contacts.value.map { it.id })
+                assertEquals(0, client.contacts.value.single().unreadCount)
+                client.sendMessageWithResult(contact.id, "Phone reply on the same chat").getOrThrow()
+                assertTrue(notification.sent.none { it.verb == "XFR" })
+                assertEquals(1, switchboard.sent.count { it.verb == "ANS" })
+                assertTrue(switchboard.sent.none { it.verb == "CAL" || it.verb == "USR" })
+                val reply = Msnp18Protocol.textPayload("Contact reply")
+                switchboard.deliver(MsnpCommand("MSG", parameters = listOf(contact.email, "Contact"), payload = reply))
+                val messages = withTimeout(1_000) {
+                    client.messages.first { it[contact.id]?.size == 3 }.getValue(contact.id)
+                }
+                withTimeout(1_000) { while (events.isEmpty()) yield() }
+                assertEquals(listOf(MessageAuthor.Me, MessageAuthor.Me, MessageAuthor.Contact), messages.map { it.author })
+                assertEquals(listOf(MessengerEvent.IncomingMessage(contact.id, messages.last().id)), events.toList())
+            } finally { collector.cancel(); client.close() }
+        }
+    }
+
+    @Test fun desktopInitiatedChatCannotBypassAContactsBlock() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard, blocked = true)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            notification.deliver(MsnpCommand("RNG", parameters = listOf("4242",
+                "mock-switchboard.example:1864", "CKI", "key", email, "Owner")))
+            withTimeout(1_000) { switchboard.closed.await() }
+            assertTrue(client.messages.value.isEmpty())
+            assertEquals(0, client.contacts.value.single().unreadCount)
+        } finally { client.close() }
+    }
+
     @Test fun ownPictureRefreshFetchesCurrentStorageBytesWithoutUploadingAndCanAdoptTheIncomingObject() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val original = mockDisplayPictureBytes()
@@ -1768,8 +1869,10 @@ private class ContractNotificationTransport(
 private class ContractSwitchboardTransport(
     private val signedInEmail: String,
     private val contactEmail: String,
+    private val initialParticipants: List<String> = listOf(contactEmail),
 ) : MsnpTransport {
     val sent = CopyOnWriteArrayList<MsnpCommand>()
+    val closed = CompletableDeferred<Unit>()
     private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
     var remotePicture: LocalDisplayPicture? = null
     var textDeliveryGate: CompletableDeferred<Unit>? = null
@@ -1787,6 +1890,12 @@ private class ContractSwitchboardTransport(
     override suspend fun send(command: MsnpCommand) {
         sent += command
         when (command.verb) {
+            "ANS" -> {
+                initialParticipants.forEachIndexed { index, participant -> deliver(MsnpCommand("IRO",
+                    command.transactionId, listOf((index + 1).toString(), initialParticipants.size.toString(),
+                        participant, "Name", "0:0"))) }
+                deliver(MsnpCommand("ANS", command.transactionId, listOf("OK")))
+            }
             "USR" -> deliver(
                 MsnpCommand("USR", command.transactionId, listOf("OK", signedInEmail, "Mock User")),
             )
@@ -1839,5 +1948,6 @@ private class ContractSwitchboardTransport(
 
     override fun close() {
         incoming.close()
+        closed.complete(Unit)
     }
 }

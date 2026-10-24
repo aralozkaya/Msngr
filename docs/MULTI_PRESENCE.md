@@ -10,6 +10,21 @@ The name belongs to the device, so switching accounts does not change it. Device
 with identical configured names can still have identical labels; their protocol
 endpoint GUIDs distinguish their sessions. Names retain Unicode and are XML escaped.
 
+## Messages from other sessions
+
+While Msngr is signed in and joined to a private conversation, text and nudges sent
+from another session of the same account appear in that contact's Android history.
+Desktop text is shown as sent by you; your desktop nudges say **You sent a nudge.**
+These messages do not add unread counts or trigger incoming-message/nudge alerts,
+and your other sessions' typing indicators are ignored.
+
+Msngr accepts switchboard invitations from its own account. The contact is resolved
+from the switchboard's initial roster or a later join, since desktop clients can
+invite the owner's devices before calling the contact. Messages received before
+that join are held until the conversation can be identified. Blocked contacts
+remain blocked. This is live session delivery; it does not download older desktop
+history or messages sent while Msngr was disconnected.
+
 ## Session management
 
 Msngr consumes the account's own `UBX Data` publications as complete session lists.
@@ -57,3 +72,6 @@ remembered credentials and conversation history are retained.
 MsnpSessionsTest, DeviceEndpointNameTest, and LiveMsnp18ClientContractTest cover endpoint names,
 session publications, and logout handling with in-memory transports. SessionsDialogInstrumentedTest
 and SessionSettingsInstrumentedTest exercise the Android UI with synthetic device names.
+LiveMsnp18ClientContractTest also covers desktop replies, desktop-created switchboards
+with initial or delayed contact joins, saved history, formatting, unread counts,
+incoming alerts, and blocked contacts.
