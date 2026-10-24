@@ -210,6 +210,42 @@ class LiveMsnp18ClientContractTest {
         } finally { client.close() }
     }
 
+    @Test fun invisibleLogoutRejectionExplainsWorkaroundAndKeepsBothSessions() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val client = sessionClient(notification)
+        val other = "12345678-90ab-cdef-0123-456789abcdef"
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig, Presence.Offline)).getOrThrow()
+            val own = client.sessions.value.single().id
+            fun publish(ids: List<String>) = notification.deliver(MsnpCommand("UBX",
+                parameters = listOf("1:$email"), payload = ("<Data>" + ids.joinToString("") {
+                    "<PrivateEndpointData id=\"{$it}\"><State>HDN</State></PrivateEndpointData>"
+                } + "</Data>").toByteArray()))
+            publish(listOf(own, other))
+            withTimeout(1_000) { client.sessions.first { it.size == 2 } }
+            val before = client.sessions.value
+            val action = async { runCatching { client.logOutSession(other) } }
+            withTimeout(1_000) { while (notification.sent.none { it.verb == "UUN" }) yield() }
+            notification.deliver(MsnpCommand("217", notification.sent.last { it.verb == "UUN" }.transactionId))
+            val failure = withTimeout(1_000) { action.await() }.exceptionOrNull()
+            assertTrue(requireNotNull(failure).message.orEmpty().contains("MSNP 217"))
+            assertTrue(failure.message.orEmpty().contains("all sessions appear offline"))
+            assertTrue(failure.message.orEmpty().contains("Online and try again"))
+            assertEquals(before, client.sessions.value)
+            // A rejected logout must not expose an invisible account or silently remove a device.
+            assertEquals(listOf("HDN"), notification.sent.filter { it.verb == "CHG" }.map { it.parameters.first() })
+            assertEquals(1, notification.sent.count { it.verb == "UUN" })
+
+            client.changePresence(Presence.Online)
+            val retry = async { client.logOutSession(other) }
+            withTimeout(1_000) { while (notification.sent.count { it.verb == "UUN" } < 2) yield() }
+            notification.deliver(MsnpCommand("UUN", notification.sent.last { it.verb == "UUN" }.transactionId, listOf("OK")))
+            publish(listOf(own))
+            withTimeout(1_000) { retry.await() }
+            assertTrue(client.sessions.value.single().isCurrent)
+        } finally { client.close() }
+    }
+
     @Test fun remoteLogoutClosesConnectionWithoutReportingConnectionLoss() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val client = sessionClient(notification)
