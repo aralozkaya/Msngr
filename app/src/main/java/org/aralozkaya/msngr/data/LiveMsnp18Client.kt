@@ -2273,7 +2273,7 @@ internal class LiveMsnp18Client(
                 invitation = invitation,
                 transport = switchboardTransportFactory(),
                 scope = scope,
-                eventSink = { event -> handleSwitchboardEvent(id, session, event) },
+                eventSink = { event -> handleSwitchboardEvent(session, event) },
                 localPicture = ::localDisplayPictureSnapshot,
                 remoteEndpointId = contactEndpointIds[id],
                 sharedPictureSession = reusablePictureSession(id),
@@ -2371,15 +2371,14 @@ internal class LiveMsnp18Client(
         val rawInviter = command.parameters.getOrNull(4).orEmpty()
         val inviterEmail = rawInviter.normalizedIdentity()
         if (inviterEmail.isEmpty()) return
-        val isSelf = inviterEmail.equals(signedInEmail, ignoreCase = true)
+        val fromOwnSession = inviterEmail.equals(signedInEmail, ignoreCase = true)
         val inviterEndpoint = normalizeEndpointId(rawInviter.substringAfter(';', ""))
-            ?: if (isSelf) sessions.value.firstOrNull { !it.isCurrent }?.id else null
-        if (isSelf && inviterEndpoint == machineGuid) return
+            ?: if (fromOwnSession) sessions.value.firstOrNull { !it.isCurrent }?.id else null
+        if (fromOwnSession && inviterEndpoint == machineGuid) return
         if (mutableContacts.value.firstOrNull { it.id == inviterEmail.lowercase() }?.isBlocked == true) return
         val (host, port) = endpoint.parseNotificationEndpoint(switchboardFallbackPort)
-        val id = inviterEmail.lowercase()
-        if (isSelf && inviterEndpoint != null) contactEndpointIds[id] = inviterEndpoint
-        if (!isSelf) updateContact(inviterEmail) { existing ->
+        val id = if (fromOwnSession) "" else inviterEmail.lowercase()
+        if (!fromOwnSession) updateContact(inviterEmail) { existing ->
             existing ?: Contact(
                 id = id,
                 nickname = null,
@@ -2392,7 +2391,7 @@ internal class LiveMsnp18Client(
         session = MsnpSwitchboardSession(
             signedInEmail = signedInEmail,
             machineGuid = machineGuid,
-            contactEmail = inviterEmail,
+            contactEmail = id,
             invitation = SwitchboardInvitation(
                 host = host,
                 port = port,
@@ -2402,43 +2401,76 @@ internal class LiveMsnp18Client(
             ),
             transport = switchboardTransportFactory(),
             scope = scope,
-            eventSink = { event -> handleSwitchboardEvent(id, session, event) },
+            eventSink = { event -> handleSwitchboardEvent(session, event) },
             localPicture = ::localDisplayPictureSnapshot,
             remoteEndpointId = contactEndpointIds[id],
             sharedPictureSession = reusablePictureSession(id),
         )
-        pictureSessions[id] = session.pictureSession
+        if (!fromOwnSession) pictureSessions[id] = session.pictureSession
         activeSwitchboards.add(session)
         runCatching { session.connect() }
             // Native WLM can move an existing P2P bridge to a second switchboard. Keep
             // the old receiver alive for its remaining packets and retain sequence state.
-            .onSuccess { switchboards[id] = session }
+            .onSuccess { if (session.contactEmail.isNotEmpty()) registerIncomingSwitchboard(session) }
             .onFailure {
                 session.close()
                 if (switchboards[id] === previousSession) previousSession?.resumePictureTransfers()
             }
     }
 
+    private fun registerIncomingSwitchboard(session: MsnpSwitchboardSession) {
+        if (session.isClosed) return
+        val id = session.contactEmail
+        if (mutableContacts.value.firstOrNull { it.id == id }?.isBlocked == true) {
+            session.close()
+            return
+        }
+        updateContact(id) { existing -> existing ?: Contact(
+            id = id, nickname = null, email = id, presence = Presence.Online,
+        ) }
+        pictureSessions[id] = session.pictureSession
+        switchboards[id] = session
+    }
+
     private fun handleSwitchboardEvent(
-        contactId: String,
         session: MsnpSwitchboardSession,
         event: SwitchboardEvent,
     ) {
+        if (event is SwitchboardEvent.DisplayPicture && event.senderEmail.equals(signedInEmail, true)) {
+            if (MsnDisplayPicture.parse(ownPresencePicture)?.matches(event.bytes) == true) {
+                downloadedOwnPicture = event.bytes.copyOf()
+                ownPictureDownload?.complete(event.bytes.copyOf())
+            }
+            return
+        }
+        val contactId = session.contactEmail
+        if (contactId.isEmpty()) {
+            if (event == SwitchboardEvent.Closed) activeSwitchboards.remove(session)
+            return
+        }
+        if (mutableContacts.value.firstOrNull { it.id == contactId }?.isBlocked == true &&
+            event != SwitchboardEvent.Closed
+        ) {
+            session.close()
+            return
+        }
         when (event) {
+            SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
             is SwitchboardEvent.Text -> {
+                val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
                 val message = ChatMessage(
                     id = messageIds.incrementAndGet(),
                     contactId = contactId,
-                    author = MessageAuthor.Contact,
+                    author = if (mine) MessageAuthor.Me else MessageAuthor.Contact,
                     text = event.text,
                     nativeStyle = event.style,
                     timestampMillis = System.currentTimeMillis(),
                 )
                 appendMessage(message)
-                incrementUnread(contactId)
+                if (!mine) incrementUnread(contactId)
                 mutableTyping.value = mutableTyping.value + (contactId to false)
                 typingJobs.remove(contactId)?.cancel()
-                mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                if (!mine) mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
             }
             is SwitchboardEvent.Typing -> {
                 mutableTyping.value = mutableTyping.value + (contactId to true)
@@ -2450,26 +2482,22 @@ internal class LiveMsnp18Client(
                 }
             }
             is SwitchboardEvent.Nudge -> {
+                val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
                 val message = ChatMessage(
                     id = messageIds.incrementAndGet(),
                     contactId = contactId,
                     author = MessageAuthor.System,
-                    text = "You received a nudge!",
+                    text = if (mine) "You sent a nudge." else "You received a nudge!",
                     timestampMillis = System.currentTimeMillis(),
                     isNudge = true,
                 )
                 appendMessage(message)
-                incrementUnread(contactId)
-                mutableEvents.tryEmit(MessengerEvent.IncomingNudge(contactId))
+                if (!mine) {
+                    incrementUnread(contactId)
+                    mutableEvents.tryEmit(MessengerEvent.IncomingNudge(contactId))
+                }
             }
             is SwitchboardEvent.DisplayPicture -> {
-                if (event.senderEmail.equals(signedInEmail, true)) {
-                    if (MsnDisplayPicture.parse(ownPresencePicture)?.matches(event.bytes) == true) {
-                        downloadedOwnPicture = event.bytes.copyOf()
-                        ownPictureDownload?.complete(event.bytes.copyOf())
-                    }
-                    return
-                }
                 val picture = synchronized(contactDisplayPictureStateLock) {
                     val currentPicture = contactDisplayPictures[contactId]
                         ?: return@synchronized null

@@ -31,6 +31,7 @@ internal data class SwitchboardInvitation(
 )
 
 internal sealed interface SwitchboardEvent {
+    data object ContactResolved : SwitchboardEvent
     data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
     data class Typing(val senderEmail: String) : SwitchboardEvent
     data class Nudge(val senderEmail: String) : SwitchboardEvent
@@ -42,7 +43,7 @@ internal sealed interface SwitchboardEvent {
 internal class MsnpSwitchboardSession(
     private val signedInEmail: String,
     private val machineGuid: String,
-    val contactEmail: String,
+    contactEmail: String,
     private val invitation: SwitchboardInvitation,
     private val transport: MsnpTransport,
     private val scope: CoroutineScope,
@@ -52,6 +53,10 @@ internal class MsnpSwitchboardSession(
     private val handshakeTimeoutMillis: Long = DEFAULT_HANDSHAKE_TIMEOUT_MILLIS,
     sharedPictureSession: MsnpP2pSession? = null,
 ) : AutoCloseable {
+    // A sibling endpoint can invite us before it calls the conversation's contact.
+    @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
+        private set
+    internal val isClosed: Boolean get() = closed.get()
     private val transactionIds = AtomicInteger(0)
     private val sendMutex = Mutex()
     private val closed = AtomicBoolean(false)
@@ -59,22 +64,28 @@ internal class MsnpSwitchboardSession(
     private data class OutgoingPicturePacket(val destination: String, val bytes: ByteArray)
     private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED)
     private val otherPicturePeers = ConcurrentHashMap<String, MsnpP2pSession>()
+    private val pendingOwnMessages = ArrayDeque<MsnpCommand>()
     private val pendingMessageAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
-    internal val pictureSession = sharedPictureSession ?: MsnpP2pSession(
+    internal val pictureSession by lazy {
+        check(this.contactEmail.isNotEmpty()) { "The switchboard has no conversation contact." }
+        sharedPictureSession ?: MsnpP2pSession(
             localEmail = signedInEmail,
-            remoteEmail = contactEmail,
+            remoteEmail = this.contactEmail,
             sendPacket = { packet ->
-                outgoingP2pPackets.send(OutgoingPicturePacket(remoteEndpointId?.let { "$contactEmail;{$it}" } ?: contactEmail, packet))
+                outgoingP2pPackets.send(OutgoingPicturePacket(remoteEndpointId?.let { "${this.contactEmail};{$it}" } ?: this.contactEmail, packet))
             },
             localPicture = localPicture,
             onDisplayPicture = { bytes ->
-                eventSink(SwitchboardEvent.DisplayPicture(contactEmail, bytes))
+                eventSink(SwitchboardEvent.DisplayPicture(this.contactEmail, bytes))
             },
             localEndpointId = machineGuid,
             remoteEndpointId = remoteEndpointId,
         )
+    }
 
-    init { resumePictureTransfers() }
+    init { sharedPictureSession?.bindPacketSender { packet ->
+        outgoingP2pPackets.send(OutgoingPicturePacket(sharedPictureSession.destination, packet))
+    } }
 
     internal fun resumePictureTransfers() {
         pictureSession.bindPacketSender { packet -> outgoingP2pPackets.send(OutgoingPicturePacket(pictureSession.destination, packet)) }
@@ -85,6 +96,7 @@ internal class MsnpSwitchboardSession(
     suspend fun connect() {
         transport.connect(invitation.host, invitation.port)
         if (invitation.sessionId == null) connectOutgoing() else connectIncoming()
+        check(!closed.get()) { "The switchboard is closed." }
         transport.setReadTimeout(0)
         receiverJob = scope.launch {
             try {
@@ -217,8 +229,8 @@ internal class MsnpSwitchboardSession(
                     SwitchboardException("The switchboard rejected a P2P packet."),
                 )
             }
-            "IRO" -> command.parameters.getOrNull(2)?.let(::addParticipant)
-            "JOI" -> command.parameters.firstOrNull()?.let(::addParticipant)
+            "IRO" -> command.parameters.getOrNull(2)?.let { addParticipant(it) }
+            "JOI" -> command.parameters.firstOrNull()?.let { addParticipant(it) }
             "BYE" -> {
                 val departed = command.parameters.firstOrNull()?.normalizedSwitchboardIdentity()
                 if (departed == contactEmail.normalizedSwitchboardIdentity()) close()
@@ -238,15 +250,25 @@ internal class MsnpSwitchboardSession(
         val rawSender = command.parameters.firstOrNull().orEmpty()
         val sender = rawSender.normalizedSwitchboardIdentity()
         if (sender.isEmpty()) return
+        val mine = sender == signedInEmail.normalizedSwitchboardIdentity()
         val message = parseSwitchboardMime(command.payload ?: return)
-        val self = sender == signedInEmail.normalizedSwitchboardIdentity()
-        // Other endpoints of our own account can fetch our MSNObject. Chat echoes still
-        // must not appear as incoming messages, typing notifications, or nudges.
-        if (self && message !is SwitchboardMimeMessage.P2p) return
-        if (normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid) && self) return
+        if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
+        if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
+        // Keep sibling picture controls routable without treating them as conversation history.
+        if (mine && message !is SwitchboardMimeMessage.Text && message != SwitchboardMimeMessage.Nudge &&
+            message !is SwitchboardMimeMessage.P2p) return
+        if (contactEmail.isEmpty() && message !is SwitchboardMimeMessage.P2p) {
+            if (mine) {
+                check(pendingOwnMessages.size < MAX_PENDING_OWN_MESSAGES) { "The switchboard has no conversation contact." }
+                pendingOwnMessages.addLast(command)
+                return
+            }
+            addParticipant(sender)
+        }
+        if (!mine && sender != contactEmail && message !is SwitchboardMimeMessage.P2p) return
         when (message) {
             is SwitchboardMimeMessage.Text -> eventSink(SwitchboardEvent.Text(sender, message.value, message.style))
-            SwitchboardMimeMessage.Typing -> eventSink(SwitchboardEvent.Typing(sender))
+            SwitchboardMimeMessage.Typing -> if (!mine) eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))
             is SwitchboardMimeMessage.P2p -> {
                 val destination = message.destination
@@ -256,7 +278,7 @@ internal class MsnpSwitchboardSession(
                     val source = message.source ?: rawSender
                     if (source.normalizedSwitchboardIdentity() != sender) return
                     val sourceEndpoint = normalizeEndpointId(source.substringAfter(';', ""))
-                    if (self && sourceEndpoint == normalizeEndpointId(machineGuid)) return
+                    if (mine && sourceEndpoint == normalizeEndpointId(machineGuid)) return
                     val peer = if (sender == contactEmail.normalizedSwitchboardIdentity() &&
                         (sourceEndpoint == null || sourceEndpoint == normalizeEndpointId(pictureSession.destination.substringAfter(';', "")))) {
                         pictureSession
@@ -278,8 +300,16 @@ internal class MsnpSwitchboardSession(
         }
     }
 
-    private fun addParticipant(rawIdentity: String) {
-        participants += rawIdentity.normalizedSwitchboardIdentity()
+    private suspend fun addParticipant(rawIdentity: String) {
+        val identity = rawIdentity.normalizedSwitchboardIdentity()
+        participants += identity
+        if (contactEmail.isEmpty() && identity.isNotEmpty() &&
+            identity != signedInEmail.normalizedSwitchboardIdentity()
+        ) {
+            contactEmail = identity
+            eventSink(SwitchboardEvent.ContactResolved)
+            while (pendingOwnMessages.isNotEmpty()) handleMessage(pendingOwnMessages.removeFirst())
+        }
     }
 
     private suspend fun send(command: MsnpCommand) {
@@ -314,6 +344,7 @@ internal class MsnpSwitchboardSession(
         const val DEFAULT_HANDSHAKE_TIMEOUT_MILLIS = 20_000L
         const val P2P_MESSAGE_ACK_TIMEOUT_MILLIS = 20_000L
         const val MAX_SWITCHBOARD_PAYLOAD_BYTES = 1_664
+        const val MAX_PENDING_OWN_MESSAGES = 64
     }
 }
 
