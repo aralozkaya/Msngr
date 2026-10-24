@@ -90,7 +90,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -555,17 +554,7 @@ private fun MessageComposer(
         onSizeNoticeRequested = onSizeNoticeRequested,
         onDismissRequest = { showTextStyle = false },
     )
-    val density = LocalDensity.current
     val composerBackgroundColor = MaterialTheme.colorScheme.surface
-    val composerBackground = remember(composerBackgroundColor, density) {
-        Brush.verticalGradient(
-            colors = listOf(
-                composerBackgroundColor.copy(alpha = 0.72f),
-                composerBackgroundColor,
-            ),
-            endY = with(density) { 16.dp.toPx() },
-        )
-    }
 
     val bottomInsets = WindowInsets.safeDrawing
         .only(WindowInsetsSides.Bottom)
@@ -582,8 +571,8 @@ private fun MessageComposer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(composerBackground)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(composerBackgroundColor)
+                .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
