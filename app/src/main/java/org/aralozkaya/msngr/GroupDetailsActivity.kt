@@ -53,6 +53,12 @@ class GroupDetailsActivity : MsngrActivity() {
                             ownEmail = profile.email,
                             onInviteMembers = { showInvite = true },
                             onLeaveGroup = { showLeave = true },
+                            onOpenNotifications = {
+                                group?.let { target ->
+                                    startActivity(ConversationNotificationSettingsActivity.createIntent(
+                                        this@GroupDetailsActivity, target.id, target.displayName.messengerPlusPlainText(), true))
+                                }
+                            },
                         )
                     },
                     snackbarHost = { ActionSnackbarHost(snackbarHostState) },

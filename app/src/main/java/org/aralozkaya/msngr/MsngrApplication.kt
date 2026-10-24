@@ -19,20 +19,23 @@ import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.MsngrNotificationManager
 import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
+import org.aralozkaya.msngr.notifications.InAppNotificationController
 import java.io.File
 
 class MsngrApplication : Application() {
     internal val displayPictureSync by lazy { DisplayPictureSync(this) }
     val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
-    internal val visibilityTracker = AppVisibilityTracker { isForeground ->
+    internal val visibilityTracker: AppVisibilityTracker = AppVisibilityTracker { isForeground ->
+        if (!isForeground) inAppNotifications.dismiss()
         runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
             repository.setAppInForeground(isForeground)
             if (isForeground && SessionPrefs.canOpenAuthenticatedScreens(this)) displayPictureSync.requestRefresh(repository)
         }
     }
-    internal val notificationManager by lazy { MsngrNotificationManager(this) }
+    internal val notificationManager by lazy { MsngrNotificationManager(this) { visibilityTracker.isForeground } }
+    internal val inAppNotifications by lazy { InAppNotificationController(this, visibilityTracker) }
     private val realtimeNotificationBridge by lazy {
-        RealtimeNotificationBridge(visibilityTracker, notificationManager)
+        RealtimeNotificationBridge(visibilityTracker, notificationManager, inAppNotifications = inAppNotifications)
     }
     private val networkMonitor by lazy { NetworkMonitor(this) }
 
@@ -62,7 +65,10 @@ class MsngrApplication : Application() {
             messengerPlusEnabled = { MessengerPlusPrefs.isEnabled(this) },
             conversationDraftStore = persistentConversationDraftStore(this),
             conversationStyleStore = persistentConversationStyleStore(this),
-            onConversationRead = notificationManager::dismissConversation,
+            onConversationRead = { contactId ->
+                notificationManager.dismissConversation(contactId)
+                inAppNotifications.dismissConversation(contactId)
+            },
             onRemoteSignOut = {
                 // A remote sign-out must survive process restart and background service restore.
                 SessionPrefs.recordRemoteSignOut(this)

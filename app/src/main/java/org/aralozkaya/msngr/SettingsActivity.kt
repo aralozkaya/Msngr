@@ -31,6 +31,8 @@ import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
 import org.aralozkaya.msngr.pages.SettingsScreen
+import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
+import org.aralozkaya.msngr.pages.CustomizedNotificationsScreen
 import org.aralozkaya.msngr.pages.UpdateSettingsScreen
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -125,6 +127,12 @@ private fun SettingsRoute(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,
                 )
+                SettingsDestination.InAppNotifications -> InAppNotificationSettingsScreen(
+                    innerPadding = innerPadding,
+                    scrollBehavior = scrollBehavior,
+                    onCustomizedNotifications = { selectedDestination = SettingsDestination.CustomizedNotifications },
+                )
+                SettingsDestination.CustomizedNotifications -> CustomizedNotificationsScreen(innerPadding, scrollBehavior)
                 SettingsDestination.MessengerPlus -> MessengerPlusSettingsScreen(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,

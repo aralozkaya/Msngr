@@ -21,6 +21,7 @@ internal object AccountPreferences {
         "msngr_emoticons",
         "msngr_messenger_plus",
         "msngr_contact_invitations",
+        "msngr_in_app_notifications",
         "background_delivery",
     )
 
@@ -62,5 +63,6 @@ internal object AccountPreferences {
         EmoticonPrefs.reload(context)
         MessengerPlusPrefs.reload(context)
         ContactInvitationPrefs.reload(context)
+        org.aralozkaya.msngr.notifications.InAppNotificationPrefs.reload(context)
     }
 }
