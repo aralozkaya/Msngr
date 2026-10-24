@@ -1238,6 +1238,12 @@ internal class LiveMsnp18Client(
         val session = sessions.value.firstOrNull { it.id == sessionId } ?: return
         require(!session.isCurrent) { "Use local logout to end the current session." }
         val response = requestNotification(Msnp18Protocol.logOutSession(nextTransactionId(), signedInEmail, session.id))
+        if (response.verb == "217") {
+            throw LiveMsnpException(
+                "The server could not deliver remote sign-out (MSNP 217). " +
+                    "If all sessions appear offline, change your status to Online and try again.",
+            )
+        }
         if (response.verb != "UUN" || response.parameters.firstOrNull() != "OK") {
             throw response.toProtocolError()
         }
