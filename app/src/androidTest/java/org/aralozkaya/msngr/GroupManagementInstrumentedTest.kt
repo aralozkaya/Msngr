@@ -372,12 +372,14 @@ class GroupManagementInstrumentedTest {
         val role = mutableStateOf(GroupMemberRole.Owner)
         val groupAvailable = mutableStateOf(true)
         var leaveCount = 0
+        var notificationsCount = 0
         compose.setContent {
             MaterialTheme {
                 val group = if (groupAvailable.value) Contact(id, "Test", id, Presence.Offline, isGroup = true,
                     members = listOf(GroupMember(owner, role = role.value))) else null
                 SecondaryPageScaffold("Group details", {}, actions = {
-                    GroupDetailsMenu(group, owner, onInviteMembers = {}, onLeaveGroup = { leaveCount++ })
+                    GroupDetailsMenu(group, owner, onInviteMembers = {}, onLeaveGroup = { leaveCount++ },
+                        onOpenNotifications = { notificationsCount++ })
                 }) { padding, scroll ->
                     GroupDetailsPage(group, emptyList(), padding, scroll, {}, {}, owner, {})
                 }
@@ -412,8 +414,11 @@ class GroupManagementInstrumentedTest {
         compose.runOnIdle { assertEquals(1, leaveCount) }
         compose.onNodeWithContentDescription("Group options").performClick()
         compose.runOnIdle { role.value = GroupMemberRole.Unknown }
+        compose.onNodeWithTag("group-invite").assertDoesNotExist()
+        compose.onNodeWithTag("group-leave").assertDoesNotExist()
+        compose.onNodeWithTag("group_notification_settings").assertIsDisplayed().performClick()
         compose.onNode(isPopup()).assertDoesNotExist()
-        compose.onNodeWithContentDescription("Group options").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, notificationsCount) }
         compose.runOnIdle { role.value = GroupMemberRole.Owner }
         compose.onNodeWithContentDescription("Group options").performClick()
         compose.onNodeWithTag("group-invite").assertIsDisplayed()

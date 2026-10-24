@@ -10,6 +10,30 @@ import java.nio.charset.StandardCharsets
 import javax.xml.parsers.DocumentBuilderFactory
 
 class MsnpStorageServiceTest {
+    @Test fun onlyAnExplicitlyAbsentPhotoIsARemoval() {
+        fun profile(expression: String) = MsnpStorageService.parseProfile("""
+            <GetProfileResult xmlns="http://www.msn.com/webservices/storage/2008">
+              <ResourceID>profile</ResourceID>$expression
+            </GetProfileResult>
+        """.trimIndent())
+        assertTrue(profile("<ExpressionProfile><ResourceID>expression</ResourceID></ExpressionProfile>").displayPictureStateKnown)
+        assertFalse(profile("").displayPictureStateKnown)
+        assertFalse(profile("<ExpressionProfile><Photo><ResourceID>photo</ResourceID></Photo></ExpressionProfile>").displayPictureStateKnown)
+        assertFalse(profile("""<ExpressionProfile><Photo><DocumentStreams><DocumentStream>
+            <DocumentStreamType>UserTileSmall</DocumentStreamType><PreAuthURL>https://small</PreAuthURL>
+            </DocumentStream></DocumentStreams></Photo></ExpressionProfile>""").displayPictureStateKnown)
+        assertTrue(profile("""<ExpressionProfile><Photo><ResourceID>placeholder</ResourceID><DocumentStreams><DocumentStream>
+            <DocumentStreamName>UserTileSmall</DocumentStreamName><DataSize>0</DataSize>
+            </DocumentStream></DocumentStreams></Photo></ExpressionProfile>""").displayPictureStateKnown)
+    }
+
+    @Test fun profileHandleUsesTheOwnersCid() {
+        val document = parse(MsnpStorageService.buildGetProfileRequest("ticket", "-1234567890123"))
+        assertEquals("-1234567890123", document.getElementsByTagNameNS("*", "Alias").item(0)
+            .childNodes.let { nodes -> (0 until nodes.length).map { nodes.item(it) }
+                .first { it.localName == "Name" }.textContent })
+    }
+
     @Test
     fun getProfileRequestUsesStorageTicketAndMsnp18Namespace() {
         val xml = MsnpStorageService.buildGetProfileRequest("t=secret&value=p")

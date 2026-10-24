@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
@@ -15,6 +16,7 @@ internal class RealtimeNotificationBridge(
     private val visibilityTracker: AppVisibilityTracker,
     private val notificationManager: MsngrNotificationManager,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val inAppNotifications: InAppNotificationController? = null,
 ) {
     private var eventJob: Job? = null
     private var requestsJob: Job? = null
@@ -24,22 +26,52 @@ internal class RealtimeNotificationBridge(
         eventJob?.cancel()
         requestsJob?.cancel()
         groupInvitationsJob?.cancel()
+        inAppNotifications?.dismiss()
         groupInvitationsJob = scope.launch {
-            repository.groupInvitationInbox.collect(notificationManager::syncGroupInvitations)
+            var previousAccount: String? = null
+            var previousKeys = emptySet<String>()
+            combine(repository.groupInvitationInbox, visibilityTracker.foreground) { inbox, _ -> inbox }
+                .collect { inbox ->
+                    val newInvitations = inbox.invitations.filter { previousAccount != inbox.accountId || it.id !in previousKeys }
+                    if (visibilityTracker.isForeground) {
+                        newInvitations.lastOrNull()?.let { invitation ->
+                            inAppNotifications?.show(InAppNotification(InAppNotificationType.GroupInvitation,
+                                invitation.groupName.messengerPlusPlainText(), "You have been invited to join this group.", invitation.id))
+                        }
+                    }
+                    previousAccount = inbox.accountId
+                    previousKeys = inbox.invitations.map { it.id }.toSet()
+                    notificationManager.syncGroupInvitations(inbox)
+                }
         }
         requestsJob = scope.launch {
             // StateFlow also delivers invitations discovered during offline sign-in.
-            repository.contactRequestInbox.collect(notificationManager::syncContactRequests)
+            var previousAccount: String? = null
+            var previousKeys = emptySet<String>()
+            combine(repository.contactRequestInbox, visibilityTracker.foreground) { inbox, _ -> inbox }
+                .collect { inbox ->
+                    val newRequests = inbox.requests.filter { previousAccount != inbox.accountId || it.membershipId !in previousKeys }
+                    if (visibilityTracker.isForeground) {
+                        newRequests.lastOrNull()?.let { request ->
+                            inAppNotifications?.show(InAppNotification(InAppNotificationType.ContactRequest,
+                                (request.displayName ?: request.email).messengerPlusPlainText(),
+                                "Wants to add you as a contact.", request.id))
+                        }
+                    }
+                    previousAccount = inbox.accountId
+                    previousKeys = inbox.requests.map { it.membershipId }.toSet()
+                    notificationManager.syncContactRequests(inbox)
+                }
         }
         eventJob = scope.launch {
             repository.events.collect { event ->
-                if (visibilityTracker.isForeground &&
-                    event !is MessengerEvent.OfflineMessagesReceived &&
-                    (event !is MessengerEvent.IncomingMessage || !event.isOffline)
-                ) return@collect
                 val notificationEvent = when (event) {
+                    is MessengerEvent.OwnDisplayPictureChanged -> return@collect
                     MessengerEvent.OfflineMessagesReceived -> {
-                        notificationManager.showOfflineMessagesReceived()
+                        if (visibilityTracker.isForeground) {
+                            inAppNotifications?.show(InAppNotification(InAppNotificationType.OfflineMessages,
+                                "Offline messages", "You received instant messages while you were offline."))
+                        } else notificationManager.showOfflineMessagesReceived()
                         return@collect
                     }
                     is MessengerEvent.IncomingMessage -> {
@@ -67,6 +99,7 @@ internal class RealtimeNotificationBridge(
                             contactName = contact?.displayName?.messengerPlusPlainText()
                                 ?: event.contactId.substringBefore('@'),
                             contactAvatarUri = contact?.avatarUri,
+                            isGroup = contact?.isGroup == true,
                         )
                     }
                     is MessengerEvent.PresenceChanged -> {
@@ -82,9 +115,27 @@ internal class RealtimeNotificationBridge(
                             contactAvatarUri = contact.avatarUri,
                         )
                     }
-                    is MessengerEvent.ConnectionLost, is MessengerEvent.SignedOut -> return@collect
+                    is MessengerEvent.ConnectionLost, is MessengerEvent.SignedOut -> {
+                        inAppNotifications?.dismiss()
+                        return@collect
+                    }
                 }
-                notificationManager.show(notificationEvent)
+                if (visibilityTracker.isForeground) {
+                    val type = when (notificationEvent.type) {
+                        NotificationEventType.Message -> if (notificationEvent.isGroup) InAppNotificationType.GroupMessage else InAppNotificationType.Message
+                        NotificationEventType.Nudge -> InAppNotificationType.Nudge
+                        NotificationEventType.ContactSignedIn -> InAppNotificationType.ContactSignedIn
+                    }
+                    val text = when (notificationEvent.type) {
+                        NotificationEventType.Message -> if (notificationEvent.isGroup) {
+                            "${notificationEvent.senderName ?: notificationEvent.senderEmail ?: "Member"}: ${notificationEvent.messageText.orEmpty()}"
+                        } else notificationEvent.messageText.orEmpty()
+                        NotificationEventType.Nudge -> "Sent you a nudge."
+                        NotificationEventType.ContactSignedIn -> "Has just signed in."
+                    }
+                    inAppNotifications?.show(InAppNotification(type, notificationEvent.contactName, text,
+                        notificationEvent.contactId, notificationEvent.contactAvatarUri))
+                } else notificationManager.show(notificationEvent)
             }
         }
     }

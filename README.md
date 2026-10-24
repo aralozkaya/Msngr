@@ -292,6 +292,7 @@ The endpoint presets and protocol behavior were checked against:
 | [Adding contacts](docs/ADDING_CONTACTS.md) · [Deleting contacts](docs/DELETING_CONTACTS.md) | Contact management and retained history. |
 | [Contact requests](docs/CONTACT_REQUESTS.md) · [Request messages](docs/REQUEST_MESSAGES.md) | Accept/decline flows, invitation text, and service limitations. |
 | [Background notifications](docs/PUSH_NOTIFICATIONS.md) · [Active sessions](docs/MULTI_PRESENCE.md) | Android delivery, reconnects, device names, and remote logout. |
+| [Picture synchronization](docs/PROFILE_PICTURE_SYNC.md) | Roaming identity, same-account picture transfers, removals, and desktop interoperability. |
 
 ## Made with AI? Yes, really.
 

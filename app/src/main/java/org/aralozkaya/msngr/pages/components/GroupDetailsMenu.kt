@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GroupOff
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
@@ -37,10 +38,12 @@ internal fun GroupDetailsMenu(
     ownEmail: String,
     onInviteMembers: () -> Unit,
     onLeaveGroup: () -> Unit,
+    onOpenNotifications: (() -> Unit)? = null,
 ) {
     val canInvite = group?.canInviteGroupMembers(ownEmail) == true
     val canLeave = group?.canLeaveGroup(ownEmail) == true
-    val groupCount = (if (canInvite) 1 else 0) + (if (canLeave) 1 else 0)
+    val canCustomize = group != null && onOpenNotifications != null
+    val groupCount = (if (canInvite) 1 else 0) + (if (canLeave) 1 else 0) + (if (canCustomize) 1 else 0)
     if (groupCount == 0) return
 
     var expanded by remember(group?.id, ownEmail) { mutableStateOf(false) }
@@ -65,13 +68,34 @@ internal fun GroupDetailsMenu(
                     DropdownMenuItem(
                         text = { Text("Invite contacts", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                        shape = if (canLeave) MenuDefaults.leadingItemShape else MenuDefaults.standaloneItemShape,
+                        shape = if (canCustomize || canLeave) MenuDefaults.leadingItemShape else MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group-invite"),
                         onClick = { expanded = false; onInviteMembers() },
                     )
                 }
             }
-            if (canInvite && canLeave) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            if (canInvite && (canCustomize || canLeave)) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            if (canCustomize) {
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(if (canInvite) 1 else 0, groupCount),
+                    modifier = Modifier.testTag("group-notifications-menu-group"),
+                    interactionSource = interactionSource,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Custom notifications") },
+                        leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                        shape = when {
+                            canInvite && canLeave -> MenuDefaults.middleItemShape
+                            canInvite -> MenuDefaults.trailingItemShape
+                            canLeave -> MenuDefaults.leadingItemShape
+                            else -> MenuDefaults.standaloneItemShape
+                        },
+                        modifier = Modifier.testTag("group_notification_settings"),
+                        onClick = { expanded = false; onOpenNotifications?.invoke() },
+                    )
+                }
+            }
+            if (canCustomize && canLeave) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
             if (canLeave) {
                 DropdownMenuGroup(
                     shapes = MenuDefaults.groupShape(groupCount - 1, groupCount),
@@ -84,7 +108,7 @@ internal fun GroupDetailsMenu(
                             Icon(Icons.Default.GroupOff, contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error)
                         },
-                        shape = if (canInvite) MenuDefaults.trailingItemShape else MenuDefaults.standaloneItemShape,
+                        shape = if (canInvite || canCustomize) MenuDefaults.trailingItemShape else MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group-leave"),
                         onClick = { expanded = false; onLeaveGroup() },
                     )

@@ -61,6 +61,7 @@ import org.aralozkaya.msngr.rememberMessengerPlusColorSheetState
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.loadDisplayPictureBytes
 import org.aralozkaya.msngr.DisplayPictureSelection
 import org.aralozkaya.msngr.inspectDisplayPicture
@@ -391,28 +392,14 @@ fun ProfilePage(
                                         savingProfile = false
                                         return@launch
                                     }
-                                    repository.updateProfile(
+                                    context.displayPictureSync.saveProfile(
+                                        repository = repository,
                                         username = normalizedUsername,
                                         avatarUri = avatarUri,
-                                        displayPictureBytes = bytesToUpload,
+                                        pictureBytes = bytesToUpload,
+                                        pictureChanged = displayPictureChanged,
+                                        statusMessage = normalizedStatusMessage,
                                     ).onSuccess {
-                                        try {
-                                            withContext(Dispatchers.IO) {
-                                                SessionPrefs.saveUserProfile(
-                                                    context = context,
-                                                    username = normalizedUsername,
-                                                    presence = initial.presence,
-                                                    avatarUri = avatarUri,
-                                                    statusMessage = normalizedStatusMessage,
-                                                )
-                                            }
-                                        } catch (cancelled: CancellationException) { throw cancelled }
-                                        catch (_: Exception) {
-                                            profileSaveError = "Your profile was sent, but its local copy could not be saved. Please try again."
-                                            savingProfile = false
-                                            return@launch
-                                        }
-                                        repository.setStatusMessage(normalizedStatusMessage)
                                         savingProfile = false
                                         onProfileSaved()
                                     }.onFailure { error ->

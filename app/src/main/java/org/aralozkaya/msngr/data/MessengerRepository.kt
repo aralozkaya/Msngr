@@ -126,13 +126,16 @@ sealed interface MessengerEvent {
     ) : MessengerEvent
     data class ConnectionLost(val reason: String?) : MessengerEvent
     data class SignedOut(val reason: String) : MessengerEvent
+    data class OwnDisplayPictureChanged(val account: AccountIdentity, val personalMessage: String? = null) : MessengerEvent
 }
 
 private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyList()).asStateFlow()
 private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList()).asStateFlow()
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
+private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow()
 
 interface MsnpClient {
+    val displayPictureStorageIssue: StateFlow<String?> get() = noPictureStorageIssue
     val contacts: StateFlow<List<Contact>>
     val messages: StateFlow<Map<String, List<ChatMessage>>>
     val typing: StateFlow<Map<String, Boolean>>
@@ -638,6 +641,7 @@ class MessengerRepository(
     }.stateIn(scope, SharingStarted.Eagerly, ContactRequestInbox())
     val events: SharedFlow<MessengerEvent> = client.events
     val sessions: StateFlow<List<AccountSession>> = client.sessions
+    val displayPictureStorageIssue: StateFlow<String?> = client.displayPictureStorageIssue
     val signOutReason: StateFlow<String?> = mutableSignOutReason.asStateFlow()
     val connectionIssue: StateFlow<String?> = mutableConnectionIssue.asStateFlow()
     val hasSignedInSession: Boolean get() = lastSignInRequest != null
@@ -649,7 +653,9 @@ class MessengerRepository(
     init {
         scope.launch {
             client.events.collect { event ->
-                if (event is MessengerEvent.SignedOut) {
+                if (event is MessengerEvent.OwnDisplayPictureChanged && event.account == signedInAccountIdentity) {
+                    event.personalMessage?.let { status -> mutableProfile.update { it.copy(statusMessage = status) } }
+                } else if (event is MessengerEvent.SignedOut) {
                     connectionMutex.withLock {
                         logout()
                         onRemoteSignOut()
@@ -821,11 +827,12 @@ class MessengerRepository(
         username: String,
         avatarUri: String?,
         displayPictureBytes: ByteArray? = null,
-    ): Result<Unit> = runCatching {
+        updateDisplayPicture: Boolean? = null,
+    ): Result<Unit> = connectionMutex.withLock { runCatching {
         val normalizedUsername = username.trim().withoutMessengerPlusFormattingIfDisabled()
         val nicknameChanged = mutableProfile.value.username != normalizedUsername
-        val displayPictureChanged = mutableProfile.value.avatarUri != avatarUri ||
-            displayPictureBytes != null
+        val displayPictureChanged = updateDisplayPicture ?: (mutableProfile.value.avatarUri != avatarUri ||
+            displayPictureBytes != null)
         if (displayPictureChanged) {
             displayPictureJob?.cancel()
             client.changeDisplayPicture(displayPictureBytes)
@@ -835,9 +842,9 @@ class MessengerRepository(
             client.changeNickname(normalizedUsername)
         }
         mutableProfile.update {
-            it.copy(username = normalizedUsername, avatarUri = avatarUri)
+            it.copy(username = normalizedUsername, avatarUri = if (displayPictureChanged) avatarUri else it.avatarUri)
         }
-    }
+    } }
 
     fun contact(contactId: String): Flow<Contact?> =
         contacts.combine(profile) { list, currentProfile -> list.resolveContact(contactId, currentProfile) }

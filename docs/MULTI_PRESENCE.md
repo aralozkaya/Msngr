@@ -54,6 +54,18 @@ server acknowledgement and the endpoint disappearing from the live session list.
 If a remote request fails, the dialog reports the error and keeps the current session.
 These formats follow the original [MSNPSharp owner implementation](https://github.com/RayTF/MSNPSharp/blob/master/MSNPSharp/Owner.cs).
 
+### Escargot and invisible sessions
+
+When every session appears offline (`HDN`), Escargot rejects remote sign-out with
+MSNP error `217` (principal not online). This also affects native Windows Live Messenger
+2009. It is a service restriction: Escargot's
+[`UUN` handler](https://gitlab.com/escargot-chat/server/-/blob/master/front/msn/msnp_ns.py)
+checks the account's aggregate offline status before routing the notification to an endpoint.
+
+Change one session to **Online**, then retry remote sign-out. The target session can
+remain invisible. Msngr explains this workaround when the server returns `217`; it
+keeps the sessions listed and leaves the chosen presence under the user's control.
+
 Incoming same-account `UBN` type 4 (`goawyplzthxbye`, including the `-nomorempop`
 variant) and type 8 (`gtfo`) end this session. The server routes targeted notifications
 only to the named endpoint. Other accounts and the client's own broadcast echoes
@@ -72,6 +84,17 @@ remembered credentials and conversation history are retained.
 MsnpSessionsTest, DeviceEndpointNameTest, and LiveMsnp18ClientContractTest cover endpoint names,
 session publications, and logout handling with in-memory transports. SessionsDialogInstrumentedTest
 and SessionSettingsInstrumentedTest exercise the Android UI with synthetic device names.
+
+A live Escargot check on October 24, 2026 used native WLM 2009 on Windows and Msngr's
+real MSNP18 client on the Android emulator. With both sessions invisible, Msngr received
+`217` and the native client's remote sign-out delivered no notification. After Android
+changed to Online, the native client's type-4 notification reached Android and emitted
+`SignedOut`. In the reverse direction, Android signed in as Online successfully
+logged out the invisible WLM endpoint: the server acknowledged `UUN OK`, the desktop
+returned to sign-in, and the session count fell from two to one.
+The contract tests cover the `217` explanation, retained sessions and
+presence, and a successful retry after explicitly changing presence.
+
 LiveMsnp18ClientContractTest also covers desktop replies, desktop-created switchboards
 with initial or delayed contact joins, saved history, formatting, unread counts,
 incoming alerts, and blocked contacts.

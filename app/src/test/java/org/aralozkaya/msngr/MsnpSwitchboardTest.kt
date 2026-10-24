@@ -26,6 +26,57 @@ import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 
 class MsnpSwitchboardTest {
+    @Test fun otherOwnEndpointsCanFetchPicturesAndPacketsForAnotherEndpointAreIgnored() = runBlocking {
+        for (conversationContact in listOf(signedInEmail, "")) {
+            val remoteId = "11111111-1111-1111-1111-111111111111"
+            val bytes = mockDisplayPictureBytes()
+            val picture = MsnDisplayPicture.create(signedInEmail, bytes)
+            val received = CompletableDeferred<ByteArray>()
+            val events = CopyOnWriteArrayList<SwitchboardEvent>()
+            lateinit var peer: MsnpP2pSession
+            val transport = ScriptedSwitchboardTransport(signedInEmail, signedInEmail, p2pSink = { peer.handle(it) })
+            val session = MsnpSwitchboardSession(signedInEmail, machineGuid, conversationContact,
+                SwitchboardInvitation("mock.example", 1864, "key", "42", signedInEmail), transport,
+                CoroutineScope(SupervisorJob() + Dispatchers.Default), events::add,
+                localPicture = { LocalDisplayPicture(picture, bytes) }, remoteEndpointId = remoteId,
+                handshakeTimeoutMillis = 1_000)
+            var destination = "$signedInEmail;{22222222-2222-2222-2222-222222222222}"
+            peer = MsnpP2pSession(signedInEmail, signedInEmail,
+                sendPacket = { transport.deliver(MsnpCommand("MSG", parameters = listOf("$signedInEmail;{$remoteId}"),
+                    payload = Msnp18Protocol.p2pPayload(destination, it, "$signedInEmail;{$remoteId}"))) },
+                localPicture = { null }, onDisplayPicture = { received.complete(it) },
+                localEndpointId = remoteId, remoteEndpointId = machineGuid)
+            try {
+                session.connect()
+                peer.requestDisplayPicture(picture)
+                // Reaching the following command proves the preceding packet was handled.
+                val barrier = MsnpCommand("SYN")
+                transport.deliver(barrier)
+                withTimeout(1_000) { while (barrier !in transport.received) kotlinx.coroutines.yield() }
+                assertTrue(transport.sent.none { it.verb == "MSG" })
+                destination = "$signedInEmail;{$machineGuid}"
+                // A fresh request avoids the remote's pending-request deduplication.
+                val source = "$signedInEmail;{$remoteId}"
+                peer = MsnpP2pSession(signedInEmail, signedInEmail,
+                    sendPacket = { transport.deliver(MsnpCommand("MSG", parameters = listOf(source),
+                        payload = Msnp18Protocol.p2pPayload(destination, it, source))) },
+                    localPicture = { null }, onDisplayPicture = { received.complete(it) },
+                    localEndpointId = remoteId, remoteEndpointId = machineGuid)
+                transport.deliver(MsnpCommand("MSG", parameters = listOf(source), payload = Msnp18Protocol.textPayload("own echo")))
+                transport.deliver(MsnpCommand("MSG", parameters = listOf(source), payload = Msnp18Protocol.nudgePayload()))
+                peer.requestDisplayPicture(picture)
+                assertArrayEquals(bytes, withTimeout(2_000) { received.await() })
+                assertTrue(events.none { it is SwitchboardEvent.Text || it is SwitchboardEvent.Nudge })
+                if (conversationContact.isEmpty()) {
+                    transport.deliver(MsnpCommand("JOI", parameters = listOf(contactEmail, "Contact")))
+                    withTimeout(1_000) { while (events.none { it is SwitchboardEvent.Nudge }) kotlinx.coroutines.yield() }
+                    assertTrue(events.any { it == SwitchboardEvent.ContactResolved })
+                    assertEquals(listOf(SwitchboardEvent.Text(signedInEmail, "own echo")), events.filterIsInstance<SwitchboardEvent.Text>())
+                }
+            } finally { session.close() }
+        }
+    }
+
     private val signedInEmail = "mock-user@example.com"
     private val contactEmail = MockServerData.contacts().first().email
     private val machineGuid = "00000000-0000-0000-0000-000000000000"
@@ -239,6 +290,7 @@ private class ScriptedSwitchboardTransport(
     private val p2pSink: suspend (ByteArray) -> Unit = {},
 ) : MsnpTransport {
     val sent = CopyOnWriteArrayList<MsnpCommand>()
+    val received = CopyOnWriteArrayList<MsnpCommand>()
     private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
     var connectedHost: String? = null
         private set
@@ -283,7 +335,7 @@ private class ScriptedSwitchboardTransport(
         }
     }
 
-    override suspend fun receive(): MsnpCommand = incoming.receive()
+    override suspend fun receive(): MsnpCommand = incoming.receive().also { received += it }
 
     override fun setReadTimeout(timeoutMillis: Int) {
         readTimeoutMillis = timeoutMillis
