@@ -100,7 +100,8 @@ internal fun AppearanceColorOption(mode: ColorMode, index: Int, count: Int, appe
     val colors = ListItemDefaults.segmentedColors()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = if (selected) shapes.selectedShape else shapes.shape,
+        // Selection must preserve the option's corners within the segmented group.
+        shape = shapes.shape,
         color = if (selected) colors.selectedContainerColor else colors.containerColor,
         contentColor = if (selected) colors.selectedContentColor else colors.contentColor,
     ) {
@@ -108,7 +109,7 @@ internal fun AppearanceColorOption(mode: ColorMode, index: Int, count: Int, appe
             SegmentedListItem(
                 selected = selected,
                 onClick = { AppearancePrefs.setColorMode(context, mode) },
-                shapes = shapes,
+                shapes = shapes.copy(selectedShape = shapes.shape),
                 colors = colors.copy(containerColor = Color.Transparent, selectedContainerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth().testTag("color_mode_${mode.name}"),
                 supportingContent = { Text(when (mode) {
