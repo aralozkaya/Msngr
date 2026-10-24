@@ -168,6 +168,19 @@ On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. Instrumentation 
 an Android device or emulator. The checked-in tests use synthetic fixtures, mock clients, and
 in-memory transports; no community-service credentials are needed.
 
+### Pull request checks
+
+**Build and test Android** runs on every pull request's merged result, pushes to `main`, and
+merge queues. It runs the unit tests, builds the debug and release APKs, and compiles the
+instrumentation-test APK. Unit-test reports are retained as workflow artifacts for seven days.
+Device instrumentation tests still require an emulator or device.
+
+The **Require Android CI** ruleset requires this check from GitHub Actions with the latest
+`main` changes before merging. It has no bypass actors, so approval bypass still requires a
+successful build. Its importable configuration is checked in at
+[`.github/rulesets/require-android-build.json`](.github/rulesets/require-android-build.json).
+Keep the job name, this configuration, and the live ruleset's status-check name in sync.
+
 ## Downloads
 
 Find debug and release APKs on [GitHub Releases](https://github.com/aralozkaya/Msngr/releases),

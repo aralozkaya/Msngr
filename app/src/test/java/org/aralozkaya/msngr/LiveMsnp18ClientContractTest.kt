@@ -1002,7 +1002,8 @@ class LiveMsnp18ClientContractTest {
         val cache = RecordingContactDisplayPictureCache(
             cached = CachedContactDisplayPicture(cachedPicture, cachedBytes),
         )
-        var fetchedUrl: String? = null
+        val fetchStarted = CompletableDeferred<String>()
+        val releaseFetch = CompletableDeferred<Unit>()
         val client = LiveMsnp18Client(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             transport = notification,
@@ -1018,7 +1019,8 @@ class LiveMsnp18ClientContractTest {
                 AddressBookSnapshot(listOf(contact), ownerDisplayName = "Mock Server User")
             },
             fetchDisplayPicture = { url, _ ->
-                fetchedUrl = url
+                fetchStarted.complete(url)
+                releaseFetch.await()
                 updatedBytes
             },
             fetchStorageProfile = { _, _ -> StorageProfile(photoResourceId = "mock!205") },
@@ -1047,11 +1049,12 @@ class LiveMsnp18ClientContractTest {
                 ),
             )
 
+            assertEquals("https://mock-images.example/updated.png", withTimeout(1_000) { fetchStarted.await() })
             assertEquals(cachedUri, client.contacts.value.single().avatarUri)
+            releaseFetch.complete(Unit)
             val refreshed = withTimeout(1_000) {
                 client.contacts.first { it.single().avatarUri != cachedUri }.single()
             }
-            assertEquals("https://mock-images.example/updated.png", fetchedUrl)
             assertTrue(refreshed.avatarUri.orEmpty().startsWith("data:image/png;base64,"))
             withTimeout(1_000) {
                 while (cache.stored?.picture?.sha1d != updatedPicture.sha1d) {
@@ -1060,6 +1063,7 @@ class LiveMsnp18ClientContractTest {
             }
             assertArrayEquals(updatedBytes, cache.stored?.bytes)
         } finally {
+            releaseFetch.complete(Unit)
             client.close()
         }
     }
