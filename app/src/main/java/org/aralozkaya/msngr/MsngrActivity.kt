@@ -2,6 +2,11 @@ package org.aralozkaya.msngr
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import org.aralozkaya.msngr.notifications.InAppNotificationHost
+import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.Lifecycle
@@ -13,6 +18,15 @@ import kotlinx.coroutines.launch
 
 abstract class MsngrActivity : ComponentActivity() {
     protected open val observesConnectionLoss: Boolean = true
+
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        // Add after the activity's content so every authenticated screen shares the same banner.
+        findViewById<ViewGroup>(android.R.id.content).addView(ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent { MsngrTheme(fillWindowSurface = false, updateSystemBars = false) { InAppNotificationHost() } }
+        }, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
