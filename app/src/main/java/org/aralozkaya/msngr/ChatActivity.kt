@@ -235,6 +235,7 @@ private fun ChatRoute(
         draft = drafts[contactId].orEmpty(),
         onDraftChange = { repository.updateDraft(contactId, it) },
         contact = contact ?: lastKnownContact?.copy(presence = Presence.Offline),
+        ownPresence = profile.presence,
         isConversationAvailable = contact != null,
         messages = conversation?.messages.orEmpty(),
         isHistoryLoaded = conversation?.isHistoryLoaded == true,
@@ -272,6 +273,7 @@ internal fun ChatScreen(
     onSizeNoticeRequested: () -> Boolean = { false },
     otherUnreadCount: Int = 0,
     nudgeCooldownMillis: Long = 0L,
+    ownPresence: Presence = Presence.Online,
 ) {
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
@@ -324,7 +326,7 @@ internal fun ChatScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable) },
+        snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable, ownPresence) },
         topBar = {
             Column {
                 SceneBackdrop(scene) {
