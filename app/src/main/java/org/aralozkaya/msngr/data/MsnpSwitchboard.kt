@@ -11,7 +11,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.MessengerPlusTextCodec
 import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
@@ -32,6 +34,7 @@ internal data class SwitchboardInvitation(
 internal sealed interface SwitchboardEvent {
     data object ContactResolved : SwitchboardEvent
     data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
+    data class Ink(val senderEmail: String, val drawing: InkDrawing) : SwitchboardEvent
     data class Typing(val senderEmail: String) : SwitchboardEvent
     data class Nudge(val senderEmail: String) : SwitchboardEvent
     data class DisplayPicture(val senderEmail: String, val bytes: ByteArray) : SwitchboardEvent
@@ -64,6 +67,7 @@ internal class MsnpSwitchboardSession(
     private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED)
     private val otherPicturePeers = ConcurrentHashMap<String, MsnpP2pSession>()
     private val pendingOwnMessages = ArrayDeque<MsnpCommand>()
+    private val chunkAssembler = SwitchboardChunkAssembler()
     private val pendingMessageAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
     internal val pictureSession by lazy {
         check(this.contactEmail.isNotEmpty()) { "The switchboard has no conversation contact." }
@@ -128,6 +132,15 @@ internal class MsnpSwitchboardSession(
 
     suspend fun sendNudge() {
         sendPayload(Msnp18Protocol.nudgePayload(), acknowledgement = "N")
+    }
+
+    suspend fun sendInk(drawing: InkDrawing, useGif: Boolean = false) {
+        val payloads = Msnp18Protocol.inkPayloads(drawing = drawing, useGif = useGif)
+        for (payload in payloads) {
+            sendPayload(payload, acknowledgement = "A")
+        }
+    }
+    private fun unusedSendInkMarker() {
     }
 
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture) {
@@ -250,16 +263,19 @@ internal class MsnpSwitchboardSession(
         val sender = rawSender.normalizedSwitchboardIdentity()
         if (sender.isEmpty()) return
         val mine = sender == signedInEmail.normalizedSwitchboardIdentity()
-        val message = parseSwitchboardMime(command.payload ?: return)
+        if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
+        val reassembledPayload = chunkAssembler.feed(rawSender, command.payload ?: return) ?: return
+        val message = parseSwitchboardMime(reassembledPayload)
         if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
         if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
         // Keep sibling picture controls routable without treating them as conversation history.
-        if (mine && message !is SwitchboardMimeMessage.Text && message != SwitchboardMimeMessage.Nudge &&
+        if (mine && message !is SwitchboardMimeMessage.Text && message !is SwitchboardMimeMessage.Ink &&
+            message != SwitchboardMimeMessage.Nudge &&
             message !is SwitchboardMimeMessage.P2p) return
         if (contactEmail.isEmpty() && message !is SwitchboardMimeMessage.P2p) {
             if (mine) {
                 check(pendingOwnMessages.size < MAX_PENDING_OWN_MESSAGES) { "The switchboard has no conversation contact." }
-                pendingOwnMessages.addLast(command)
+                pendingOwnMessages.addLast(command.copy(payload = reassembledPayload))
                 return
             }
             addParticipant(sender)
@@ -267,6 +283,7 @@ internal class MsnpSwitchboardSession(
         if (!mine && sender != contactEmail && message !is SwitchboardMimeMessage.P2p) return
         when (message) {
             is SwitchboardMimeMessage.Text -> eventSink(SwitchboardEvent.Text(sender, message.value, message.style))
+            is SwitchboardMimeMessage.Ink -> eventSink(SwitchboardEvent.Ink(sender, message.drawing))
             SwitchboardMimeMessage.Typing -> if (!mine) eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))
             is SwitchboardMimeMessage.P2p -> {
@@ -351,6 +368,7 @@ internal class SwitchboardException(message: String, val protocolCode: Int? = nu
 
 internal sealed interface SwitchboardMimeMessage {
     data class Text(val value: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardMimeMessage
+    data class Ink(val drawing: InkDrawing) : SwitchboardMimeMessage
     data class P2p(val destination: String?, val bytes: ByteArray, val source: String? = null) : SwitchboardMimeMessage
     data object Typing : SwitchboardMimeMessage
     data object Nudge : SwitchboardMimeMessage
@@ -380,6 +398,11 @@ internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
         "text/plain" -> SwitchboardMimeMessage.Text(String(body, StandardCharsets.UTF_8),
             NativeTextStyle.fromFormatHeader(headers["x-mms-im-format"]))
         Msnp18Protocol.TYPING_CONTENT_TYPE -> SwitchboardMimeMessage.Typing
+        Msnp18Protocol.INK_ISF_CONTENT_TYPE,
+        Msnp18Protocol.INK_GIF_CONTENT_TYPE -> {
+            MsnInkCodec.decodeMimeBody(contentType, body)?.let(SwitchboardMimeMessage::Ink)
+                ?: SwitchboardMimeMessage.Unsupported
+        }
         Msnp18Protocol.NUDGE_CONTENT_TYPE -> if (
             String(body, StandardCharsets.UTF_8)
                 .lineSequence()
@@ -411,3 +434,82 @@ private fun String.normalizedSwitchboardIdentity(): String =
     substringBefore(';').substringAfter(':').trim().lowercase()
 
 private val MIME_DELIMITER = "\r\n\r\n".toByteArray(StandardCharsets.US_ASCII)
+
+internal class SwitchboardChunkAssembler {
+    private data class PartialChunkedMessage(
+        val totalChunks: Int,
+        val headerBlock: ByteArray,
+        val chunks: Array<ByteArray?>,
+    )
+
+    private val pending = LinkedHashMap<String, PartialChunkedMessage>()
+
+    fun feed(rawSender: String, payload: ByteArray): ByteArray? {
+        val delimiter = payload.indexOfMimeDelimiter()
+        if (delimiter < 0) return payload
+        val headerText = String(payload, 0, delimiter, StandardCharsets.UTF_8)
+        val headers = headerText.lineSequence()
+            .mapNotNull { line ->
+                val separator = line.indexOf(':')
+                if (separator <= 0) null
+                else line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
+            }
+            .toMap()
+        val messageId = headers["message-id"]?.trim()?.lowercase()
+        val totalChunksText = headers["chunks"]?.trim()
+        val chunkIndexText = headers["chunk"]?.trim()
+        if (messageId.isNullOrEmpty() || (totalChunksText == null && chunkIndexText == null)) {
+            return payload
+        }
+        val body = payload.copyOfRange(delimiter + MIME_DELIMITER.size, payload.size)
+        val key = "${rawSender.trim().lowercase()}|$messageId"
+
+        if (totalChunksText != null) {
+            val totalChunks = totalChunksText.toIntOrNull() ?: return null
+            if (totalChunks <= 1) return payload
+            if (totalChunks > Msnp18Protocol.MAX_INK_CHUNKS) return null
+            val existing = pending[key]
+            val state = if (existing != null && existing.totalChunks == totalChunks) {
+                existing.copy(headerBlock = payload.copyOfRange(0, delimiter + MIME_DELIMITER.size))
+            } else {
+                PartialChunkedMessage(
+                    totalChunks = totalChunks,
+                    headerBlock = payload.copyOfRange(0, delimiter + MIME_DELIMITER.size),
+                    chunks = arrayOfNulls(totalChunks),
+                )
+            }
+            state.chunks[0] = body
+            pending[key] = state
+            while (pending.size > MAX_PARTIAL_CHUNKED_MESSAGES) {
+                val eldest = pending.keys.firstOrNull() ?: break
+                pending.remove(eldest)
+            }
+            return tryFinish(key, state)
+        }
+
+        val chunkIndex = chunkIndexText?.toIntOrNull() ?: return null
+        val state = pending[key] ?: return null
+        if (chunkIndex !in 1 until state.totalChunks) return null
+        state.chunks[chunkIndex] = body
+        return tryFinish(key, state)
+    }
+
+    private fun tryFinish(key: String, state: PartialChunkedMessage): ByteArray? {
+        if (state.chunks.any { it == null } || state.headerBlock.isEmpty()) return null
+        pending.remove(key)
+        val totalBodySize = state.chunks.sumOf { it!!.size }
+        val result = ByteArray(state.headerBlock.size + totalBodySize)
+        System.arraycopy(state.headerBlock, 0, result, 0, state.headerBlock.size)
+        var offset = state.headerBlock.size
+        for (chunk in state.chunks) {
+            val bytes = chunk!!
+            System.arraycopy(bytes, 0, result, offset, bytes.size)
+            offset += bytes.size
+        }
+        return result
+    }
+
+    private companion object {
+        const val MAX_PARTIAL_CHUNKED_MESSAGES = 16
+    }
+}

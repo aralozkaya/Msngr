@@ -38,7 +38,9 @@ import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.deviceEndpointName
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
@@ -177,6 +179,7 @@ internal class LiveMsnp18Client(
     private val activeSwitchboards = ConcurrentHashMap.newKeySet<MsnpSwitchboardSession>()
     private val pictureSessions = ConcurrentHashMap<String, MsnpP2pSession>()
     private val circleDeliveries = ConcurrentHashMap<Int, Pair<String, Long>>()
+    private val circleSegments = CircleSegmentAssembler()
     private val typingJobs = ConcurrentHashMap<String, Job>()
     private val lastTypingSentAt = ConcurrentHashMap<String, Long>()
     private val contactDisplayPictures = ConcurrentHashMap<String, MsnDisplayPicture>()
@@ -760,6 +763,23 @@ internal class LiveMsnp18Client(
         return deliverMessage(message)
     }
 
+    override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> {
+        val nonEmpty = drawing.strokes.filter { it.points.isNotEmpty() }
+        if (nonEmpty.isEmpty()) return Result.success(Unit)
+        val email = contactEmail(contactId)
+        val message = ChatMessage(
+            id = messageIds.incrementAndGet(),
+            contactId = email.lowercase(),
+            author = MessageAuthor.Me,
+            text = "Handwriting",
+            timestampMillis = System.currentTimeMillis(),
+            isSending = true,
+            inkDrawing = drawing.copy(strokes = nonEmpty),
+        )
+        appendMessage(message)
+        return deliverMessage(message)
+    }
+
     override suspend fun retryMessage(message: ChatMessage): Result<Unit> {
         while (true) {
             val conversations = mutableMessages.value
@@ -794,7 +814,47 @@ internal class LiveMsnp18Client(
             ) {
                 "Messages cannot be sent to a blocked contact."
             }
-            if (isGroup(email)) {
+            if (message.inkDrawing != null) {
+                if (isGroup(email)) {
+                    val commands = MsnpCircles.inkMessages(
+                        groupEmail = email,
+                        senderEmail = signedInEmail,
+                        endpointId = machineGuid,
+                        drawing = message.inkDrawing,
+                        nextTransactionId = ::nextTransactionId,
+                    )
+                    for (command in commands) {
+                        val transaction = checkNotNull(command.transactionId)
+                        circleDeliveries[transaction] = message.contactId to message.id
+                        try {
+                            send(command)
+                        } catch (error: Exception) {
+                            circleDeliveries.remove(transaction)
+                            throw error
+                        }
+                        scope.launch {
+                            delay(NOTIFICATION_TRANSACTION_TIMEOUT_MILLIS)
+                            circleDeliveries.remove(transaction)
+                        }
+                    }
+                } else {
+                    check(
+                        mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline,
+                    ) {
+                        "Handwriting messages require the contact to be online."
+                    }
+                    val board = try {
+                        switchboardFor(email)
+                    } catch (error: SwitchboardException) {
+                        if (error.protocolCode == 217) {
+                            setContactOffline(email)
+                            throw LiveMsnpException("Handwriting messages require the contact to be online.")
+                        }
+                        throw error
+                    }
+                    board.sendInk(message.inkDrawing)
+                }
+            } else if (isGroup(email)) {
                 val command = MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, message.text, style = message.nativeStyle)
                 val transaction = checkNotNull(command.transactionId)
                 circleDeliveries[transaction] = message.contactId to message.id
@@ -1698,10 +1758,11 @@ internal class LiveMsnp18Client(
     }
 
     private fun receiveCircleMessage(command: MsnpCommand) {
-        val envelope = parseCircleEnvelope(command.payload ?: return) ?: return
-        val id = envelope.groupId ?: return
+        val rawEnvelope = parseCircleEnvelope(command.payload ?: return) ?: return
+        val id = rawEnvelope.groupId ?: return
         val group = mutableContacts.value.firstOrNull { it.id == id && it.isGroup } ?: return
         if (group.isBlocked) return
+        val envelope = circleSegments.accept(rawEnvelope) ?: return
         val sender = envelope.senderEmail ?: return
         val mine = sender.equals(signedInEmail, true)
         val type = envelope.headers["message-type"]
@@ -1715,7 +1776,16 @@ internal class LiveMsnp18Client(
             }
             return
         }
-        if (type != "Text" && type != "Nudge") return
+        val contentType = envelope.headers["content-type"].orEmpty().substringBefore(';').trim()
+        val isInk = type.equals("Ink", ignoreCase = true) ||
+            contentType.equals(Msnp18Protocol.INK_ISF_CONTENT_TYPE, ignoreCase = true) ||
+            contentType.equals(Msnp18Protocol.INK_GIF_CONTENT_TYPE, ignoreCase = true)
+        if (type != "Text" && type != "Nudge" && !isInk) return
+        val inkDrawing = if (isInk) {
+            MsnInkCodec.decodeMimeBody(contentType, envelope.body) ?: return
+        } else {
+            null
+        }
         val senderName = group.members.firstOrNull { it.email == sender }?.displayName
             ?: mutableContacts.value.firstOrNull { it.email.equals(sender, true) }?.displayName ?: sender
         val nudge = type == "Nudge"
@@ -1724,12 +1794,16 @@ internal class LiveMsnp18Client(
         val message = ChatMessage(
             id = messageIds.incrementAndGet(), contactId = id,
             author = if (nudge) MessageAuthor.System else if (mine) MessageAuthor.Me else MessageAuthor.Contact,
-            text = if (nudge) { if (mine) "You sent a nudge." else "$senderName sent a nudge!" }
-                else String(envelope.body, StandardCharsets.UTF_8),
+            text = when {
+                nudge -> if (mine) "You sent a nudge." else "$senderName sent a nudge!"
+                isInk -> "Handwriting"
+                else -> String(envelope.body, StandardCharsets.UTF_8)
+            },
             timestampMillis = System.currentTimeMillis(), isNudge = nudge,
             senderEmail = sender, senderName = senderName,
-            nativeStyle = if (nudge) NativeTextStyle() else
+            nativeStyle = if (nudge || isInk) NativeTextStyle() else
                 NativeTextStyle.fromFormatHeader(envelope.headers["x-mms-im-format"]),
+            inkDrawing = inkDrawing,
         )
         appendMessage(message)
         typingJobs.remove(id)?.cancel()
@@ -2471,6 +2545,22 @@ internal class LiveMsnp18Client(
         }
         when (event) {
             SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
+            is SwitchboardEvent.Ink -> {
+                val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
+                val message = ChatMessage(
+                    id = messageIds.incrementAndGet(),
+                    contactId = contactId,
+                    author = if (mine) MessageAuthor.Me else MessageAuthor.Contact,
+                    text = "Handwriting",
+                    timestampMillis = System.currentTimeMillis(),
+                    inkDrawing = event.drawing,
+                )
+                appendMessage(message)
+                if (!mine) incrementUnread(contactId)
+                mutableTyping.value = mutableTyping.value + (contactId to false)
+                typingJobs.remove(contactId)?.cancel()
+                if (!mine) mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+            }
             is SwitchboardEvent.Text -> {
                 val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
                 val message = ChatMessage(
@@ -2725,6 +2815,7 @@ internal class LiveMsnp18Client(
         activeSwitchboards.clear()
         pictureSessions.clear()
         circleDeliveries.clear()
+        circleSegments.clear()
         switchboards.clear()
         switchboardMutexes.clear()
         typingJobs.values.forEach(Job::cancel)
