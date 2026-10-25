@@ -64,11 +64,16 @@ launches it again.
   as expedited WorkManager tasks with a network constraint. Their workers use the active MSNP
   session, reconnect it, or sign back in from encrypted remembered credentials.
 - Incoming nudge notifications offer a **Nudge back** action through the same delivery path.
-- Messages, nudges, and contact sign-in alerts use Android's conversation layout: the contact photo
+- Messages, nudges, and contact sign-in alerts use Android's Conversations API (MessagingStyle,
+  long-lived conversation ShortcutInfoCompat, and matching LocusId): the contact photo
   (or contact-list initial) is the main avatar, with the app badge in its lower corner. Photos are
   supplied through the conversation person and shortcut, rather than a trailing large icon or image
-  attachment. Reply/nudge progress and failure updates retain that conversation identity, including
-  after process restoration. Group messages use the group's shortcut avatar and keep member names.
+  attachment. Replying from a phone notification or smart watch marks the chat read without
+  dismissing the notification, keeps the incoming message(s), appends the user's reply to the
+  MessagingStyle conversation, and appends any new messages that arrive while the notification is
+  still expanded. Reply/nudge failure updates retain that conversation identity, including after
+  process restoration. Group messages use the group's shortcut avatar and keep member names and
+  avatars.
 - **Contact signed in** notifications say `<contact> has just signed in.` and are sent only when
   a contact changes from Offline to Online, Busy, or Away. Changes between non-offline statuses
   do not send notifications. Returning to any Msngr screen automatically dismisses all contact

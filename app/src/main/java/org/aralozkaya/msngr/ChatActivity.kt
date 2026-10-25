@@ -148,6 +148,14 @@ class ChatActivity : MsngrActivity() {
             finish()
             return
         }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            setLocusContext(
+                android.content.LocusId(
+                    org.aralozkaya.msngr.notifications.MsngrNotificationManager.conversationShortcutId(contactId),
+                ),
+                null,
+            )
+        }
         setContent {
             MsngrTheme {
                 ChatRoute(

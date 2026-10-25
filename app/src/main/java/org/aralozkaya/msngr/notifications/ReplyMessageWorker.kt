@@ -19,6 +19,7 @@ internal class ReplyMessageWorker(
             KEY_NOTIFICATION_ID,
             MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId),
         )
+        val isGroupInput = inputData.getBoolean(KEY_IS_GROUP, false)
         val notifications = MsngrNotificationManager(applicationContext)
         val repository = applicationContext.connectedRepositoryForNotificationAction()
             ?: return finalFailure(
@@ -31,9 +32,16 @@ internal class ReplyMessageWorker(
         if (contact == null || contact.isBlocked) {
             return finalFailure(notifications, contactId, contactName, notificationId)
         }
+        repository.markRead(contactId, dismissNotification = false)
         val sent = repository.sendMessageNow(contactId, text)
         if (sent.isSuccess) {
-            notifications.dismiss(notificationId)
+            notifications.ensureReplyShown(
+                contactId = contactId,
+                contactName = contact.displayName.ifBlank { contactName },
+                replyText = text,
+                notificationId = notificationId,
+                isGroup = contact.isGroup || isGroupInput,
+            )
             return Result.success()
         }
         if (runAttemptCount < MAX_RETRIES) return Result.retry()
@@ -55,6 +63,7 @@ internal class ReplyMessageWorker(
         const val KEY_CONTACT_NAME = "contact_name"
         const val KEY_REPLY_TEXT = "reply_text"
         const val KEY_NOTIFICATION_ID = "notification_id"
+        const val KEY_IS_GROUP = "is_group"
         private const val MAX_RETRIES = 2
     }
 }

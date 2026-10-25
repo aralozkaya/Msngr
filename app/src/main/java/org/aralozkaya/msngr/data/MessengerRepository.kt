@@ -460,12 +460,17 @@ class MockMsnp18Client(
             mutableTyping.update { it + (contactId to true) }
             delay(1_000)
             mutableTyping.update { it + (contactId to false) }
+            val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
+            val groupSender = group?.members?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
+                ?: group?.members?.firstOrNull()
             val incoming = ChatMessage(
                 id = ids.incrementAndGet(),
                 contactId = contactId,
                 author = MessageAuthor.Contact,
                 text = MockServerData.replyTo(normalized.messengerPlusPlainText()),
                 timestampMillis = System.currentTimeMillis(),
+                senderEmail = groupSender?.email,
+                senderName = groupSender?.displayName,
             )
             appendMessage(incoming)
             incrementUnread(contactId)
@@ -1029,9 +1034,9 @@ class MessengerRepository(
         catch (error: Exception) { Result.failure(error) }
     }
 
-    fun markRead(contactId: String) {
+    fun markRead(contactId: String, dismissNotification: Boolean = true) {
         client.markRead(contactId)
-        onConversationRead(contactId)
+        if (dismissNotification) onConversationRead(contactId)
     }
 
     fun markUnread(contactId: String) = client.markUnread(contactId)

@@ -74,6 +74,9 @@ internal class RealtimeNotificationBridge(
                         val message = repository.messageSnapshot(event.contactId, event.messageId)
                             ?: return@collect
                         val contact = repository.contactSnapshot(event.contactId)
+                        val senderContact = message.senderEmail
+                            ?.takeIf { contact?.isGroup == true }
+                            ?.let(repository::contactSnapshot)
                         NotificationEvent(
                             type = NotificationEventType.Message,
                             contactId = event.contactId,
@@ -83,8 +86,10 @@ internal class RealtimeNotificationBridge(
                             messageText = message.text.messengerPlusPlainText(),
                             sentAtMillis = message.timestampMillis,
                             isGroup = contact?.isGroup == true,
-                            senderName = message.senderName?.messengerPlusPlainText(),
+                            senderName = (message.senderName ?: senderContact?.displayName)
+                                ?.messengerPlusPlainText(),
                             senderEmail = message.senderEmail,
+                            senderAvatarUri = senderContact?.avatarUri,
                         )
                     }
                     is MessengerEvent.IncomingNudge -> {

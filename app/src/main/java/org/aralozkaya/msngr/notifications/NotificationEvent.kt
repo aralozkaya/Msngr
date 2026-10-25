@@ -16,4 +16,5 @@ internal data class NotificationEvent(
     val isGroup: Boolean = false,
     val senderName: String? = null,
     val senderEmail: String? = null,
+    val senderAvatarUri: String? = null,
 )

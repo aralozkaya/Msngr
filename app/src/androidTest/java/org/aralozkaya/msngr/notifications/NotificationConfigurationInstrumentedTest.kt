@@ -128,21 +128,33 @@ class NotificationConfigurationInstrumentedTest {
         assertEquals("Message body", messageStyle?.messages?.single()?.text?.toString())
         assertNotNull(messageStyle?.messages?.single()?.person?.icon)
         assertEquals(3, messageNotification.actions.orEmpty().size)
-        assertTrue(
-            messageNotification.actions.orEmpty().any { action ->
-                action.remoteInputs?.any { input ->
-                    input.resultKey == NotificationReplyReceiver.KEY_TEXT_REPLY
-                } == true
-            },
-        )
-        val nudgeAction = messageNotification.actions.orEmpty().single { action ->
+        val compatActions = (0 until NotificationCompat.getActionCount(messageNotification))
+            .mapNotNull { NotificationCompat.getAction(messageNotification, it) }
+        val replyAction = compatActions.single { action ->
+            action.remoteInputs?.any { input ->
+                input.resultKey == NotificationReplyReceiver.KEY_TEXT_REPLY
+            } == true
+        }
+        assertFalse(replyAction.showsUserInterface)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            assertEquals(
+                NotificationCompat.Action.SEMANTIC_ACTION_REPLY,
+                replyAction.semanticAction,
+            )
+        }
+        val wearableReply = NotificationCompat.Action.WearableExtender(replyAction)
+        assertTrue(wearableReply.hintDisplayActionInline)
+        assertFalse(wearableReply.hintLaunchesActivity)
+        val nudgeAction = compatActions.single { action ->
             action.title.toString() == context.getString(R.string.notification_nudge_label)
         }
         assertTrue(nudgeAction.remoteInputs.isNullOrEmpty())
-        val markReadAction = messageNotification.actions.orEmpty().single { action ->
+        assertFalse(nudgeAction.showsUserInterface)
+        val markReadAction = compatActions.single { action ->
             action.title.toString() == context.getString(R.string.notification_mark_read_label)
         }
         assertTrue(markReadAction.remoteInputs.isNullOrEmpty())
+        assertFalse(markReadAction.showsUserInterface)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             assertEquals(
                 NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ,
@@ -189,7 +201,7 @@ class NotificationConfigurationInstrumentedTest {
 
         // Exercise the actual broadcast PendingIntent, including the cold-process path
         // where the application has no active repository to mark as read.
-        markReadAction.actionIntent.send()
+        requireNotNull(markReadAction.actionIntent).send()
         val messageId = MsngrNotificationManager.notificationId(
             NotificationEventType.Message,
             "message-event@example.com",
@@ -305,9 +317,10 @@ class NotificationConfigurationInstrumentedTest {
         assertNotNull(sender?.icon)
         val shortcutId = MsngrNotificationManager.conversationShortcutId(contactPictureId)
         assertEquals(shortcutId, NotificationCompat.getShortcutId(contactPictureNotification))
-        assertTrue(
-            ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId },
-        )
+        assertEquals(shortcutId, NotificationCompat.getLocusId(contactPictureNotification)?.id)
+        val publishedShortcut = ShortcutManagerCompat.getDynamicShortcuts(context)
+            .single { it.id == shortcutId }
+        assertEquals(shortcutId, publishedShortcut.locusId?.id)
         assertNull(fallbackNotification.getLargeIcon())
         assertNotNull(NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(fallbackNotification)?.messages?.single()?.person?.icon)
@@ -478,6 +491,7 @@ class NotificationConfigurationInstrumentedTest {
             MsngrNotificationManager(context).show(NotificationEvent(
                 NotificationEventType.Message, contactId, "Group with picture", profilePictureDataUri(),
                 messageText = "From a member", isGroup = true, senderName = "Alice", senderEmail = "alice@example.test",
+                senderAvatarUri = profilePictureDataUri(),
             ))
             val notification = awaitNotification(id) { messageText(it) == "From a member" }
             assertConversationIcon(notification, contactId)
@@ -485,6 +499,11 @@ class NotificationConfigurationInstrumentedTest {
             assertTrue(style.isGroupConversation)
             assertEquals("Group with picture", style.conversationTitle.toString())
             assertEquals("Alice", style.messages.single().person?.name.toString())
+            assertNotNull(style.messages.single().person?.icon)
+            val shortcutId = MsngrNotificationManager.conversationShortcutId(contactId)
+            assertEquals(shortcutId, NotificationCompat.getLocusId(notification)?.id)
+            val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
+            assertEquals(shortcutId, shortcut.locusId?.id)
         } finally {
             manager.cancel(id)
             ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(MsngrNotificationManager.conversationShortcutId(contactId)))
