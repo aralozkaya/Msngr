@@ -37,11 +37,18 @@ android {
     compileSdk {
         version = release(37)
     }
-    ndkVersion = "28.2.13676358"
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+    // Java/Kotlin CodeQL extraction compiles all managed sources without needing
+    // a native linker. Its default runner cannot download additional NDKs.
+    // Keep JNI enabled for normal builds and for C/C++ CodeQL extraction.
+    val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
+        !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
+    if (!javaOnlyCodeQl) {
+        ndkVersion = "28.2.13676358"
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 
