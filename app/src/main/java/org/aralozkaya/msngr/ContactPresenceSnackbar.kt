@@ -17,14 +17,24 @@ import org.aralozkaya.msngr.enums.Presence
 import java.util.Locale
 
 @Composable
-internal fun ContactPresenceSnackbar(contact: Contact?, isConversationAvailable: Boolean = true) {
+internal fun ContactPresenceSnackbar(
+    contact: Contact?,
+    isConversationAvailable: Boolean = true,
+    ownPresence: Presence = Presence.Online,
+) {
     val hostState = remember { SnackbarHostState() }
-    var dismissed by rememberSaveable(contact?.id, contact?.presence, isConversationAvailable) { mutableStateOf(false) }
+    val showAppearOfflineNotice = contact?.isGroup == false &&
+        contact.presence.isOnline && ownPresence == Presence.Offline
+    var dismissed by rememberSaveable(
+        contact?.id, contact?.presence, isConversationAvailable, showAppearOfflineNotice,
+    ) { mutableStateOf(false) }
     val name = contact?.displayName?.messengerPlusPlainText().orEmpty()
     val message = if (contact?.isGroup == true) when {
         !isConversationAvailable -> stringResource(R.string.chat_group_removed, name)
         !contact.presence.isOnline -> stringResource(R.string.chat_group_offline, name)
         else -> null
+    } else if (showAppearOfflineNotice) {
+        stringResource(R.string.chat_appear_offline)
     } else when (contact?.presence) {
         Presence.Busy, Presence.Away -> stringResource(
             R.string.chat_contact_unavailable,
@@ -44,7 +54,7 @@ internal fun ContactPresenceSnackbar(contact: Contact?, isConversationAvailable:
                 duration = SnackbarDuration.Indefinite,
             )
             // Remember explicit dismissal across recompositions and rotation, but
-            // allow a fresh notice when the contact's presence changes.
+            // allow a fresh notice when the contact's presence or our visibility changes.
             dismissed = true
         }
     }
@@ -52,7 +62,7 @@ internal fun ContactPresenceSnackbar(contact: Contact?, isConversationAvailable:
     SnackbarHost(hostState = hostState) { data ->
         Snackbar(
             snackbarData = data,
-            actionOnNewLine = contact?.isGroup == true || contact?.presence == Presence.Offline,
+            actionOnNewLine = showAppearOfflineNotice || contact?.isGroup == true || contact?.presence == Presence.Offline,
         )
     }
 }
