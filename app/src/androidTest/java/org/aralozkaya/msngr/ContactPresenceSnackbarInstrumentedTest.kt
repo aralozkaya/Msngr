@@ -68,6 +68,71 @@ class ContactPresenceSnackbarInstrumentedTest {
         compose.onNodeWithText("Dismiss").assertDoesNotExist()
     }
 
+    @Test
+    fun appearOfflineNoticeTracksOwnStatusAndStaysDismissedOnProfileUpdates() {
+        val contact = mutableStateOf(contact(Presence.Online))
+        val ownPresence = mutableStateOf(Presence.Online)
+        compose.setContent {
+            MaterialTheme {
+                Scaffold(snackbarHost = {
+                    ContactPresenceSnackbar(contact.value, ownPresence = ownPresence.value)
+                }) { innerPadding ->
+                    Box(Modifier.padding(innerPadding))
+                }
+            }
+        }
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+        compose.runOnIdle { ownPresence.value = Presence.Offline }
+        compose.onNodeWithText(appearOfflineNotice).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(60_000)
+        compose.onNodeWithText(appearOfflineNotice).assertIsDisplayed()
+        compose.onNodeWithText("Dismiss").performClick()
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+        compose.runOnIdle { contact.value = contact.value.copy(nickname = "Alex Updated") }
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+        compose.runOnIdle { ownPresence.value = Presence.Away }
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+        compose.runOnIdle { ownPresence.value = Presence.Offline }
+        compose.onNodeWithText(appearOfflineNotice).assertIsDisplayed()
+        compose.runOnIdle { ownPresence.value = Presence.Online }
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+    }
+
+    @Test
+    fun appearOfflineNoticeAppliesToAllNonOfflineContactsAndPreservesOtherNotices() {
+        val contact = mutableStateOf<Contact?>(null)
+        compose.setContent {
+            MaterialTheme {
+                Scaffold(snackbarHost = {
+                    ContactPresenceSnackbar(contact.value, ownPresence = Presence.Offline)
+                }) { innerPadding ->
+                    Box(Modifier.padding(innerPadding))
+                }
+            }
+        }
+        compose.onNodeWithText("Dismiss").assertDoesNotExist()
+        for (presence in listOf(Presence.Online, Presence.Busy, Presence.Away)) {
+            compose.runOnIdle { contact.value = contact(presence) }
+            compose.onNodeWithText(appearOfflineNotice).assertIsDisplayed()
+            compose.onNodeWithText("Alex is busy and may not respond").assertDoesNotExist()
+            compose.onNodeWithText("Alex is away and may not respond").assertDoesNotExist()
+        }
+        compose.runOnIdle { contact.value = contact(Presence.Offline) }
+        compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
+        compose.onNodeWithText("Alex is offline. Messages you send will be delivered when they sign in.")
+            .assertIsDisplayed()
+        compose.runOnIdle { contact.value = null }
+        compose.onNodeWithText("Dismiss").assertDoesNotExist()
+        compose.runOnIdle { contact.value = contact(Presence.Online).copy(isGroup = true) }
+        compose.onNodeWithText("Dismiss").assertDoesNotExist()
+        compose.runOnIdle { contact.value = contact.value?.copy(presence = Presence.Offline) }
+        compose.onNodeWithText("Alex is currently offline. You can send a message when more group members are online.")
+            .assertIsDisplayed()
+    }
+
+    private val appearOfflineNotice = "Your status is set to Appear offline. You can communicate with your contacts " +
+        "but they will know you are appearing offline."
+
     private fun contact(presence: Presence) = Contact(
         id = "alex@example.com",
         nickname = "\u0002Alex\u0002",
