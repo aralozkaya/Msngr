@@ -16,19 +16,26 @@ import org.aralozkaya.msngr.data.AddressBookSnapshot
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMember
 import org.aralozkaya.msngr.data.LiveMsnp18Client
+import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerEvent
+import org.aralozkaya.msngr.data.MsnpCircles
 import org.aralozkaya.msngr.data.NudgeCooldownException
 import org.aralozkaya.msngr.data.NudgeRateLimiter
-import org.aralozkaya.msngr.data.MsnpCircles
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.SsoToken
 import org.aralozkaya.msngr.data.StorageProfile
 import org.aralozkaya.msngr.data.parseCircleEnvelope
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.InkDrawing
+import org.aralozkaya.msngr.protocol.InkPoint
+import org.aralozkaya.msngr.protocol.InkStroke
+import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -125,8 +132,8 @@ class LiveCircleClientTest {
             assertTrue(subscriptions.last().payload!!.toString(Charsets.UTF_8).contains("t=\"9\""))
             transport.incoming.send(roster(groupId, me, "alice@example.com"))
             withTimeout(2000) { client.contacts.first { it.first().presence == Presence.Online } }
-            client.sendMessageWithResult(groupId, "Hello TÃ¼rkiye", null).getOrThrow()
-            assertEquals("Hello TÃ¼rkiye", parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!.body.toString(Charsets.UTF_8))
+            client.sendMessageWithResult(groupId, "Hello Türkiye", null).getOrThrow()
+            assertEquals("Hello Türkiye", parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!.body.toString(Charsets.UTF_8))
             transport.incoming.send(MsnpCircles.message(0, groupId, "alice@example.com", "remote", "Alice's message"))
             withTimeout(2000) { client.messages.first { it[groupId]?.size == 2 } }
             val incoming = client.messages.value[groupId]!!.last()
@@ -151,6 +158,140 @@ class LiveCircleClientTest {
             withTimeout(2000) { client.messages.first { it[groupId]!!.last().deliveryError != null } }
             Unit
         } finally { client.close(); scope.cancel() }
+    }
+
+    @Test fun groupHandwritingSendsAndReceivesOverCircleSdgWithoutSwitchboard() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(
+            scope = scope,
+            transport = transport,
+            switchboardTransportFactory = { error("Group handwriting must not open a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ ->
+                AddressBookSnapshot(
+                    listOf(
+                        group.copy(
+                            members = listOf(
+                                GroupMember(me, "Me"),
+                                GroupMember("alice@example.com", "Alice"),
+                                GroupMember("bob@example.com", "Bob"),
+                            ),
+                        ),
+                    ),
+                    circleTicket = "signed",
+                )
+            },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+        )
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com", "bob@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+
+            // 1. Send outgoing group handwriting
+            val outgoingDrawing = InkDrawing(
+                canvasWidthPx = 220f,
+                canvasHeightPx = 90f,
+                strokes = listOf(
+                    InkStroke(
+                        points = listOf(InkPoint(15f, 20f), InkPoint(120f, 65f)),
+                        colorRgb = 0x800080,
+                        widthHimetric = 100,
+                    ),
+                ),
+            )
+            client.sendInkMessage(groupId, outgoingDrawing).getOrThrow()
+            val sentSdg = transport.sent.last { it.verb == "SDG" }
+            val sentEnvelope = requireNotNull(parseCircleEnvelope(sentSdg.payload!!))
+            assertEquals(groupId, sentEnvelope.groupId)
+            assertEquals("Ink", sentEnvelope.headers["message-type"])
+            assertEquals(Msnp18Protocol.INK_ISF_CONTENT_TYPE, sentEnvelope.headers["content-type"])
+            val decodedOutgoing = requireNotNull(MsnInkCodec.decodeMimeBody(sentEnvelope.headers["content-type"]!!, sentEnvelope.body))
+            assertEquals(1, decodedOutgoing.strokes.size)
+            assertEquals(0x800080, decodedOutgoing.strokes.single().colorRgb)
+
+            // 2. Receive incoming ISF group handwriting from Alice
+            val aliceDrawing = InkDrawing(
+                canvasWidthPx = 240f,
+                canvasHeightPx = 96f,
+                strokes = listOf(
+                    InkStroke(
+                        points = listOf(InkPoint(20f, 30f), InkPoint(90f, 70f), InkPoint(180f, 40f)),
+                        colorRgb = 0x008000,
+                        widthHimetric = 200,
+                    ),
+                ),
+            )
+            transport.incoming.send(
+                MsnpCircles.inkMessage(
+                    transactionId = 0,
+                    groupEmail = groupId,
+                    senderEmail = "alice@example.com",
+                    endpointId = "b343262e-a9e9-4335-a76e-d1e6df5923f2",
+                    drawing = aliceDrawing,
+                    useGif = false,
+                    segment = 7,
+                ),
+            )
+            withTimeout(2_000) { client.messages.first { it[groupId]?.size == 2 } }
+            val aliceMsg = client.messages.value.getValue(groupId).last()
+            assertEquals(MessageAuthor.Contact, aliceMsg.author)
+            assertEquals("alice@example.com", aliceMsg.senderEmail)
+            assertEquals("Alice", aliceMsg.senderName)
+            assertTrue(aliceMsg.isInk)
+            assertEquals(0x008000, aliceMsg.inkDrawing!!.strokes.single().colorRgb)
+            assertEquals(200, aliceMsg.inkDrawing!!.strokes.single().widthHimetric)
+            assertEquals(1, client.contacts.value.single().unreadCount)
+            withTimeout(2_000) {
+                while (events.none { it == MessengerEvent.IncomingMessage(groupId, aliceMsg.id) }) yield()
+            }
+
+            // 3. Receive incoming Fortified GIF group handwriting from Bob
+            val bobDrawing = InkDrawing(
+                canvasWidthPx = 200f,
+                canvasHeightPx = 80f,
+                strokes = listOf(
+                    InkStroke(
+                        points = listOf(InkPoint(10f, 15f), InkPoint(140f, 55f)),
+                        colorRgb = 0xFF0000,
+                        widthHimetric = 53,
+                    ),
+                ),
+            )
+            transport.incoming.send(
+                MsnpCircles.inkMessage(
+                    transactionId = 0,
+                    groupEmail = groupId,
+                    senderEmail = "bob@example.com",
+                    endpointId = "b343262e-a9e9-4335-a76e-d1e6df5923f3",
+                    drawing = bobDrawing,
+                    useGif = true,
+                    segment = 8,
+                ),
+            )
+            withTimeout(2_000) { client.messages.first { it[groupId]?.size == 3 } }
+            val bobMsg = client.messages.value.getValue(groupId).last()
+            assertEquals(MessageAuthor.Contact, bobMsg.author)
+            assertEquals("bob@example.com", bobMsg.senderEmail)
+            assertEquals("Bob", bobMsg.senderName)
+            assertTrue(bobMsg.isInk)
+            assertEquals(0xFF0000, bobMsg.inkDrawing!!.strokes.single().colorRgb)
+            assertNotNull(bobMsg.inkDrawing!!.fallbackGifBytes)
+            assertEquals(2, client.contacts.value.single().unreadCount)
+
+            // 4. Server rejection (933) marks the outgoing group handwriting message as failed
+            transport.rejectSdg = true
+            client.sendInkMessage(groupId, outgoingDrawing)
+            withTimeout(2_000) { client.messages.first { it[groupId]!!.last().deliveryError != null } }
+            Unit
+        } finally {
+            collector.cancel()
+            client.close()
+            scope.cancel()
+        }
     }
 
     @Test fun availabilityExcludesSelfAndMembershipRefreshesOnlyAfterProtocolEvents() = runBlocking {

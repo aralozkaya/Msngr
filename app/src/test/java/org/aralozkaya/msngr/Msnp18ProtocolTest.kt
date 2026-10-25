@@ -128,12 +128,17 @@ class Msnp18ProtocolTest {
             "${Msnp18Protocol.CLIENT_ID}:${Msnp18Protocol.EXTENDED_CAPABILITIES}",
             Msnp18Protocol.CLIENT_IDENTITY,
         )
-        assertEquals(0x20, Msnp18Protocol.BASE_CAPABILITIES)
+        assertEquals(0x2C, Msnp18Protocol.BASE_CAPABILITIES)
         assertEquals(0x400, Msnp18Protocol.EXTENDED_CAPABILITIES)
         assertEquals(
-            "Handwriting capabilities must not be advertised",
-            0,
+            "Handwriting GIF and ISF capabilities must be advertised",
+            0x0C,
             Msnp18Protocol.BASE_CAPABILITIES and (0x04 or 0x08),
+        )
+        assertEquals(
+            "Handwriting GIF and ISF capabilities must be advertised",
+            0,
+            Msnp18Protocol.BASE_CAPABILITIES and 0,
         )
         assertEquals(
             "Activity and game invitations must not be advertised",

@@ -50,6 +50,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Keyboard
@@ -119,6 +120,7 @@ import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.notifications.otherUnreadCount
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
@@ -247,6 +249,7 @@ private fun ChatRoute(
         onRetryMessage = { repository.retryMessage(contactId, it.id) },
         onSendTyping = { repository.sendTyping(contactId) },
         onSendNudge = { repository.sendNudge(contactId) },
+        onSendInk = { repository.sendInk(contactId, it) },
         onLoadOlderMessages = { repository.loadOlderMessages(contactId) },
     )
 }
@@ -266,6 +269,7 @@ internal fun ChatScreen(
     onRetryMessage: (ChatMessage) -> Unit,
     onSendTyping: () -> Unit,
     onSendNudge: () -> Unit,
+    onSendInk: (InkDrawing) -> Unit = {},
     onLoadOlderMessages: suspend () -> Unit,
     nativeStyle: NativeTextStyle = NativeTextStyle(),
     onNativeStyleChange: (NativeTextStyle) -> Unit = {},
@@ -401,7 +405,7 @@ internal fun ChatScreen(
                                         )
                                         SceneText(
                                             text = if (isTyping) {
-                                                "typing…"
+                                                "typingâ€¦"
                                             } else if (contact?.isGroup == true) {
                                                 "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}"
                                             } else {
@@ -425,6 +429,7 @@ internal fun ChatScreen(
                 onNativeStyleChange = onNativeStyleChange,
                 onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
+                handwritingEnabled = isConversationAvailable && contact?.presence?.isOnline != false,
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
                 draft = draft,
@@ -443,6 +448,8 @@ internal fun ChatScreen(
                     }
                 },
                 onSendNudge = onSendNudge,
+                onSendInk = onSendInk,
+                onSendTyping = onSendTyping,
                 emoticonSettings = emoticonSettings,
                 messengerPlusEnabled = messengerPlusEnabled,
             )
@@ -546,12 +553,15 @@ internal fun ChatMessageList(
 @Composable
 private fun MessageComposer(
     enabled: Boolean = true,
+    handwritingEnabled: Boolean = enabled,
     nudgeEnabled: Boolean = enabled,
     nudgeCooldownMillis: Long = 0L,
     draft: String,
     onDraftChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     onSendNudge: () -> Unit,
+    onSendInk: (InkDrawing) -> Unit = {},
+    onSendTyping: () -> Unit = {},
     emoticonSettings: EmoticonSettings,
     messengerPlusEnabled: Boolean,
     nativeStyle: NativeTextStyle,
@@ -562,8 +572,11 @@ private fun MessageComposer(
     val emoticonSheet = rememberEmoticonSheetState()
     val colorSheet = rememberMessengerPlusColorSheetState()
     var showTextStyle by remember { mutableStateOf(false) }
-    LaunchedEffect(enabled, messengerPlusEnabled) {
+    var handwritingMode by rememberSaveable { mutableStateOf(false) }
+    val handwritingState = rememberHandwritingCanvasState()
+    LaunchedEffect(enabled, handwritingEnabled, messengerPlusEnabled) {
         if (!enabled || !messengerPlusEnabled) colorSheet.dismiss()
+        if (!handwritingEnabled) handwritingMode = false
         if (!enabled) {
             showTextStyle = false
             emoticonSheet.dismiss()
@@ -599,7 +612,7 @@ private fun MessageComposer(
     ) {
         if (enabled && nudgeCooldownMillis > 0L) {
             Text(
-                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge…" else
+                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudgeâ€¦" else
                     "You can send another nudge in ${(nudgeCooldownMillis + 999) / 1_000} seconds.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -607,6 +620,16 @@ private fun MessageComposer(
                     .padding(start = 16.dp, top = 6.dp, end = 16.dp),
             )
         }
+        if (handwritingMode) {
+            HandwritingComposerPanel(
+                state = handwritingState,
+                enabled = handwritingEnabled,
+                onSendInk = onSendInk,
+                onSwitchToTypeMode = { handwritingMode = false },
+                onStrokeActivity = onSendTyping,
+                modifier = Modifier.background(composerBackgroundColor),
+            )
+        } else {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -655,6 +678,23 @@ private fun MessageComposer(
                                 contentDescription = "Send nudge"
                             )
                         }
+                        IconButton(
+                            onClick = {
+                                colorSheet.dismiss()
+                                emoticonSheet.dismiss()
+                                showTextStyle = false
+                                editorController.hideKeyboard()
+                                handwritingMode = true
+                            },
+                            enabled = handwritingEnabled,
+                            shapes = IconButtonDefaults.shapes(),
+                            modifier = Modifier.testTag(HANDWRITING_MODE_BUTTON_TAG),
+                        ) {
+                            Icon(
+                                Icons.Default.Draw,
+                                contentDescription = "Handwriting",
+                            )
+                        }
                     }
                     MsnEmoticonEditor(
                         nativeStyle = nativeStyle,
@@ -698,6 +738,7 @@ private fun MessageComposer(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
             }
+        }
         }
         Spacer(
             modifier = Modifier
@@ -880,6 +921,7 @@ private fun ChatMessage?.groupsWith(next: ChatMessage?): Boolean =
             author != MessageAuthor.System && author == next.author &&
             senderEmail == next.senderEmail &&
             !isNudge && !next.isNudge &&
+            !isInk && !next.isInk &&
             next.timestampMillis - timestampMillis in 0L..(5 * 60 * 1_000L)
 
 @Composable
@@ -961,17 +1003,24 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                MsnEmoticonText(
-                    text = message.text,
-                    nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
-                        else message.nativeStyle.copy(size = textSize),
-                    useOriginalEmoticons = useOriginalEmoticons,
-                    renderedShortcutRanges = message.renderedEmoticonRanges,
-                    linkify = true,
-                    style = if (message.isNudge) {
-                        MaterialTheme.typography.titleMedium
-                    } else MaterialTheme.typography.bodyLarge,
-                )
+                if (message.inkDrawing != null) {
+                    HandwritingMessageCanvas(
+                        drawing = message.inkDrawing,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                } else {
+                    MsnEmoticonText(
+                        text = message.text,
+                        nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
+                            else message.nativeStyle.copy(size = textSize),
+                        useOriginalEmoticons = useOriginalEmoticons,
+                        renderedShortcutRanges = message.renderedEmoticonRanges,
+                        linkify = true,
+                        style = if (message.isNudge) {
+                            MaterialTheme.typography.titleMedium
+                        } else MaterialTheme.typography.bodyLarge,
+                    )
+                }
                 Row(
                     modifier = Modifier.align(
                         if (message.author == MessageAuthor.Me) Alignment.End else Alignment.Start,

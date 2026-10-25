@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.MsnInkCodec
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -502,6 +503,12 @@ private fun DataInputStream.readChatMessage(contactId: String, version: Int = 1)
         senderName = if (version >= 3 && readBoolean()) readSizedString() else null,
         nativeStyle = if (version >= 4) NativeTextStyle.fromFormatHeader(readSizedString())
             .copy(size = readInt()) else NativeTextStyle(),
+        inkDrawing = if (version >= 5 && readBoolean()) {
+            val byteCount = readInt()
+            require(byteCount in 1..MAX_STRING_BYTES)
+            val isfBytes = ByteArray(byteCount).also(::readFully)
+            MsnInkCodec.decodeIsf(isfBytes)
+        } else null,
     )
 }
 
@@ -529,6 +536,15 @@ private fun DataOutputStream.writeChatMessage(message: ChatMessage) {
     message.senderName?.let(::writeSizedString)
     writeSizedString(message.nativeStyle.toFormatHeader())
     writeInt(message.nativeStyle.size)
+    val isfBytes = message.inkDrawing?.let { drawing ->
+        runCatching { MsnInkCodec.encodeIsf(drawing) }.getOrNull()
+    }
+    writeBoolean(isfBytes != null)
+    if (isfBytes != null) {
+        require(isfBytes.size <= MAX_STRING_BYTES)
+        writeInt(isfBytes.size)
+        write(isfBytes)
+    }
 }
 
 private fun writeHistoryChunk(file: File, contactId: String, messages: List<ChatMessage>) =
@@ -591,7 +607,7 @@ private val CHAT_MESSAGE_COMPARATOR = compareBy(ChatMessage::timestampMillis, Ch
 private val CHUNK_FILE_REGEX = Regex("chunk-(\\d{8})\\.bin")
 private const val DEFAULT_PAGE_SIZE = 200
 private const val CHUNK_MAGIC = 0x4D534743
-private const val CHUNK_VERSION = 4
+private const val CHUNK_VERSION = 5
 private const val LEGACY_FILE_MAGIC = 0x4D534748
 private const val LEGACY_FILE_VERSION = 1
 private const val MAX_ENTRY_COUNT = 1_000_000

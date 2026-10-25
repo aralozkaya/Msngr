@@ -26,6 +26,9 @@ import org.aralozkaya.msngr.AccountIdentity
 import org.aralozkaya.msngr.MessengerPlusTextCodec
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.InkDrawing
+import org.aralozkaya.msngr.protocol.InkPoint
+import org.aralozkaya.msngr.protocol.InkStroke
 import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.enums.Presence
@@ -106,6 +109,11 @@ data class ChatMessage(
     val senderEmail: String? = null,
     val senderName: String? = null,
     val nativeStyle: NativeTextStyle = NativeTextStyle(),
+    val inkDrawing: InkDrawing? = null,
+) {
+    val isInk: Boolean get() = inkDrawing != null
+}
+private fun unusedChatMessageMarker() = listOf<Unit>(
 )
 
 data class ConversationState(
@@ -184,6 +192,8 @@ interface MsnpClient {
     ): Result<Unit> = sendMessageWithResult(contactId, text, renderedEmoticonRanges)
     suspend fun retryMessage(message: ChatMessage): Result<Unit> =
         Result.failure(UnsupportedOperationException("Message retry is not supported."))
+    suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Handwriting messages are not supported."))
     suspend fun sendTyping(contactId: String)
     suspend fun sendNudge(contactId: String)
     suspend fun sendNudgeWithResult(contactId: String): Result<Unit> =
@@ -480,6 +490,65 @@ class MockMsnp18Client(
     }
 
     override suspend fun sendTyping(contactId: String) {
+        // Kept as an explicit operation so the live transport can send text/x-msmsgscontrol.
+    }
+
+    override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> {
+        val nonEmpty = drawing.strokes.filter { it.points.isNotEmpty() }
+        if (nonEmpty.isEmpty()) return Result.success(Unit)
+        appendMessage(
+            ChatMessage(
+                id = ids.incrementAndGet(),
+                contactId = contactId,
+                author = MessageAuthor.Me,
+                text = "Handwriting",
+                timestampMillis = System.currentTimeMillis(),
+                inkDrawing = drawing.copy(strokes = nonEmpty),
+            ),
+        )
+        scope.launch {
+            delay(500)
+            mutableTyping.update { it + (contactId to true) }
+            delay(1_000)
+            mutableTyping.update { it + (contactId to false) }
+            val replyDrawing = InkDrawing(
+                canvasWidthPx = 220f,
+                canvasHeightPx = 90f,
+                strokes = listOf(
+                    InkStroke(
+                        points = listOf(
+                            InkPoint(24f, 45f),
+                            InkPoint(58f, 24f),
+                            InkPoint(96f, 64f),
+                            InkPoint(142f, 28f),
+                            InkPoint(188f, 52f),
+                        ),
+                        colorRgb = 0x0000FF,
+                        widthHimetric = 100,
+                    ),
+                ),
+            )
+            val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
+            val groupSender = group?.members?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
+                ?: group?.members?.firstOrNull()
+            val incoming = ChatMessage(
+                id = ids.incrementAndGet(),
+                contactId = contactId,
+                author = MessageAuthor.Contact,
+                text = "Handwriting",
+                timestampMillis = System.currentTimeMillis(),
+                senderEmail = groupSender?.email,
+                senderName = groupSender?.displayName,
+                inkDrawing = replyDrawing,
+            )
+            appendMessage(incoming)
+            incrementUnread(contactId)
+            mutableEvents.emit(MessengerEvent.IncomingMessage(contactId, incoming.id))
+        }
+        return Result.success(Unit)
+    }
+
+    private fun unusedSendTypingMarker() {
         // Kept as an explicit operation so the live transport can send text/x-msmsgscontrol.
     }
 
@@ -927,6 +996,13 @@ class MessengerRepository(
             null,
             textStyles.value[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
         )
+
+    fun sendInk(contactId: String, drawing: InkDrawing) {
+        scope.launch { client.sendInkMessage(contactId, drawing) }
+    }
+
+    suspend fun sendInkNow(contactId: String, drawing: InkDrawing): Result<Unit> =
+        client.sendInkMessage(contactId, drawing)
 
     fun retryMessage(contactId: String, messageId: Long) {
         scope.launch {

@@ -14,6 +14,8 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
 import java.nio.charset.StandardCharsets
+import java.util.Locale
+import java.util.UUID
 
 data class MsnpCommand(
     val verb: String,
@@ -30,6 +32,10 @@ object Msnp18Protocol {
     const val TYPING_CONTENT_TYPE = "text/x-msmsgscontrol"
     const val NUDGE_CONTENT_TYPE = "text/x-msnmsgr-datacast"
     const val P2P_CONTENT_TYPE = "application/x-msnmsgrp2p"
+    const val INK_ISF_CONTENT_TYPE = "application/x-ms-ink"
+    const val INK_GIF_CONTENT_TYPE = "image/gif"
+    const val MAX_INK_CHUNK_BODY_BYTES = 1_202
+    const val MAX_INK_CHUNKS = 60
     const val FORWARD_LIST = 1
     const val ALLOW_LIST = 2
     const val BLOCK_LIST = 4
@@ -242,6 +248,70 @@ object Msnp18Protocol {
         body = packet,
     )
 
+    fun inkPayloads(
+        drawing: InkDrawing,
+        messageId: String = UUID.randomUUID().toString().uppercase(Locale.US),
+        useGif: Boolean = false,
+    ): List<ByteArray> {
+        val contentType = if (useGif) INK_GIF_CONTENT_TYPE else INK_ISF_CONTENT_TYPE
+        val encodedBody = if (useGif) {
+            MsnInkCodec.encodeBase64GifPayload(drawing)
+        } else {
+            MsnInkCodec.encodeBase64IsfPayload(drawing)
+        }
+        return inkPayloadsFromEncodedBody(
+            contentType = contentType,
+            encodedBody = encodedBody,
+            messageId = messageId,
+        )
+    }
+
+    fun inkPayloadsFromEncodedBody(
+        contentType: String,
+        encodedBody: String,
+        messageId: String = UUID.randomUUID().toString().uppercase(Locale.US),
+    ): List<ByteArray> {
+        val bodyBytes = encodedBody.toByteArray(StandardCharsets.UTF_8)
+        if (bodyBytes.size <= MAX_INK_CHUNK_BODY_BYTES) {
+            return listOf(
+                mimePayload(
+                    contentType = contentType,
+                    body = bodyBytes,
+                ),
+            )
+        }
+        val chunks = mutableListOf<ByteArray>()
+        var offset = 0
+        while (offset < bodyBytes.size) {
+            val end = minOf(offset + MAX_INK_CHUNK_BODY_BYTES, bodyBytes.size)
+            chunks += bodyBytes.copyOfRange(offset, end)
+            offset = end
+        }
+        require(chunks.size <= MAX_INK_CHUNKS) {
+            "Handwriting drawing exceeds the MSNP maximum of $MAX_INK_CHUNKS chunks."
+        }
+        val normalizedId = "{${messageId.trim().trim('{', '}')}}"
+        return chunks.mapIndexed { index, chunkBody ->
+            if (index == 0) {
+                mimePayload(
+                    contentType = contentType,
+                    extraHeaders = linkedMapOf(
+                        "Message-ID" to normalizedId,
+                        "Chunks" to chunks.size.toString(),
+                    ),
+                    body = chunkBody,
+                )
+            } else {
+                val headers = buildString {
+                    append("Message-ID: $normalizedId\r\n")
+                    append("Chunk: $index\r\n")
+                    append("\r\n")
+                }.toByteArray(StandardCharsets.UTF_8)
+                headers + chunkBody
+            }
+        }
+    }
+
     fun switchboardTransfer(transactionId: Int) = MsnpCommand(
         verb = "XFR",
         transactionId = transactionId,
@@ -358,14 +428,14 @@ object Msnp18Protocol {
         )
     }
 
-    // MSNC9 (0x90) in the high byte, with only message chunking (0x20) advertised.
+    // MSNC9 (0x90) in the high byte, with message chunking (0x20) and ink/handwriting (0x4 | 0x8) advertised.
     // The extended mask advertises only nudges (0x400). In particular, it leaves out
-    // handwriting (0x4/0x8), activities and games (0x100), and file transfer (0x20000).
-    const val CLIENT_ID = 2_415_919_136L
-    const val BASE_CAPABILITIES = 32
+    // activities and games (0x100), and file transfer (0x20000).
+    const val CLIENT_ID = 2_415_919_148L
+    const val BASE_CAPABILITIES = 44
     const val EXTENDED_CAPABILITIES = 1_024
-    const val CLIENT_IDENTITY = "2415919136:1024"
-    const val ENDPOINT_CAPABILITIES = "32:1024"
+    const val CLIENT_IDENTITY = "2415919148:1024"
+    const val ENDPOINT_CAPABILITIES = "44:1024"
 }
 
 object MsnpFrameCodec {

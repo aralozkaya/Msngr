@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr
 
+import org.aralozkaya.msngr.data.CircleSegmentAssembler
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMemberRole
 import org.aralozkaya.msngr.data.MsnpCircles
@@ -8,10 +9,16 @@ import org.aralozkaya.msngr.data.parseCircleEnvelope
 import org.aralozkaya.msngr.data.parseCircleMembers
 import org.aralozkaya.msngr.data.parseCirclePublication
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.InkDrawing
+import org.aralozkaya.msngr.protocol.InkPoint
+import org.aralozkaya.msngr.protocol.InkStroke
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpFrameCodec
 import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,5 +113,107 @@ class MsnpCirclesTest {
             "unknown@example.com", "missing@example.com"), members.map { it.email })
         assertEquals(listOf(GroupMemberRole.Owner, GroupMemberRole.Administrator, GroupMemberRole.User,
             GroupMemberRole.Unknown, GroupMemberRole.Unknown), members.map { it.role })
+    }
+
+    @Test fun capturedWlm2009GroupInkSdgPacketDecodesAndRoundTrips() {
+        val capturedPayload = (
+            "Routing: 1.0\r\n" +
+                "To: 9:00000000-0000-0000-0009-3ffc6bdd2e50@live.com;path=IM\r\n" +
+                "From: 1:mrlistenerr@escargot.chat;epid={b343262e-a9e9-4335-a76e-d1e6df5923f2}\r\n\r\n" +
+                "Reliability: 1.0\r\n" +
+                "Stream: 0\r\n" +
+                "Segment: 7\r\n\r\n" +
+                "Messaging: 1.0\r\n" +
+                "Content-Length: 131\r\n" +
+                "Content-Type: application/x-ms-ink\r\n" +
+                "Content-Transfer-Encoding: 7bit\r\n" +
+                "Message-Type: Ink\r\n" +
+                "MIME-Version: 1.0\r\n\r\n" +
+                "base64:AFscA4CABB0DmgJSAwlIEUSAgAJFyAEZFDIIAIAoAjiGK0IzCADAFgK3bStCFauq00GrqtNBAHeWxYB7QcYKHQ2D+HvT8WSakmiHmEFt+BsD4GwPgbA+BsD4GwOA"
+            ).toByteArray(Charsets.UTF_8)
+        assertEquals(476, capturedPayload.size)
+
+        val wire = "SDG 80 ${capturedPayload.size}\r\n".toByteArray(Charsets.UTF_8) + capturedPayload
+        val command = MsnpFrameDecoder().feed(wire).single()
+        assertEquals("SDG", command.verb)
+        assertEquals(Integer.valueOf(80), command.transactionId)
+
+        val envelope = requireNotNull(parseCircleEnvelope(command.payload!!))
+        assertEquals("00000000-0000-0000-0009-3ffc6bdd2e50@live.com", envelope.groupId)
+        assertEquals("mrlistenerr@escargot.chat", envelope.senderEmail)
+        assertEquals("7", envelope.reliability["segment"])
+        assertEquals("Ink", envelope.headers["message-type"])
+        assertEquals(Msnp18Protocol.INK_ISF_CONTENT_TYPE, envelope.headers["content-type"])
+        assertEquals("131", envelope.headers["content-length"])
+
+        val drawing = requireNotNull(MsnInkCodec.decodeMimeBody(envelope.headers["content-type"]!!, envelope.body))
+        assertEquals(1, drawing.strokes.size)
+        assertEquals(0x008000, drawing.strokes.single().colorRgb)
+        assertEquals(200, drawing.strokes.single().widthHimetric)
+
+        val outgoing = MsnpCircles.inkMessage(
+            transactionId = 81,
+            groupEmail = envelope.groupId!!,
+            senderEmail = envelope.senderEmail!!,
+            endpointId = "b343262e-a9e9-4335-a76e-d1e6df5923f2",
+            drawing = drawing,
+            segment = 7,
+        )
+        val outgoingEnvelope = requireNotNull(parseCircleEnvelope(outgoing.payload!!))
+        assertEquals("Ink", outgoingEnvelope.headers["message-type"])
+        assertEquals(Msnp18Protocol.INK_ISF_CONTENT_TYPE, outgoingEnvelope.headers["content-type"])
+        assertEquals("7bit", outgoingEnvelope.headers["content-transfer-encoding"])
+        assertEquals("1.0", outgoingEnvelope.headers["mime-version"])
+        assertEquals(outgoingEnvelope.body.size.toString(), outgoingEnvelope.headers["content-length"])
+        val roundTripped = requireNotNull(MsnInkCodec.decodeMimeBody(outgoingEnvelope.headers["content-type"]!!, outgoingEnvelope.body))
+        assertEquals(1, roundTripped.strokes.size)
+        assertEquals(0x008000, roundTripped.strokes.single().colorRgb)
+    }
+
+    @Test fun multiSegmentCircleInkMessagesReassembleAcrossSequentialReliabilitySegments() {
+        val strokes = (0 until 85).map { idx ->
+            InkStroke(
+                points = (0 until 25).map { pt ->
+                    InkPoint(
+                        x = 12f + ((idx * 17 + pt * 11) % 320),
+                        y = 10f + ((idx * 23 + pt * 7) % 110),
+                    )
+                },
+                colorRgb = if (idx % 2 == 0) 0xFF0000 else 0x0000FF,
+                widthHimetric = if (idx % 3 == 0) 200 else 53,
+            )
+        }
+        val largeDrawing = InkDrawing(strokes = strokes)
+        var nextTrid = 100
+        val commands = MsnpCircles.inkMessages(
+            groupEmail = group.id,
+            senderEmail = "member@example.com",
+            endpointId = "b343262e-a9e9-4335-a76e-d1e6df5923f2",
+            drawing = largeDrawing,
+            useGif = true,
+            startSegment = 10,
+            nextTransactionId = { nextTrid++ },
+        )
+        assertTrue(commands.size >= 2)
+        assertTrue(commands.all { it.payload!!.size <= MsnpCircles.MAX_SDG_PAYLOAD_BYTES })
+
+        val assembler = CircleSegmentAssembler()
+        var assembledEnvelope: org.aralozkaya.msngr.data.CircleEnvelope? = null
+        commands.forEachIndexed { index, cmd ->
+            val parsed = requireNotNull(parseCircleEnvelope(cmd.payload!!))
+            assertEquals((10 + index).toString(), parsed.reliability["segment"])
+            val result = assembler.accept(parsed)
+            if (index < commands.lastIndex) {
+                assertNull(result)
+            } else {
+                assembledEnvelope = result
+            }
+        }
+        val finalEnvelope = requireNotNull(assembledEnvelope)
+        assertEquals("Ink", finalEnvelope.headers["message-type"])
+        assertEquals(Msnp18Protocol.INK_GIF_CONTENT_TYPE, finalEnvelope.headers["content-type"])
+        val decoded = requireNotNull(MsnInkCodec.decodeMimeBody(finalEnvelope.headers["content-type"]!!, finalEnvelope.body))
+        assertEquals(strokes.size, decoded.strokes.size)
+        assertNotNull(decoded.fallbackGifBytes)
     }
 }
