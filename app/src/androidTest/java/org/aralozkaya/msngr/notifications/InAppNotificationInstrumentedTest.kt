@@ -36,7 +36,7 @@ class InAppNotificationInstrumentedTest {
         }
     }
 
-    @Test fun foregroundMessagesAndOfflineReceiptsNeverPostSystemNotifications() = runBlocking {
+    @Test fun foregroundMessagesNotifyButContactSignInsAndOfflineReceiptsStaySilent() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = isolatedContext()
         if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation
@@ -72,17 +72,30 @@ class InAppNotificationInstrumentedTest {
         try {
             bridge.attach(repository)
             repository.signIn(SignInRequest("owner@example.test", "mock-only",
-                ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+                ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()),
+                initialPresence = Presence.Offline)).getOrThrow()
             withTimeout(3000) { events.subscriptionCount.first { it >= 2 } }
-            events.emit(MessengerEvent.IncomingMessage(peer, 1))
+            Presence.entries.filter { it != Presence.Offline }.forEach { presence ->
+                events.emit(MessengerEvent.PresenceChanged(peer, presence, Presence.Offline))
+            }
+            events.emit(MessengerEvent.OfflineMessagesReceived)
+            delay(150)
+            assertNull(controller.banner.value)
+            assertEquals(0, vibrations.get())
+            assertFalse(hasEventNotifications(manager))
+            events.emit(MessengerEvent.IncomingMessage(peer, 1, isOffline = true))
             withTimeout(3000) { controller.banner.first { it?.text == "Hello in app" } }
             assertEquals(1, vibrations.get())
             assertFalse(hasEventNotifications(manager))
             events.emit(MessengerEvent.IncomingMessage(group, 2))
             withTimeout(3000) { controller.banner.first { it?.type == InAppNotificationType.GroupMessage } }
             assertEquals("Member: Group hello", controller.banner.value?.text)
+            val messageBanner = controller.banner.value
+            val messageVibrations = vibrations.get()
             events.emit(MessengerEvent.OfflineMessagesReceived)
-            withTimeout(3000) { controller.banner.first { it?.type == InAppNotificationType.OfflineMessages } }
+            delay(150)
+            assertEquals(messageBanner, controller.banner.value)
+            assertEquals(messageVibrations, vibrations.get())
             assertFalse(hasEventNotifications(manager))
             renderer.syncContactRequests(ContactRequestInbox("owner", listOf(ContactRequest(peer, "request"))))
             renderer.syncGroupInvitations(GroupInvitationInbox("owner", listOf(GroupInvitation(group, "Group"))))
@@ -93,7 +106,7 @@ class InAppNotificationInstrumentedTest {
             invitations.value = listOf(GroupInvitation(group, "Invited group"))
             withTimeout(3000) { controller.banner.first { it?.type == InAppNotificationType.GroupInvitation } }
             assertFalse(hasEventNotifications(manager))
-            // The open conversation is silent; another conversation still produces a banner.
+            // Nudges in the open conversation have no banner; another conversation still gets one.
             withContext(Dispatchers.Main) {
                 val chat = ChatActivity().apply { intent = ChatActivity.createIntent(context, peer) }
                 visibility.onActivityResumed(chat)
@@ -123,6 +136,53 @@ class InAppNotificationInstrumentedTest {
             manager.cancelAll()
             InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
             InAppNotificationPrefs.reload(instrumentation.targetContext)
+        }
+    }
+
+    @Test fun openConversationNudgesVibrateWithoutBannersAndRespectSettings() = runBlocking {
+        val context = isolatedContext()
+        val visibility = AppVisibilityTracker()
+        val peer = "open-peer"
+        withContext(Dispatchers.Main) {
+            visibility.onActivityStarted(Activity())
+            visibility.onActivityResumed(ChatActivity().apply { intent = ChatActivity.createIntent(context, peer) })
+        }
+        val defaults = InAppNotificationOptions()
+        val custom = ConversationNotificationOverride(peer, "Peer", false, defaults)
+        val cases = listOf(
+            InAppNotificationSettings() to 1,
+            InAppNotificationSettings(defaults.copy(banners = false)) to 1,
+            InAppNotificationSettings(defaults.copy(enabled = false)) to 0,
+            InAppNotificationSettings(defaults.copy(vibrate = false)) to 0,
+            InAppNotificationSettings(defaults.copy(rules = mapOf(
+                InAppNotificationType.Nudge to InAppNotificationRule(vibrate = false)))) to 0,
+            InAppNotificationSettings(defaults.copy(rules = mapOf(
+                InAppNotificationType.Nudge to InAppNotificationRule(enabled = false)))) to 0,
+            InAppNotificationSettings(defaults.copy(enabled = false, vibrate = false), mapOf(peer to custom)) to 1,
+            InAppNotificationSettings(conversations = mapOf(peer to custom.copy(options = defaults.copy(vibrate = false)))) to 0,
+        )
+        try {
+            cases.forEach { (settings, expectedVibrations) ->
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+                val vibrations = AtomicInteger()
+                InAppNotificationPrefs.update(context) { settings }
+                val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet(); Unit }
+                try {
+                    withContext(Dispatchers.Main) {
+                        controller.show(InAppNotification(InAppNotificationType.Message, "Peer", "Hello", peer))
+                        assertEquals(0, vibrations.get())
+                        controller.show(InAppNotification(InAppNotificationType.Nudge, "Peer", "Sent you a nudge.", peer))
+                        assertEquals(expectedVibrations, vibrations.get())
+                        assertNull(controller.banner.value)
+                        // Consecutive nudges still respect the vibration burst limit.
+                        controller.show(InAppNotification(InAppNotificationType.Nudge, "Peer", "Sent you another nudge.", peer))
+                        assertEquals(expectedVibrations, vibrations.get())
+                    }
+                } finally { scope.cancel() }
+            }
+        } finally {
+            InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
+            InAppNotificationPrefs.reload(InstrumentationRegistry.getInstrumentation().targetContext)
         }
     }
 

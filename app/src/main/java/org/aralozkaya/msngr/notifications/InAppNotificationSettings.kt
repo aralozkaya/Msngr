@@ -5,8 +5,6 @@ internal enum class InAppNotificationType(val label: String) {
     Message("Messages"),
     GroupMessage("Group messages"),
     Nudge("Nudges"),
-    ContactSignedIn("Contacts signing in"),
-    OfflineMessages("Offline messages"),
     ContactRequest("Contact requests"),
     GroupInvitation("Group invitations"),
 }

@@ -143,7 +143,7 @@ internal fun ConversationNotificationSettingsScreen(
         }
         notificationOptions(options, custom != null && options.enabled,
             types = if (isGroup) listOf(InAppNotificationType.GroupMessage, InAppNotificationType.Nudge) else
-                listOf(InAppNotificationType.Message, InAppNotificationType.Nudge, InAppNotificationType.ContactSignedIn),
+                listOf(InAppNotificationType.Message, InAppNotificationType.Nudge),
             onChange = { changed -> update { changed } })
         item {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -26,7 +26,8 @@ class MsngrApplication : Application() {
     internal val displayPictureSync by lazy { DisplayPictureSync(this) }
     val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
     internal val visibilityTracker: AppVisibilityTracker = AppVisibilityTracker { isForeground ->
-        if (!isForeground) inAppNotifications.dismiss()
+        if (isForeground) notificationManager.dismissContactSignedInNotifications()
+        else inAppNotifications.dismiss()
         runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
             repository.setAppInForeground(isForeground)
             displayPictureSync.setForeground(isForeground)

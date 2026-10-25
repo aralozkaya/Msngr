@@ -243,6 +243,17 @@ internal class MsngrNotificationManager(
         NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
+    fun dismissContactSignedInNotifications() {
+        val manager = NotificationManagerCompat.from(context)
+        manager.activeNotifications.filter {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
+            } else {
+                it.id in CONTACT_SIGNED_IN_ID_BASE until CONTACT_SIGNED_IN_ID_BASE + EVENT_NOTIFICATION_ID_COUNT
+            }
+        }.forEach { manager.cancel(it.tag, it.id) }
+    }
+
     internal fun activeNotification(notificationId: Int): Notification? =
         NotificationManagerCompat.from(context).activeNotifications
             .firstOrNull { it.id == notificationId }?.notification
@@ -547,6 +558,8 @@ internal class MsngrNotificationManager(
         const val OFFLINE_MESSAGES_NOTIFICATION_ID = 400_000
         const val CONTACT_REQUESTS_NOTIFICATION_ID = 500_000
         const val GROUP_INVITATIONS_NOTIFICATION_ID = 600_000
+        private const val CONTACT_SIGNED_IN_ID_BASE = 300_000
+        private const val EVENT_NOTIFICATION_ID_COUNT = 90_000
         private const val NUDGE_REQUEST_CODE_OFFSET = 400_000
 
         internal fun conversationShortcutId(contactId: String): String =
@@ -556,9 +569,9 @@ internal class MsngrNotificationManager(
             val typePrefix = when (type) {
                 NotificationEventType.Message -> 100_000
                 NotificationEventType.Nudge -> 200_000
-                NotificationEventType.ContactSignedIn -> 300_000
+                NotificationEventType.ContactSignedIn -> CONTACT_SIGNED_IN_ID_BASE
             }
-            return typePrefix + (contactId.hashCode() and 0x7fffffff) % 90_000
+            return typePrefix + (contactId.hashCode() and 0x7fffffff) % EVENT_NOTIFICATION_ID_COUNT
         }
     }
 }
