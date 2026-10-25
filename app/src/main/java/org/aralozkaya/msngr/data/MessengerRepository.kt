@@ -133,8 +133,10 @@ private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyL
 private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList()).asStateFlow()
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
 private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow()
+private val emptyNudgeCooldowns = MutableStateFlow<Map<String, Long>>(emptyMap()).asStateFlow()
 
 interface MsnpClient {
+    val nudgeCooldowns: StateFlow<Map<String, Long>> get() = emptyNudgeCooldowns
     val displayPictureStorageIssue: StateFlow<String?> get() = noPictureStorageIssue
     val contacts: StateFlow<List<Contact>>
     val messages: StateFlow<Map<String, List<ChatMessage>>>
@@ -258,6 +260,8 @@ class MockMsnp18Client(
     private val mutableSessions = MutableStateFlow<List<AccountSession>>(emptyList())
     private val mutableEvents = MutableSharedFlow<MessengerEvent>(extraBufferCapacity = 16)
     private val ids = AtomicLong(System.currentTimeMillis() shl 16)
+    private val nudgeLimiter = NudgeRateLimiter()
+    override val nudgeCooldowns = nudgeLimiter.cooldowns
     private var presenceJob: Job? = null
     private var signedInEmail = ""
     private var ownDisplayPicture: ByteArray? = null
@@ -284,6 +288,7 @@ class MockMsnp18Client(
         }
 
         sessionGeneration++
+        nudgeLimiter.selectAccount(AccountIdentity.forServer(request.email, request.serverConfig, true).storageId)
         if (!signedInEmail.equals(request.email, true)) mutableContactRequests.value = requestFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) mutableGroupInvitations.value = groupInvitationFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) ownDisplayPicture = null
@@ -474,6 +479,11 @@ class MockMsnp18Client(
     }
 
     override suspend fun sendNudge(contactId: String) {
+        sendNudgeWithResult(contactId)
+    }
+
+    override suspend fun sendNudgeWithResult(contactId: String): Result<Unit> = runCatching {
+        val reservation = nudgeLimiter.reserveSend(contactId)
         appendMessage(
             ChatMessage(
                 id = ids.incrementAndGet(),
@@ -484,6 +494,7 @@ class MockMsnp18Client(
                 isNudge = true,
             ),
         )
+        nudgeLimiter.finishSend(reservation, succeeded = true)
         scope.launch {
             delay(900)
             val incoming = ChatMessage(
@@ -495,8 +506,11 @@ class MockMsnp18Client(
                 isNudge = true,
             )
             appendMessage(incoming)
-            mutableEvents.emit(MessengerEvent.IncomingNudge(contactId))
+            if (nudgeLimiter.allowReceivedAlert(contactId, contactId)) {
+                mutableEvents.emit(MessengerEvent.IncomingNudge(contactId))
+            }
         }
+        Unit
     }
 
     override suspend fun blockContact(contactId: String) {
@@ -631,6 +645,7 @@ class MessengerRepository(
     val drafts: StateFlow<Map<String, String>> = draftStore.drafts
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
+    val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
     val contactRequests: StateFlow<List<ContactRequest>> = client.contactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> = client.groupInvitations
     val groupInvitationInbox: StateFlow<GroupInvitationInbox> = combine(client.groupInvitations, mutableRequestAccount) { invitations, account ->

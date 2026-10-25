@@ -143,6 +143,7 @@ internal class LiveMsnp18Client(
     private val respondAddressBookGroupInvitation: suspend (String, String, String, Boolean) -> Unit = MsnpAddressBookService::respondToGroupInvitation,
     private val leaveAddressBookGroup: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::leaveGroup,
     private val fetchAddressBookGroupMembers: suspend (String, String, String) -> List<GroupMember> = MsnpAddressBookService::fetchGroupMembers,
+    private val nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter(),
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
     private val mutableContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList())
@@ -157,6 +158,7 @@ internal class LiveMsnp18Client(
     private val mutableSessions = MutableStateFlow<List<AccountSession>>(emptyList())
     private var accountSessionsReceived: CompletableDeferred<Unit>? = null
     private val mutableEvents = MutableSharedFlow<MessengerEvent>(extraBufferCapacity = 16)
+    override val nudgeCooldowns = nudgeLimiter.cooldowns
     private val transactionIds = AtomicInteger(0)
     private val messageIds = AtomicLong(System.currentTimeMillis() shl 16)
     private val connectionLossReported = AtomicBoolean(false)
@@ -255,6 +257,7 @@ internal class LiveMsnp18Client(
         }
 
         val accountId = AccountIdentity.forServer(email, request.serverConfig, false).storageId
+        nudgeLimiter.selectAccount(accountId)
         val sameAccount = requestsAccountId == accountId
         val restoreContactPresence = presenceAccountId == accountId
         resetConnection(preserveRequests = sameAccount, preserveContactPresence = restoreContactPresence)
@@ -905,9 +908,16 @@ internal class LiveMsnp18Client(
             check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.isBlocked != true) {
                 "Nudges cannot be sent to a blocked contact."
             }
-            if (isGroup(email)) {
-                send(MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, type = "Nudge"))
-            } else switchboardFor(email).sendNudge()
+            val reservation = nudgeLimiter.reserveSend(email)
+            var succeeded = false
+            try {
+                if (isGroup(email)) {
+                    send(MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, type = "Nudge"))
+                } else switchboardFor(email).sendNudge()
+                succeeded = true
+            } finally {
+                nudgeLimiter.finishSend(reservation, succeeded)
+            }
             appendMessage(
                 ChatMessage(
                     id = messageIds.incrementAndGet(),
@@ -919,6 +929,8 @@ internal class LiveMsnp18Client(
                 ),
             )
         }.onFailure { error ->
+            if (error is CancellationException) throw error
+            if (error is NudgeCooldownException) return@onFailure
             if (signedInEmail.isNotEmpty()) {
                 val email = runCatching { contactEmail(contactId) }.getOrDefault(contactId)
                 discardSwitchboard(email)
@@ -1708,6 +1720,8 @@ internal class LiveMsnp18Client(
         val senderName = group.members.firstOrNull { it.email == sender }?.displayName
             ?: mutableContacts.value.firstOrNull { it.email.equals(sender, true) }?.displayName ?: sender
         val nudge = type == "Nudge"
+        val allowNudgeAlert = nudge && !mine && nudgeLimiter.allowReceivedAlert(id, sender)
+        if (nudge && mine) nudgeLimiter.observeOwnNudge(id)
         val message = ChatMessage(
             id = messageIds.incrementAndGet(), contactId = id,
             author = if (nudge) MessageAuthor.System else if (mine) MessageAuthor.Me else MessageAuthor.Contact,
@@ -1723,8 +1737,10 @@ internal class LiveMsnp18Client(
         mutableTyping.update { it + (id to false) }
         if (!mine) {
             incrementUnread(id)
-            mutableEvents.tryEmit(if (nudge) MessengerEvent.IncomingNudge(id)
-                else MessengerEvent.IncomingMessage(id, message.id))
+            if (!nudge || allowNudgeAlert) {
+                mutableEvents.tryEmit(if (nudge) MessengerEvent.IncomingNudge(id)
+                    else MessengerEvent.IncomingMessage(id, message.id))
+            }
         }
     }
 
@@ -2483,6 +2499,8 @@ internal class LiveMsnp18Client(
             }
             is SwitchboardEvent.Nudge -> {
                 val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
+                val allowAlert = !mine && nudgeLimiter.allowReceivedAlert(contactId, event.senderEmail)
+                if (mine) nudgeLimiter.observeOwnNudge(contactId)
                 val message = ChatMessage(
                     id = messageIds.incrementAndGet(),
                     contactId = contactId,
@@ -2494,7 +2512,9 @@ internal class LiveMsnp18Client(
                 appendMessage(message)
                 if (!mine) {
                     incrementUnread(contactId)
-                    mutableEvents.tryEmit(MessengerEvent.IncomingNudge(contactId))
+                    if (allowAlert) {
+                        mutableEvents.tryEmit(MessengerEvent.IncomingNudge(contactId))
+                    }
                 }
             }
             is SwitchboardEvent.DisplayPicture -> {

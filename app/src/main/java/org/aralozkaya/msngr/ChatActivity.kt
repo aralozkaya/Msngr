@@ -112,10 +112,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.delay
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.notifications.otherUnreadCount
 import org.aralozkaya.msngr.pages.components.Avatar
@@ -181,6 +183,21 @@ private fun ChatRoute(
     val conversation by repository.conversation(contactId).collectAsState(initial = null)
     val lifecycleOwner = LocalLifecycleOwner.current
     val contacts by repository.contacts.collectAsState()
+    val nudgeCooldowns by repository.nudgeCooldowns.collectAsState()
+    val nudgeDeadline = nudgeCooldowns[contactId.lowercase(java.util.Locale.ROOT)]
+    fun remainingNudgeCooldown(): Long = when (nudgeDeadline) {
+        null -> 0L
+        Long.MAX_VALUE -> Long.MAX_VALUE
+        else -> (nudgeDeadline - nudgeMonotonicMillis()).coerceAtLeast(0L)
+    }
+    var nudgeCooldownMillis by remember(nudgeDeadline) { mutableStateOf(remainingNudgeCooldown()) }
+    LaunchedEffect(nudgeDeadline) {
+        do {
+            nudgeCooldownMillis = remainingNudgeCooldown()
+            if (nudgeCooldownMillis == 0L || nudgeCooldownMillis == Long.MAX_VALUE) break
+            delay(200)
+        } while (true)
+    }
 
     LaunchedEffect(contactId) {
         repository.loadConversation(contactId)
@@ -203,6 +220,7 @@ private fun ChatRoute(
 
     ChatScreen(
         otherUnreadCount = otherUnreadCount(contacts, contactId),
+        nudgeCooldownMillis = nudgeCooldownMillis,
         nativeStyle = textStyles[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
         onNativeStyleChange = { repository.updateTextStyle(contactId, it) },
         onSizeNoticeRequested = { repository.markTextSizeNoticeShown(contactId) },
@@ -245,6 +263,7 @@ internal fun ChatScreen(
     onNativeStyleChange: (NativeTextStyle) -> Unit = {},
     onSizeNoticeRequested: () -> Boolean = { false },
     otherUnreadCount: Int = 0,
+    nudgeCooldownMillis: Long = 0L,
 ) {
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
@@ -398,7 +417,8 @@ internal fun ChatScreen(
                 onNativeStyleChange = onNativeStyleChange,
                 onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
-                nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false,
+                nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
+                nudgeCooldownMillis = nudgeCooldownMillis,
                 draft = draft,
                 onDraftChange = {
                     onDraftChange(it)
@@ -519,6 +539,7 @@ internal fun ChatMessageList(
 private fun MessageComposer(
     enabled: Boolean = true,
     nudgeEnabled: Boolean = enabled,
+    nudgeCooldownMillis: Long = 0L,
     draft: String,
     onDraftChange: (String) -> Unit,
     onSendMessage: () -> Unit,
@@ -568,6 +589,16 @@ private fun MessageComposer(
     Column(
         modifier = Modifier.fillMaxWidth(),
     ) {
+        if (enabled && nudgeCooldownMillis > 0L) {
+            Text(
+                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge…" else
+                    "You can send another nudge in ${(nudgeCooldownMillis + 999) / 1_000} seconds.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().background(composerBackgroundColor)
+                    .padding(start = 16.dp, top = 6.dp, end = 16.dp),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()

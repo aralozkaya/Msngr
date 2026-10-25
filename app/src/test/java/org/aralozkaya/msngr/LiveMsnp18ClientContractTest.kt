@@ -24,6 +24,8 @@ import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockServerData
 import org.aralozkaya.msngr.data.MsnpP2pSession
+import org.aralozkaya.msngr.data.NudgeRateLimiter
+import org.aralozkaya.msngr.data.NudgeCooldownException
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.SsoToken
 import org.aralozkaya.msngr.data.StorageProfile
@@ -143,7 +145,7 @@ class LiveMsnp18ClientContractTest {
     }
 
     private fun syncClient(notification: ContractNotificationTransport, switchboard: ContractSwitchboardTransport,
-        blocked: Boolean = false) = LiveMsnp18Client(
+        blocked: Boolean = false, nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter()) = LiveMsnp18Client(
         transport = notification,
         switchboardTransportFactory = { switchboard },
         authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
@@ -151,7 +153,100 @@ class LiveMsnp18ClientContractTest {
             presence = Presence.Online, isBlocked = blocked,
         ))) },
         fetchStorageProfile = { _, _ -> StorageProfile() },
+        nudgeLimiter = nudgeLimiter,
     )
+
+    @Test fun nudgeCooldownProtectsConcurrentSendsWithoutDisconnecting() = runBlocking {
+        var time = 0L
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard, nudgeLimiter = NudgeRateLimiter { time })
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val gate = CompletableDeferred<Unit>()
+            switchboard.nudgeDeliveryGate = gate
+            val first = async { client.sendNudgeWithResult(contact.id) }
+            withTimeout(2_000) { while (switchboard.sent.none { it.payload?.contentEquals(Msnp18Protocol.nudgePayload()) == true }) yield() }
+            time = 30_000 // A slow pending write must still exclude concurrent actions.
+            assertTrue(client.sendNudgeWithResult(contact.email.uppercase()).exceptionOrNull() is NudgeCooldownException)
+            assertTrue(client.messages.value[contact.id].isNullOrEmpty())
+            gate.complete(Unit)
+            first.await().getOrThrow()
+            time += 10_999
+            assertTrue(client.sendNudgeWithResult(contact.id).exceptionOrNull() is NudgeCooldownException)
+            assertEquals(1, client.messages.value.getValue(contact.id).size)
+            assertFalse(switchboard.closed.isCompleted)
+            assertTrue(events.none { it is MessengerEvent.ConnectionLost })
+            time++
+            client.sendNudgeWithResult(contact.id).getOrThrow()
+            assertEquals(2, switchboard.sent.count { it.payload?.contentEquals(Msnp18Protocol.nudgePayload()) == true })
+            assertEquals(2, client.messages.value.getValue(contact.id).size)
+        } finally { collector.cancel(); client.close() }
+    }
+
+    @Test fun cancellingAPendingNudgeReleasesItsReservationWithoutDiscardingTheConversation() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            switchboard.nudgeDeliveryGate = CompletableDeferred()
+            val sending = async { client.sendNudgeWithResult(contact.id) }
+            withTimeout(2_000) { while (switchboard.sent.none { it.payload?.contentEquals(Msnp18Protocol.nudgePayload()) == true }) yield() }
+            sending.cancel()
+            sending.join()
+            assertTrue(client.nudgeCooldowns.value.isEmpty())
+            assertFalse(switchboard.closed.isCompleted)
+            assertTrue(client.messages.value[contact.id].isNullOrEmpty())
+            switchboard.nudgeDeliveryGate = null
+            client.sendNudgeWithResult(contact.id).getOrThrow()
+            assertEquals(1, client.messages.value.getValue(contact.id).size)
+        } finally { client.close() }
+    }
+
+    @Test fun incomingPrivateNudgeFloodKeepsEveryChatEntryButOnlyEligibleAlertEvents() = runBlocking {
+        var time = 0L
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard, nudgeLimiter = NudgeRateLimiter { time })
+        val history = InMemoryConversationHistoryStore()
+        val repository = MessengerRepository(client, historyStore = history)
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        try {
+            repository.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            client.sendMessageWithResult(contact.id, "Open conversation").getOrThrow()
+            var size = 1
+            suspend fun deliver(sender: String, payload: ByteArray = Msnp18Protocol.nudgePayload()) {
+                switchboard.deliver(MsnpCommand("MSG", parameters = listOf(sender, "Name"), payload = payload))
+                size++
+                withTimeout(2_000) { client.messages.first { it[contact.id]?.size == size } }
+            }
+            deliver(contact.email)
+            repeat(24) {
+                time += 10_999
+                deliver("1:${contact.email.uppercase()};{rotating-endpoint-$it}")
+            }
+            // Text does not reset the receiver's allowance, and is still delivered normally.
+            deliver(contact.email, Msnp18Protocol.textPayload("Text during flood"))
+            deliver(contact.email)
+            time += 11_000
+            deliver(contact.email)
+            deliver(email) // Own endpoint echo is history and outgoing cooldown only.
+            assertTrue(client.sendNudgeWithResult(contact.id).exceptionOrNull() is NudgeCooldownException)
+            deliver(contact.email, Msnp18Protocol.textPayload("End marker"))
+            val marker = client.messages.value.getValue(contact.id).last().id
+            withTimeout(2_000) { while (events.none { it == MessengerEvent.IncomingMessage(contact.id, marker) }) yield() }
+            withTimeout(2_000) { history.messages.first { it[contact.id]?.size == size } }
+            assertEquals(28, history.messages.value.getValue(contact.id).count { it.isNudge })
+            assertEquals(2, events.count { it is MessengerEvent.IncomingNudge })
+            assertEquals(2, events.count { it is MessengerEvent.IncomingMessage })
+            assertEquals(29, client.contacts.value.single().unreadCount)
+            assertFalse(switchboard.closed.isCompleted)
+        } finally { collector.cancel(); repository.logout() }
+    }
 
     @Test fun desktopRepliesOnAnExistingChatAreOwnMessagesAndPersistWithoutIncomingAlerts() = runBlocking {
         val notification = ContractNotificationTransport(email)
@@ -2017,6 +2112,7 @@ private class ContractSwitchboardTransport(
     private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
     var remotePicture: LocalDisplayPicture? = null
     var textDeliveryGate: CompletableDeferred<Unit>? = null
+    var nudgeDeliveryGate: CompletableDeferred<Unit>? = null
     var rejectText: Boolean = false
     private var remotePeer: MsnpP2pSession? = null
     private val receivedPictures = Channel<ByteArray>(Channel.UNLIMITED)
@@ -2051,6 +2147,7 @@ private class ContractSwitchboardTransport(
                     if (rejectText) throw IOException("Message send failed")
                 }
                 val message = parseSwitchboardMime(requireNotNull(command.payload))
+                if (message == SwitchboardMimeMessage.Nudge) nudgeDeliveryGate?.await()
                 if (message is SwitchboardMimeMessage.P2p) {
                     val peer = remotePeer ?: MsnpP2pSession(
                         localEmail = contactEmail,

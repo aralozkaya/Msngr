@@ -31,7 +31,7 @@ class GroupAvailabilityInstrumentedTest {
         compose.onNodeWithText(notice).assertIsDisplayed()
         compose.onNode(hasSetTextAction()).assertIsNotEnabled().assertTextContains("Saved draft")
         compose.onNodeWithContentDescription("Send message").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Show emoticons").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Show emoticons").assertIsNotEnabled()
         compose.runOnIdle { contact.value = contact.value.copy(presence = Presence.Online) }
         compose.onNodeWithText(notice).assertDoesNotExist()
         compose.onNode(hasSetTextAction()).assertIsEnabled().assertTextContains("Saved draft")

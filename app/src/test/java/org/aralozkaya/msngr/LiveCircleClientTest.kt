@@ -18,6 +18,49 @@ class LiveCircleClientTest {
     private val otherGroupId = "00000000-0000-0000-0009-123456789abd@live.com"
     private val group = Contact(groupId, "Test", groupId, Presence.Online, isGroup = true)
 
+    @Test fun groupNudgeFloodIsSilentPerSenderAndKeepsItsHistory() = runBlocking {
+        var time = 0L
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { error("Group nudges must not open a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            nudgeLimiter = NudgeRateLimiter { time })
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com", "bob@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            client.sendNudgeWithResult(groupId).getOrThrow()
+            assertTrue(client.sendNudgeWithResult(groupId).exceptionOrNull() is NudgeCooldownException)
+            assertEquals(1, transport.sent.count { it.verb == "SDG" })
+            var size = 1
+            suspend fun receive(sender: String, type: String = "Nudge") {
+                transport.incoming.send(MsnpCircles.message(0, groupId, sender, "endpoint", "Marker", type))
+                size++
+                withTimeout(2_000) { client.messages.first { it[groupId]?.size == size } }
+            }
+            receive("alice@example.com")
+            receive("ALICE@example.com")
+            time = 10_999
+            receive("alice@example.com")
+            receive("bob@example.com") // Alice's stream must not silence Bob.
+            time += 11_000
+            receive("alice@example.com")
+            receive(me)
+            receive("bob@example.com", "Text")
+            val marker = client.messages.value.getValue(groupId).last().id
+            withTimeout(2_000) { while (events.none { it == MessengerEvent.IncomingMessage(groupId, marker) }) yield() }
+            assertEquals(7, client.messages.value.getValue(groupId).count { it.isNudge })
+            assertEquals(3, events.count { it is MessengerEvent.IncomingNudge })
+            assertEquals(6, client.contacts.value.single().unreadCount)
+            assertTrue(client.sendNudgeWithResult(groupId).exceptionOrNull() is NudgeCooldownException)
+        } finally { collector.cancel(); client.close(); scope.cancel() }
+    }
+
     @Test fun groupOnlyMemberPicturesRefreshInEveryGroupWithoutAddingAContact() = runBlocking {
         val transport = CircleTransport()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
