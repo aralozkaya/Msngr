@@ -262,7 +262,7 @@ internal fun StatusShortcutWindow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss, enabled = !applying, shapes = ButtonDefaults.shapes()) {
+                    TextButton(onClick = onDismiss, enabled = !applying) {
                         Text(stringResource(android.R.string.cancel))
                     }
                     Button(

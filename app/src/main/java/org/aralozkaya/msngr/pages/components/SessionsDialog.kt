@@ -176,7 +176,7 @@ internal fun SessionsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, enabled = !busy, shapes = ButtonDefaults.shapes()) { Text("Close") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") }
         },
     )
 }

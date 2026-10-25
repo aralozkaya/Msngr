@@ -2,50 +2,50 @@ package org.aralozkaya.msngr
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Typeface
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.fonts.Font
-import android.graphics.fonts.FontStyle as AndroidFontStyle
 import android.graphics.text.TextRunShaper
 import android.text.TextPaint
 import android.text.style.CharacterStyle
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.material3.Text
-import androidx.test.filters.SdkSuppress
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
-import org.aralozkaya.msngr.ui.theme.MsngrTheme
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.MessageAuthor
+import org.aralozkaya.msngr.ui.theme.MsngrTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import android.graphics.fonts.FontStyle as AndroidFontStyle
 
 /** Check glyph pixels: Typeface.isItalic alone can be true while the glyphs remain upright. */
 class NativeTextRenderingInstrumentedTest {

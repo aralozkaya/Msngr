@@ -1,11 +1,10 @@
 package org.aralozkaya.msngr.protocol
 
-import org.aralozkaya.msngr.NativeTextStyle
-
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.BuildConfig
+import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.enums.Presence
 import java.io.BufferedInputStream

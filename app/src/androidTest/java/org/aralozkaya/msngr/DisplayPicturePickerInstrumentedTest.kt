@@ -37,7 +37,12 @@ import org.aralozkaya.msngr.pages.DisplayPictureOptionsDialog
 import org.aralozkaya.msngr.pages.ProfilePage
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.json.JSONObject
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File

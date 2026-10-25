@@ -1,5 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="48dp" android:height="48dp" android:viewportWidth="72" android:viewportHeight="72">
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
   <path android:name="legacy_full_bleed_background" android:pathData="M0,0h72v72h-72Z" android:fillColor="#F5F8FC"/>
   <group android:name="messenger_artwork" android:scaleX="0.25" android:scaleY="0.25" android:translateX="4.5" android:translateY="4.5">
     <path android:name="rear_orbit" android:pathData="M30 168 C13 164 8 150 12 139 C16 127 31 116 49 115 C91 109 134 140 179 136 C207 137 228 121 240 100" android:strokeColor="#FFCB57" android:strokeWidth="4.7" android:strokeLineCap="round" android:strokeLineJoin="round"/>

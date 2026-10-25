@@ -14,8 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.ContactRow
 import org.aralozkaya.msngr.pages.components.PageContentList
 

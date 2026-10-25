@@ -2,7 +2,9 @@ package org.aralozkaya.msngr.notifications
 
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InAppNotificationSettingsTest {

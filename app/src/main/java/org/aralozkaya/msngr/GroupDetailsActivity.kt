@@ -4,18 +4,24 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.*
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.material3.*
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
-import org.aralozkaya.msngr.pages.components.GroupEditorDialog
-import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
-import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
-import org.aralozkaya.msngr.pages.components.LeaveGroupDialog
-import org.aralozkaya.msngr.pages.components.showActionSnackbar
 import org.aralozkaya.msngr.data.resolveContact
 import org.aralozkaya.msngr.pages.GroupDetailsPage
+import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
+import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
+import org.aralozkaya.msngr.pages.components.GroupEditorDialog
+import org.aralozkaya.msngr.pages.components.LeaveGroupDialog
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
+import org.aralozkaya.msngr.pages.components.showActionSnackbar
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 
 class GroupDetailsActivity : MsngrActivity() {

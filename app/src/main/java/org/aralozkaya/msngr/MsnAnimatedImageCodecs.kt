@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import org.w3c.dom.Element
+import org.w3c.dom.Node
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Locale
@@ -8,8 +10,6 @@ import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import org.w3c.dom.Element
-import org.w3c.dom.Node
 
 /** Messenger emoticons are authored on a 19x19 pixel grid. */
 internal const val MSN_EMOTICON_GRID_PX = 19

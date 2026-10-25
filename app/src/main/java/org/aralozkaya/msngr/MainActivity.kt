@@ -8,16 +8,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.annotation.PluralsRes
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.core.content.edit
-import androidx.lifecycle.lifecycleScope
+import androidx.annotation.PluralsRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,23 +21,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.plus
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -54,10 +50,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,32 +65,34 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import org.aralozkaya.msngr.data.MessengerRepository
-import org.aralozkaya.msngr.data.ContactRequestInbox
-import org.aralozkaya.msngr.notifications.BackgroundConnectionController
-import org.aralozkaya.msngr.pages.ContactsPage
-import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
-import org.aralozkaya.msngr.pages.components.ContactsActionMenu
-import org.aralozkaya.msngr.pages.components.AddContactDialog
-import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
-import org.aralozkaya.msngr.pages.components.showActionSnackbar
-import org.aralozkaya.msngr.pages.components.DeleteContactDialog
-import org.aralozkaya.msngr.pages.components.GroupEditorDialog
-import org.aralozkaya.msngr.data.Contact
-import org.aralozkaya.msngr.pages.components.MockServerBanner
-import org.aralozkaya.msngr.pages.components.SessionsDialog
-import org.aralozkaya.msngr.ui.theme.MsngrTheme
-import org.aralozkaya.msngr.pages.UpdateBadge
-import org.aralozkaya.msngr.updates.updateManager
-import kotlinx.coroutines.flow.collect
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.ContactRequestInbox
+import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.notifications.BackgroundConnectionController
+import org.aralozkaya.msngr.pages.ContactsPage
+import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
+import org.aralozkaya.msngr.pages.UpdateBadge
+import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
+import org.aralozkaya.msngr.pages.components.AddContactDialog
+import org.aralozkaya.msngr.pages.components.ContactsActionMenu
+import org.aralozkaya.msngr.pages.components.DeleteContactDialog
+import org.aralozkaya.msngr.pages.components.GroupEditorDialog
+import org.aralozkaya.msngr.pages.components.MockServerBanner
+import org.aralozkaya.msngr.pages.components.SessionsDialog
+import org.aralozkaya.msngr.pages.components.showActionSnackbar
+import org.aralozkaya.msngr.ui.theme.MsngrTheme
+import org.aralozkaya.msngr.updates.updateManager
 
 class MainActivity : MsngrActivity() {
     private val snackbarHostState = SnackbarHostState()
@@ -529,7 +527,6 @@ private fun MsngrApp(
             dismissButton = {
                 TextButton(
                     onClick = { showLogoutConfirmation = false },
-                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text("Cancel")
                 }

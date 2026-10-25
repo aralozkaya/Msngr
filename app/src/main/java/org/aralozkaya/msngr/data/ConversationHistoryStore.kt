@@ -1,11 +1,10 @@
 package org.aralozkaya.msngr.data
 
-import org.aralozkaya.msngr.NativeTextStyle
-
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.aralozkaya.msngr.MsnEmoticonRange
+import org.aralozkaya.msngr.NativeTextStyle
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream

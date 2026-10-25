@@ -15,8 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
@@ -56,18 +54,17 @@ internal fun InAppNotificationSettingsScreen(
     val settings by remember(context) { InAppNotificationPrefs.state(context) }.collectAsState()
     PageContentList(innerPadding = innerPadding, scrollBehavior = scrollBehavior,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-        item(key = "customized-notifications") {
-            FilledTonalButton(
-                onClick = onCustomizedNotifications,
-                modifier = Modifier.fillMaxWidth().testTag("customized_notification_settings"),
-                shapes = ButtonDefaults.shapes(),
-            ) { Text("Customized notifications") }
-        }
         notificationToggle("In-app notifications", settings.defaults.enabled, true, "in_app_enabled") { enabled ->
             InAppNotificationPrefs.update(context) { it.copy(defaults = it.defaults.copy(enabled = enabled)) }
         }
         notificationOptions(settings.defaults, settings.defaults.enabled, InAppNotificationType.entries,
             onChange = { options -> InAppNotificationPrefs.update(context) { it.copy(defaults = options) } })
+        item(key = "customized-notifications") {
+            TextButton(
+                onClick = onCustomizedNotifications,
+                modifier = Modifier.fillMaxWidth().testTag("customized_notification_settings").padding(16.dp),
+            ) { Text("Customized notifications") }
+        }
     }
 }
 

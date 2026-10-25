@@ -1,7 +1,5 @@
 package org.aralozkaya.msngr.data
 
-import org.aralozkaya.msngr.NativeTextStyle
-
 import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.CancellationException
@@ -31,15 +29,14 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import org.aralozkaya.msngr.BuildConfig
-import org.aralozkaya.msngr.MsnEmoticonRange
-import org.aralozkaya.msngr.MessengerPlusTextCodec
-import org.aralozkaya.msngr.trimMessengerPlusWhitespace
-import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.AccountIdentity
-import org.aralozkaya.msngr.deviceEndpointName
+import org.aralozkaya.msngr.BuildConfig
+import org.aralozkaya.msngr.MessengerPlusTextCodec
+import org.aralozkaya.msngr.MsnEmoticonRange
+import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
-import org.aralozkaya.msngr.withoutUnicodeEmoji
+import org.aralozkaya.msngr.deviceEndpointName
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
@@ -47,6 +44,8 @@ import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
+import org.aralozkaya.msngr.trimMessengerPlusWhitespace
+import org.aralozkaya.msngr.withoutUnicodeEmoji
 import org.w3c.dom.Element
 import java.io.ByteArrayOutputStream
 import java.io.IOException

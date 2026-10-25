@@ -1,9 +1,19 @@
 package org.aralozkaya.msngr
 
-import org.aralozkaya.msngr.data.*
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.GroupMemberRole
+import org.aralozkaya.msngr.data.MsnpCircles
+import org.aralozkaya.msngr.data.parseAddressBook
+import org.aralozkaya.msngr.data.parseCircleEnvelope
+import org.aralozkaya.msngr.data.parseCircleMembers
+import org.aralozkaya.msngr.data.parseCirclePublication
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.protocol.*
-import org.junit.Assert.*
+import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.MsnpFrameCodec
+import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MsnpCirclesTest {

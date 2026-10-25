@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -359,7 +358,7 @@ private fun GroupContactPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes(),
+            TextButton(onClick = onDismiss,
                 modifier = Modifier.testTag("group-contact-picker-done")) { Text("Done") }
         },
     )

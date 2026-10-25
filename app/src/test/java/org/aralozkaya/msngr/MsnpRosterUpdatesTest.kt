@@ -1,9 +1,18 @@
 package org.aralozkaya.msngr
 
-import org.aralozkaya.msngr.data.*
+import org.aralozkaya.msngr.data.AddressBookSnapshot
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.GroupMember
+import org.aralozkaya.msngr.data.GroupMemberRole
+import org.aralozkaya.msngr.data.isAddressBookNotification
+import org.aralozkaya.msngr.data.mergeAddressBookUpdate
+import org.aralozkaya.msngr.data.mergeBlockedMemberships
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MsnpRosterUpdatesTest {

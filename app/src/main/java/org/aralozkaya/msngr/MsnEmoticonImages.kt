@@ -28,8 +28,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.PathParser
 import androidx.core.graphics.withSave
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.delay
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt

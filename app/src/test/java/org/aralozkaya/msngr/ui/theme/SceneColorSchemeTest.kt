@@ -2,9 +2,12 @@ package org.aralozkaya.msngr.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import org.aralozkaya.msngr.MessengerScenes
 import org.aralozkaya.msngr.MessengerMainColors
-import org.junit.Assert.*
+import org.aralozkaya.msngr.MessengerScenes
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 

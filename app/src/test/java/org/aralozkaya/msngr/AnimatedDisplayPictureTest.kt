@@ -8,7 +8,11 @@ import org.aralozkaya.msngr.data.MsnpStorageService
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnimatedDisplayPictureTest {

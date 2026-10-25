@@ -1,12 +1,36 @@
 package org.aralozkaya.msngr
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import org.aralozkaya.msngr.data.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
+import org.aralozkaya.msngr.data.AddressBookSnapshot
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.GroupMember
+import org.aralozkaya.msngr.data.LiveMsnp18Client
+import org.aralozkaya.msngr.data.MessengerEvent
+import org.aralozkaya.msngr.data.NudgeCooldownException
+import org.aralozkaya.msngr.data.NudgeRateLimiter
+import org.aralozkaya.msngr.data.MsnpCircles
+import org.aralozkaya.msngr.data.SignInRequest
+import org.aralozkaya.msngr.data.SsoToken
+import org.aralozkaya.msngr.data.StorageProfile
+import org.aralozkaya.msngr.data.parseCircleEnvelope
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.protocol.*
-import org.junit.Assert.*
+import org.aralozkaya.msngr.protocol.MsnpCommand
+import org.aralozkaya.msngr.protocol.MsnpTransport
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -101,8 +125,8 @@ class LiveCircleClientTest {
             assertTrue(subscriptions.last().payload!!.toString(Charsets.UTF_8).contains("t=\"9\""))
             transport.incoming.send(roster(groupId, me, "alice@example.com"))
             withTimeout(2000) { client.contacts.first { it.first().presence == Presence.Online } }
-            client.sendMessageWithResult(groupId, "Hello Türkiye", null).getOrThrow()
-            assertEquals("Hello Türkiye", parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!.body.toString(Charsets.UTF_8))
+            client.sendMessageWithResult(groupId, "Hello TÃ¼rkiye", null).getOrThrow()
+            assertEquals("Hello TÃ¼rkiye", parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!.body.toString(Charsets.UTF_8))
             transport.incoming.send(MsnpCircles.message(0, groupId, "alice@example.com", "remote", "Alice's message"))
             withTimeout(2000) { client.messages.first { it[groupId]?.size == 2 } }
             val incoming = client.messages.value[groupId]!!.last()

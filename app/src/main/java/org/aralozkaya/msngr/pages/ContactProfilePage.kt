@@ -3,29 +3,28 @@
 package org.aralozkaya.msngr.pages
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,11 +32,9 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +48,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.ContactPictureViewer
 import org.aralozkaya.msngr.ConversationNotificationSettingsActivity
 import org.aralozkaya.msngr.EmoticonPrefs
@@ -62,10 +61,10 @@ import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
-import org.aralozkaya.msngr.pages.components.PageContentList
-import org.aralozkaya.msngr.pages.components.ProfileDetailCard
-import org.aralozkaya.msngr.pages.components.PresenceLabel
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
+import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.pages.components.PresenceLabel
+import org.aralozkaya.msngr.pages.components.ProfileDetailCard
 import org.aralozkaya.msngr.ui.theme.avatar
 
 @Composable
@@ -284,7 +283,6 @@ fun ContactProfilePage(
                 TextButton(
                     onClick = { showEraseConfirmation = false },
                     enabled = !isErasing,
-                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text("Cancel")
                 }
@@ -320,7 +318,6 @@ fun ContactProfilePage(
             dismissButton = {
                 TextButton(
                     onClick = { showBlockConfirmation = false },
-                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text("Cancel")
                 }

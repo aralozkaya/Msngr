@@ -1,8 +1,8 @@
 package org.aralozkaya.msngr.data
 
 import kotlinx.coroutines.Dispatchers
-import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.w3c.dom.Element
 import java.net.HttpURLConnection

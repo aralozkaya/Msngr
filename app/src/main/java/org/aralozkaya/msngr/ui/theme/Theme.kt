@@ -5,11 +5,11 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -24,16 +24,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.AppAppearance
+import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.LocalMessengerPlusEnabled
 import org.aralozkaya.msngr.LocalMessengerPlusHideControlCharacters
-import org.aralozkaya.msngr.MessengerPlusPrefs
-import org.aralozkaya.msngr.ThemeMode
 import org.aralozkaya.msngr.LocalMessengerScene
 import org.aralozkaya.msngr.LocalScenePresentation
+import org.aralozkaya.msngr.MessengerPlusPrefs
 import org.aralozkaya.msngr.ScenePresentation
+import org.aralozkaya.msngr.ThemeMode
 import org.aralozkaya.msngr.messengerScene
 import org.aralozkaya.msngr.pages.components.KeyboardSheetScaffold
 

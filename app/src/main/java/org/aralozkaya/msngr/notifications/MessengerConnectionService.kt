@@ -16,15 +16,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.LoginActivity
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
-import org.aralozkaya.msngr.restoreSignedInProfile
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.SignInRequest
+import org.aralozkaya.msngr.restoreSignedInProfile
 
 class MessengerConnectionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
