@@ -35,6 +35,8 @@ internal sealed interface SwitchboardEvent {
     data object ContactResolved : SwitchboardEvent
     data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
     data class Ink(val senderEmail: String, val drawing: InkDrawing) : SwitchboardEvent
+    data class VoiceClipOffered(val senderEmail: String, val metadata: MsnDisplayPicture) : SwitchboardEvent
+    data class VoiceClipReceived(val senderEmail: String, val metadata: MsnDisplayPicture, val bytes: ByteArray) : SwitchboardEvent
     data class Typing(val senderEmail: String) : SwitchboardEvent
     data class Nudge(val senderEmail: String) : SwitchboardEvent
     data class DisplayPicture(val senderEmail: String, val bytes: ByteArray) : SwitchboardEvent
@@ -54,6 +56,7 @@ internal class MsnpSwitchboardSession(
     private val remoteEndpointId: String? = null,
     private val handshakeTimeoutMillis: Long = DEFAULT_HANDSHAKE_TIMEOUT_MILLIS,
     sharedPictureSession: MsnpP2pSession? = null,
+    private val localVoiceClip: (String) -> LocalDisplayPicture? = { null },
 ) : AutoCloseable {
     // A sibling endpoint can invite us before it calls the conversation's contact.
     @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
@@ -83,6 +86,8 @@ internal class MsnpSwitchboardSession(
             },
             localEndpointId = machineGuid,
             remoteEndpointId = remoteEndpointId,
+            localVoiceClip = localVoiceClip,
+            onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(this.contactEmail, metadata, bytes)) },
         )
     }
 
@@ -139,6 +144,10 @@ internal class MsnpSwitchboardSession(
         for (payload in payloads) {
             sendPayload(payload, acknowledgement = "A")
         }
+    }
+
+    suspend fun sendVoiceClip(metadata: MsnDisplayPicture) {
+        sendPayload(Msnp18Protocol.voiceClipPayload(metadata), acknowledgement = "A")
     }
     private fun unusedSendInkMarker() {
     }
@@ -270,6 +279,7 @@ internal class MsnpSwitchboardSession(
         if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
         // Keep sibling picture controls routable without treating them as conversation history.
         if (mine && message !is SwitchboardMimeMessage.Text && message !is SwitchboardMimeMessage.Ink &&
+            message !is SwitchboardMimeMessage.VoiceClipOffer &&
             message != SwitchboardMimeMessage.Nudge &&
             message !is SwitchboardMimeMessage.P2p) return
         if (contactEmail.isEmpty() && message !is SwitchboardMimeMessage.P2p) {
@@ -284,6 +294,12 @@ internal class MsnpSwitchboardSession(
         when (message) {
             is SwitchboardMimeMessage.Text -> eventSink(SwitchboardEvent.Text(sender, message.value, message.style))
             is SwitchboardMimeMessage.Ink -> eventSink(SwitchboardEvent.Ink(sender, message.drawing))
+            is SwitchboardMimeMessage.VoiceClipOffer -> {
+                if (!message.metadata.creator.equals(sender, true)) return
+                eventSink(SwitchboardEvent.VoiceClipOffered(sender, message.metadata))
+                if (!closed.get()) p2pPeer(sender, normalizeEndpointId(rawSender.substringAfter(';', "")))
+                    ?.requestVoiceClip(message.metadata)
+            }
             SwitchboardMimeMessage.Typing -> if (!mine) eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))
             is SwitchboardMimeMessage.P2p -> {
@@ -295,24 +311,30 @@ internal class MsnpSwitchboardSession(
                     if (source.normalizedSwitchboardIdentity() != sender) return
                     val sourceEndpoint = normalizeEndpointId(source.substringAfter(';', ""))
                     if (mine && sourceEndpoint == normalizeEndpointId(machineGuid)) return
-                    val peer = if (sender == contactEmail.normalizedSwitchboardIdentity() &&
-                        (sourceEndpoint == null || sourceEndpoint == normalizeEndpointId(pictureSession.destination.substringAfter(';', "")))) {
-                        pictureSession
-                    } else {
-                        val identity = sourceEndpoint?.let { "$sender;{$it}" } ?: sender
-                        if (!otherPicturePeers.containsKey(identity) && otherPicturePeers.size >= 16) return
-                        otherPicturePeers.computeIfAbsent(identity) {
-                            MsnpP2pSession(signedInEmail, sender,
-                                sendPacket = { outgoingP2pPackets.send(OutgoingPicturePacket(identity, it)) },
-                                localPicture = localPicture,
-                                onDisplayPicture = { eventSink(SwitchboardEvent.DisplayPicture(sender, it)) },
-                                localEndpointId = machineGuid, remoteEndpointId = sourceEndpoint)
-                        }
-                    }
+                    val peer = p2pPeer(sender, sourceEndpoint) ?: return
                     peer.handle(message.bytes)
                 }
             }
             SwitchboardMimeMessage.Unsupported -> Unit
+        }
+    }
+
+    private fun p2pPeer(sender: String, sourceEndpoint: String?): MsnpP2pSession? {
+        if (sender == contactEmail.normalizedSwitchboardIdentity() &&
+            (sourceEndpoint == null || sourceEndpoint == normalizeEndpointId(pictureSession.destination.substringAfter(';', ""))))
+            return pictureSession
+        val identity = sourceEndpoint?.let { "$sender;{$it}" } ?: sender
+        if (!otherPicturePeers.containsKey(identity) && otherPicturePeers.size >= 16) return null
+        return otherPicturePeers.computeIfAbsent(identity) {
+            MsnpP2pSession(signedInEmail, sender,
+                sendPacket = { outgoingP2pPackets.send(OutgoingPicturePacket(identity, it)) },
+                localPicture = localPicture,
+                onDisplayPicture = { eventSink(SwitchboardEvent.DisplayPicture(sender, it)) },
+                localEndpointId = machineGuid, remoteEndpointId = sourceEndpoint,
+                localVoiceClip = { hash ->
+                    if (sender == contactEmail || sender.equals(signedInEmail, true)) localVoiceClip(hash) else null
+                },
+                onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) })
         }
     }
 
@@ -369,6 +391,7 @@ internal class SwitchboardException(message: String, val protocolCode: Int? = nu
 internal sealed interface SwitchboardMimeMessage {
     data class Text(val value: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardMimeMessage
     data class Ink(val drawing: InkDrawing) : SwitchboardMimeMessage
+    data class VoiceClipOffer(val metadata: MsnDisplayPicture) : SwitchboardMimeMessage
     data class P2p(val destination: String?, val bytes: ByteArray, val source: String? = null) : SwitchboardMimeMessage
     data object Typing : SwitchboardMimeMessage
     data object Nudge : SwitchboardMimeMessage
@@ -403,14 +426,16 @@ internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
             MsnInkCodec.decodeMimeBody(contentType, body)?.let(SwitchboardMimeMessage::Ink)
                 ?: SwitchboardMimeMessage.Unsupported
         }
-        Msnp18Protocol.NUDGE_CONTENT_TYPE -> if (
-            String(body, StandardCharsets.UTF_8)
-                .lineSequence()
-                .any { it.trim().equals("ID: 1", ignoreCase = true) }
-        ) {
-            SwitchboardMimeMessage.Nudge
-        } else {
-            SwitchboardMimeMessage.Unsupported
+        Msnp18Protocol.NUDGE_CONTENT_TYPE -> {
+            val cast = String(body, StandardCharsets.UTF_8)
+            when (cast.field("ID")) {
+                "1" -> SwitchboardMimeMessage.Nudge
+                "3" -> MsnDisplayPicture.parseObject(cast.field("Data"), 11)?.takeIf {
+                    it.size in 60..org.aralozkaya.msngr.protocol.MsnVoiceClip.MAX_WAV_BYTES &&
+                        org.aralozkaya.msngr.protocol.MsnBase64.decode(it.sha1d)?.size == 20
+                }?.let(SwitchboardMimeMessage::VoiceClipOffer) ?: SwitchboardMimeMessage.Unsupported
+                else -> SwitchboardMimeMessage.Unsupported
+            }
         }
         Msnp18Protocol.P2P_CONTENT_TYPE -> SwitchboardMimeMessage.P2p(
             destination = headers["p2p-dest"],

@@ -24,6 +24,9 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   counts, and local history that survives restarts and reconnects.
 - **Leave a message.** Send private text and emoticons to offline Escargot contacts and receive
   queued messages when you reconnect, with their original timestamps.
+- **Say it out loud.** Record up to 15 seconds, preview, send, and play
+  [voice clips](docs/VOICE_CLIPS.md) in one-to-one chats with online contacts.
+  Voice clips do not work in group chats.
 - **Bring the group along.** Chat in persistent Messenger groups (MSNP18 circles), see members
   and their roles, create groups, invite people, and join or decline invitations. Owners and
   administrators can invite members; non-owners can leave.
@@ -150,6 +153,8 @@ Open the repository in Android Studio with support for the pinned Android Gradle
 **9.2.1**, use a compatible Gradle JDK (Android Studio's bundled JDK is the usual starting point),
 and install Android SDK Platform **37**. Configure the SDK through Android Studio or your local
 `local.properties` file. The repository includes the Gradle **9.4.1** wrapper.
+Voice clips also use **NDK 28.2.13676358** and **CMake 3.22.1**; Gradle installs
+missing pinned packages when their Android SDK licenses have been accepted.
 
 From PowerShell in the repository root:
 

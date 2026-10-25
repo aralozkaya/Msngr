@@ -49,6 +49,25 @@ class LiveCircleClientTest {
     private val otherGroupId = "00000000-0000-0000-0009-123456789abd@live.com"
     private val group = Contact(groupId, "Test", groupId, Presence.Online, isGroup = true)
 
+    @Test fun voiceClipsNeverOpenASwitchboardOrSubmitAGroupMessage() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { error("Group voice clips must never open a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() })
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(
+                ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            val bytes = javaClass.getResourceAsStream("/voice-clips/native-siren.wav")!!.use { it.readBytes() }
+            val clip = org.aralozkaya.msngr.protocol.MsnVoiceClip.parse(bytes)!!
+            assertTrue(client.sendVoiceClip(groupId, clip).isFailure)
+            assertTrue(client.messages.value[groupId].isNullOrEmpty())
+            assertFalse(transport.sent.any { it.verb in setOf("MSG", "SDG", "UUM", "XFR") })
+        } finally { client.close(); scope.cancel() }
+    }
+
     @Test fun groupNudgeFloodIsSilentPerSenderAndKeepsItsHistory() = runBlocking {
         var time = 0L
         val transport = CircleTransport()
