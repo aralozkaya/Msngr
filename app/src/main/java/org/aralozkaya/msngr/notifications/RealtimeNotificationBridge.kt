@@ -68,10 +68,7 @@ internal class RealtimeNotificationBridge(
                 val notificationEvent = when (event) {
                     is MessengerEvent.OwnDisplayPictureChanged -> return@collect
                     MessengerEvent.OfflineMessagesReceived -> {
-                        if (visibilityTracker.isForeground) {
-                            inAppNotifications?.show(InAppNotification(InAppNotificationType.OfflineMessages,
-                                "Offline messages", "You received instant messages while you were offline."))
-                        } else notificationManager.showOfflineMessagesReceived()
+                        if (!visibilityTracker.isForeground) notificationManager.showOfflineMessagesReceived()
                         return@collect
                     }
                     is MessengerEvent.IncomingMessage -> {
@@ -124,14 +121,13 @@ internal class RealtimeNotificationBridge(
                     val type = when (notificationEvent.type) {
                         NotificationEventType.Message -> if (notificationEvent.isGroup) InAppNotificationType.GroupMessage else InAppNotificationType.Message
                         NotificationEventType.Nudge -> InAppNotificationType.Nudge
-                        NotificationEventType.ContactSignedIn -> InAppNotificationType.ContactSignedIn
+                        NotificationEventType.ContactSignedIn -> return@collect
                     }
-                    val text = when (notificationEvent.type) {
-                        NotificationEventType.Message -> if (notificationEvent.isGroup) {
+                    val text = when (type) {
+                        InAppNotificationType.GroupMessage ->
                             "${notificationEvent.senderName ?: notificationEvent.senderEmail ?: "Member"}: ${notificationEvent.messageText.orEmpty()}"
-                        } else notificationEvent.messageText.orEmpty()
-                        NotificationEventType.Nudge -> "Sent you a nudge."
-                        NotificationEventType.ContactSignedIn -> "Has just signed in."
+                        InAppNotificationType.Nudge -> "Sent you a nudge."
+                        else -> notificationEvent.messageText.orEmpty()
                     }
                     inAppNotifications?.show(InAppNotification(type, notificationEvent.contactName, text,
                         notificationEvent.contactId, notificationEvent.contactAvatarUri))

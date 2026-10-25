@@ -50,7 +50,9 @@ internal class InAppNotificationController(
 
     fun show(notification: InAppNotification) {
         scope.launch {
-            if (!visibility.isForeground || isOpenConversation(notification.contactId)) return@launch
+            if (!visibility.isForeground) return@launch
+            val isOpenConversation = isOpenConversation(notification.contactId)
+            if (isOpenConversation && notification.type != InAppNotificationType.Nudge) return@launch
             val settings = InAppNotificationPrefs.read(context)
             if (!settings.allows(notification.type, notification.contactId)) return@launch
             val now = SystemClock.elapsedRealtime()
@@ -58,7 +60,7 @@ internal class InAppNotificationController(
                 vibrate()
                 lastVibrationAt = now
             }
-            if (!settings.showsBanner(notification.type, notification.contactId)) return@launch
+            if (isOpenConversation || !settings.showsBanner(notification.type, notification.contactId)) return@launch
             expiry?.cancel()
             val current = notification.copy(id = ++sequence)
             mutableBanner.value = current

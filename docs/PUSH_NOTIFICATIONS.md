@@ -3,16 +3,19 @@
 ## In-app notifications
 
 While any Msngr activity is in the foreground, incoming events use Msngr's banner host instead of
-posting Android event notifications. This includes offline messages, contact requests and group
+posting Android event notifications. This includes messages, nudges, contact requests and group
 invitations. The existing background connection service keeps its required ongoing notification.
 Pending request notifications are removed when entering the app and synchronized again when leaving it.
 
 **Settings > In-app notifications** controls banners, vibration, and independent categories for
-messages, group messages, nudges, contacts signing in, offline receipts, contact requests and group
-invitations. Each type has its own named group containing its notification and vibration switches.
+messages, group messages, nudges, contact requests and group invitations. Each type has its own named
+group containing its notification and vibration switches.
 All current types have paired controls, so there is no **Others** group. Everything starts enabled.
 Turning off the general notification switch disables its dependent controls without changing their
 selections. General settings apply to conversations that do not have a custom notification profile.
+Contact sign-in alerts and general offline-message receipt notices are only shown while Msngr is in
+the background. Receipt notices stay silent in the foreground even when signed in as **Appear offline**;
+individual messages still follow the message notification settings.
 
 These preferences do not create Android channels or require Android notification permission. Vibration
 uses [Android's notification vibration usage](https://developer.android.com/reference/android/os/VibrationAttributes#USAGE_NOTIFICATION)
@@ -20,7 +23,8 @@ so device vibration policy applies; silent mode and Do Not Disturb suppress vibr
 limited to one vibration per 750 ms. A banner shows the latest alert for five seconds, can be dismissed,
 and opens its conversation or the requests page when tapped. Banners slide and fade in and out using
 Compose's Material motion; consecutive alerts crossfade with an animated size change. The conversation currently open does
-not produce banners or notification vibration. Other unread conversations contribute to the back
+not produce banners. Incoming nudges in that conversation still vibrate when enabled; messages stay
+silent. Other unread conversations contribute to the back
 badge; blocked conversations do not. The back-button count is always enabled, including when alerts
 are muted or turned off, and has no setting. Reading a conversation clears its banner and badge.
 
@@ -67,7 +71,8 @@ launches it again.
   after process restoration. Group messages use the group's shortcut avatar and keep member names.
 - **Contact signed in** notifications say `<contact> has just signed in.` and are sent only when
   a contact changes from Offline to Online, Busy, or Away. Changes between non-offline statuses
-  do not send notifications.
+  do not send notifications. Returning to any Msngr screen automatically dismisses all contact
+  sign-in notifications, including those left from an earlier app process. Other alerts remain.
 - Tapping an event notification goes through the authenticated entry point and opens the matching
   conversation, including after process death.
 - Lost connections retry with capped exponential backoff. Retries suspend while Android reports that

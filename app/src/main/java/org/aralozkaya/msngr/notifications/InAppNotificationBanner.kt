@@ -2,7 +2,6 @@
 
 package org.aralozkaya.msngr.notifications
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -41,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.aralozkaya.msngr.ChatActivity
-import org.aralozkaya.msngr.MainActivity
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.RequestsActivity
 import org.aralozkaya.msngr.SessionPrefs
@@ -81,8 +79,6 @@ internal fun InAppNotificationHost() {
                 controller.dismiss(current.id)
                 val intent = when (current.type) {
                     InAppNotificationType.ContactRequest, InAppNotificationType.GroupInvitation -> RequestsActivity.createIntent(context)
-                    InAppNotificationType.OfflineMessages -> Intent(context, MainActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     else -> current.contactId?.let { ChatActivity.createIntent(context, it) }
                 }
                 intent?.let { context.startActivity(it) }
