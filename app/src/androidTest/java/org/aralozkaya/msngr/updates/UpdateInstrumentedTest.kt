@@ -6,6 +6,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.os.Build
 import android.os.SystemClock
+import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -14,6 +15,7 @@ import org.junit.Test
 import java.util.UUID
 import java.io.File
 import java.io.IOException
+import org.aralozkaya.msngr.createDisplayPictureCaptureUri
 import org.aralozkaya.msngr.notifications.NotificationChannels
 
 class UpdateInstrumentedTest {
@@ -155,6 +157,27 @@ class UpdateInstrumentedTest {
             rejected(release, "checksum")
             rejected(release.copy(sha256 = null), "valid signed APK")
         } finally { file.delete() }
+    }
+
+    @Test fun downloadedApkCanBeReadThroughItsProviderAlongsideDisplayPictures() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.cacheDir, "updates").apply { mkdirs() }
+        val apk = File.createTempFile("provider-test-", ".apk", directory)
+        val photo = context.createDisplayPictureCaptureUri()
+        try {
+            val photoContents = "Camera image contents"
+            context.contentResolver.openOutputStream(photo)!!.use { it.write(photoContents.toByteArray()) }
+            val contents = "Downloaded APK contents"
+            apk.writeText(contents)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
+            assertEquals(APK_MIME_TYPE, context.contentResolver.getType(uri))
+            assertEquals(contents, context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() })
+            assertEquals("image/jpeg", context.contentResolver.getType(photo))
+            assertEquals(photoContents, context.contentResolver.openInputStream(photo)?.bufferedReader()?.use { it.readText() })
+        } finally {
+            apk.delete()
+            context.contentResolver.delete(photo, null, null)
+        }
     }
 
     @Test fun installedUpdateCleanupDeletesItsApkAndOldPartialsButPreservesFutureDownloads() = runBlocking {

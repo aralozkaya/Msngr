@@ -34,7 +34,7 @@
                 android:resource="@xml/display_picture_paths" />
         </provider>
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".updates.UpdateFileProvider"
             android:authorities="${applicationId}.updates"
             android:exported="false"
             android:grantUriPermissions="true">

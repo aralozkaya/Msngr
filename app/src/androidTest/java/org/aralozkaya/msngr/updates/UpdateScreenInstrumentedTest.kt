@@ -41,7 +41,7 @@ class UpdateScreenInstrumentedTest {
             override fun getSharedPreferences(name: String, mode: Int) = super.getSharedPreferences(prefix + name, mode)
         }
         val release = AppRelease(checkNotNull(ReleaseVersion.parse("v2.0.0")), 1_792_337_215_000L,
-            "A faster, friendlier Messenger.\n• Connection fixes\n• New colors", false,
+            "### What's new\n\n- **Connection fixes**\n- New colors\n\n[Full changelog]($RELEASES_PAGE)", false,
             RELEASES_PAGE, "$RELEASES_PAGE/download/v2.0.0/Msngr-release.apk", 12345)
         val manager = UpdateManager(context, supported = true, installedCode = 1, releaseSource = { listOf(release) })
         manager.configure(UpdatePreferences(enabled = false))
@@ -56,6 +56,13 @@ class UpdateScreenInstrumentedTest {
         }
         compose.onNodeWithTag("updates-page-badge").assertExists()
         File(target.getExternalFilesDir(null), "updates-large-text.png").outputStream().use {
+            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        compose.waitUntil(5_000) { runCatching { compose.onNodeWithText("What's new").assertExists() }.isSuccess }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("release-notes"))
+        compose.onNodeWithText("Connection fixes").assertExists()
+        compose.onNodeWithText("Full changelog").assertExists()
+        File(target.getExternalFilesDir(null), "release-notes-large-text.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("download-update"))
