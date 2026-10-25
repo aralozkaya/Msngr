@@ -3,7 +3,6 @@ package org.aralozkaya.msngr.notifications
 import android.Manifest
 import android.app.NotificationManager
 import android.content.ComponentName
-import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
@@ -18,7 +17,6 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import java.io.ByteArrayOutputStream
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.shortcutAvatarBitmap
 import org.junit.Assert.assertEquals
@@ -28,6 +26,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
 
 @RunWith(AndroidJUnit4::class)
 class NotificationConfigurationInstrumentedTest {

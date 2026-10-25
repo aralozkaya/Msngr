@@ -1,4 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
   <path android:name="opaque_full_bleed_background" android:pathData="M0,0h108v108h-108Z" android:fillColor="#F5F8FC"/>
 </vector>

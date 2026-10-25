@@ -2,12 +2,12 @@ package org.aralozkaya.msngr
 
 import android.view.Menu
 import android.view.MenuItem
-import java.lang.reflect.Proxy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.lang.reflect.Proxy
 
 class MessengerPlusSelectionMenuTest {
     private val formattingIds = listOf(

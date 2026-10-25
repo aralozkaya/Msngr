@@ -1,12 +1,11 @@
 package org.aralozkaya.msngr.data
 
-import org.aralozkaya.msngr.NativeTextStyle
-
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.BuildConfig
+import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
 import java.net.HttpURLConnection

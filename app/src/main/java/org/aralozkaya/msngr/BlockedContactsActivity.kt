@@ -14,8 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.pages.BlockedContactsPage
-import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
+import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 
 class BlockedContactsActivity : MsngrActivity() {

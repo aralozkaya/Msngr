@@ -140,7 +140,7 @@ internal fun MessengerPlusCustomColorDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest, shapes = ButtonDefaults.shapes()) {
+            TextButton(onClick = onDismissRequest) {
                 Text("Cancel")
             }
         },

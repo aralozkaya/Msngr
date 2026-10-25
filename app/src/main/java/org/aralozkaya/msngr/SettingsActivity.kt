@@ -27,12 +27,12 @@ import org.aralozkaya.msngr.pages.AppearanceSettingsScreen
 import org.aralozkaya.msngr.pages.ConnectionInformationScreen
 import org.aralozkaya.msngr.pages.ConnectionSettingsScreen
 import org.aralozkaya.msngr.pages.ContactInvitationSettingsScreen
+import org.aralozkaya.msngr.pages.CustomizedNotificationsScreen
 import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
+import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
 import org.aralozkaya.msngr.pages.SettingsScreen
-import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
-import org.aralozkaya.msngr.pages.CustomizedNotificationsScreen
 import org.aralozkaya.msngr.pages.UpdateSettingsScreen
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.ui.theme.MsngrTheme

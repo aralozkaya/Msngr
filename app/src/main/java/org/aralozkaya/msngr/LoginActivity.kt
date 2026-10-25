@@ -11,20 +11,16 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.minus
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContent
-import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -77,8 +73,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.data.SignInRequest
-import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.aralozkaya.msngr.ui.theme.contentCard
@@ -436,7 +432,6 @@ private fun LoginReadyRoute(
             confirmButton = {
                 TextButton(
                     onClick = { errorMessage = null },
-                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text("OK")
                 }
@@ -843,7 +838,6 @@ private fun CustomServerDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shapes = ButtonDefaults.shapes(),
             ) {
                 Text("Cancel")
             }

@@ -1,7 +1,5 @@
 package org.aralozkaya.msngr.data
 
-import org.aralozkaya.msngr.NativeTextStyle
-
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -11,8 +9,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.MessengerPlusTextCodec
+import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport

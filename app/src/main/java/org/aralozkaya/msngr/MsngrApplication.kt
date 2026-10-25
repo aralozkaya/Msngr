@@ -3,10 +3,8 @@ package org.aralozkaya.msngr
 import android.app.Application
 import android.content.Context
 import org.aralozkaya.msngr.data.ConversationDraftStore
-import org.aralozkaya.msngr.data.persistentConversationDraftStore
-import org.aralozkaya.msngr.data.ConversationStyleStore
-import org.aralozkaya.msngr.data.persistentConversationStyleStore
 import org.aralozkaya.msngr.data.ConversationHistoryStore
+import org.aralozkaya.msngr.data.ConversationStyleStore
 import org.aralozkaya.msngr.data.FileContactDisplayPictureCache
 import org.aralozkaya.msngr.data.FileConversationHistoryStore
 import org.aralozkaya.msngr.data.InMemoryConversationHistoryStore
@@ -14,12 +12,14 @@ import org.aralozkaya.msngr.data.LiveMsnp18Client
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockMsnp18Client
 import org.aralozkaya.msngr.data.MsnpClient
+import org.aralozkaya.msngr.data.persistentConversationDraftStore
+import org.aralozkaya.msngr.data.persistentConversationStyleStore
 import org.aralozkaya.msngr.notifications.AppVisibilityTracker
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
+import org.aralozkaya.msngr.notifications.InAppNotificationController
 import org.aralozkaya.msngr.notifications.MsngrNotificationManager
 import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
-import org.aralozkaya.msngr.notifications.InAppNotificationController
 import java.io.File
 
 class MsngrApplication : Application() {

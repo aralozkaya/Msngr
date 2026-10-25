@@ -2,8 +2,8 @@
 
 package org.aralozkaya.msngr
 
-import android.graphics.Movie
 import android.graphics.ImageDecoder
+import android.graphics.Movie
 import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build

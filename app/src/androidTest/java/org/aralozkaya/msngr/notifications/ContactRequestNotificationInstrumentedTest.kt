@@ -4,14 +4,28 @@ import android.Manifest
 import android.app.NotificationManager
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import org.aralozkaya.msngr.*
-import org.aralozkaya.msngr.data.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.aralozkaya.msngr.ProviderOptions
+import org.aralozkaya.msngr.ServerOverrides
+import org.aralozkaya.msngr.ServerPresets
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.ContactRequest
+import org.aralozkaya.msngr.data.MessengerEvent
+import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.data.MockMsnp18Client
+import org.aralozkaya.msngr.data.MsnpClient
+import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
-import org.junit.Assert.*
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContactRequestNotificationInstrumentedTest {

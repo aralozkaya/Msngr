@@ -14,7 +14,8 @@ import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 

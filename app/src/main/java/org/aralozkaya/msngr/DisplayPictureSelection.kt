@@ -18,7 +18,6 @@ import org.aralozkaya.msngr.protocol.DisplayPictureLimits
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import org.aralozkaya.msngr.protocol.ProfileGifEncoder
 import java.io.ByteArrayOutputStream
-import kotlin.coroutines.coroutineContext
 import kotlin.math.max
 import kotlin.math.sqrt
 

@@ -7,7 +7,9 @@ import org.aralozkaya.msngr.data.parseSwitchboardMime
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpFrameCodec
 import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeTextStyleTest {

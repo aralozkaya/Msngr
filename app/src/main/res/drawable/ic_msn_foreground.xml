@@ -1,5 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
   <group android:name="messenger_artwork" android:scaleX="0.25" android:scaleY="0.25" android:translateX="22.5" android:translateY="22.5">
     <path android:name="rear_orbit" android:pathData="M30 168 C13 164 8 150 12 139 C16 127 31 116 49 115 C91 109 134 140 179 136 C207 137 228 121 240 100" android:strokeColor="#FFCB57" android:strokeWidth="4.7" android:strokeLineCap="round" android:strokeLineJoin="round"/>
     <path android:name="rear_highlight" android:pathData="M30 168 C13 164 8 150 12 139 C16 127 31 116 49 115 C91 109 134 140 179 136 C207 137 228 121 240 100" android:strokeColor="#FFF4B9" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:strokeAlpha="0.7"/>

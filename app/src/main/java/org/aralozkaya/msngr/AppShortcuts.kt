@@ -11,9 +11,9 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.data.Contact
 import java.io.File
 import java.security.MessageDigest
-import org.aralozkaya.msngr.data.Contact
 
 internal data class RecentChatShortcut(
     val contactId: String,

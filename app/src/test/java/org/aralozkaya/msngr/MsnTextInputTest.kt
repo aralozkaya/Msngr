@@ -1,16 +1,15 @@
 package org.aralozkaya.msngr
 
-import java.io.ByteArrayInputStream
-import java.io.File
-import java.util.Locale
-import javax.imageio.ImageIO
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.util.Locale
+import javax.imageio.ImageIO
 
 class MsnTextInputTest {
     @Test

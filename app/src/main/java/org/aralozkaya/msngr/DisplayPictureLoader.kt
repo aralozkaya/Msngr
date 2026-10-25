@@ -8,13 +8,13 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.DisplayPictureLimits
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnBase64
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
-import org.aralozkaya.msngr.protocol.DisplayPictureLimits
 
 private const val AVATAR_DECODE_TARGET_SIZE = 384
 private const val PROFILE_PICTURE_MAX_PIXELS = 4_194_304L

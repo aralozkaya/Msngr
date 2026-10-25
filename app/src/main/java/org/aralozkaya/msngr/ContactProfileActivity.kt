@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import org.aralozkaya.msngr.pages.ContactProfilePage
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
 import org.aralozkaya.msngr.ui.theme.MsngrTheme

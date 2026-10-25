@@ -1,7 +1,17 @@
 package org.aralozkaya.msngr
 
-import org.aralozkaya.msngr.data.*
-import org.junit.Assert.*
+import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.GroupInvitation
+import org.aralozkaya.msngr.data.buildAddContactRequest
+import org.aralozkaya.msngr.data.buildCreateGroupRequest
+import org.aralozkaya.msngr.data.buildGroupConnectionRequest
+import org.aralozkaya.msngr.data.mergeMessengerMemberships
+import org.aralozkaya.msngr.data.parseAddressBook
+import org.aralozkaya.msngr.data.parseMessengerMemberships
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import javax.xml.parsers.DocumentBuilderFactory

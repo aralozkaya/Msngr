@@ -2,20 +2,29 @@ package org.aralozkaya.msngr
 
 import android.Manifest
 import android.app.NotificationManager
-import android.os.Build
 import android.graphics.Bitmap
-import java.io.File
+import android.os.Build
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.data.SignInRequest
-import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.aralozkaya.msngr.notifications.MsngrNotificationManager
-import org.junit.Assert.*
+import org.aralozkaya.msngr.notifications.NotificationChannels
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 
 class MockContactRequestsInstrumentedTest {
     @get:Rule val compose = createEmptyComposeRule()

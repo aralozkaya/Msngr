@@ -1,22 +1,27 @@
 package org.aralozkaya.msngr.updates
 
-import android.content.Context
-import android.content.ContextWrapper
 import android.Manifest
 import android.app.NotificationManager
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import android.os.SystemClock
 import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.json.JSONObject
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
-import java.util.UUID
 import java.io.File
 import java.io.IOException
 import org.aralozkaya.msngr.createDisplayPictureCaptureUri
-import org.aralozkaya.msngr.notifications.NotificationChannels
+import java.util.UUID
 
 class UpdateInstrumentedTest {
     private fun isolatedContext(): Context {

@@ -1,9 +1,20 @@
 package org.aralozkaya.msngr
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import org.aralozkaya.msngr.data.*
-import org.junit.Assert.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.data.MockMsnp18Client
+import org.aralozkaya.msngr.data.SignInRequest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MockContactDeletingTest {

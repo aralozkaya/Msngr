@@ -16,8 +16,8 @@ import kotlinx.coroutines.yield
 import org.aralozkaya.msngr.data.AddressBookSnapshot
 import org.aralozkaya.msngr.data.CachedContactDisplayPicture
 import org.aralozkaya.msngr.data.ContactDisplayPictureCache
-import org.aralozkaya.msngr.data.LiveMsnp18Client
 import org.aralozkaya.msngr.data.InMemoryConversationHistoryStore
+import org.aralozkaya.msngr.data.LiveMsnp18Client
 import org.aralozkaya.msngr.data.LocalDisplayPicture
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerEvent
@@ -32,15 +32,15 @@ import org.aralozkaya.msngr.data.StorageProfile
 import org.aralozkaya.msngr.data.SwitchboardMimeMessage
 import org.aralozkaya.msngr.data.parseSwitchboardMime
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException

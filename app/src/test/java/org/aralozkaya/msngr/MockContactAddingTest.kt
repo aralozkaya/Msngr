@@ -1,9 +1,14 @@
 package org.aralozkaya.msngr
 
-import kotlinx.coroutines.*
-import org.aralozkaya.msngr.data.*
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import org.aralozkaya.msngr.data.MockMsnp18Client
+import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** These clients have no transport or SOAP service; dummy credentials never leave memory. */

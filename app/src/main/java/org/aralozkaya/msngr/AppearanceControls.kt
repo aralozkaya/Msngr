@@ -13,13 +13,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -37,14 +38,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -64,8 +64,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -96,31 +96,36 @@ internal val MessengerMainColors = listOf(
 internal fun AppearanceColorOption(mode: ColorMode, index: Int, count: Int, appearance: AppAppearance) {
     val context = LocalContext.current
     val selected = appearance.colorMode == mode
-    val shapes = ListItemDefaults.segmentedShapes(index, count)
-    val colors = ListItemDefaults.segmentedColors()
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        // Selection must preserve the option's corners within the segmented group.
-        shape = shapes.shape,
-        color = if (selected) colors.selectedContainerColor else colors.containerColor,
-        contentColor = if (selected) colors.selectedContentColor else colors.contentColor,
-    ) {
-        Column {
+    Column {
+        SegmentedListItem(
+            selected = selected,
+            onClick = { AppearancePrefs.setColorMode(context, mode) },
+            shapes = if (selected && mode != ColorMode.Dynamic) ListItemDefaults.segmentedShapes(0, 2).copy(
+                selectedShape =  ListItemDefaults.segmentedShapes(0, 2).shape
+            ) else ListItemDefaults.segmentedShapes(index, count),
+            colors = ListItemDefaults.segmentedColors(),
+            modifier = Modifier.fillMaxWidth().testTag("color_mode_${mode.name}"),
+            supportingContent = { Text(when (mode) {
+                ColorMode.Default -> "Messenger colors or a custom main color"
+                ColorMode.Dynamic -> "Colors from your device wallpaper"
+                ColorMode.Scenes -> "Classic scenes with matching app colors"
+            }) },
+            trailingContent = { RadioButton(selected = selected, onClick = null) },
+            content = { Text(mode.label) },
+        )
+        if (selected && mode != ColorMode.Dynamic) {
+            Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
+        }
+        AnimatedVisibility(visible = selected && mode != ColorMode.Dynamic) {
             SegmentedListItem(
-                selected = selected,
-                onClick = { AppearancePrefs.setColorMode(context, mode) },
-                shapes = shapes.copy(selectedShape = shapes.shape),
-                colors = colors.copy(containerColor = Color.Transparent, selectedContainerColor = Color.Transparent),
-                modifier = Modifier.fillMaxWidth().testTag("color_mode_${mode.name}"),
-                supportingContent = { Text(when (mode) {
-                    ColorMode.Default -> "Messenger colors or a custom main color"
-                    ColorMode.Dynamic -> "Colors from your device wallpaper"
-                    ColorMode.Scenes -> "Classic scenes with matching app colors"
-                }) },
-                trailingContent = { RadioButton(selected = selected, onClick = null) },
-                content = { Text(mode.label) },
-            )
-            AnimatedVisibility(visible = selected && mode != ColorMode.Dynamic) {
+                selected = true,
+                onClick = {},
+                shapes = ListItemDefaults.segmentedShapes(1, 2).copy(
+                    selectedShape =  ListItemDefaults.segmentedShapes(1, 2).shape
+                ),
+                colors = ListItemDefaults.segmentedColors(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 AppearanceColorControls(appearance.copy(colorMode = mode))
             }
         }
@@ -137,7 +142,7 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
     val isScene = appearance.colorMode == ColorMode.Scenes
     val override = if (isScene) appearance.sceneColorArgb else appearance.customColorArgb
     val seed = override ?: if (isScene) scene.seedArgb else 0xFF74B4EF.toInt()
-    Column(Modifier.fillMaxWidth().padding(16.dp).testTag("color_controls_${appearance.colorMode.name}"),
+    Column(Modifier.fillMaxWidth().testTag("color_controls_${appearance.colorMode.name}"),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (isScene) {
             Card(onClick = { showScenes = true }, modifier = Modifier.fillMaxWidth().testTag("choose_scene"),
@@ -192,10 +197,9 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalButton(onClick = { showColor = true }, shapes = ButtonDefaults.shapes(),
+            TextButton(onClick = { showColor = true },
                 modifier = Modifier.testTag("custom_main_color")) { Text("Custom color") }
-            if (override != null) TextButton(onClick = { AppearancePrefs.setMainColor(context, null) },
-                shapes = ButtonDefaults.shapes()) { Text(if (isScene) "Use scene colors" else "Reset color") }
+            if (override != null) TextButton(onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
         }
     }
     if (showScenes) ScenePickerDialog(appearance.sceneId,
@@ -342,5 +346,5 @@ internal fun MainColorDialog(initialArgb: Int, onSelect: (Int) -> Unit, onDismis
         },
         confirmButton = { Button(onClick = { argb?.let(onSelect) }, enabled = argb != null,
             shapes = ButtonDefaults.shapes()) { Text("Apply") } },
-        dismissButton = { TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text("Cancel") } })
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }

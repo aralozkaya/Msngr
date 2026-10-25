@@ -3,9 +3,9 @@ package org.aralozkaya.msngr.notifications
 import android.content.Context
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.SessionPrefs
-import org.aralozkaya.msngr.restoreSignedInProfile
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.SignInRequest
+import org.aralozkaya.msngr.restoreSignedInProfile
 
 /** Returns an active repository, reconnecting or restoring the remembered session if necessary. */
 internal suspend fun Context.connectedRepositoryForNotificationAction(): MessengerRepository? {

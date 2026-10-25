@@ -1,10 +1,10 @@
 package org.aralozkaya.msngr
 
-import java.util.Base64
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import java.util.Base64
 
 /** Outputs captured from MsgPlus.RemoveFormatCodes in the installed Plus! 5.02.712. */
 @RunWith(Parameterized::class)

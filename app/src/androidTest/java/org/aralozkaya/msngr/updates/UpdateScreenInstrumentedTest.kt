@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -27,8 +27,8 @@ import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
-import java.util.UUID
 import java.io.File
+import java.util.UUID
 
 class UpdateScreenInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

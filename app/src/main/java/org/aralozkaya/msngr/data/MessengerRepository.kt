@@ -1,7 +1,7 @@
 package org.aralozkaya.msngr.data
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -10,11 +10,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -22,16 +22,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.AccountIdentity
+import org.aralozkaya.msngr.MessengerPlusTextCodec
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.aralozkaya.msngr.NativeTextStyle
-import org.aralozkaya.msngr.MessengerPlusTextCodec
+import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
+import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.trimMessengerPlusWhitespace
 import org.aralozkaya.msngr.withoutUnicodeEmoji
-import org.aralozkaya.msngr.enums.Presence
 import java.util.concurrent.atomic.AtomicLong
 
 data class SignInRequest(

@@ -40,28 +40,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.AppearanceColorOption
+import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.ContactInvitationPrefs
 import org.aralozkaya.msngr.DisplayPictureSyncBehavior
 import org.aralozkaya.msngr.DisplayPictureSyncPrefs
-import org.aralozkaya.msngr.appContainer
-import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.MESSENGER_PLUS_DISCLAIMER
 import org.aralozkaya.msngr.MessengerPlusPrefs
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.ThemeMode
+import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
 import org.aralozkaya.msngr.pages.components.PageContentList
@@ -319,7 +319,7 @@ fun ConnectionSettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showPictureBehavior = false }, shapes = ButtonDefaults.shapes()) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { showPictureBehavior = false }) { Text("Cancel") } },
         )
     }
 }
@@ -743,7 +743,6 @@ private fun DeleteHistoryDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                shapes = ButtonDefaults.shapes(),
             ) {
                 Text("Cancel")
             }

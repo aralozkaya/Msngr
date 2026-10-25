@@ -1,7 +1,7 @@
 package org.aralozkaya.msngr
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.MockMsnp18Client
 import org.aralozkaya.msngr.data.MockServerData

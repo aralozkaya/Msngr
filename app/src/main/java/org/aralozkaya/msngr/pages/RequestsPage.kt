@@ -3,37 +3,70 @@
 
 package org.aralozkaya.msngr.pages
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.AlertDialogDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.ContactInvitationSettings
+import org.aralozkaya.msngr.MessengerPlusText
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.ContactRequest
 import org.aralozkaya.msngr.data.GroupInvitation
-import org.aralozkaya.msngr.MessengerPlusText
-import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 
 @Composable
 internal fun RequestsPage(
@@ -99,7 +132,7 @@ internal fun RequestsPage(
                 if (refreshError != null) item(key = "refresh-error") {
                     Text(refreshError, color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    TextButton(onRefresh, enabled = !refreshing, shapes = ButtonDefaults.shapes()) {
+                    TextButton(onRefresh, enabled = !refreshing) {
                         Text(stringResource(R.string.requests_refresh))
                     }
                 }
@@ -327,7 +360,7 @@ internal fun ContactRequestDeclineDialog(request: ContactRequest,
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("contact-request-error").semantics { liveRegion = LiveRegionMode.Polite }) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                    TextButton(onDismiss, enabled = !busy, shapes = ButtonDefaults.shapes()) {
+                    TextButton(onDismiss, enabled = !busy) {
                         Text(stringResource(R.string.contact_request_later))
                     }
                     Button(onClick = {

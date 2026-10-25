@@ -23,11 +23,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,11 +119,11 @@ internal fun DisplayPictureOptionsDialog(
                 }
                 if (pictureUri != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onViewPicture, shapes = ButtonDefaults.shapes()) {
+                        TextButton(onClick = onViewPicture) {
                             Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("View", Modifier.padding(start = 8.dp))
                         }
-                        TextButton(onClick = onRemovePicture, shapes = ButtonDefaults.shapes(),
+                        TextButton(onClick = onRemovePicture,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                             Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Remove", Modifier.padding(start = 8.dp))
@@ -135,7 +135,7 @@ internal fun DisplayPictureOptionsDialog(
                     PictureSourceOption(1, "Select a photo", "Photos and GIFs from your gallery", Icons.Default.PhotoLibrary, onSelectPhoto)
                     PictureSourceOption(2, "Use a default photo", "The original Messenger collection", Icons.Default.PhotoSizeSelectActual, onDefaultPhoto)
                 }
-                TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes(), modifier = Modifier.align(Alignment.End)) {
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
                     Text("Cancel")
                 }
             }
@@ -226,7 +226,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                 }
                 Surface(color = MaterialTheme.colorScheme.surfaceContainerHighest) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                        TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text("Cancel") }
+                        TextButton(onClick = onDismiss) { Text("Cancel") }
                         Button(onClick = { selection?.let(onSelect) }, enabled = selection != null,
                             shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("use-default-picture")) { Text("Use photo") }
                     }

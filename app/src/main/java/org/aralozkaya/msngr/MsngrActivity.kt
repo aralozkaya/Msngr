@@ -3,18 +3,17 @@ package org.aralozkaya.msngr
 import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import org.aralozkaya.msngr.notifications.InAppNotificationHost
-import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.notifications.InAppNotificationHost
+import org.aralozkaya.msngr.ui.theme.MsngrTheme
 
 abstract class MsngrActivity : ComponentActivity() {
     protected open val observesConnectionLoss: Boolean = true
