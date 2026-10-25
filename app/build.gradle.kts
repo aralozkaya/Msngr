@@ -5,6 +5,13 @@ plugins {
 
 val releaseTag = providers.gradleProperty("releaseTag")
     .orElse(providers.environmentVariable("RELEASE_TAG"))
+    .orElse(
+        providers.exec {
+            workingDir(rootProject.projectDir)
+            commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.map { it.trim() }.filter { it.isNotEmpty() }
+    )
     .orNull
 val appVersion = if (releaseTag == null) {
     "1.0.0-dev" to 1
