@@ -2,6 +2,7 @@ package org.aralozkaya.msngr.data
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +33,7 @@ import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.trimMessengerPlusWhitespace
 import org.aralozkaya.msngr.withoutUnicodeEmoji
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 
 data class SignInRequest(
@@ -645,12 +647,14 @@ class MessengerRepository(
         UserProfileSnapshot("You", "", Presence.Online),
     )
     private val mutableRequestAccount = MutableStateFlow<String?>(null)
+    private val mutablePendingNudgeShakes = MutableStateFlow<Set<String>>(emptySet())
 
     val profile: StateFlow<UserProfileSnapshot> = mutableProfile.asStateFlow()
     val drafts: StateFlow<Map<String, String>> = draftStore.drafts
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
     val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
+    val pendingNudgeShakes: StateFlow<Set<String>> = mutablePendingNudgeShakes.asStateFlow()
     val contactRequests: StateFlow<List<ContactRequest>> = client.contactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> = client.groupInvitations
     val groupInvitationInbox: StateFlow<GroupInvitationInbox> = combine(client.groupInvitations, mutableRequestAccount) { invitations, account ->
@@ -671,15 +675,22 @@ class MessengerRepository(
     val contactRequestAccountId: String? get() = mutableRequestAccount.value
 
     init {
-        scope.launch {
+        scope.launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
             client.events.collect { event ->
-                if (event is MessengerEvent.OwnDisplayPictureChanged && event.account == signedInAccountIdentity) {
+                if (event is MessengerEvent.IncomingNudge) {
+                    val key = normalizeNudgeShakeKey(event.contactId)
+                    if (key.isNotEmpty()) {
+                        mutablePendingNudgeShakes.update { it + key }
+                    }
+                } else if (event is MessengerEvent.OwnDisplayPictureChanged && event.account == signedInAccountIdentity) {
                     event.personalMessage?.let { status -> mutableProfile.update { it.copy(statusMessage = status) } }
                 } else if (event is MessengerEvent.SignedOut) {
-                    connectionMutex.withLock {
-                        logout()
-                        onRemoteSignOut()
-                        mutableSignOutReason.value = event.reason
+                    scope.launch {
+                        connectionMutex.withLock {
+                            logout()
+                            onRemoteSignOut()
+                            mutableSignOutReason.value = event.reason
+                        }
                     }
                 } else if (event is MessengerEvent.ConnectionLost && lastSignInRequest != null) {
                     mutableConnectionIssue.value =
@@ -710,7 +721,10 @@ class MessengerRepository(
             }
             val hadSignedInSession = lastSignInRequest != null
             val requestAccount = AccountIdentity.forServer(request.email, request.serverConfig, useMockServer).storageId
-            if (mutableRequestAccount.value != requestAccount) mutableRequestAccount.value = null
+            if (mutableRequestAccount.value != requestAccount) {
+                mutableRequestAccount.value = null
+                mutablePendingNudgeShakes.value = emptySet()
+            }
             mutableSignOutReason.value = null
             val result = signInClient(request)
             result.getOrNull()?.let { profile ->
@@ -966,7 +980,34 @@ class MessengerRepository(
     suspend fun sendNudgeNow(contactId: String): Result<Unit> =
         client.sendNudgeWithResult(contactId)
 
+    fun consumePendingNudgeShake(contactId: String): Boolean {
+        val key = normalizeNudgeShakeKey(contactId)
+        if (key.isEmpty()) return false
+        var consumed = false
+        mutablePendingNudgeShakes.update { current ->
+            if (key in current) {
+                consumed = true
+                current - key
+            } else {
+                consumed = false
+                current
+            }
+        }
+        return consumed
+    }
+
+    private fun clearPendingNudgeShake(contactId: String) {
+        val key = normalizeNudgeShakeKey(contactId)
+        if (key.isNotEmpty()) {
+            mutablePendingNudgeShakes.update { it - key }
+        }
+    }
+
+    private fun normalizeNudgeShakeKey(contactId: String): String =
+        contactId.trim().lowercase(Locale.ROOT)
+
     fun blockContact(contactId: String) {
+        clearPendingNudgeShake(contactId)
         scope.launch { runCatching { client.blockContact(contactId) } }
     }
 
@@ -990,6 +1031,7 @@ class MessengerRepository(
     suspend fun inviteGroupMembers(groupId: String, emails: List<String>, message: String = ""): Result<Unit> = groupOperation { client.inviteGroupMembers(groupId, emails, message) }
     suspend fun leaveGroup(groupId: String): Result<Unit> = groupOperation {
         client.leaveGroup(groupId)
+        clearPendingNudgeShake(groupId)
         onConversationRead(groupId)
     }
     suspend fun refreshGroupInvitations(): Result<Unit> = groupOperation { client.refreshGroupInvitations() }
@@ -1007,6 +1049,7 @@ class MessengerRepository(
         try {
             check(lastSignInRequest != null && mutableSignOutReason.value == null) { "Sign in before deleting a contact." }
             client.deleteContact(contactId, block)
+            clearPendingNudgeShake(contactId)
             onConversationRead(contactId)
             Result.success(Unit)
         } catch (error: CancellationException) {
@@ -1043,6 +1086,7 @@ class MessengerRepository(
 
     suspend fun clearConversationHistory(contactId: String) = withContext(Dispatchers.IO) {
         historyMutationMutex.withLock {
+            clearPendingNudgeShake(contactId)
             historyStore.clearContact(contactId)
             client.clearMessages(contactId)
         }
@@ -1051,6 +1095,7 @@ class MessengerRepository(
     suspend fun clearConversationHistory() {
         withContext(Dispatchers.IO) {
             historyMutationMutex.withLock {
+                mutablePendingNudgeShakes.value = emptySet()
                 client.clearMessages()
                 historyStore.clearAll()
             }
@@ -1087,6 +1132,7 @@ class MessengerRepository(
 
     fun logout() {
         mutableRequestAccount.value = null
+        mutablePendingNudgeShakes.value = emptySet()
         automaticReconnectJob?.cancel()
         automaticReconnectJob = null
         persistentBackgroundConnection = false

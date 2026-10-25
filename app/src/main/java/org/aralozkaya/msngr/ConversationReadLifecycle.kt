@@ -14,3 +14,22 @@ internal suspend fun observeConversationReadState(
         repository.conversation(contactId).collect { repository.markRead(contactId) }
     }
 }
+
+/**
+ * Queued incoming nudges stay pending while the conversation is stopped and coalesce into a
+ * single shake when the conversation becomes visible again.
+ */
+internal suspend fun observeConversationNudgeShakes(
+    repository: MessengerRepository,
+    contactId: String,
+    lifecycle: Lifecycle,
+    onShake: () -> Unit,
+) {
+    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        repository.pendingNudgeShakes.collect {
+            if (repository.consumePendingNudgeShake(contactId)) {
+                onShake()
+            }
+        }
+    }
+}
