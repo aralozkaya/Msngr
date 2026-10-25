@@ -11,7 +11,9 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 
 class NotificationReplyReceiver : BroadcastReceiver() {
@@ -21,31 +23,43 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             ?.toString()
             ?.withoutUnicodeEmoji()
             ?.trim()
-            ?.takeIf(String::isNotEmpty)
+            ?.takeIf { it.messengerPlusPlainText().isNotBlank() }
             ?.take(MAX_REPLY_LENGTH)
             ?: return
         val contactId = intent.getStringExtra(EXTRA_CONTACT_ID)?.takeIf(String::isNotBlank) ?: return
+        val repository = runCatching { context.appContainer.messengerRepository }.getOrNull()
+        val contactSnapshot = repository?.contactSnapshot(contactId)
         val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
             ?.takeIf(String::isNotBlank)
+            ?: contactSnapshot?.displayName
             ?: contactId.substringBefore('@')
+        val isGroup = intent.getBooleanExtra(EXTRA_IS_GROUP, contactSnapshot?.isGroup == true)
         val notificationId = intent.getIntExtra(
             EXTRA_NOTIFICATION_ID,
             MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId),
         )
         val notifications = MsngrNotificationManager(context)
         val previousNotification = notifications.activeNotification(notificationId)
-        // Mark the conversation read when the reply is submitted, before network
-        // work can be delayed or retried and newer messages can arrive.
-        runCatching { context.appContainer.messengerRepository }.getOrNull()?.markRead(contactId)
-        notifications.apply {
-            dismissConversation(contactId)
-            markReplying(contactId, contactName, notificationId, previousNotification)
-        }
+        // Mark the conversation read when the reply is submitted without cancelling
+        // the active conversation notification, so the expanded shade and connected
+        // smart watches continue showing the incoming message, our reply, and follow-ups.
+        repository?.markRead(contactId, dismissNotification = false)
+        notifications.dismiss(MsngrNotificationManager.notificationId(NotificationEventType.Nudge, contactId))
+        (context.applicationContext as? MsngrApplication)?.inAppNotifications?.dismissConversation(contactId)
+        notifications.appendReply(
+            contactId = contactId,
+            contactName = contactName,
+            replyText = reply,
+            notificationId = notificationId,
+            previousNotification = previousNotification,
+            isGroup = isGroup,
+        )
         val input = Data.Builder()
             .putString(ReplyMessageWorker.KEY_CONTACT_ID, contactId)
             .putString(ReplyMessageWorker.KEY_CONTACT_NAME, contactName)
             .putString(ReplyMessageWorker.KEY_REPLY_TEXT, reply)
             .putInt(ReplyMessageWorker.KEY_NOTIFICATION_ID, notificationId)
+            .putBoolean(ReplyMessageWorker.KEY_IS_GROUP, isGroup)
             .build()
         val request = OneTimeWorkRequestBuilder<ReplyMessageWorker>()
             .setInputData(input)
@@ -64,6 +78,7 @@ class NotificationReplyReceiver : BroadcastReceiver() {
         const val EXTRA_CONTACT_ID = "notification_contact_id"
         const val EXTRA_CONTACT_NAME = "notification_contact_name"
         const val EXTRA_NOTIFICATION_ID = "notification_id"
+        const val EXTRA_IS_GROUP = "notification_is_group"
         private const val MAX_REPLY_LENGTH = 4_000
     }
 }

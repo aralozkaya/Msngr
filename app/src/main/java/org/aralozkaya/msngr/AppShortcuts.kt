@@ -4,7 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
-import android.util.Base64
+import androidx.core.app.Person
+import androidx.core.content.LocusIdCompat
 import androidx.core.content.edit
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -12,6 +13,7 @@ import androidx.core.graphics.drawable.IconCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.notifications.MsngrNotificationManager
 import java.io.File
 import java.security.MessageDigest
 
@@ -212,10 +214,21 @@ internal object AppShortcuts {
             val bitmap = BitmapFactory.decodeFile(
                 iconFile(context, state.account, recent.contactId).path,
             ) ?: context.shortcutAvatarBitmap(recent.label, null)
-            ShortcutInfoCompat.Builder(context, chatShortcutId(recent.contactId))
+            val shortcutId = chatShortcutId(recent.contactId)
+            val icon = IconCompat.createWithAdaptiveBitmap(bitmap)
+            val person = Person.Builder()
+                .setName(recent.label)
+                .setKey(recent.contactId)
+                .setIcon(icon)
+                .build()
+            ShortcutInfoCompat.Builder(context, shortcutId)
                 .setShortLabel(recent.label)
                 .setLongLabel(context.getString(R.string.shortcut_chat_long, recent.label))
-                .setIcon(IconCompat.createWithAdaptiveBitmap(bitmap))
+                .setIcon(icon)
+                .setPerson(person)
+                .setLongLived(true)
+                .setIsConversation()
+                .setLocusId(LocusIdCompat(shortcutId))
                 .setRank(index)
                 .setIntent(
                     LoginActivity.createRecentChatShortcutIntent(
@@ -238,11 +251,8 @@ internal object AppShortcuts {
         runCatching { ShortcutManagerCompat.reportShortcutUsed(context, shortcutId) }
     }
 
-    private fun chatShortcutId(contactId: String): String = "recent_chat_" +
-        Base64.encodeToString(
-            contactId.lowercase().toByteArray(Charsets.UTF_8),
-            Base64.NO_WRAP or Base64.NO_PADDING or Base64.URL_SAFE,
-        )
+    private fun chatShortcutId(contactId: String): String =
+        MsngrNotificationManager.conversationShortcutId(contactId)
 
     private fun preferences(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
