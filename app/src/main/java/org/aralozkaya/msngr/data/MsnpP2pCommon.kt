@@ -27,10 +27,10 @@ internal object MsnpP2pUtil {
     ): String = buildString {
         append("EUF-GUID: {$DISPLAY_PICTURE_GUID}\r\n")
         append("SessionID: $sessionId\r\n")
-        append("AppID: 1\r\n")
+        append("AppID: ${if (picture.objectType == 11) 20 else 1}\r\n")
         append("RequestFlags: 18\r\n")
         append("Context: ")
-        append(MsnBase64.encode(picture.toXml().toByteArray(StandardCharsets.UTF_8)))
+        append(MsnBase64.encode((picture.toXml() + '\u0000').toByteArray(StandardCharsets.UTF_8)))
         append("\r\n\r\n")
     }
 
@@ -43,10 +43,15 @@ internal object MsnpP2pUtil {
             // Native WLM Base64-encodes a NUL-terminated XML string in its Context field.
             val xml = String(MsnBase64.decode(context) ?: return null, StandardCharsets.UTF_8)
                 .trimEnd('\u0000')
-            MsnDisplayPicture.parse(xml)
+            MsnDisplayPicture.parseObject(xml, localPicture?.metadata?.objectType ?: 3)
         }.getOrNull() ?: return null
         return localPicture?.takeIf { picture ->
-            picture.metadata.sha1d == requestedObject.sha1d &&
+            (picture.metadata.objectType != 11 ||
+                (requestBody.field("AppID") == "20" &&
+                    requestBody.field("EUF-GUID")?.trim('{', '}')?.equals(DISPLAY_PICTURE_GUID, true) == true)) &&
+                picture.metadata.sha1d == requestedObject.sha1d &&
+                picture.metadata.creator.equals(requestedObject.creator, true) &&
+                picture.metadata.size == requestedObject.size &&
                 picture.metadata.matches(picture.bytes)
         }
     }

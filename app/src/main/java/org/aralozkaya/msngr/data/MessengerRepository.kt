@@ -112,8 +112,12 @@ data class ChatMessage(
     val senderName: String? = null,
     val nativeStyle: NativeTextStyle = NativeTextStyle(),
     val inkDrawing: InkDrawing? = null,
+    val voiceClip: org.aralozkaya.msngr.protocol.VoiceClip? = null,
+    val isVoiceClipPending: Boolean = false,
+    val voiceClipTransferError: String? = null,
 ) {
     val isInk: Boolean get() = inkDrawing != null
+    val isVoiceClip: Boolean get() = voiceClip != null || isVoiceClipPending || voiceClipTransferError != null
 }
 private fun unusedChatMessageMarker() = listOf<Unit>(
 )
@@ -196,6 +200,8 @@ interface MsnpClient {
         Result.failure(UnsupportedOperationException("Message retry is not supported."))
     suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> =
         Result.failure(UnsupportedOperationException("Handwriting messages are not supported."))
+    suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Voice clips are not supported."))
     suspend fun sendTyping(contactId: String)
     suspend fun sendNudge(contactId: String)
     suspend fun sendNudgeWithResult(contactId: String): Result<Unit> =
@@ -493,6 +499,15 @@ class MockMsnp18Client(
 
     override suspend fun sendTyping(contactId: String) {
         // Kept as an explicit operation so the live transport can send text/x-msmsgscontrol.
+    }
+
+    override suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> = runCatching {
+        val contact = mutableContacts.value.firstOrNull { it.id == contactId }
+        check(contact?.isGroup != true) { "Voice clips are not supported in group chats." }
+        check(contact?.isBlocked != true && contact?.presence != Presence.Offline) { "Voice clips require an online contact." }
+        requireNotNull(org.aralozkaya.msngr.protocol.MsnVoiceClip.parse(clip.bytes()))
+        appendMessage(ChatMessage(ids.incrementAndGet(), contactId, MessageAuthor.Me, "Voice clip",
+            System.currentTimeMillis(), voiceClip = clip))
     }
 
     override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> {
@@ -1017,6 +1032,9 @@ class MessengerRepository(
 
     suspend fun sendInkNow(contactId: String, drawing: InkDrawing): Result<Unit> =
         client.sendInkMessage(contactId, drawing)
+
+    suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> =
+        client.sendVoiceClip(contactId, clip)
 
     fun retryMessage(contactId: String, messageId: Long) {
         scope.launch {

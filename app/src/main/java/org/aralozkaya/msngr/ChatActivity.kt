@@ -289,6 +289,7 @@ private fun ChatRoute(
         onSendTyping = { repository.sendTyping(contactId) },
         onSendNudge = { repository.sendNudge(contactId) },
         onSendInk = { repository.sendInk(contactId, it) },
+        onSendVoiceClip = { repository.sendVoiceClip(contactId, it) },
         onLoadOlderMessages = { repository.loadOlderMessages(contactId) },
     )
 }
@@ -309,6 +310,9 @@ internal fun ChatScreen(
     onSendTyping: () -> Unit,
     onSendNudge: () -> Unit,
     onSendInk: (InkDrawing) -> Unit = {},
+    onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
+        Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
+    },
     onLoadOlderMessages: suspend () -> Unit,
     nativeStyle: NativeTextStyle = NativeTextStyle(),
     onNativeStyleChange: (NativeTextStyle) -> Unit = {},
@@ -488,6 +492,9 @@ internal fun ChatScreen(
                 onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
                 handwritingEnabled = isConversationAvailable && contact?.presence?.isOnline != false,
+                voiceClipsVisible = contact?.isGroup != true,
+                voiceClipsEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline != false,
+                onSendVoiceClip = onSendVoiceClip,
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
                 draft = draft,
@@ -616,6 +623,11 @@ internal fun ChatMessageList(
 private fun MessageComposer(
     enabled: Boolean = true,
     handwritingEnabled: Boolean = enabled,
+    voiceClipsVisible: Boolean = true,
+    voiceClipsEnabled: Boolean = enabled,
+    onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
+        Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
+    },
     nudgeEnabled: Boolean = enabled,
     nudgeCooldownMillis: Long = 0L,
     draft: String,
@@ -804,6 +816,9 @@ private fun MessageComposer(
                                 },
                             )
                         }
+                    }
+                    if (voiceClipsVisible && !draft.hasMessengerPlusVisibleContent()) {
+                        VoiceClipComposerButton(enabled = enabled && voiceClipsEnabled, onSend = onSendVoiceClip)
                     }
                     FilledIconButton(
                         modifier = Modifier
@@ -1409,7 +1424,9 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                if (message.inkDrawing != null) {
+                if (message.isVoiceClip) {
+                    VoiceClipMessage(message)
+                } else if (message.inkDrawing != null) {
                     HandwritingMessageCanvas(
                         drawing = message.inkDrawing,
                         modifier = Modifier.padding(bottom = 4.dp),

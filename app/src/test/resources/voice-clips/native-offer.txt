@@ -1,0 +1,3 @@
+ID: 3
+Data: <msnobj Creator="peer@example.test" Type="11" SHA1D="fV5EBuaoU/Opt3DbE/QK4srEKoE=" Size="5460" Location="0" Friendly="bQBzAG4AbQBzAGcAcgBfADIAMAAyADYAXwAxADAAXwAyADUAXwAyADIAXwA1ADMAXwA0ADQAXwA0ADYAXwAyAAAA"/>
+

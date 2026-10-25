@@ -15,6 +15,8 @@ internal class MsnpP2pSession(
     private val onDisplayPicture: (ByteArray) -> Unit,
     localEndpointId: String = "",
     remoteEndpointId: String? = null,
+    private val localVoiceClip: (String) -> LocalDisplayPicture? = { null },
+    private val onVoiceClip: (MsnDisplayPicture, ByteArray) -> Unit = { _, _ -> },
 ) {
     private val v2 = remoteEndpointId?.takeIf(String::isNotBlank)?.let {
         MsnpP2pV2Session(
@@ -25,6 +27,8 @@ internal class MsnpP2pSession(
             sendPacket = { packet -> sendPacket(packet) },
             localPicture = localPicture,
             onDisplayPicture = onDisplayPicture,
+            localVoiceClip = localVoiceClip,
+            onVoiceClip = onVoiceClip,
         )
     }
     val destination: String get() = v2?.destination ?: remoteEmail
@@ -69,6 +73,11 @@ internal class MsnpP2pSession(
         )
     }
 
+    suspend fun requestVoiceClip(clip: MsnDisplayPicture) {
+        require(clip.objectType == 11 && clip.size in 1..org.aralozkaya.msngr.protocol.MsnVoiceClip.MAX_WAV_BYTES)
+        requestDisplayPicture(clip)
+    }
+
     suspend fun handle(packetBytes: ByteArray) {
         if (P2pV2Packet.looksLike(packetBytes)) {
             v2?.handle(packetBytes)
@@ -106,7 +115,12 @@ internal class MsnpP2pSession(
                 // switchboard therefore may not own the original pending call. The live client
                 // validates the completed bytes against the contact's current MSNObject hash.
                 val pending = pendingCalls.remove(message.header.sessionId)
-                if (pending == null || pending.picture.matches(message.body)) {
+                if (pending?.picture?.objectType == 11) {
+                    if (pending.picture.matches(message.body)) {
+                        onVoiceClip(pending.picture, message.body)
+                        closeVoiceSession(pending.callId, message.header.sessionId)
+                    }
+                } else if (pending == null || pending.picture.matches(message.body)) {
                     onDisplayPicture(message.body)
                 }
             }
@@ -142,6 +156,11 @@ internal class MsnpP2pSession(
         ) return
         val sessionId = message.body.field("SessionID")?.toIntOrNull() ?: return
         val picture = MsnpP2pUtil.matchingLocalPicture(message.body, localPicture())
+            ?: message.body.field("Context")?.let { context ->
+                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
+                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 11)
+                }
+            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localVoiceClip(it.sha1d)) }
         val accepted = picture != null
         val responseContent = "SessionID: $sessionId\r\n\r\n"
         sendMessage(
@@ -169,9 +188,17 @@ internal class MsnpP2pSession(
         sendMessage(
             sessionId = sessionId,
             flags = P2P_MSN_OBJECT_DATA,
-            appId = 1,
+            appId = if (picture.metadata.objectType == 11) 20 else 1,
             body = picture.bytes,
         )
+        if (picture.metadata.objectType == 11) closeVoiceSession(message.callId, sessionId)
+    }
+
+    private suspend fun closeVoiceSession(callId: String, sessionId: Int) {
+        sendMessage(0, P2P_NO_FLAG, 0, sipMessage(
+            "BYE MSNMSGR:$remoteEmail MSNSLP/1.0", remoteEmail, localEmail,
+            MsnpP2pUtil.randomGuid(), callId, 0, "application/x-msnmsgr-sessionclosebody",
+            "SessionID: $sessionId\r\n\r\n"))
     }
 
     private suspend fun sendTransportFallback(message: SlpMessage) {

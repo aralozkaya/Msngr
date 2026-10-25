@@ -428,14 +428,20 @@ object Msnp18Protocol {
         )
     }
 
-    // MSNC9 (0x90) in the high byte, with message chunking (0x20) and ink/handwriting (0x4 | 0x8) advertised.
+    // MSNC9, chunking, handwriting, and one-to-one voice clips (0x40000).
     // The extended mask advertises only nudges (0x400). In particular, it leaves out
     // activities and games (0x100), and file transfer (0x20000).
-    const val CLIENT_ID = 2_415_919_148L
-    const val BASE_CAPABILITIES = 44
+    const val CLIENT_ID = 2_416_181_292L
+    const val BASE_CAPABILITIES = 262_188
     const val EXTENDED_CAPABILITIES = 1_024
-    const val CLIENT_IDENTITY = "2415919148:1024"
-    const val ENDPOINT_CAPABILITIES = "44:1024"
+    const val CLIENT_IDENTITY = "2416181292:1024"
+    const val ENDPOINT_CAPABILITIES = "262188:1024"
+
+    fun voiceClipPayload(clip: MsnDisplayPicture): ByteArray {
+        require(clip.objectType == MsnVoiceClip.OBJECT_TYPE)
+        return ("MIME-Version: 1.0\r\nContent-Type: $NUDGE_CONTENT_TYPE\r\n\r\n" +
+            "ID: 3\r\nData: ${clip.toXml()}\r\n\r\n").toByteArray(StandardCharsets.UTF_8)
+    }
 }
 
 object MsnpFrameCodec {

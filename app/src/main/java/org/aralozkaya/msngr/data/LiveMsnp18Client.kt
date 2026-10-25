@@ -42,6 +42,8 @@ import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnVoiceClip
+import org.aralozkaya.msngr.protocol.VoiceClip
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
 import org.aralozkaya.msngr.protocol.MsnpCommand
@@ -178,6 +180,9 @@ internal class LiveMsnp18Client(
     private val switchboards = ConcurrentHashMap<String, MsnpSwitchboardSession>()
     private val activeSwitchboards = ConcurrentHashMap.newKeySet<MsnpSwitchboardSession>()
     private val pictureSessions = ConcurrentHashMap<String, MsnpP2pSession>()
+    private data class SharedVoice(val data: LocalDisplayPicture, val createdAt: Long)
+    private val sharedVoiceClips = ConcurrentHashMap<String, SharedVoice>()
+    private val pendingVoiceClips = ConcurrentHashMap<String, Long>()
     private val circleDeliveries = ConcurrentHashMap<Int, Pair<String, Long>>()
     private val circleSegments = CircleSegmentAssembler()
     private val typingJobs = ConcurrentHashMap<String, Job>()
@@ -804,6 +809,17 @@ internal class LiveMsnp18Client(
         }
     }
 
+    override suspend fun sendVoiceClip(contactId: String, clip: VoiceClip): Result<Unit> {
+        val email = contactEmail(contactId)
+        if (isGroup(email)) return Result.failure(IllegalStateException("Voice clips are not supported in group chats."))
+        val valid = MsnVoiceClip.parse(clip.bytes())
+            ?: return Result.failure(IllegalArgumentException("Invalid voice clip."))
+        val message = ChatMessage(messageIds.incrementAndGet(), email.lowercase(), MessageAuthor.Me,
+            "Voice clip", System.currentTimeMillis(), isSending = true, voiceClip = valid)
+        appendMessage(message)
+        return deliverMessage(message)
+    }
+
     private suspend fun deliverMessage(message: ChatMessage): Result<Unit> {
         val email = contactEmail(message.contactId)
         val result = runCatching {
@@ -814,7 +830,21 @@ internal class LiveMsnp18Client(
             ) {
                 "Messages cannot be sent to a blocked contact."
             }
-            if (message.inkDrawing != null) {
+            if (message.voiceClip != null) {
+                check(!isGroup(email)) { "Voice clips are not supported in group chats." }
+                check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
+                    "Voice clips require the contact to be online."
+                }
+                val bytes = message.voiceClip.bytes()
+                val metadata = MsnDisplayPicture.create(signedInEmail, bytes, 11)
+                    .copy(location = "0", sha1c = null)
+                val now = System.nanoTime()
+                sharedVoiceClips.entries.removeIf { now - it.value.createdAt > 600_000_000_000L }
+                if (sharedVoiceClips.size >= 64) sharedVoiceClips.entries.minByOrNull { it.value.createdAt }
+                    ?.let { sharedVoiceClips.remove(it.key, it.value) }
+                sharedVoiceClips["${email.lowercase()}\n${metadata.sha1d}"] = SharedVoice(LocalDisplayPicture(metadata, bytes), now)
+                switchboardFor(email).sendVoiceClip(metadata)
+            } else if (message.inkDrawing != null) {
                 if (isGroup(email)) {
                     val commands = MsnpCircles.inkMessages(
                         groupEmail = email,
@@ -2364,6 +2394,7 @@ internal class LiveMsnp18Client(
                 scope = scope,
                 eventSink = { event -> handleSwitchboardEvent(session, event) },
                 localPicture = ::localDisplayPictureSnapshot,
+                localVoiceClip = { hash -> localVoiceClipSnapshot(session.contactEmail, hash) },
                 remoteEndpointId = contactEndpointIds[id],
                 sharedPictureSession = reusablePictureSession(id),
             )
@@ -2492,6 +2523,7 @@ internal class LiveMsnp18Client(
             scope = scope,
             eventSink = { event -> handleSwitchboardEvent(session, event) },
             localPicture = ::localDisplayPictureSnapshot,
+            localVoiceClip = { hash -> localVoiceClipSnapshot(session.contactEmail, hash) },
             remoteEndpointId = contactEndpointIds[id],
             sharedPictureSession = reusablePictureSession(id),
         )
@@ -2545,6 +2577,29 @@ internal class LiveMsnp18Client(
         }
         when (event) {
             SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
+            is SwitchboardEvent.VoiceClipOffered -> {
+                if (isGroup(contactId)) return
+                val key = "$contactId\n${event.senderEmail.lowercase()}\n${event.metadata.sha1d}"
+                val id = messageIds.incrementAndGet()
+                if (pendingVoiceClips.putIfAbsent(key, id) != null) return
+                val mine = event.senderEmail.equals(signedInEmail, true)
+                appendMessage(ChatMessage(id, contactId, if (mine) MessageAuthor.Me else MessageAuthor.Contact,
+                    "Voice clip", System.currentTimeMillis(), isVoiceClipPending = true))
+                if (!mine) {
+                    incrementUnread(contactId)
+                    mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id))
+                }
+                mutableTyping.update { it + (contactId to false) }
+                scope.launch {
+                    delay(45_000)
+                    if (pendingVoiceClips.remove(key, id)) updateVoiceClip(contactId, id, null)
+                }
+            }
+            is SwitchboardEvent.VoiceClipReceived -> {
+                val key = "$contactId\n${event.senderEmail.lowercase()}\n${event.metadata.sha1d}"
+                val id = pendingVoiceClips.remove(key) ?: return
+                updateVoiceClip(contactId, id, MsnVoiceClip.parse(event.bytes))
+            }
             is SwitchboardEvent.Ink -> {
                 val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
                 val message = ChatMessage(
@@ -2632,6 +2687,21 @@ internal class LiveMsnp18Client(
 
     private fun localDisplayPictureSnapshot(): LocalDisplayPicture? {
         return localDisplayPicture
+    }
+
+    private fun localVoiceClipSnapshot(peer: String, hash: String): LocalDisplayPicture? =
+        sharedVoiceClips["${peer.lowercase()}\n$hash"]?.takeIf {
+            System.nanoTime() - it.createdAt <= 600_000_000_000L
+        }?.data
+
+    private fun updateVoiceClip(contactId: String, id: Long, clip: VoiceClip?) {
+        mutableMessages.update { conversations ->
+            val messages = conversations[contactId] ?: return@update conversations
+            conversations + (contactId to messages.map {
+                if (it.id == id) it.copy(voiceClip = clip, isVoiceClipPending = false,
+                    voiceClipTransferError = if (clip == null) "Voice clip could not be downloaded." else null) else it
+            })
+        }
     }
 
     private suspend fun cacheContactDisplayPicture(
@@ -2814,6 +2884,8 @@ internal class LiveMsnp18Client(
         activeSwitchboards.toList().forEach(MsnpSwitchboardSession::close)
         activeSwitchboards.clear()
         pictureSessions.clear()
+        sharedVoiceClips.clear()
+        pendingVoiceClips.clear()
         circleDeliveries.clear()
         circleSegments.clear()
         switchboards.clear()
