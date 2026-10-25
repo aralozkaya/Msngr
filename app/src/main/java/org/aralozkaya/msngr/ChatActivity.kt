@@ -463,7 +463,7 @@ internal fun ChatScreen(
                                         )
                                         SceneText(
                                             text = if (isTyping) {
-                                                "typingâ€¦"
+                                                "typing…"
                                             } else if (contact?.isGroup == true) {
                                                 "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}"
                                             } else {
@@ -674,7 +674,7 @@ private fun MessageComposer(
     ) {
         if (enabled && nudgeCooldownMillis > 0L) {
             Text(
-                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudgeâ€¦" else
+                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge…" else
                     "You can send another nudge in ${(nudgeCooldownMillis + 999) / 1_000} seconds.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
