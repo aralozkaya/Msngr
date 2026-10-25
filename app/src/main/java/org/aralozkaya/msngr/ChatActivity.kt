@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -647,10 +648,15 @@ private fun MessageComposer(
     val colorSheet = rememberMessengerPlusColorSheetState()
     var showTextStyle by remember { mutableStateOf(false) }
     var handwritingMode by rememberSaveable { mutableStateOf(false) }
+    var showVoiceClipDialog by remember { mutableStateOf(false) }
+    val hasText = draft.hasMessengerPlusVisibleContent()
+    val voiceClipAction = voiceClipsVisible && !hasText
+    val canRecordVoiceClip = enabled && voiceClipsEnabled && voiceClipAction && !handwritingMode
     val handwritingState = rememberHandwritingCanvasState()
-    LaunchedEffect(enabled, handwritingEnabled, messengerPlusEnabled) {
+    LaunchedEffect(enabled, handwritingEnabled, messengerPlusEnabled, canRecordVoiceClip) {
         if (!enabled || !messengerPlusEnabled) colorSheet.dismiss()
         if (!handwritingEnabled) handwritingMode = false
+        if (!canRecordVoiceClip) showVoiceClipDialog = false
         if (!enabled) {
             showTextStyle = false
             emoticonSheet.dismiss()
@@ -669,6 +675,10 @@ private fun MessageComposer(
         onStyleChange = onNativeStyleChange,
         onSizeNoticeRequested = onSizeNoticeRequested,
         onDismissRequest = { showTextStyle = false },
+    )
+    if (showVoiceClipDialog) VoiceClipDialog(
+        onDismiss = { showVoiceClipDialog = false },
+        onSend = onSendVoiceClip,
     )
     val composerBackgroundColor = MaterialTheme.colorScheme.surface
 
@@ -779,7 +789,7 @@ private fun MessageComposer(
                                     handwritingMode = true
                                 },
                             )
-                            if (!draft.hasMessengerPlusVisibleContent()) {
+                            if (!hasText) {
                                 IconButton(
                                     onClick = onSendNudge,
                                     enabled = nudgeEnabled,
@@ -817,24 +827,26 @@ private fun MessageComposer(
                             )
                         }
                     }
-                    if (voiceClipsVisible && !draft.hasMessengerPlusVisibleContent()) {
-                        VoiceClipComposerButton(enabled = enabled && voiceClipsEnabled, onSend = onSendVoiceClip)
-                    }
                     FilledIconButton(
                         modifier = Modifier
                             .requiredHeight(56.dp)
                             .aspectRatio(1f, true),
-                        onClick = onSendMessage,
+                        onClick = {
+                            if (voiceClipAction) showVoiceClipDialog = true else onSendMessage()
+                        },
                         shapes = IconButtonDefaults.shapes(
                             pressedShape = IconButtonDefaults.mediumPressedShape,
                         ),
-                        enabled = enabled && draft.hasMessengerPlusVisibleContent(),
+                        enabled = if (voiceClipAction) canRecordVoiceClip else enabled && hasText,
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                         ),
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
+                        Icon(
+                            imageVector = if (voiceClipAction) Icons.Default.Mic else Icons.AutoMirrored.Filled.Send,
+                            contentDescription = if (voiceClipAction) "Record voice clip" else "Send message",
+                        )
                     }
                 }
             }
