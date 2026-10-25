@@ -77,6 +77,7 @@
     <string name="empty_conversation_warning">Don\'t include information like passwords or credit card numbers in an instant message</string>
     <string name="chat_contact_unavailable">%1$s is %2$s and may not respond</string>
     <string name="chat_contact_offline">%1$s is offline. Messages you send will be delivered when they sign in.</string>
+    <string name="chat_appear_offline">Your status is set to Appear offline. You can communicate with your contacts but they will know you are appearing offline.</string>
     <string name="chat_group_offline">%1$s is currently offline. You can send a message when more group members are online.</string>
     <string name="chat_group_removed">%1$s is no longer available. You may have left or been removed from the group.</string>
     <string name="chat_dismiss_status">Dismiss</string>

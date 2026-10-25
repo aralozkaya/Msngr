@@ -244,6 +244,7 @@ private fun ChatRoute(
         draft = drafts[contactId].orEmpty(),
         onDraftChange = { repository.updateDraft(contactId, it) },
         contact = contact ?: lastKnownContact?.copy(presence = Presence.Offline),
+        ownPresence = profile.presence,
         isConversationAvailable = contact != null,
         messages = conversation?.messages.orEmpty(),
         isHistoryLoaded = conversation?.isHistoryLoaded == true,
@@ -282,6 +283,7 @@ internal fun ChatScreen(
     nudgeShakeCount: Int = 0,
     otherUnreadCount: Int = 0,
     nudgeCooldownMillis: Long = 0L,
+    ownPresence: Presence = Presence.Online,
 ) {
     val nudgeShakeState = rememberNudgeShakeState()
     var handledNudgeShakeCount by rememberSaveable(contact?.id) { mutableIntStateOf(0) }
@@ -351,7 +353,7 @@ internal fun ChatScreen(
             .offset { nudgeShakeState.offsetDp.toIntOffset(this) }
             .testTag(CHAT_SCREEN_SHAKE_CONTAINER_TAG),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable) },
+        snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable, ownPresence) },
         topBar = {
             Column {
                 SceneBackdrop(scene) {
