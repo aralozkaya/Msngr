@@ -1,19 +1,24 @@
 package org.aralozkaya.msngr
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMember
@@ -69,53 +74,75 @@ class HandwritingComposerInstrumentedTest {
             }
         }
 
-        // Switch from Type mode to Handwriting mode
-        compose.onNodeWithTag(HANDWRITING_MODE_BUTTON_TAG).assertIsDisplayed().performClick()
+        // Dedicated handwriting button is removed; emoticon button has the 3-dot long-press indicator
+        compose.onNodeWithTag(HANDWRITING_MODE_BUTTON_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(EMOTICON_LONG_PRESS_DOTS_TAG, useUnmergedTree = true).assertIsDisplayed()
+
+        // Method 1: Long-press and release on the emoticon button -> menu stays open, then tap Handwriting
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput {
+            longClick()
+        }
+        compose.onNodeWithTag(EMOTICON_MENU_EMOTICONS_ITEM_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).assertIsDisplayed().performClick()
+
         compose.onNodeWithTag(HANDWRITING_TOOLBAR_TAG).assertIsDisplayed()
         compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).assertIsDisplayed()
-        compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsNotEnabled()
+        compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsDisplayed().assertIsNotEnabled()
+
+        // Helper to click a toolbar item whether it fits directly in the toolbar or overflowed into the menu
+        fun clickToolbarItem(tag: String) {
+            val directNodes = compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes()
+            if (directNodes.isEmpty()) {
+                compose.onNodeWithTag(HANDWRITING_OVERFLOW_BUTTON_TAG).assertIsDisplayed().performClick()
+            }
+            compose.onNodeWithTag(tag).assertIsDisplayed().performClick()
+        }
+
+        // Verify default grid is Blank (empty) in the canvas semantics
+        compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).assertExists()
 
         // 1. Pen Size submenu: Fine -> Bold -> Normal
-        compose.onNodeWithTag(HANDWRITING_PEN_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_PEN_BUTTON_TAG)
         compose.onNodeWithText("Fine").assertIsDisplayed().performClick()
-        compose.onNodeWithTag(HANDWRITING_PEN_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_PEN_BUTTON_TAG)
         compose.onNodeWithText("Bold").assertIsDisplayed().performClick()
 
-        // 2. Ink Color submenu: select Purple
-        compose.onNodeWithTag(HANDWRITING_COLOR_BUTTON_TAG).performClick()
+        // 2. Ink Color submenu: select Purple (overflowed on portrait phone width into the menu)
+        clickToolbarItem(HANDWRITING_COLOR_BUTTON_TAG)
         compose.onNodeWithContentDescription("Ink color Purple").assertIsDisplayed().performClick()
 
-        // 3. Grid submenu: Small grid -> Large grid -> Blank -> Medium grid
-        compose.onNodeWithTag(HANDWRITING_GRID_BUTTON_TAG).performClick()
+        // 3. Grid submenu: verify default is Blank, then Small grid -> Blank -> Medium grid
+        compose.onNodeWithTag(HANDWRITING_OVERFLOW_BUTTON_TAG).assertIsDisplayed().performClick()
+        compose.onNodeWithText("Grid (Blank)").assertIsDisplayed().performClick()
         compose.onNodeWithText("Small grid").assertIsDisplayed().performClick()
-        compose.onNodeWithTag(HANDWRITING_GRID_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_GRID_BUTTON_TAG)
         compose.onNodeWithText("Blank").assertIsDisplayed().performClick()
-        compose.onNodeWithTag(HANDWRITING_GRID_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_GRID_BUTTON_TAG)
         compose.onNodeWithText("Medium grid").assertIsDisplayed().performClick()
 
         // Draw a stroke on the canvas
         compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).performTouchInput {
             swipe(start = Offset(40f, 60f), end = Offset(240f, 110f), durationMillis = 120)
         }
-        compose.onNodeWithTag(HANDWRITING_UNDO_BUTTON_TAG).assertIsEnabled()
         compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsEnabled()
 
         // Undo & Redo
-        compose.onNodeWithTag(HANDWRITING_UNDO_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_UNDO_BUTTON_TAG)
         compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsNotEnabled()
-        compose.onNodeWithTag(HANDWRITING_REDO_BUTTON_TAG).assertIsEnabled().performClick()
+        clickToolbarItem(HANDWRITING_REDO_BUTTON_TAG)
         compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsEnabled()
 
         // 4. Eraser submenu: Small, Big, Stroke, Clear all
-        compose.onNodeWithTag(HANDWRITING_ERASER_BUTTON_TAG).performClick()
+        clickToolbarItem(HANDWRITING_ERASER_BUTTON_TAG)
         compose.onNodeWithText("Small").assertIsDisplayed()
         compose.onNodeWithText("Big").assertIsDisplayed()
         compose.onNodeWithText("Stroke").assertIsDisplayed()
         compose.onNodeWithText("Clear all").assertIsDisplayed().performClick()
         compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsNotEnabled()
 
-        // Undo Clear all so the stroke returns, then send the handwriting message
-        compose.onNodeWithTag(HANDWRITING_UNDO_BUTTON_TAG).performClick()
+        // Undo Clear all so the stroke returns, then send the handwriting message via the paired FAB
+        clickToolbarItem(HANDWRITING_UNDO_BUTTON_TAG)
         compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsEnabled().performClick()
 
         compose.runOnIdle {
@@ -129,13 +156,13 @@ class HandwritingComposerInstrumentedTest {
         // Verify the rendered ink message canvas is displayed in the chat list
         compose.onNodeWithTag(INK_MESSAGE_CANVAS_TAG).assertIsDisplayed()
 
-        // Switch back to Type mode
+        // Switch back to Type mode and verify toolbar animates closed
         compose.onNodeWithTag(HANDWRITING_TYPE_BUTTON_TAG).performClick()
-        compose.onNodeWithTag(HANDWRITING_MODE_BUTTON_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).assertIsDisplayed()
     }
 
     @Test
-    fun groupChatSupportsSendingAndReceivingHandwritingWithSenderName() {
+    fun groupChatSupportsHoldAndDragEmoticonMenuAndSendingAndReceivingHandwriting() {
         val groupId = "00000000-0000-0000-0009-3ffc6bdd2e50@live.com"
         val draft = mutableStateOf("")
         val messages = mutableStateListOf(
@@ -207,8 +234,33 @@ class HandwritingComposerInstrumentedTest {
         compose.onNodeWithText("Mr Listener").assertIsDisplayed()
         compose.onNodeWithTag(INK_MESSAGE_CANVAS_TAG).assertIsDisplayed()
 
-        // Verify Handwriting button is enabled in group chat and can send a drawing
-        compose.onNodeWithTag(HANDWRITING_MODE_BUTTON_TAG).assertIsDisplayed().assertIsEnabled().performClick()
+        // Test hold-and-drag in one continuous touch gesture:
+        // 1. Touch down on EMOTICON_MODE_BUTTON_TAG and hold past longPressTimeoutMillis
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100L)
+            moveBy(Offset(0f, 1f))
+        }
+        compose.waitForIdle()
+        // Menu is now open while finger is still held down! Find the Handwriting item's screen position relative to the button
+        val buttonNode = compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).fetchSemanticsNode()
+        val buttonScreenCenter = buttonNode.layoutInfo.coordinates.localToScreen(
+            Offset(buttonNode.size.width / 2f, buttonNode.size.height / 2f),
+        )
+        val handwritingItemNode = compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).fetchSemanticsNode()
+        val handwritingItemScreenCenter = handwritingItemNode.layoutInfo.coordinates.localToScreen(
+            Offset(handwritingItemNode.size.width / 2f, handwritingItemNode.size.height / 2f),
+        )
+        val delta = handwritingItemScreenCenter - buttonScreenCenter
+
+        // 2. While still holding, drag finger to the Handwriting option and release!
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput {
+            moveBy(Offset(delta.x, delta.y - 1f))
+            advanceEventTime(50L)
+            up()
+        }
+
+        // Handwriting toolbar & canvas open automatically from the hold-and-drag release!
         compose.onNodeWithTag(HANDWRITING_TOOLBAR_TAG).assertIsDisplayed()
         compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).performTouchInput {
             swipe(start = Offset(30f, 50f), end = Offset(200f, 95f), durationMillis = 120)
@@ -219,6 +271,40 @@ class HandwritingComposerInstrumentedTest {
             assertEquals(1, sentDrawings.size)
             assertEquals(2, messages.size)
             assertTrue(messages.last().isInk)
+        }
+    }
+
+    @Test
+    fun narrowWidthAutomaticallyPutsOverflowToolbarItemsIntoMenuWhileKeepingFabOutside() {
+        val state = HandwritingCanvasState()
+        val sentDrawings = mutableListOf<InkDrawing>()
+
+        compose.setContent {
+            MsngrTheme {
+                Box(modifier = Modifier.width(260.dp)) {
+                    HandwritingComposerPanel(
+                        state = state,
+                        enabled = true,
+                        onSendInk = { sentDrawings += it },
+                        onSwitchToTypeMode = {},
+                    )
+                }
+            }
+        }
+
+        // The paired Send FAB stays outside the overflow menu even on a narrow width
+        compose.onNodeWithTag(HANDWRITING_SEND_BUTTON_TAG).assertIsDisplayed()
+        // The overflow button appears in the toolbar because all 7 items do not fit in 260dp
+        compose.onNodeWithTag(HANDWRITING_OVERFLOW_BUTTON_TAG).assertIsDisplayed()
+        // Grid button is in the overflow menu, not directly in the toolbar
+        compose.onNodeWithTag(HANDWRITING_GRID_BUTTON_TAG).assertDoesNotExist()
+
+        // Tapping the overflow button opens the Material 3 Expressive menu with the overflowed items
+        compose.onNodeWithTag(HANDWRITING_OVERFLOW_BUTTON_TAG).performClick()
+        compose.onNodeWithTag(HANDWRITING_GRID_BUTTON_TAG).assertIsDisplayed().performClick()
+        compose.onNodeWithText("Small grid").assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertEquals(WlmGridStyle.SmallGrid, state.gridStyle)
         }
     }
 }

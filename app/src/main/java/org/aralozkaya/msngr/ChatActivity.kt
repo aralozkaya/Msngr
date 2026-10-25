@@ -10,12 +10,26 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -62,11 +76,17 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -91,9 +111,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -104,8 +130,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -620,125 +649,147 @@ private fun MessageComposer(
                     .padding(start = 16.dp, top = 6.dp, end = 16.dp),
             )
         }
-        if (handwritingMode) {
-            HandwritingComposerPanel(
-                state = handwritingState,
-                enabled = handwritingEnabled,
-                onSendInk = onSendInk,
-                onSwitchToTypeMode = { handwritingMode = false },
-                onStrokeActivity = onSendTyping,
-                modifier = Modifier.background(composerBackgroundColor),
-            )
-        } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(composerBackgroundColor)
-                .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .weight(1f, true)
-                    .requiredHeightIn(min = 56.dp),
-            ) {
+        BackHandler(enabled = handwritingMode) {
+            handwritingMode = false
+        }
+        AnimatedContent(
+            targetState = handwritingMode,
+            transitionSpec = {
+                val spatialSpec = MotionScheme.expressive().defaultSpatialSpec<IntSize>()
+                val effectsSpec = MotionScheme.expressive().defaultEffectsSpec<Float>()
+                val offsetSpec = MotionScheme.expressive().defaultSpatialSpec<IntOffset>()
+                if (targetState) {
+                    (fadeIn(animationSpec = effectsSpec) +
+                        expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Bottom) +
+                        slideInVertically(animationSpec = offsetSpec) { it / 3 })
+                        .togetherWith(
+                            fadeOut(animationSpec = effectsSpec) +
+                                shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Bottom),
+                        )
+                } else {
+                    (fadeIn(animationSpec = effectsSpec) +
+                        expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Bottom))
+                        .togetherWith(
+                            fadeOut(animationSpec = effectsSpec) +
+                                shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Bottom) +
+                                slideOutVertically(animationSpec = offsetSpec) { it / 3 },
+                        )
+                }.using(
+                    SizeTransform(
+                        clip = false,
+                        sizeAnimationSpec = { _, _ -> spatialSpec },
+                    ),
+                )
+            },
+            label = "handwritingComposerTransition",
+        ) { isHandwriting ->
+            if (isHandwriting) {
+                HandwritingComposerPanel(
+                    state = handwritingState,
+                    enabled = handwritingEnabled,
+                    onSendInk = onSendInk,
+                    onSwitchToTypeMode = { handwritingMode = false },
+                    onStrokeActivity = onSendTyping,
+                    toolbarVisible = transition.targetState == EnterExitState.Visible,
+                    modifier = Modifier.background(composerBackgroundColor),
+                )
+            } else {
                 Row(
                     modifier = Modifier
-                        .pointerInput(editorController, enabled) {
-                            detectTapGestures {
-                                if (!enabled) return@detectTapGestures
-                                editorController.requestFocusAndShowKeyboard()
-                            }
-                        }
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .fillMaxWidth()
+                        .background(composerBackgroundColor)
+                        .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Bottom,
                 ) {
-                    IconButton(
-                        onClick = { emoticonSheet.toggle(editorController) },
-                        enabled = enabled,
-                        shapes = IconButtonDefaults.shapes(),
-                    ) {
-                        if (emoticonSheet.visible) {
-                            Icon(Icons.Default.Keyboard, contentDescription = "Show keyboard")
-                        } else {
-                            Icon(Icons.Default.EmojiEmotions, contentDescription = "Show emoticons")
-                        }
-                    }
-                    if (!draft.hasMessengerPlusVisibleContent()) {
-                        IconButton(
-                            onClick = onSendNudge,
-                            enabled = nudgeEnabled,
-                            shapes = IconButtonDefaults.shapes(),
-                        ) {
-                            Icon(
-                                Icons.Default.NotificationsActive,
-                                contentDescription = "Send nudge"
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                colorSheet.dismiss()
-                                emoticonSheet.dismiss()
-                                showTextStyle = false
-                                editorController.hideKeyboard()
-                                handwritingMode = true
-                            },
-                            enabled = handwritingEnabled,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.testTag(HANDWRITING_MODE_BUTTON_TAG),
-                        ) {
-                            Icon(
-                                Icons.Default.Draw,
-                                contentDescription = "Handwriting",
-                            )
-                        }
-                    }
-                    MsnEmoticonEditor(
-                        nativeStyle = nativeStyle,
-                        onTextStyle = {
-                            colorSheet.dismiss()
-                            emoticonSheet.dismiss()
-                            editorController.hideKeyboard()
-                            showTextStyle = true
-                        },
-                        enabled = enabled,
-                        value = draft,
-                        onValueChange = onDraftChange,
+                    Surface(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         modifier = Modifier
-                            .weight(1f)
-                            .requiredHeightIn(min = 48.dp),
-                        convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
-                        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                        messengerPlusEnabled = messengerPlusEnabled,
-                        controller = editorController,
-                        onColors = if (messengerPlusEnabled) {
-                            { colorSheet.open(editorController) }
-                        } else {
-                            null
-                        },
-                    )
+                            .weight(1f, true)
+                            .requiredHeightIn(min = 56.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .pointerInput(editorController, enabled) {
+                                    detectTapGestures {
+                                        if (!enabled) return@detectTapGestures
+                                        editorController.requestFocusAndShowKeyboard()
+                                    }
+                                }
+                                .padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            EmoticonAndHandwritingMenuButton(
+                                enabled = enabled,
+                                handwritingEnabled = handwritingEnabled,
+                                emoticonSheetVisible = emoticonSheet.visible,
+                                onToggleEmoticons = { emoticonSheet.toggle(editorController) },
+                                onSelectEmoticons = { emoticonSheet.open(editorController) },
+                                onSelectHandwriting = {
+                                    colorSheet.dismiss()
+                                    emoticonSheet.dismiss()
+                                    showTextStyle = false
+                                    editorController.hideKeyboard()
+                                    handwritingMode = true
+                                },
+                            )
+                            if (!draft.hasMessengerPlusVisibleContent()) {
+                                IconButton(
+                                    onClick = onSendNudge,
+                                    enabled = nudgeEnabled,
+                                    shapes = IconButtonDefaults.shapes(),
+                                ) {
+                                    Icon(
+                                        Icons.Default.NotificationsActive,
+                                        contentDescription = "Send nudge",
+                                    )
+                                }
+                            }
+                            MsnEmoticonEditor(
+                                nativeStyle = nativeStyle,
+                                onTextStyle = {
+                                    colorSheet.dismiss()
+                                    emoticonSheet.dismiss()
+                                    editorController.hideKeyboard()
+                                    showTextStyle = true
+                                },
+                                enabled = enabled,
+                                value = draft,
+                                onValueChange = onDraftChange,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .requiredHeightIn(min = 48.dp),
+                                convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
+                                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                messengerPlusEnabled = messengerPlusEnabled,
+                                controller = editorController,
+                                onColors = if (messengerPlusEnabled) {
+                                    { colorSheet.open(editorController) }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                    FilledIconButton(
+                        modifier = Modifier
+                            .requiredHeight(56.dp)
+                            .aspectRatio(1f, true),
+                        onClick = onSendMessage,
+                        shapes = IconButtonDefaults.shapes(
+                            pressedShape = IconButtonDefaults.mediumPressedShape,
+                        ),
+                        enabled = enabled && draft.hasMessengerPlusVisibleContent(),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
+                    }
                 }
             }
-            FilledIconButton(
-                modifier = Modifier
-                    .requiredHeight(56.dp)
-                    .aspectRatio(1f, true),
-                onClick = onSendMessage,
-                shapes = IconButtonDefaults.shapes(
-                    pressedShape = IconButtonDefaults.mediumPressedShape,
-                ),
-                enabled = enabled && draft.hasMessengerPlusVisibleContent(),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
-            }
-        }
         }
         Spacer(
             modifier = Modifier
@@ -746,6 +797,328 @@ private fun MessageComposer(
                 .background(slotBackgroundColor)
                 .windowInsetsBottomHeight(bottomInsets),
         )
+    }
+}
+
+private enum class ComposerEmoticonMenuOption {
+    Emoticons,
+    Handwriting,
+}
+
+@Composable
+private fun EmoticonAndHandwritingMenuButton(
+    enabled: Boolean,
+    handwritingEnabled: Boolean,
+    emoticonSheetVisible: Boolean,
+    onToggleEmoticons: () -> Unit,
+    onSelectEmoticons: () -> Unit,
+    onSelectHandwriting: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val horizontalHitPadPx = with(density) { 36.dp.toPx() }
+    var menuExpanded by remember { mutableStateOf(false) }
+    var draggedOption by remember { mutableStateOf<ComposerEmoticonMenuOption?>(null) }
+    var suppressNextClick by remember { mutableStateOf(false) }
+    var anchorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var emoticonsItemBounds by remember { mutableStateOf<Rect?>(null) }
+    var handwritingItemBounds by remember { mutableStateOf<Rect?>(null) }
+    var lastDragScreenOffset by remember { mutableStateOf<Offset?>(null) }
+    var hasDraggedAfterLongPress by remember { mutableStateOf(false) }
+    val groupInteractionSource = remember { MutableInteractionSource() }
+    val emoticonsItemInteractionSource = remember { MutableInteractionSource() }
+    val handwritingItemInteractionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(draggedOption == ComposerEmoticonMenuOption.Emoticons) {
+        if (draggedOption == ComposerEmoticonMenuOption.Emoticons) {
+            val press = PressInteraction.Press(Offset.Zero)
+            emoticonsItemInteractionSource.emit(press)
+        }
+    }
+    LaunchedEffect(draggedOption == ComposerEmoticonMenuOption.Handwriting) {
+        if (draggedOption == ComposerEmoticonMenuOption.Handwriting) {
+            val press = PressInteraction.Press(Offset.Zero)
+            handwritingItemInteractionSource.emit(press)
+        }
+    }
+
+    val resolveOptionAtScreenOffset: (Offset?) -> ComposerEmoticonMenuOption? = { screenPos ->
+        if (screenPos == null) {
+            null
+        } else {
+            val emoBounds = emoticonsItemBounds
+            val hwBounds = handwritingItemBounds
+            when {
+                emoBounds != null &&
+                    screenPos.y in emoBounds.top..emoBounds.bottom &&
+                    screenPos.x in (emoBounds.left - horizontalHitPadPx)..(emoBounds.right + horizontalHitPadPx) ->
+                    ComposerEmoticonMenuOption.Emoticons
+                handwritingEnabled &&
+                    hwBounds != null &&
+                    screenPos.y in hwBounds.top..hwBounds.bottom &&
+                    screenPos.x in (hwBounds.left - horizontalHitPadPx)..(hwBounds.right + horizontalHitPadPx) ->
+                    ComposerEmoticonMenuOption.Handwriting
+                else -> null
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .onGloballyPositioned { anchorCoordinates = it }
+            .pointerInput(enabled, handwritingEnabled) {
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    suppressNextClick = false
+                    val touchSlop = viewConfiguration.touchSlop
+                    var movedBeforeLongPress = false
+
+                    val releasedBeforeTimeout = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val current = event.changes.firstOrNull { it.id == down.id }
+                                ?: event.changes.firstOrNull()
+                                ?: return@withTimeoutOrNull true
+                            if (!current.pressed) {
+                                return@withTimeoutOrNull true
+                            }
+                            if ((current.position - down.position).getDistance() > touchSlop) {
+                                movedBeforeLongPress = true
+                                return@withTimeoutOrNull true
+                            }
+                        }
+                    }
+
+                    if (releasedBeforeTimeout == null && !movedBeforeLongPress) {
+                        suppressNextClick = true
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        draggedOption = null
+                        hasDraggedAfterLongPress = false
+                        lastDragScreenOffset = null
+                        menuExpanded = true
+
+                        var lastLocalPos = down.position
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                                ?: event.changes.firstOrNull()
+                                ?: break
+                            lastLocalPos = change.position
+                            val screenPos = anchorCoordinates
+                                ?.takeIf { it.isAttached }
+                                ?.localToScreen(change.position)
+                            lastDragScreenOffset = screenPos
+                            if ((change.position - down.position).getDistance() > touchSlop * 0.4f) {
+                                hasDraggedAfterLongPress = true
+                            }
+                            if (hasDraggedAfterLongPress) {
+                                draggedOption = resolveOptionAtScreenOffset(screenPos)
+                            }
+                            event.changes.forEach { it.consume() }
+                            if (!event.changes.any { it.pressed }) {
+                                break
+                            }
+                        }
+
+                        val finalScreenPos = anchorCoordinates
+                            ?.takeIf { it.isAttached }
+                            ?.localToScreen(lastLocalPos)
+                            ?: lastDragScreenOffset
+                        val chosenOption = if (hasDraggedAfterLongPress) {
+                            resolveOptionAtScreenOffset(finalScreenPos) ?: draggedOption
+                        } else {
+                            null
+                        }
+                        draggedOption = null
+                        lastDragScreenOffset = null
+                        hasDraggedAfterLongPress = false
+
+                        when (chosenOption) {
+                            ComposerEmoticonMenuOption.Emoticons -> {
+                                menuExpanded = false
+                                onSelectEmoticons()
+                            }
+                            ComposerEmoticonMenuOption.Handwriting -> {
+                                menuExpanded = false
+                                onSelectHandwriting()
+                            }
+                            null -> {
+                                // Finger released without dragging to an option: keep menu open.
+                            }
+                        }
+                    }
+                }
+            },
+    ) {
+        IconButton(
+            onClick = {
+                if (suppressNextClick) {
+                    suppressNextClick = false
+                } else if (menuExpanded) {
+                    menuExpanded = false
+                } else {
+                    onToggleEmoticons()
+                }
+            },
+            enabled = enabled,
+            shapes = IconButtonDefaults.shapes(),
+            modifier = Modifier
+                .testTag(EMOTICON_MODE_BUTTON_TAG)
+                .semantics {
+                    onLongClick("Open emoticon and handwriting menu") {
+                        menuExpanded = true
+                        true
+                    }
+                },
+        ) {
+            Box(
+                modifier = Modifier.size(28.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (emoticonSheetVisible) {
+                    Icon(
+                        Icons.Default.Keyboard,
+                        contentDescription = "Show keyboard",
+                        modifier = Modifier.size(22.dp),
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.EmojiEmotions,
+                        contentDescription = "Show emoticons",
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                val dotColor = LocalContentColor.current
+                val badgeBgColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                Canvas(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(width = 11.dp, height = 5.dp)
+                        .testTag(EMOTICON_LONG_PRESS_DOTS_TAG),
+                ) {
+                    val dotRadius = 1.25.dp.toPx()
+                    val haloRadius = 2.0.dp.toPx()
+                    val cy = size.height - dotRadius - 0.5.dp.toPx()
+                    val spacing = 3.2.dp.toPx()
+                    val centerX = size.width / 2f
+                    val xs = floatArrayOf(centerX - spacing, centerX, centerX + spacing)
+                    for (x in xs) {
+                        drawCircle(
+                            color = badgeBgColor,
+                            radius = haloRadius,
+                            center = Offset(x, cy),
+                        )
+                    }
+                    for (x in xs) {
+                        drawCircle(
+                            color = dotColor,
+                            radius = dotRadius,
+                            center = Offset(x, cy),
+                        )
+                    }
+                }
+            }
+        }
+
+        DropdownMenuPopup(
+            expanded = menuExpanded,
+            onDismissRequest = {
+                menuExpanded = false
+                draggedOption = null
+            },
+        ) {
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 1),
+                interactionSource = groupInteractionSource,
+            ) {
+                val isEmoticonsHovered = draggedOption == ComposerEmoticonMenuOption.Emoticons
+                val isHandwritingHovered = draggedOption == ComposerEmoticonMenuOption.Handwriting
+                DropdownMenuItem(
+                    text = { Text("Emoticons") },
+                    leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
+                    shape = MenuDefaults.leadingItemShape,
+                    interactionSource = emoticonsItemInteractionSource,
+                    colors = if (isEmoticonsHovered) {
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            leadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        MenuDefaults.itemColors()
+                    },
+                    modifier = Modifier
+                        .background(
+                            color = if (isEmoticonsHovered) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                Color.Transparent
+                            },
+                            shape = MenuDefaults.leadingItemShape,
+                        )
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                val topLeft = coords.localToScreen(Offset.Zero)
+                                emoticonsItemBounds = Rect(
+                                    topLeft,
+                                    Size(coords.size.width.toFloat(), coords.size.height.toFloat()),
+                                )
+                                if (menuExpanded && hasDraggedAfterLongPress) {
+                                    draggedOption = resolveOptionAtScreenOffset(lastDragScreenOffset)
+                                }
+                            }
+                        }
+                        .testTag(EMOTICON_MENU_EMOTICONS_ITEM_TAG),
+                    onClick = {
+                        menuExpanded = false
+                        draggedOption = null
+                        onSelectEmoticons()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Handwriting") },
+                    leadingIcon = { Icon(Icons.Default.Draw, contentDescription = null) },
+                    shape = MenuDefaults.trailingItemShape,
+                    enabled = handwritingEnabled,
+                    interactionSource = handwritingItemInteractionSource,
+                    colors = if (isHandwritingHovered) {
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            leadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        MenuDefaults.itemColors()
+                    },
+                    modifier = Modifier
+                        .background(
+                            color = if (isHandwritingHovered) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                Color.Transparent
+                            },
+                            shape = MenuDefaults.trailingItemShape,
+                        )
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                val topLeft = coords.localToScreen(Offset.Zero)
+                                handwritingItemBounds = Rect(
+                                    topLeft,
+                                    Size(coords.size.width.toFloat(), coords.size.height.toFloat()),
+                                )
+                                if (menuExpanded && hasDraggedAfterLongPress) {
+                                    draggedOption = resolveOptionAtScreenOffset(lastDragScreenOffset)
+                                }
+                            }
+                        }
+                        .testTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG),
+                    onClick = {
+                        menuExpanded = false
+                        draggedOption = null
+                        onSelectHandwriting()
+                    },
+                )
+            }
+        }
     }
 }
 
