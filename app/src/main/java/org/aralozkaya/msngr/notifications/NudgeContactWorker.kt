@@ -3,6 +3,7 @@ package org.aralozkaya.msngr.notifications
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import org.aralozkaya.msngr.data.NudgeCooldownException
 
 internal class NudgeContactWorker(
     context: Context,
@@ -44,7 +45,8 @@ internal class NudgeContactWorker(
             notifications.dismiss(notificationId)
             return Result.success()
         }
-        if (runAttemptCount < MAX_RETRIES) return Result.retry()
+        // A rejected tap must not become a delayed nudge after WorkManager's retry backoff.
+        if (sent.exceptionOrNull() !is NudgeCooldownException && runAttemptCount < MAX_RETRIES) return Result.retry()
         return finalFailure(notifications, contactId, contactName, notificationId, channelId)
     }
 
