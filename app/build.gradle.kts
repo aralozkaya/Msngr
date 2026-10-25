@@ -73,6 +73,7 @@ android {
 
 dependencies {
     implementation(libs.material.color.utilities)
+    implementation(libs.markdown.renderer.m3)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

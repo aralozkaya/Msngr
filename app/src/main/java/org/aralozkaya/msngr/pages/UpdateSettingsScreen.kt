@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -66,6 +65,7 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.pages.components.ReleaseNotes
 import org.aralozkaya.msngr.updates.APK_MIME_TYPE
 import org.aralozkaya.msngr.updates.RELEASES_PAGE
 import org.aralozkaya.msngr.updates.UpdateInterval
@@ -211,7 +211,7 @@ fun UpdateSettingsScreen(
                     Text(stringResource(R.string.update_release_date, DateFormat.getMediumDateFormat(context).format(Date(release.publishedAt))))
                     if (release.prerelease) Text(stringResource(R.string.update_prerelease_label), color = MaterialTheme.colorScheme.tertiary)
                     Text(stringResource(R.string.update_changelog), style = MaterialTheme.typography.titleMedium)
-                    SelectionContainer { Text(release.notes.ifBlank { stringResource(R.string.update_no_changelog) }) }
+                    ReleaseNotes(release.notes, Modifier.fillMaxWidth().testTag("release-notes"))
                     if (state.downloading) {
                         LinearWavyProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth())
                         Text(stringResource(R.string.update_downloading, (state.downloadProgress * 100).toInt()))
