@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
@@ -83,6 +84,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -222,13 +224,20 @@ private fun ChatRoute(
         }
     }
 
+    var nudgeShakeCount by rememberSaveable(contactId) { mutableIntStateOf(0) }
     LaunchedEffect(contactId, lifecycleOwner) {
         observeConversationReadState(repository, contactId, lifecycleOwner.lifecycle)
+    }
+    LaunchedEffect(contactId, lifecycleOwner) {
+        observeConversationNudgeShakes(repository, contactId, lifecycleOwner.lifecycle) {
+            nudgeShakeCount++
+        }
     }
 
     ChatScreen(
         otherUnreadCount = otherUnreadCount(contacts, contactId),
         nudgeCooldownMillis = nudgeCooldownMillis,
+        nudgeShakeCount = nudgeShakeCount,
         nativeStyle = textStyles[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle(),
         onNativeStyleChange = { repository.updateTextStyle(contactId, it) },
         onSizeNoticeRequested = { repository.markTextSizeNoticeShown(contactId) },
@@ -270,9 +279,18 @@ internal fun ChatScreen(
     nativeStyle: NativeTextStyle = NativeTextStyle(),
     onNativeStyleChange: (NativeTextStyle) -> Unit = {},
     onSizeNoticeRequested: () -> Boolean = { false },
+    nudgeShakeCount: Int = 0,
     otherUnreadCount: Int = 0,
     nudgeCooldownMillis: Long = 0L,
 ) {
+    val nudgeShakeState = rememberNudgeShakeState()
+    var handledNudgeShakeCount by rememberSaveable(contact?.id) { mutableIntStateOf(0) }
+    LaunchedEffect(nudgeShakeCount) {
+        if (nudgeShakeCount > handledNudgeShakeCount) {
+            handledNudgeShakeCount = nudgeShakeCount
+            nudgeShakeState.trigger()
+        }
+    }
     val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
     val scenePresentation = LocalScenePresentation.current
@@ -322,7 +340,16 @@ internal fun ChatScreen(
         }
     }
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+    ) {
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .offset { nudgeShakeState.offsetDp.toIntOffset(this) }
+            .testTag(CHAT_SCREEN_SHAKE_CONTAINER_TAG),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         snackbarHost = { ContactPresenceSnackbar(contact, isConversationAvailable) },
         topBar = {
@@ -442,7 +469,10 @@ internal fun ChatScreen(
                         onDraftChange("")
                     }
                 },
-                onSendNudge = onSendNudge,
+                onSendNudge = {
+                    nudgeShakeState.trigger()
+                    onSendNudge()
+                },
                 emoticonSettings = emoticonSettings,
                 messengerPlusEnabled = messengerPlusEnabled,
             )
@@ -458,6 +488,7 @@ internal fun ChatScreen(
             onRetryMessage = onRetryMessage,
             textSize = nativeStyle.size,
         )
+    }
     }
 }
 

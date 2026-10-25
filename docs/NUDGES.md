@@ -23,6 +23,17 @@ after approximately one second, but does not restore sending while that flag
 is set. The constructor initializes sending as available. There is no
 consecutive-send counter in these paths: the maximum immediate burst is one.
 
+For both outgoing and incoming nudges, `0x568931` also starts window-shake timer
+`0x12c` with interval `0x14` (**20 ms**) and records `GetTickCount()` at
+`[this + 0x368]`. Each `0x12c` timer tick (`0x568bb5`) calls `0x55d317`, which
+adds the signed `(dx, dy)` step from the 13-entry `POINT` table at `0x430da0`
+(`(4, 3)`, `(-3, -6)`, `(-3, 4)`, `(2, 2)`, `(-3, -5)`, `(5, 5)`, `(-3, -6)`,
+`(-3, 6)`, `(-1, -3)`, `(6, -1)`, `(-3, 4)`, `(6, -6)`, `(-4, 3)`) and advances
+the step index `[this + 0x36c]` modulo 13. The 13 steps sum to `(0, 0)`, so each
+260 ms cycle returns the window to its origin on step 12. Only when the step
+index wraps back to `0` does `0x568bb5` check whether `GetTickCount() - startTick > 1000`,
+stopping after **4 full cycles** (**52 steps / 1,040 ms**) at `(0, 0)`.
+
 ## App behavior
 
 - The live and mock clients enforce the cooldown before sending. A reservation
@@ -36,8 +47,13 @@ consecutive-send counter in these paths: the maximum immediate burst is one.
   without creating an incoming alert.
 - Incoming private and group nudges always append their usual chat text and
   update unread state. An independent receiving check decides whether to emit
-  an alert event, which feeds both Android notifications and in-app banners
-  and vibrations.
+  an alert event, which feeds Android notifications, in-app banners and
+  vibrations, and the chat screen shake.
+- Sending a nudge from the composer or receiving an allowed nudge while that
+  conversation is open in `ChatActivity` shakes the entire chat screen content
+  using the 13-step, 20 ms Windows Live Messenger 2009 trajectory (4 cycles,
+  1,040 ms). Nudges received while outside that conversation are queued per
+  conversation and coalesced into a single shake when the conversation is opened.
 - Receiving limits apply to each sender in each conversation, combining the
   sender's endpoints and case variants. A group member cannot consume another
   member's allowance.
