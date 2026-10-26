@@ -22,7 +22,12 @@ internal class NudgeContactWorker(
             ?.takeIf(ALLOWED_CHANNEL_IDS::contains)
             ?: NotificationChannels.MESSAGES
         val notifications = MsngrNotificationManager(applicationContext)
-        val repository = applicationContext.connectedRepositoryForNotificationAction()
+        val repository = try {
+            applicationContext.connectedRepositoryForNotificationAction()
+        } catch (_: NotificationActionSessionRestoreException) {
+            if (runAttemptCount < MAX_RETRIES) return Result.retry()
+            null
+        }
             ?: return finalFailure(
                 notifications,
                 contactId,

@@ -854,7 +854,7 @@ internal class MsngrNotificationManager(
         private const val EVENT_NOTIFICATION_ID_COUNT = 90_000
         private const val NUDGE_REQUEST_CODE_OFFSET = 400_000
         private const val SELF_PERSON_KEY = "me"
-        private const val STATUS_SENDING_REPLY = "Sending replyâ€¦"
+        private const val STATUS_SENDING_REPLY = "Sending reply\u2026"
         private const val STATUS_REPLY_FAILED =
             "Reply not sent. Open Msngr to reconnect and try again."
         private const val EXTRA_IS_ACTION_STATUS = "msngr_is_action_status"

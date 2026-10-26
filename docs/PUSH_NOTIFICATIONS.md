@@ -63,6 +63,10 @@ launches it again.
 - Message notifications offer `RemoteInput` replies and a one-tap **Nudge** action. Both are queued
   as expedited WorkManager tasks with a network constraint. Their workers use the active MSNP
   session, reconnect it, or sign back in from encrypted remembered credentials.
+  Failed connection attempts during session restoration use the same bounded retry budget as
+  delivery failures, instead of immediately reporting that the action was not sent. Missing
+  credentials and remotely revoked sessions still require sign-in; nudge cooldown rejections
+  are never retried as delayed nudges.
 - Incoming nudge notifications offer a **Nudge back** action through the same delivery path.
 - Messages, nudges, and contact sign-in alerts use Android's Conversations API (MessagingStyle,
   long-lived conversation ShortcutInfoCompat, and matching LocusId): the contact photo
