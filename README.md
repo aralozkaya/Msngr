@@ -199,8 +199,11 @@ candidate to stable, then with each patch, minor, or major version. Supported ra
 major 0–209, minor/patch 0–99, and prerelease number 1–99; malformed tags stop the build.
 The GitHub release title is free-form; its tag is the version source.
 
-Local builds default to **1.0.0-dev**. To build a specific release version locally, pass
-`-PreleaseTag=v1.2.3` to Gradle.
+Local builds use the nearest release tag in the checked-out Git history for both the version
+name and Android version code. Fetch new release tags with `git fetch origin --tags` when
+updating the checkout. To override the version, pass `-PreleaseTag=v1.2.3` to Gradle or set
+`RELEASE_TAG`; the Gradle property takes priority. Builds without a matching Git tag default
+to **1.0.0-dev**.
 
 ## Under the hood
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -89,6 +90,7 @@ class VoiceClipInstrumentedTest {
             onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {}, onSendTyping = {}, onSendNudge = {},
             onLoadOlderMessages = {}) } }
         compose.onNodeWithContentDescription("Record voice clip").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Send message").assertIsNotEnabled()
     }
 
     private fun grantMicrophone() {
@@ -224,17 +226,23 @@ class VoiceClipInstrumentedTest {
 
     @Test fun chatComposerKeepsHeldMicrophoneAndKeyboardInPlaceUntilReview() {
         grantMicrophone()
+        val draft = mutableStateOf("Message")
         val peer = org.aralozkaya.msngr.data.Contact("peer", "Alex", "alex@example.test",
             org.aralozkaya.msngr.enums.Presence.Online)
         val clip = MsnVoiceClip.parse(nativeWave())!!
         compose.setContent { MaterialTheme {
-            ChatScreen("", {}, peer, messages = listOf(
+            ChatScreen(draft.value, { draft.value = it }, peer, messages = listOf(
                 ChatMessage(1, "peer", MessageAuthor.Contact, "Voice clip", 1, voiceClip = clip),
                 ChatMessage(2, "peer", MessageAuthor.Me, "Voice clip", 2, voiceClip = clip)),
                 isHistoryLoaded = true, canLoadOlderMessages = false, isTyping = false,
                 onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {}, onSendTyping = {}, onSendNudge = {},
                 onSendVoiceClip = { Result.success(Unit) }, onLoadOlderMessages = {})
         } }
+        compose.onNodeWithContentDescription("Send message").assertIsEnabled()
+        compose.onNodeWithContentDescription("Record voice clip").assertDoesNotExist()
+        compose.runOnIdle { draft.value = "" }
+        compose.onNodeWithContentDescription("Send message").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Record voice clip").assertIsEnabled()
         compose.onNodeWithContentDescription("Message input").performClick()
         Thread.sleep(500)
         val before = compose.onNodeWithContentDescription("Record voice clip").fetchSemanticsNode().boundsInRoot.center
