@@ -118,6 +118,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -572,51 +573,84 @@ internal fun ChatMessageList(
     // Index zero is the bottom anchor, even when history arrives after composition.
     // The first measure and subsequent IME resizes therefore show the newest message
     // without a corrective scroll. Storage and bubble grouping stay chronological.
-    val newestFirst = remember(messages) { messages.asReversed() }
-    LazyColumn(
-        state = listState,
-        reverseLayout = true,
-        verticalArrangement = Arrangement.Top,
+    val dayLabels = rememberChatDayLabels()
+    val timeline = remember(messages, dayLabels.timeZone) { chatTimeline(messages, dayLabels.timeZone) }
+    val stickyDayAlpha = rememberChatStickyDayAlpha(listState)
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .padding(top = innerPadding.calculateTopPadding())
             .consumeWindowInsets(innerPadding),
-        contentPadding = PaddingValues(
-            start = innerPadding.calculateStartPadding(layoutDirection) + 14.dp,
-            top = 14.dp,
-            end = innerPadding.calculateEndPadding(layoutDirection) + 14.dp,
-            bottom = innerPadding.calculateBottomPadding() + 14.dp,
-        ),
     ) {
-        if (isHistoryLoaded && messages.isEmpty()) {
-            item(key = "empty-conversation") {
-                Text(
-                    text = stringResource(R.string.empty_conversation_warning),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        LazyColumn(
+            state = listState,
+            reverseLayout = true,
+            verticalArrangement = Arrangement.Top,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = innerPadding.calculateStartPadding(layoutDirection) + 14.dp,
+                top = 14.dp,
+                end = innerPadding.calculateEndPadding(layoutDirection) + 14.dp,
+                bottom = innerPadding.calculateBottomPadding() + 14.dp,
+            ),
+        ) {
+            if (isHistoryLoaded && messages.isEmpty()) {
+                item(key = "empty-conversation") {
+                    Text(
+                        text = stringResource(R.string.empty_conversation_warning),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            itemsIndexed(
+                timeline,
+                key = { _, item -> item.key },
+                contentType = { _, item -> if (item is ChatTimelineItem.DayDivider) "day" else "message" },
+            ) { index, item ->
+                if (item is ChatTimelineItem.DayDivider) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = ChatDayChipSpacing),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ChatDayChip(
+                            dayLabels.label(item.dayMillis),
+                            modifier = Modifier.graphicsLayer {
+                                val layout = listState.layoutInfo
+                                val row = layout.visibleItemsInfo.firstOrNull { it.key == item.key }
+                                // The overlay takes over this chip once it passes the visual top.
+                                alpha = if (stickyDayAlpha.value > 0f && row != null &&
+                                    layout.viewportEndOffset - row.offset - row.size < 0
+                                ) 0f else 1f
+                            },
+                        )
+                    }
+                    return@itemsIndexed
+                }
+                val message = (item as ChatTimelineItem.Message).message
+                val previous = (timeline.getOrNull(index + 1) as? ChatTimelineItem.Message)?.message
+                val next = (timeline.getOrNull(index - 1) as? ChatTimelineItem.Message)?.message
+                val joinsPrevious = previous.groupsWith(message)
+                val joinsNext = message.groupsWith(next)
+                MessageBubble(
+                    message = message,
+                    textSize = textSize,
+                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                    showSenderName = isGroup,
+                    joinsPrevious = joinsPrevious,
+                    joinsNext = joinsNext,
+                    onRetry = { onRetryMessage(message) },
+                    modifier = Modifier.padding(
+                        top = when {
+                            previous == null -> 0.dp
+                            joinsPrevious -> 3.dp
+                            else -> 12.dp
+                        },
+                    ),
                 )
             }
         }
-        itemsIndexed(newestFirst, key = { _, message -> message.id }) { index, message ->
-            val joinsPrevious = newestFirst.getOrNull(index + 1).groupsWith(message)
-            val joinsNext = message.groupsWith(newestFirst.getOrNull(index - 1))
-            MessageBubble(
-                message = message,
-                textSize = textSize,
-                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                showSenderName = isGroup,
-                joinsPrevious = joinsPrevious,
-                joinsNext = joinsNext,
-                onRetry = { onRetryMessage(message) },
-                modifier = Modifier.padding(
-                    top = when {
-                        index == newestFirst.lastIndex -> 0.dp
-                        joinsPrevious -> 3.dp
-                        else -> 12.dp
-                    },
-                ),
-            )
-        }
+        ChatStickyDay(timeline, listState, dayLabels, stickyDayAlpha)
     }
 }
 
