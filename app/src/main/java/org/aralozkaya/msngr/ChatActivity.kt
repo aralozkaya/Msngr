@@ -739,104 +739,107 @@ private fun MessageComposer(
                     modifier = Modifier.background(composerBackgroundColor),
                 )
             } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(composerBackgroundColor)
-                        .padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier
-                            .weight(1f, true)
-                            .requiredHeightIn(min = 56.dp),
-                    ) {
-                        Row(
+                VoiceClipComposer(
+                    enabled = enabled && voiceClipsEnabled,
+                    voiceButtonVisible = voiceClipsVisible && !draft.hasMessengerPlusVisibleContent(),
+                    onSend = onSendVoiceClip,
+                    onRecordingStarted = {
+                        colorSheet.dismiss()
+                        emoticonSheet.dismiss()
+                        showTextStyle = false
+                    },
+                    onRecordingFinished = { editorController.hideKeyboard() },
+                    textComposer = {
+                        Surface(
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             modifier = Modifier
-                                .pointerInput(editorController, enabled) {
-                                    detectTapGestures {
-                                        if (!enabled) return@detectTapGestures
-                                        editorController.requestFocusAndShowKeyboard()
+                                .fillMaxWidth()
+                                .requiredHeightIn(min = 56.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .pointerInput(editorController, enabled) {
+                                        detectTapGestures {
+                                            if (!enabled) return@detectTapGestures
+                                            editorController.requestFocusAndShowKeyboard()
+                                        }
+                                    }
+                                    .padding(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                EmoticonAndHandwritingMenuButton(
+                                    enabled = enabled,
+                                    handwritingEnabled = handwritingEnabled,
+                                    emoticonSheetVisible = emoticonSheet.visible,
+                                    onToggleEmoticons = { emoticonSheet.toggle(editorController) },
+                                    onSelectEmoticons = { emoticonSheet.open(editorController) },
+                                    onSelectHandwriting = {
+                                        colorSheet.dismiss()
+                                        emoticonSheet.dismiss()
+                                        showTextStyle = false
+                                        editorController.hideKeyboard()
+                                        handwritingMode = true
+                                    },
+                                )
+                                if (!draft.hasMessengerPlusVisibleContent()) {
+                                    IconButton(
+                                        onClick = onSendNudge,
+                                        enabled = nudgeEnabled,
+                                        shapes = IconButtonDefaults.shapes(),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.NotificationsActive,
+                                            contentDescription = "Send nudge",
+                                        )
                                     }
                                 }
-                                .padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            EmoticonAndHandwritingMenuButton(
-                                enabled = enabled,
-                                handwritingEnabled = handwritingEnabled,
-                                emoticonSheetVisible = emoticonSheet.visible,
-                                onToggleEmoticons = { emoticonSheet.toggle(editorController) },
-                                onSelectEmoticons = { emoticonSheet.open(editorController) },
-                                onSelectHandwriting = {
-                                    colorSheet.dismiss()
-                                    emoticonSheet.dismiss()
-                                    showTextStyle = false
-                                    editorController.hideKeyboard()
-                                    handwritingMode = true
-                                },
-                            )
-                            if (!draft.hasMessengerPlusVisibleContent()) {
-                                IconButton(
-                                    onClick = onSendNudge,
-                                    enabled = nudgeEnabled,
-                                    shapes = IconButtonDefaults.shapes(),
-                                ) {
-                                    Icon(
-                                        Icons.Default.NotificationsActive,
-                                        contentDescription = "Send nudge",
-                                    )
-                                }
+                                MsnEmoticonEditor(
+                                    nativeStyle = nativeStyle,
+                                    onTextStyle = {
+                                        colorSheet.dismiss()
+                                        emoticonSheet.dismiss()
+                                        editorController.hideKeyboard()
+                                        showTextStyle = true
+                                    },
+                                    enabled = enabled,
+                                    value = draft,
+                                    onValueChange = onDraftChange,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .requiredHeightIn(min = 48.dp),
+                                    convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
+                                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                    messengerPlusEnabled = messengerPlusEnabled,
+                                    controller = editorController,
+                                    onColors = if (messengerPlusEnabled) {
+                                        { colorSheet.open(editorController) }
+                                    } else {
+                                        null
+                                    },
+                                )
                             }
-                            MsnEmoticonEditor(
-                                nativeStyle = nativeStyle,
-                                onTextStyle = {
-                                    colorSheet.dismiss()
-                                    emoticonSheet.dismiss()
-                                    editorController.hideKeyboard()
-                                    showTextStyle = true
-                                },
-                                enabled = enabled,
-                                value = draft,
-                                onValueChange = onDraftChange,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .requiredHeightIn(min = 48.dp),
-                                convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
-                                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                                messengerPlusEnabled = messengerPlusEnabled,
-                                controller = editorController,
-                                onColors = if (messengerPlusEnabled) {
-                                    { colorSheet.open(editorController) }
-                                } else {
-                                    null
-                                },
-                            )
                         }
-                    }
-                    if (voiceClipsVisible && !draft.hasMessengerPlusVisibleContent()) {
-                        VoiceClipComposerButton(enabled = enabled && voiceClipsEnabled, onSend = onSendVoiceClip)
-                    }
-                    FilledIconButton(
-                        modifier = Modifier
-                            .requiredHeight(56.dp)
-                            .aspectRatio(1f, true),
-                        onClick = onSendMessage,
-                        shapes = IconButtonDefaults.shapes(
-                            pressedShape = IconButtonDefaults.mediumPressedShape,
-                        ),
-                        enabled = enabled && draft.hasMessengerPlusVisibleContent(),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
-                    }
-                }
+                    },
+                    sendButton = {
+                        FilledIconButton(
+                            modifier = Modifier
+                                .requiredHeight(56.dp)
+                                .aspectRatio(1f, true),
+                            onClick = onSendMessage,
+                            shapes = IconButtonDefaults.shapes(
+                                pressedShape = IconButtonDefaults.mediumPressedShape,
+                            ),
+                            enabled = enabled && draft.hasMessengerPlusVisibleContent(),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
+                        }
+                    },
+                )
             }
         }
         Spacer(

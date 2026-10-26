@@ -6,10 +6,15 @@ they are not sent through offline messaging. The app advertises the base
 `SupportsVoiceIM` capability (`0x40000`), and does not advertise the extended
 WMA or circle/group voice capabilities.
 
-Tap the microphone beside the empty message composer, allow microphone access,
-then start recording. Stop, preview, record again, send, or cancel. Recording
-stops after 15 seconds and is discarded when the dialog closes or the activity
-leaves the foreground. Incoming clips play only when tapped. Clip audio is
+Hold the microphone beside the empty message composer to replace the input with
+a recording bar and live voice-level waveform. Allow microphone access when
+prompted, then hold again to start. Release to preview the clip, send it, or
+delete it. Drag onto the floating lock to keep recording without holding;
+tapping the lock unlocks recording and stops it if the microphone is no longer
+held. Recording stops after 15 seconds and is discarded when the activity
+leaves the foreground. Material motion animates recording, review, and lock
+transitions. Incoming clips have separate playback surfaces and play only when
+tapped. Clip audio is
 stored with account-specific local conversation history and removed when that
 history is erased. Interrupted downloads become an unavailable-clip message
 after a restart; malformed audio is not handed to a platform media decoder.

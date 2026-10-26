@@ -24,7 +24,8 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   counts, and local history that survives restarts and reconnects.
 - **Leave a message.** Send private text and emoticons to offline Escargot contacts and receive
   queued messages when you reconnect, with their original timestamps.
-- **Say it out loud.** Record up to 15 seconds, preview, send, and play
+- **Say it out loud.** Hold to record up to 15 seconds with a live waveform,
+  drag up to lock hands-free recording, then preview, send, and play
   [voice clips](docs/VOICE_CLIPS.md) in one-to-one chats with online contacts.
   Voice clips do not work in group chats.
 - **Bring the group along.** Chat in persistent Messenger groups (MSNP18 circles), see members
