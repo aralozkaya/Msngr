@@ -2,7 +2,9 @@ package org.aralozkaya.msngr
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -71,6 +73,7 @@ class VoiceClipInstrumentedTest {
             onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {}, onSendTyping = {}, onSendNudge = {},
             onLoadOlderMessages = {}) } }
         compose.onNodeWithContentDescription("Record voice clip").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Send message").assertIsNotEnabled()
     }
 
     @Test fun recordsPreviewsAndSendsFromTheComposer() {
@@ -78,10 +81,18 @@ class VoiceClipInstrumentedTest {
         InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
             context.packageName, android.Manifest.permission.RECORD_AUDIO)
         var sent: org.aralozkaya.msngr.protocol.VoiceClip? = null
-        compose.setContent { MaterialTheme { VoiceClipComposerButton(true) { clip ->
-            sent = clip; Result.success(Unit)
-        } } }
-        compose.onNodeWithContentDescription("Record voice clip").performClick()
+        val draft = mutableStateOf("Message")
+        val contact = org.aralozkaya.msngr.data.Contact("peer", "Peer", "peer@example.com",
+            org.aralozkaya.msngr.enums.Presence.Online)
+        compose.setContent { MaterialTheme { ChatScreen(draft.value, { draft.value = it }, contact,
+            messages = emptyList(), isHistoryLoaded = true, canLoadOlderMessages = false, isTyping = false,
+            onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {}, onSendTyping = {}, onSendNudge = {},
+            onSendVoiceClip = { clip -> sent = clip; Result.success(Unit) }, onLoadOlderMessages = {}) } }
+        compose.onNodeWithContentDescription("Send message").assertIsEnabled()
+        compose.onNodeWithContentDescription("Record voice clip").assertDoesNotExist()
+        compose.runOnIdle { draft.value = "" }
+        compose.onNodeWithContentDescription("Send message").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Record voice clip").assertIsEnabled().performClick()
         compose.onNodeWithText("Start recording").performClick()
         Thread.sleep(500)
         compose.onNodeWithText("Stop recording").performClick()

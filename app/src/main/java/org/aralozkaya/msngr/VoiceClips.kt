@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -28,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -172,17 +170,7 @@ internal fun VoiceClipMessage(message: ChatMessage) {
 }
 
 @Composable
-internal fun VoiceClipComposerButton(enabled: Boolean, onSend: suspend (VoiceClip) -> Result<Unit>) {
-    var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }, enabled = enabled) {
-        Icon(Icons.Default.Mic, contentDescription = "Record voice clip")
-    }
-    if (open) VoiceClipDialog(onDismiss = { open = false }, onSend = onSend)
-    LaunchedEffect(enabled) { if (!enabled) open = false }
-}
-
-@Composable
-private fun VoiceClipDialog(onDismiss: () -> Unit, onSend: suspend (VoiceClip) -> Result<Unit>) {
+internal fun VoiceClipDialog(onDismiss: () -> Unit, onSend: suspend (VoiceClip) -> Result<Unit>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val recorder = remember { VoiceRecorder() }
