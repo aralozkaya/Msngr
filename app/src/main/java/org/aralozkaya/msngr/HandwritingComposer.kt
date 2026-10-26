@@ -49,12 +49,14 @@ import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalTonalElevationEnabled
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -70,6 +72,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -349,6 +352,25 @@ private enum class HandwritingToolbarItem {
 }
 
 @Composable
+private fun HandwritingSurface(
+    modifier: Modifier,
+    shape: Shape,
+    content: @Composable () -> Unit,
+) {
+    // Ink is drawn on white paper, including inside elevated or dynamically colored surfaces.
+    CompositionLocalProvider(LocalTonalElevationEnabled provides false) {
+        Surface(
+            modifier = modifier,
+            shape = shape,
+            color = Color.White,
+            contentColor = Color.DarkGray,
+            border = BorderStroke(1.dp, Color.LightGray),
+            content = content,
+        )
+    }
+}
+
+@Composable
 internal fun HandwritingComposerPanel(
     state: HandwritingCanvasState,
     enabled: Boolean,
@@ -402,7 +424,7 @@ internal fun HandwritingComposerPanel(
     val selectedColorOption = remember(state.selectedColorRgb) {
         WLM_INK_COLORS.firstOrNull { it.rgb == state.selectedColorRgb } ?: WLM_INK_COLORS.first()
     }
-    val gridLineColor = MaterialTheme.colorScheme.outlineVariant
+    val gridLineColor = Color.LightGray
 
     @Composable
     fun PenSubmenuPopup() {
@@ -591,15 +613,11 @@ internal fun HandwritingComposerPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Drawing surface using Material 3 theme color tokens
-        Surface(
+        HandwritingSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(184.dp),
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            tonalElevation = 1.dp,
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Canvas(
@@ -680,7 +698,6 @@ internal fun HandwritingComposerPanel(
                     Text(
                         text = "Draw handwriting message here…",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1063,14 +1080,12 @@ internal fun HandwritingMessageCanvas(
         (bounds.width.toDp() + 24.dp).coerceIn(140.dp, 280.dp)
     }
 
-    Surface(
+    HandwritingSurface(
         modifier = modifier
             .widthIn(min = 130.dp, max = preferredWidthDp)
             .fillMaxWidth()
             .aspectRatio(aspect, matchHeightConstraintsFirst = false),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Canvas(
             modifier = Modifier
