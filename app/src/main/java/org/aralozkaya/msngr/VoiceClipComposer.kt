@@ -62,7 +62,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -121,7 +120,7 @@ internal fun VoiceClipComposer(
     var levels by remember { mutableStateOf(emptyList<Float>()) }
     var clip by remember { mutableStateOf<VoiceClip?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var lockBounds by remember { mutableStateOf<Rect?>(null) }
+    var lockCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var anchor by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val active = recording || processing || clip != null
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -154,7 +153,7 @@ internal fun VoiceClipComposer(
     val lockContentColor by animateColorAsState(when {
         locked -> MaterialTheme.colorScheme.onPrimary
         lockHovered -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }, motion.fastEffectsSpec(), label = "voiceLockContentColor")
     // Retain the preview during its native exit transition after send or delete clears the draft.
     var exitingClip by remember { mutableStateOf<VoiceClip?>(null) }
@@ -276,9 +275,13 @@ internal fun VoiceClipComposer(
         } else false
     }
     val updateLockDrag by rememberUpdatedState<(Offset?) -> Unit> { position ->
-        val bounds = lockBounds
-        lockHovered = recording && position != null && bounds?.inflate(lockHoverPadding)?.contains(position) == true
-        if (recording && !locked && position != null && bounds?.contains(position) == true) {
+        // The lock enters from behind the microphone, so its animated bounds briefly overlap the held finger.
+        // Only a drag that has left the microphone upwards may hover or engage the lock.
+        val microphoneTop = anchor?.takeIf { it.isAttached }?.boundsInRoot()?.top
+        val bounds = lockCoordinates?.takeIf { it.isAttached }?.boundsInRoot()
+        val target = position?.takeIf { recording && microphoneTop != null && it.y < microphoneTop }
+        lockHovered = target != null && bounds?.inflate(lockHoverPadding)?.contains(target) == true
+        if (target != null && !locked && bounds?.contains(target) == true) {
             locked = true
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
@@ -328,7 +331,7 @@ internal fun VoiceClipComposer(
                         color = lockColor,
                         contentColor = lockContentColor,
                         shadowElevation = lockElevation.coerceAtLeast(0.dp),
-                        modifier = Modifier.size(48.dp).onGloballyPositioned { lockBounds = it.boundsInRoot() }
+                        modifier = Modifier.size(48.dp).onGloballyPositioned { lockCoordinates = it }
                             .semantics {
                                 contentDescription = if (locked) "Unlock recording" else "Lock recording"
                                 stateDescription = if (locked) "Recording locked" else "Drag up to lock recording"
@@ -344,7 +347,7 @@ internal fun VoiceClipComposer(
                     }
                     AnimatedVisibility(!locked, enter = fadeIn(motion.fastEffectsSpec()), exit = fadeOut(motion.fastEffectsSpec())) {
                         Icon(Icons.Default.KeyboardArrowUp, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 }
             }

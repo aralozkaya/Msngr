@@ -115,6 +115,10 @@ data class ChatMessage(
     val voiceClip: org.aralozkaya.msngr.protocol.VoiceClip? = null,
     val isVoiceClipPending: Boolean = false,
     val voiceClipTransferError: String? = null,
+    val wink: org.aralozkaya.msngr.protocol.WinkReference? = null,
+    val isWinkPending: Boolean = false,
+    val winkTransferError: String? = null,
+    val autoPlayWink: Boolean = false,
 ) {
     val isInk: Boolean get() = inkDrawing != null
     val isVoiceClip: Boolean get() = voiceClip != null || isVoiceClipPending || voiceClipTransferError != null
@@ -202,6 +206,8 @@ interface MsnpClient {
         Result.failure(UnsupportedOperationException("Handwriting messages are not supported."))
     suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> =
         Result.failure(UnsupportedOperationException("Voice clips are not supported."))
+    suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Winks are unavailable."))
     suspend fun sendTyping(contactId: String)
     suspend fun sendNudge(contactId: String)
     suspend fun sendNudgeWithResult(contactId: String): Result<Unit> =
@@ -501,6 +507,15 @@ class MockMsnp18Client(
         // Kept as an explicit operation so the live transport can send text/x-msmsgscontrol.
     }
 
+    override suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> = runCatching {
+        require(wink.metadata.matches(bytes))
+        requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes))
+        val contact = mutableContacts.value.firstOrNull { it.id == contactId }
+        check(contact?.isGroup != true && contact?.isBlocked != true && contact?.presence?.isOnline == true)
+        appendMessage(ChatMessage(ids.incrementAndGet(), contactId, MessageAuthor.Me, "Wink: ${wink.name}",
+            System.currentTimeMillis(), wink = wink, autoPlayWink = true))
+    }
+
     override suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> = runCatching {
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
         check(contact?.isGroup != true) { "Voice clips are not supported in group chats." }
@@ -738,6 +753,12 @@ class MessengerRepository(
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
     val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
+    private val mutablePendingWinks = MutableStateFlow<Map<String, ChatMessage>>(emptyMap())
+    private val queuedWinkIds = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    val pendingWinks = mutablePendingWinks.asStateFlow()
+    fun consumePendingWink(contactId: String, id: Long) {
+        mutablePendingWinks.update { if (it[contactId]?.id == id) it - contactId else it }
+    }
     val pendingNudgeShakes: StateFlow<Set<String>> = mutablePendingNudgeShakes.asStateFlow()
     val contactRequests: StateFlow<List<ContactRequest>> = client.contactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> = client.groupInvitations
@@ -788,6 +809,14 @@ class MessengerRepository(
                 historyMutationMutex.withLock {
                     if (lastSignInRequest != null && messages == client.messages.value) {
                         historyStore.merge(messages)
+                        messages.forEach { (contactId, entries) ->
+                            entries.lastOrNull { it.autoPlayWink && it.wink != null && it.winkTransferError == null }?.let { message ->
+                                if (message.id > (queuedWinkIds[contactId] ?: Long.MIN_VALUE)) {
+                                    queuedWinkIds[contactId] = message.id
+                                    mutablePendingWinks.update { it + (contactId to message) }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -808,6 +837,8 @@ class MessengerRepository(
             if (mutableRequestAccount.value != requestAccount) {
                 mutableRequestAccount.value = null
                 mutablePendingNudgeShakes.value = emptySet()
+                mutablePendingWinks.value = emptyMap()
+                queuedWinkIds.clear()
             }
             mutableSignOutReason.value = null
             val result = signInClient(request)
@@ -1033,6 +1064,9 @@ class MessengerRepository(
     suspend fun sendInkNow(contactId: String, drawing: InkDrawing): Result<Unit> =
         client.sendInkMessage(contactId, drawing)
 
+    suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> =
+        client.sendWink(contactId, wink, bytes)
+
     suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> =
         client.sendVoiceClip(contactId, clip)
 
@@ -1144,6 +1178,7 @@ class MessengerRepository(
             check(lastSignInRequest != null && mutableSignOutReason.value == null) { "Sign in before deleting a contact." }
             client.deleteContact(contactId, block)
             clearPendingNudgeShake(contactId)
+            mutablePendingWinks.update { it - contactId }
             onConversationRead(contactId)
             Result.success(Unit)
         } catch (error: CancellationException) {
@@ -1181,6 +1216,7 @@ class MessengerRepository(
     suspend fun clearConversationHistory(contactId: String) = withContext(Dispatchers.IO) {
         historyMutationMutex.withLock {
             clearPendingNudgeShake(contactId)
+            mutablePendingWinks.update { it - contactId }
             historyStore.clearContact(contactId)
             client.clearMessages(contactId)
         }
@@ -1190,6 +1226,7 @@ class MessengerRepository(
         withContext(Dispatchers.IO) {
             historyMutationMutex.withLock {
                 mutablePendingNudgeShakes.value = emptySet()
+                mutablePendingWinks.value = emptyMap()
                 client.clearMessages()
                 historyStore.clearAll()
             }
@@ -1225,6 +1262,8 @@ class MessengerRepository(
             ?: historyStore.messages.value[contactId]?.firstOrNull { it.id == messageId }
 
     fun logout() {
+        mutablePendingWinks.value = emptyMap()
+        queuedWinkIds.clear()
         mutableRequestAccount.value = null
         mutablePendingNudgeShakes.value = emptySet()
         automaticReconnectJob?.cancel()

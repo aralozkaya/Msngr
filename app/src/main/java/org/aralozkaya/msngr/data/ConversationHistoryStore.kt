@@ -516,6 +516,11 @@ private fun DataInputStream.readChatMessage(contactId: String, version: Int = 1)
                 ?: error("Invalid saved voice clip.")
         } else null,
         voiceClipTransferError = if (version >= 6 && readBoolean()) readSizedString() else null,
+        wink = if (version >= 7 && readBoolean()) {
+            org.aralozkaya.msngr.protocol.WinkReference(
+                org.aralozkaya.msngr.protocol.MsnWink.parseOffer(readSizedString()) ?: error("Invalid saved wink."), readSizedString())
+        } else null,
+        winkTransferError = if (version >= 7 && readBoolean()) readSizedString() else null,
     )
 }
 
@@ -562,6 +567,11 @@ private fun DataOutputStream.writeChatMessage(message: ChatMessage) {
     val voiceError = if (message.isVoiceClipPending) "Voice clip download was interrupted." else message.voiceClipTransferError
     writeBoolean(voiceError != null)
     voiceError?.let(::writeSizedString)
+    writeBoolean(message.wink != null)
+    message.wink?.let { writeSizedString(it.metadata.toXml()); writeSizedString(it.name) }
+    val winkError = if (message.isWinkPending) "Wink download was interrupted." else message.winkTransferError
+    writeBoolean(winkError != null)
+    winkError?.let(::writeSizedString)
 }
 
 private fun writeHistoryChunk(file: File, contactId: String, messages: List<ChatMessage>) =
@@ -624,7 +634,7 @@ private val CHAT_MESSAGE_COMPARATOR = compareBy(ChatMessage::timestampMillis, Ch
 private val CHUNK_FILE_REGEX = Regex("chunk-(\\d{8})\\.bin")
 private const val DEFAULT_PAGE_SIZE = 200
 private const val CHUNK_MAGIC = 0x4D534743
-private const val CHUNK_VERSION = 6
+private const val CHUNK_VERSION = 7
 private const val LEGACY_FILE_MAGIC = 0x4D534748
 private const val LEGACY_FILE_VERSION = 1
 private const val MAX_ENTRY_COUNT = 1_000_000

@@ -72,7 +72,7 @@ enum class SettingsDestination(
     val parent: SettingsDestination? = null,
 ) {
     Appearance("Appearance"),
-    Emoticons("Emoticons"),
+    Emoticons("Emoticons & Winks"),
     MessengerPlus("Messenger Plus!"),
     ContactInvitations("Contact Invitations"),
     InAppNotifications("In-app notifications"),
@@ -96,7 +96,7 @@ internal enum class SettingsCategory(
         destination = SettingsDestination.Appearance,
     ),
     Emoticons(
-        title = "Emoticons",
+        title = "Emoticons & Winks",
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Emoticons,
     ),
@@ -532,7 +532,8 @@ fun EmoticonSettingsScreen(
 ) {
     val context = LocalContext.current
     val settings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
-    val itemCount = 2
+    val winkSettings by remember(context) { org.aralozkaya.msngr.WinkPrefs.state(context) }.collectAsState()
+    val itemCount = 4
 
     PageContentList(
         innerPadding = innerPadding,
@@ -585,6 +586,22 @@ fun EmoticonSettingsScreen(
                 },
                 content = { Text("Use original Messenger emoticons") },
             )
+        }
+        item(key = "play-winks") {
+            SegmentedListItem(checked = winkSettings.playWinks,
+                onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(playWinks = it)) },
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = itemCount), modifier = Modifier.settingsRow(),
+                trailingContent = { Switch(winkSettings.playWinks, null) },
+                supportingContent = { Text("Play incoming winks while the chat is open. Reduced motion uses a thumbnail.") },
+                content = { Text("Play winks automatically") })
+        }
+        item(key = "wink-sounds") {
+            SegmentedListItem(checked = winkSettings.sounds,
+                onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(sounds = it)) },
+                shapes = ListItemDefaults.segmentedShapes(index = 3, count = itemCount), modifier = Modifier.settingsRow(),
+                trailingContent = { Switch(winkSettings.sounds, null) },
+                supportingContent = { Text("Wink sounds respect silent and vibrate mode.") },
+                content = { Text("Wink sounds") })
         }
     }
 }
