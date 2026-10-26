@@ -21,7 +21,12 @@ internal class ReplyMessageWorker(
         )
         val isGroupInput = inputData.getBoolean(KEY_IS_GROUP, false)
         val notifications = MsngrNotificationManager(applicationContext)
-        val repository = applicationContext.connectedRepositoryForNotificationAction()
+        val repository = try {
+            applicationContext.connectedRepositoryForNotificationAction()
+        } catch (_: NotificationActionSessionRestoreException) {
+            if (runAttemptCount < MAX_RETRIES) return Result.retry()
+            null
+        }
             ?: return finalFailure(
                 notifications,
                 contactId,
