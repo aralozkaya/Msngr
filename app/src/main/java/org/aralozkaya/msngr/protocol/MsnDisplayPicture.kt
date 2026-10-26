@@ -17,6 +17,7 @@ data class MsnDisplayPicture(
     val url1: String? = null,
     val objectType: Int = 3,
     val friendly: String = "AAA=",
+    val extraAttributes: Map<String, String> = emptyMap(),
 ) {
     val downloadUrl: String? get() = url1?.takeIf(String::isNotBlank)
         ?: url?.takeIf(String::isNotBlank)
@@ -30,6 +31,10 @@ data class MsnDisplayPicture(
         sha1c?.let { append("\" SHA1C=\"").append(it.escapeMsnObjectXml()) }
         url?.let { append("\" Url=\"").append(it.escapeMsnObjectXml()) }
         url1?.let { append("\" Url1=\"").append(it.escapeMsnObjectXml()) }
+        extraAttributes.forEach { (name, value) ->
+            if (name.matches(Regex("[A-Za-z_][A-Za-z0-9_.:-]*")) && name !in setOf("Creator", "Size", "Type", "Location", "Friendly", "SHA1D", "SHA1C", "Url", "Url1"))
+                append("\" ").append(name).append("=\"").append(value.escapeMsnObjectXml())
+        }
         append("\"/>")
     }
 
@@ -46,17 +51,16 @@ data class MsnDisplayPicture(
         private const val USER_TILE_TYPE = 3
         private const val DEFAULT_LOCATION = "TFR2C2.tmp"
 
-        fun create(creator: String, bytes: ByteArray, objectType: Int = USER_TILE_TYPE): MsnDisplayPicture {
+        fun create(creator: String, bytes: ByteArray, objectType: Int = USER_TILE_TYPE, location: String = DEFAULT_LOCATION, friendly: String = "AAA="): MsnDisplayPicture {
             require(creator.isNotBlank())
             require(bytes.isNotEmpty())
             val sha1d = MsnBase64.encode(bytes.sha1())
-            val location = DEFAULT_LOCATION
             val canonical = buildString {
                 append("Creator").append(creator)
                 append("Size").append(bytes.size)
                 append("Type").append(objectType)
                 append("Location").append(location)
-                append("FriendlyAAA=")
+                append("Friendly").append(friendly)
                 append("SHA1D").append(sha1d)
             }
             val sha1c = MsnBase64.encode(
@@ -69,6 +73,7 @@ data class MsnDisplayPicture(
                 sha1d = sha1d,
                 sha1c = sha1c,
                 objectType = objectType,
+                friendly = friendly,
             )
         }
 
@@ -83,6 +88,7 @@ data class MsnDisplayPicture(
             } else {
                 URLDecoder.decode(raw, StandardCharsets.UTF_8.name())
             }
+            require(xml.length <= 64 * 1024 && !xml.contains("<!DOCTYPE", ignoreCase = true))
             val document = secureDocumentBuilderFactory().newDocumentBuilder()
                 .parse(xml.byteInputStream(StandardCharsets.UTF_8))
             val element = document.documentElement
@@ -102,6 +108,9 @@ data class MsnDisplayPicture(
                 url1 = element.getAttribute("Url1").takeIf(String::isNotBlank),
                 objectType = objectType,
                 friendly = element.getAttribute("Friendly").ifBlank { "AAA=" },
+                extraAttributes = (0 until element.attributes.length).map { element.attributes.item(it) }
+                    .filter { it.nodeName !in setOf("Creator", "Size", "Type", "Location", "Friendly", "SHA1D", "SHA1C", "Url", "Url1") }
+                    .associate { it.nodeName to it.nodeValue },
             )
         }.getOrNull()
     }

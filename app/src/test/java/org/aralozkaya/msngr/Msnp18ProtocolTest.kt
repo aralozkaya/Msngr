@@ -128,7 +128,8 @@ class Msnp18ProtocolTest {
             "${Msnp18Protocol.CLIENT_ID}:${Msnp18Protocol.EXTENDED_CAPABILITIES}",
             Msnp18Protocol.CLIENT_IDENTITY,
         )
-        assertEquals(0x4002C, Msnp18Protocol.BASE_CAPABILITIES)
+        assertEquals(0x4802C, Msnp18Protocol.BASE_CAPABILITIES)
+        assertEquals(0x8000, Msnp18Protocol.BASE_CAPABILITIES and 0x8000)
         assertEquals(0x40000, Msnp18Protocol.BASE_CAPABILITIES and 0x40000)
         assertEquals(0x400, Msnp18Protocol.EXTENDED_CAPABILITIES)
         assertEquals(

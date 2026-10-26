@@ -23,6 +23,18 @@ import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
 import java.io.File
 
 class MsngrApplication : Application() {
+    internal val winkStore by lazy {
+        org.aralozkaya.msngr.data.WinkStore(File(noBackupFilesDir, "winks")) {
+            val catalog = org.json.JSONArray(assets.open("winks/catalog.json").bufferedReader().use { it.readText() })
+            (0 until catalog.length()).map { index ->
+                val item = catalog.getJSONObject(index)
+                val bytes = assets.open("winks/" + item.getString("file")).use { it.readBytes() }
+                val metadata = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("msngr", bytes, 8)
+                    .copy(extraAttributes = mapOf("stamp" to item.getString("stamp")))
+                org.aralozkaya.msngr.protocol.WinkReference(metadata, item.getString("name")) to bytes
+            }
+        }
+    }
     internal val displayPictureSync by lazy { DisplayPictureSync(this) }
     val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
     internal val visibilityTracker: AppVisibilityTracker = AppVisibilityTracker { isForeground ->
@@ -48,6 +60,7 @@ class MsngrApplication : Application() {
                     MockMsnp18Client()
                 } else {
                     LiveMsnp18Client(
+                        winkStore = winkStore,
                         endpointName = { deviceEndpointName(this) },
                         contactDisplayPictureCache = FileContactDisplayPictureCache(
                             File(filesDir, "contact_display_pictures"),

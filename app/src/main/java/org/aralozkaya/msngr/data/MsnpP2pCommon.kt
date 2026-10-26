@@ -19,6 +19,8 @@ internal object MsnpP2pUtil {
     private const val DISPLAY_PICTURE_GUID = "A4268EEC-FEC5-49E5-95C3-F126696BDBF6"
     private const val ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 
+    fun objectAppId(type: Int): Int = when (type) { 11 -> 20; 8, 3 -> 1; else -> error("Unsupported MSNObject type.") }
+
     fun randomGuid(): String = UUID.randomUUID().toString().uppercase()
 
     fun displayPictureRequestContent(
@@ -27,7 +29,7 @@ internal object MsnpP2pUtil {
     ): String = buildString {
         append("EUF-GUID: {$DISPLAY_PICTURE_GUID}\r\n")
         append("SessionID: $sessionId\r\n")
-        append("AppID: ${if (picture.objectType == 11) 20 else 1}\r\n")
+        append("AppID: ${objectAppId(picture.objectType)}\r\n")
         append("RequestFlags: 18\r\n")
         append("Context: ")
         append(MsnBase64.encode((picture.toXml() + '\u0000').toByteArray(StandardCharsets.UTF_8)))
@@ -46,8 +48,8 @@ internal object MsnpP2pUtil {
             MsnDisplayPicture.parseObject(xml, localPicture?.metadata?.objectType ?: 3)
         }.getOrNull() ?: return null
         return localPicture?.takeIf { picture ->
-            (picture.metadata.objectType != 11 ||
-                (requestBody.field("AppID") == "20" &&
+            (picture.metadata.objectType !in listOf(8, 11) ||
+                (requestBody.field("AppID") == objectAppId(picture.metadata.objectType).toString() &&
                     requestBody.field("EUF-GUID")?.trim('{', '}')?.equals(DISPLAY_PICTURE_GUID, true) == true)) &&
                 picture.metadata.sha1d == requestedObject.sha1d &&
                 picture.metadata.creator.equals(requestedObject.creator, true) &&

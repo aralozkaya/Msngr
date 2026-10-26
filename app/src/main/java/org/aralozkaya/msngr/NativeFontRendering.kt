@@ -75,7 +75,11 @@ private fun systemTypeface(weight: Int, italic: Boolean): Typeface {
         weight >= 900 -> "sans-serif-black"
         else -> "sans-serif"
     }
-    val style = (if (weight == 700) Typeface.BOLD else Typeface.NORMAL) or
-        (if (italic) Typeface.ITALIC else Typeface.NORMAL)
+    val style = when {
+        weight == 700 && italic -> Typeface.BOLD_ITALIC
+        weight == 700 -> Typeface.BOLD
+        italic -> Typeface.ITALIC
+        else -> Typeface.NORMAL
+    }
     return Typeface.create(family, style)
 }

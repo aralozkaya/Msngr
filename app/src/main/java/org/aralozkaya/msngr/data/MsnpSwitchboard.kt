@@ -37,6 +37,8 @@ internal sealed interface SwitchboardEvent {
     data class Ink(val senderEmail: String, val drawing: InkDrawing) : SwitchboardEvent
     data class VoiceClipOffered(val senderEmail: String, val metadata: MsnDisplayPicture) : SwitchboardEvent
     data class VoiceClipReceived(val senderEmail: String, val metadata: MsnDisplayPicture, val bytes: ByteArray) : SwitchboardEvent
+    data class WinkOffered(val senderEmail: String, val metadata: MsnDisplayPicture) : SwitchboardEvent
+    data class WinkReceived(val senderEmail: String, val metadata: MsnDisplayPicture, val bytes: ByteArray) : SwitchboardEvent
     data class Typing(val senderEmail: String) : SwitchboardEvent
     data class Nudge(val senderEmail: String) : SwitchboardEvent
     data class DisplayPicture(val senderEmail: String, val bytes: ByteArray) : SwitchboardEvent
@@ -57,6 +59,9 @@ internal class MsnpSwitchboardSession(
     private val handshakeTimeoutMillis: Long = DEFAULT_HANDSHAKE_TIMEOUT_MILLIS,
     sharedPictureSession: MsnpP2pSession? = null,
     private val localVoiceClip: (String) -> LocalDisplayPicture? = { null },
+    private val localWink: (String) -> LocalDisplayPicture? = { null },
+    private val cachedWink: (MsnDisplayPicture) -> ByteArray? = { null },
+    private val acceptWink: () -> Boolean = { true },
 ) : AutoCloseable {
     // A sibling endpoint can invite us before it calls the conversation's contact.
     @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
@@ -87,6 +92,8 @@ internal class MsnpSwitchboardSession(
             localEndpointId = machineGuid,
             remoteEndpointId = remoteEndpointId,
             localVoiceClip = localVoiceClip,
+            localWink = localWink,
+            onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(this.contactEmail, metadata, bytes)) },
             onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(this.contactEmail, metadata, bytes)) },
         )
     }
@@ -144,6 +151,10 @@ internal class MsnpSwitchboardSession(
         for (payload in payloads) {
             sendPayload(payload, acknowledgement = "A")
         }
+    }
+
+    suspend fun sendWink(metadata: MsnDisplayPicture) {
+        for (payload in org.aralozkaya.msngr.protocol.MsnWink.payloads(metadata)) sendPayload(payload, "A")
     }
 
     suspend fun sendVoiceClip(metadata: MsnDisplayPicture) {
@@ -279,7 +290,7 @@ internal class MsnpSwitchboardSession(
         if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
         // Keep sibling picture controls routable without treating them as conversation history.
         if (mine && message !is SwitchboardMimeMessage.Text && message !is SwitchboardMimeMessage.Ink &&
-            message !is SwitchboardMimeMessage.VoiceClipOffer &&
+            message !is SwitchboardMimeMessage.VoiceClipOffer && message !is SwitchboardMimeMessage.WinkOffer &&
             message != SwitchboardMimeMessage.Nudge &&
             message !is SwitchboardMimeMessage.P2p) return
         if (contactEmail.isEmpty() && message !is SwitchboardMimeMessage.P2p) {
@@ -299,6 +310,14 @@ internal class MsnpSwitchboardSession(
                 eventSink(SwitchboardEvent.VoiceClipOffered(sender, message.metadata))
                 if (!closed.get()) p2pPeer(sender, normalizeEndpointId(rawSender.substringAfter(';', "")))
                     ?.requestVoiceClip(message.metadata)
+            }
+            is SwitchboardMimeMessage.WinkOffer -> {
+                if (!message.metadata.creator.equals(sender, true) || !acceptWink()) return
+                eventSink(SwitchboardEvent.WinkOffered(sender, message.metadata))
+                val cached = cachedWink(message.metadata)
+                if (cached != null) eventSink(SwitchboardEvent.WinkReceived(sender, message.metadata, cached))
+                else if (!closed.get()) p2pPeer(sender, normalizeEndpointId(rawSender.substringAfter(';', "")))
+                    ?.requestDisplayPicture(message.metadata)
             }
             SwitchboardMimeMessage.Typing -> if (!mine) eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))
@@ -334,6 +353,8 @@ internal class MsnpSwitchboardSession(
                 localVoiceClip = { hash ->
                     if (sender == contactEmail || sender.equals(signedInEmail, true)) localVoiceClip(hash) else null
                 },
+                localWink = { hash -> if (sender == contactEmail || sender.equals(signedInEmail, true)) localWink(hash) else null },
+                onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(sender, metadata, bytes)) },
                 onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) })
         }
     }
@@ -391,6 +412,7 @@ internal class SwitchboardException(message: String, val protocolCode: Int? = nu
 internal sealed interface SwitchboardMimeMessage {
     data class Text(val value: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardMimeMessage
     data class Ink(val drawing: InkDrawing) : SwitchboardMimeMessage
+    data class WinkOffer(val metadata: MsnDisplayPicture) : SwitchboardMimeMessage
     data class VoiceClipOffer(val metadata: MsnDisplayPicture) : SwitchboardMimeMessage
     data class P2p(val destination: String?, val bytes: ByteArray, val source: String? = null) : SwitchboardMimeMessage
     data object Typing : SwitchboardMimeMessage
@@ -430,6 +452,7 @@ internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
             val cast = String(body, StandardCharsets.UTF_8)
             when (cast.field("ID")) {
                 "1" -> SwitchboardMimeMessage.Nudge
+                "2" -> org.aralozkaya.msngr.protocol.MsnWink.parseOffer(cast.field("Data"))?.let(SwitchboardMimeMessage::WinkOffer) ?: SwitchboardMimeMessage.Unsupported
                 "3" -> MsnDisplayPicture.parseObject(cast.field("Data"), 11)?.takeIf {
                     it.size in 60..org.aralozkaya.msngr.protocol.MsnVoiceClip.MAX_WAV_BYTES &&
                         org.aralozkaya.msngr.protocol.MsnBase64.decode(it.sha1d)?.size == 20

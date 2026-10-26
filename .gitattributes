@@ -1,0 +1,5 @@
+# Preserve the pinned upstream Ruffle runtime byte-for-byte.
+app/src/main/assets/ruffle/*.js -text
+app/src/main/assets/ruffle/*.wasm -text
+app/src/main/assets/ruffle/LICENSE_* -text
+app/src/main/assets/ruffle/README.md text eol=lf

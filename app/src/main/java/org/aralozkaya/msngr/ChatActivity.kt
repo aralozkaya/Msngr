@@ -65,6 +65,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -152,6 +153,8 @@ import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
+import androidx.lifecycle.repeatOnLifecycle
+import org.aralozkaya.msngr.protocol.WinkReference
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.notifications.otherUnreadCount
 import org.aralozkaya.msngr.pages.components.Avatar
@@ -182,7 +185,7 @@ class ChatActivity : MsngrActivity() {
             finish()
             return
         }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             setLocusContext(
                 android.content.LocusId(
                     org.aralozkaya.msngr.notifications.MsngrNotificationManager.conversationShortcutId(contactId),
@@ -266,7 +269,23 @@ private fun ChatRoute(
         }
     }
 
+    var playingWink by remember(contactId) { mutableStateOf<ChatMessage?>(null) }
+    LaunchedEffect(contactId, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            repository.pendingWinks.collect { pending ->
+                pending[contactId]?.let { message ->
+                    repository.consumePendingWink(contactId, message.id)
+                    playingWink = message
+                }
+            }
+        }
+    }
+    playingWink?.let { message -> androidx.compose.runtime.key(message.id) {
+        message.wink?.let { WinkOverlay(it, { playingWink = null }, automatic = true) }
+    } }
+
     ChatScreen(
+        onSendWink = { wink, bytes -> repository.sendWink(contactId, wink, bytes) },
         otherUnreadCount = otherUnreadCount(contacts, contactId),
         nudgeCooldownMillis = nudgeCooldownMillis,
         nudgeShakeCount = nudgeShakeCount,
@@ -311,6 +330,7 @@ internal fun ChatScreen(
     onSendTyping: () -> Unit,
     onSendNudge: () -> Unit,
     onSendInk: (InkDrawing) -> Unit = {},
+    onSendWink: suspend (WinkReference, ByteArray) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException("Winks are unavailable.")) },
     onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
         Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
     },
@@ -496,6 +516,9 @@ internal fun ChatScreen(
                 voiceClipsVisible = contact?.isGroup != true,
                 voiceClipsEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline != false,
                 onSendVoiceClip = onSendVoiceClip,
+                winksVisible = contact?.isGroup != true,
+                winksEnabled = isConversationAvailable && contact?.isGroup != true && contact?.isBlocked != true && contact?.presence?.isOnline == true,
+                onSendWink = onSendWink,
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
                 draft = draft,
@@ -657,8 +680,11 @@ internal fun ChatMessageList(
 private fun MessageComposer(
     enabled: Boolean = true,
     handwritingEnabled: Boolean = enabled,
+    winksVisible: Boolean = true,
+    winksEnabled: Boolean = enabled,
     voiceClipsVisible: Boolean = true,
     voiceClipsEnabled: Boolean = enabled,
+    onSendWink: suspend (WinkReference, ByteArray) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException("Winks are unavailable.")) },
     onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
         Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
     },
@@ -679,6 +705,7 @@ private fun MessageComposer(
     val editorController = remember { MessengerPlusEditorController() }
     val emoticonSheet = rememberEmoticonSheetState()
     val colorSheet = rememberMessengerPlusColorSheetState()
+    var showWinks by remember { mutableStateOf(false) }
     var showTextStyle by remember { mutableStateOf(false) }
     var handwritingMode by rememberSaveable { mutableStateOf(false) }
     val handwritingState = rememberHandwritingCanvasState()
@@ -697,6 +724,8 @@ private fun MessageComposer(
         canDelete = draft.isNotEmpty(),
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
+    WinkPicker(showWinks, winksEnabled, { showWinks = false }, onSendWink)
+    LaunchedEffect(winksVisible) { if (!winksVisible) showWinks = false }
     MessengerPlusColorSheet(colorSheet)
     if (showTextStyle) NativeTextStyleSheet(
         style = nativeStyle,
@@ -805,6 +834,11 @@ private fun MessageComposer(
                                 EmoticonAndHandwritingMenuButton(
                                     enabled = enabled,
                                     handwritingEnabled = handwritingEnabled,
+                                    winksEnabled = winksVisible,
+                                    onSelectWinks = {
+                                        colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
+                                        handwritingMode = false; editorController.hideKeyboard(); showWinks = true
+                                    },
                                     emoticonSheetVisible = emoticonSheet.visible,
                                     onToggleEmoticons = { emoticonSheet.toggle(editorController) },
                                     onSelectEmoticons = { emoticonSheet.open(editorController) },
@@ -888,12 +922,15 @@ private fun MessageComposer(
 private enum class ComposerEmoticonMenuOption {
     Emoticons,
     Handwriting,
+    Winks,
 }
 
 @Composable
 private fun EmoticonAndHandwritingMenuButton(
     enabled: Boolean,
     handwritingEnabled: Boolean,
+    winksEnabled: Boolean,
+    onSelectWinks: () -> Unit,
     emoticonSheetVisible: Boolean,
     onToggleEmoticons: () -> Unit,
     onSelectEmoticons: () -> Unit,
@@ -908,11 +945,13 @@ private fun EmoticonAndHandwritingMenuButton(
     var anchorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var emoticonsItemBounds by remember { mutableStateOf<Rect?>(null) }
     var handwritingItemBounds by remember { mutableStateOf<Rect?>(null) }
+    var winksItemBounds by remember { mutableStateOf<Rect?>(null) }
     var lastDragScreenOffset by remember { mutableStateOf<Offset?>(null) }
     var hasDraggedAfterLongPress by remember { mutableStateOf(false) }
     val groupInteractionSource = remember { MutableInteractionSource() }
     val emoticonsItemInteractionSource = remember { MutableInteractionSource() }
     val handwritingItemInteractionSource = remember { MutableInteractionSource() }
+    val winksItemInteractionSource = remember { MutableInteractionSource() }
 
     LaunchedEffect(draggedOption == ComposerEmoticonMenuOption.Emoticons) {
         if (draggedOption == ComposerEmoticonMenuOption.Emoticons) {
@@ -933,6 +972,7 @@ private fun EmoticonAndHandwritingMenuButton(
         } else {
             val emoBounds = emoticonsItemBounds
             val hwBounds = handwritingItemBounds
+            val winkBounds = winksItemBounds
             when {
                 emoBounds != null &&
                     screenPos.y in emoBounds.top..emoBounds.bottom &&
@@ -943,6 +983,8 @@ private fun EmoticonAndHandwritingMenuButton(
                     screenPos.y in hwBounds.top..hwBounds.bottom &&
                     screenPos.x in (hwBounds.left - horizontalHitPadPx)..(hwBounds.right + horizontalHitPadPx) ->
                     ComposerEmoticonMenuOption.Handwriting
+                winksEnabled && winkBounds != null && screenPos.y in winkBounds.top..winkBounds.bottom &&
+                    screenPos.x in (winkBounds.left - horizontalHitPadPx)..(winkBounds.right + horizontalHitPadPx) -> ComposerEmoticonMenuOption.Winks
                 else -> null
             }
         }
@@ -951,7 +993,7 @@ private fun EmoticonAndHandwritingMenuButton(
     Box(
         modifier = Modifier
             .onGloballyPositioned { anchorCoordinates = it }
-            .pointerInput(enabled, handwritingEnabled) {
+            .pointerInput(enabled, handwritingEnabled, winksEnabled) {
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -1028,6 +1070,7 @@ private fun EmoticonAndHandwritingMenuButton(
                                 menuExpanded = false
                                 onSelectHandwriting()
                             }
+                            ComposerEmoticonMenuOption.Winks -> { menuExpanded = false; onSelectWinks() }
                             null -> {
                                 // Finger released without dragging to an option: keep menu open.
                             }
@@ -1051,7 +1094,7 @@ private fun EmoticonAndHandwritingMenuButton(
             modifier = Modifier
                 .testTag(EMOTICON_MODE_BUTTON_TAG)
                 .semantics {
-                    onLongClick("Open emoticon and handwriting menu") {
+                    onLongClick("Open emoticon, handwriting, and winks menu") {
                         menuExpanded = true
                         true
                     }
@@ -1119,6 +1162,7 @@ private fun EmoticonAndHandwritingMenuButton(
             ) {
                 val isEmoticonsHovered = draggedOption == ComposerEmoticonMenuOption.Emoticons
                 val isHandwritingHovered = draggedOption == ComposerEmoticonMenuOption.Handwriting
+                val isWinksHovered = draggedOption == ComposerEmoticonMenuOption.Winks
                 DropdownMenuItem(
                     text = { Text("Emoticons") },
                     leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
@@ -1163,7 +1207,7 @@ private fun EmoticonAndHandwritingMenuButton(
                 DropdownMenuItem(
                     text = { Text("Handwriting") },
                     leadingIcon = { Icon(Icons.Default.Draw, contentDescription = null) },
-                    shape = MenuDefaults.trailingItemShape,
+                    shape = MenuDefaults.middleItemShape,
                     enabled = handwritingEnabled,
                     interactionSource = handwritingItemInteractionSource,
                     colors = if (isHandwritingHovered) {
@@ -1181,7 +1225,7 @@ private fun EmoticonAndHandwritingMenuButton(
                             } else {
                                 Color.Transparent
                             },
-                            shape = MenuDefaults.trailingItemShape,
+                            shape = MenuDefaults.middleItemShape,
                         )
                         .onGloballyPositioned { coords ->
                             if (coords.isAttached) {
@@ -1200,6 +1244,48 @@ private fun EmoticonAndHandwritingMenuButton(
                         menuExpanded = false
                         draggedOption = null
                         onSelectHandwriting()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Winks") },
+                    leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    shape = MenuDefaults.trailingItemShape,
+                    enabled = winksEnabled,
+                    interactionSource = winksItemInteractionSource,
+                    colors = if (isWinksHovered) {
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            leadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        MenuDefaults.itemColors()
+                    },
+                    modifier = Modifier
+                        .background(
+                            color = if (isWinksHovered) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                Color.Transparent
+                            },
+                            shape = MenuDefaults.trailingItemShape,
+                        )
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                val topLeft = coords.localToScreen(Offset.Zero)
+                                winksItemBounds = Rect(
+                                    topLeft,
+                                    Size(coords.size.width.toFloat(), coords.size.height.toFloat()),
+                                )
+                                if (menuExpanded && hasDraggedAfterLongPress) {
+                                    draggedOption = resolveOptionAtScreenOffset(lastDragScreenOffset)
+                                }
+                            }
+                        }
+                        .testTag("wink_menu_item"),
+                    onClick = {
+                        menuExpanded = false
+                        draggedOption = null
+                        onSelectWinks()
                     },
                 )
             }
@@ -1461,7 +1547,9 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                if (message.isVoiceClip) {
+                if (message.wink != null) {
+                    WinkMessage(message)
+                } else if (message.isVoiceClip) {
                     VoiceClipMessage(message)
                 } else if (message.inkDrawing != null) {
                     HandwritingMessageCanvas(

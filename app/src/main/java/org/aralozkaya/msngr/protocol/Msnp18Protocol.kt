@@ -428,14 +428,14 @@ object Msnp18Protocol {
         )
     }
 
-    // MSNC9, chunking, handwriting, and one-to-one voice clips (0x40000).
+    // MSNC9, chunking, handwriting, voice clips (0x40000), and winks (0x8000).
     // The extended mask advertises only nudges (0x400). In particular, it leaves out
     // activities and games (0x100), and file transfer (0x20000).
-    const val CLIENT_ID = 2_416_181_292L
-    const val BASE_CAPABILITIES = 262_188
+    const val CLIENT_ID = 2_416_214_060L
+    const val BASE_CAPABILITIES = 294_956
     const val EXTENDED_CAPABILITIES = 1_024
-    const val CLIENT_IDENTITY = "2416181292:1024"
-    const val ENDPOINT_CAPABILITIES = "262188:1024"
+    const val CLIENT_IDENTITY = "2416214060:1024"
+    const val ENDPOINT_CAPABILITIES = "294956:1024"
 
     fun voiceClipPayload(clip: MsnDisplayPicture): ByteArray {
         require(clip.objectType == MsnVoiceClip.OBJECT_TYPE)
