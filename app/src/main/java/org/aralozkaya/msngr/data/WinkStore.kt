@@ -1,6 +1,8 @@
 package org.aralozkaya.msngr.data
 
 import org.aralozkaya.msngr.protocol.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.security.MessageDigest
 import java.util.Properties
@@ -10,11 +12,22 @@ internal class WinkStore(
     private val directory: File,
     private val bundled: () -> List<Pair<WinkReference, ByteArray>> = { emptyList() },
 ) {
+    private val mutableLibraryChanges = MutableStateFlow(0L)
+    val libraryChanges = mutableLibraryChanges.asStateFlow()
     private val defaults by lazy { bundled().associateBy { it.first.metadata.sha1d } }
 
     @Synchronized fun catalog(account: String): List<WinkReference> =
         (defaults.values.map { it.first } + area(account, "library").listFiles().orEmpty()
             .filter { it.extension == "properties" }.mapNotNull { readReference(it) }).distinctBy { it.metadata.sha1d }
+
+    @Synchronized fun isSaved(account: String, metadata: MsnDisplayPicture): Boolean {
+        if (defaults[metadata.sha1d]?.first?.metadata?.size == metadata.size) return true
+        val area = area(account, "library")
+        val stem = metadata.sha1d.key()
+        val reference = readReference(File(area, "$stem.properties")) ?: return false
+        val cab = File(area, "$stem.cab")
+        return reference.metadata.sha1d == metadata.sha1d && cab.isFile && cab.length() == metadata.size.toLong()
+    }
 
     @Synchronized fun bytes(account: String, metadata: MsnDisplayPicture): ByteArray? {
         defaults[metadata.sha1d]?.second?.takeIf(metadata::matches)?.let { return it.copyOf() }
@@ -30,6 +43,7 @@ internal class WinkStore(
 
     @Synchronized fun install(account: String, reference: WinkReference, bytes: ByteArray) {
         save(account, "library", reference, bytes, null)
+        mutableLibraryChanges.value += 1
     }
 
     @Synchronized fun receive(account: String, contact: String, reference: WinkReference, bytes: ByteArray) {

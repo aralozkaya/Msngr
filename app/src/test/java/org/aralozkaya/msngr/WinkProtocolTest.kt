@@ -108,6 +108,24 @@ class WinkProtocolTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun savedWinksIncludeDefaultsAndInstalledPackagesButNotReceivedCache() {
+        val directory = Files.createTempDirectory("wink-saved-state").toFile()
+        try {
+            val bundledBytes = cab()
+            val bundled = WinkReference(MsnDisplayPicture.create("bundled", bundledBytes, 8), "Bundled")
+            val store = WinkStore(directory) { listOf(bundled to bundledBytes) }
+            assertTrue(store.isSaved("account", bundled.metadata.copy(creator = "peer")))
+            val bytes = fixture("screen-punch-lzx.cab")
+            val reference = WinkReference(MsnDisplayPicture.create("peer", bytes, 8), "Received")
+            store.receive("account", "peer", reference, bytes)
+            assertFalse(store.isSaved("account", reference.metadata))
+            store.install("account", reference, bytes)
+            assertTrue(store.isSaved("account", reference.metadata.copy(creator = "another-peer")))
+            assertFalse(store.isSaved("other-account", reference.metadata))
+            assertFalse(store.isSaved("account", reference.metadata.copy(size = bytes.size + 1)))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun historyRoundTripsReferencesAndMarksInterruptedDownload() {
         val directory = Files.createTempDirectory("wink-history").toFile()
         try {

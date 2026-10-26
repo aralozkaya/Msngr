@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
@@ -130,14 +132,81 @@ class WinkInstrumentedTest {
         compose.onNodeWithText("Winks").performClick()
         compose.onNodeWithTag("wink_picker").assertIsDisplayed()
         compose.onNodeWithText("Get more winks").assertIsDisplayed()
-        compose.onNodeWithText("Import a file").assertIsDisplayed()
-        compose.onNodeWithText("Auto-play").assertIsDisplayed()
+        compose.onNodeWithText("Import a file").assertDoesNotExist()
+        compose.onNodeWithText("Auto-play").assertDoesNotExist()
+        compose.onNodeWithText("Sound").assertDoesNotExist()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Bouncy Ball").assertIsNotEnabled()
+        // Offline contacts can still preview, while tapping never sends a wink.
+        compose.onNodeWithText("Bouncy Ball").performTouchInput { longClick() }
+        compose.onNodeWithText("Preview").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
         instrumentation.uiAutomation.takeScreenshot().let { image ->
             java.io.File(context.getExternalFilesDir(null), "wink-picker.png").outputStream().use {
                 image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
             }; image.recycle()
         }
+    }
+
+    @Test fun holdingAWinkPreviewsWithoutSendingAndTapStillSends() {
+        installedFixture()
+        WinkPrefs.update(context, WinkSettings(playWinks = false, sounds = false))
+        val visible = mutableStateOf(true)
+        val sends = java.util.concurrent.atomic.AtomicInteger(0)
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            Box(Modifier.fillMaxSize()) {
+                WinkPicker(visible.value, true, { visible.value = false }) { _, _ ->
+                    sends.incrementAndGet(); Result.success(Unit)
+                }
+            }
+        } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Bouncy Ball").performTouchInput { longClick() }
+        compose.onNodeWithText("Preview").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Close wink").assertIsDisplayed()
+        assertEquals(0, sends.get())
+        compose.onNodeWithContentDescription("Close wink").performClick()
+        compose.onNodeWithTag("wink_picker").assertIsDisplayed()
+        compose.onNodeWithText("Bouncy Ball").performClick()
+        compose.waitUntil(10_000) { sends.get() == 1 && !visible.value }
+        assertEquals(1, sends.get())
+    }
+
+    @Test fun savingAReceivedWinkHidesSaveInEveryBubbleAndDefaultsNeverOfferSave() {
+        SessionPrefs.completeLogin(context, "wink-save-${System.nanoTime()}@example.test", "mock-password", false,
+            ProviderOptions.ESCARGOT, ServerOverrides(), true)
+        val account = context.winkAccount()!!
+        val bytes = instrumentation.context.assets.open("winks/screen-punch.cab").use { it.readBytes() }
+        val reference = org.aralozkaya.msngr.protocol.WinkReference(
+            org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("peer@example.test", bytes, 8), "Screen Punch")
+        context.winkStore().receive(account, "peer", reference, bytes)
+        val bundled = context.winkStore().catalog(account).first { it.name == "Bouncy Ball" }
+        val messages = listOf(reference, reference.copy(metadata = reference.metadata.copy(creator = "other@example.test")), bundled)
+            .mapIndexed { index, wink -> org.aralozkaya.msngr.data.ChatMessage(index.toLong(), "peer",
+                org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = wink) }
+        compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.statusBarsPadding().padding(16.dp)) { messages.forEach { WinkMessage(it) } }
+        } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to my winks").fetchSemanticsNodes().size == 2 }
+        compose.onAllNodesWithText("Play again").assertCountEquals(3)
+        compose.onAllNodesWithText("Add to my winks")[0].performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to my winks").fetchSemanticsNodes().isEmpty() }
+        assertTrue(context.winkStore().isSaved(account, reference.metadata))
+        compose.onAllNodesWithText("Play again").assertCountEquals(3)
+    }
+
+    @Test fun autoplayLivesInEmoticonsAndWinksSettingsAndPersists() {
+        installedFixture()
+        WinkPrefs.update(context, WinkSettings(playWinks = true, sounds = false))
+        compose.setContent { MaterialTheme {
+            org.aralozkaya.msngr.pages.components.SecondaryPageScaffold(
+                org.aralozkaya.msngr.pages.SettingsDestination.Emoticons.title, {}) { padding, scroll ->
+                org.aralozkaya.msngr.pages.EmoticonSettingsScreen(padding, scroll)
+            }
+        } }
+        compose.onAllNodesWithText("Emoticons & Winks").onFirst().assertIsDisplayed()
+        compose.onNodeWithText("Play winks automatically").performScrollTo().performClick()
+        assertFalse(WinkPrefs.state(context).value.playWinks)
+        WinkPrefs.reload(context)
+        assertFalse(WinkPrefs.state(context).value.playWinks)
     }
 }

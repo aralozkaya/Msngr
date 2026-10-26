@@ -161,7 +161,7 @@ class MockUserJourneyInstrumentedTest {
         waitForText("Settings")
         compose.onNodeWithText(MOCK_BANNER).assertExists()
         compose.onNodeWithText("Appearance").assertExists()
-        compose.onNodeWithText("Emoticons").assertExists()
+        compose.onNodeWithText("Emoticons & Winks").assertExists()
         compose.onNodeWithText("Messenger Plus!").performClick()
         waitForText("Enable Messenger Plus! rendering")
         val messengerPlusToggle = compose.onNodeWithTag("messenger_plus_enabled")
@@ -205,7 +205,7 @@ class MockUserJourneyInstrumentedTest {
         compose.onNodeWithText("Dynamic").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
 
-        compose.onNodeWithText("Emoticons").performClick()
+        compose.onNodeWithText("Emoticons & Winks").performClick()
         waitForText("Convert typed shortcuts")
         val shortcutToggle = compose.onNodeWithTag("convert_typed_shortcuts")
         shortcutToggle.assertIsOn().performClick().assertIsOff()

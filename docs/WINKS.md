@@ -2,18 +2,20 @@
 
 Long-press the emoticon button in an online one-to-one conversation, then choose **Winks**.
 The picker uses the same keyboard sheet as emoticons and Messenger Plus! colors. It includes
-15 original Messenger winks. Choose a tile to send it and play it locally.
+15 original Messenger winks. Choose a tile to send it and play it locally. Hold a tile and
+choose **Preview** to play it without sending; closing the preview returns to the picker.
+Preview is available even when sending is unavailable.
 
 **Get more winks** opens Escargot's wink catalog in an in-app browser. The site's **InstallContent**
 button originally called a Windows ActiveX object, rather than a custom URL handler. Msngr translates
 that call into a bounded HTTPS download and asks which package to add. The original nested CAB and
 its signature are retained. The catalog itself remains remote, so its contents can change.
-**Import a file** accepts MCO theme installers and standalone wink CAB/MCT files from other sources.
+The selector offers downloads from the catalog; it has no local-file picker.
 
 An external browser can also launch an Escargot package import with
 `msngr://winks?url=<percent-encoded HTTPS package URL>`. This is a Msngr handler, not an existing
-Escargot protocol. Android content providers can open supported CAB/Messenger MIME types directly.
-Packages from other sites can be downloaded in the browser and imported as files.
+Escargot protocol. Local-file and content-provider imports are not supported. Additional winks received from
+contacts can still be saved to the collection.
 
 ## Playback and storage
 
@@ -24,12 +26,15 @@ Packages from other sites can be downloaded in the browser and imported as files
   shared WebView renderer process after a player is destroyed.
 - Incoming winks wait until their conversation is resumed. Pending playback is conflated to the
   latest wink for each conversation; reopening saved history does not replay old winks.
-- The **Auto-play** and **Sound** switches are available in the picker and under Emoticons settings.
+- The **Play winks automatically** and **Wink sounds** switches are under **Emoticons & Winks**
+  in app settings. The selector contains no playback switches.
   Silent/vibrate mutes audio. The Android animation scale being zero uses a thumbnail.
   Explicit **Play again** can play with auto-play disabled; reduced motion still uses a thumbnail.
 - Downloads reuse a matching bundled/library/cached CAB by SHA1D. History stores only references,
   not another CAB for each message. The received cache is limited to 32 MiB / 256 items per account;
-  installed winks are kept separately, up to 64 MiB / 512 items. Clearing a conversation removes its
+  installed winks are kept separately, up to 64 MiB / 512 items. Bundled or already saved winks
+  do not offer **Add to my winks** in message bubbles; saving one updates every matching bubble.
+  Clearing a conversation removes its
   received-cache references; installed winks and bundled defaults remain available.
 - Every completed transfer is checked against the advertised byte count and SHA-1 before parsing.
   One-to-one online conversations are supported; group and offline wink delivery are unavailable.

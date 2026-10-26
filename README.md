@@ -29,8 +29,9 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   [voice clips](docs/VOICE_CLIPS.md) in one-to-one chats with online contacts.
   Voice clips do not work in group chats.
 - **Send a wink.** Send and receive classic animated [winks](docs/WINKS.md) with sound in
-  one-to-one chats. Long-press the emoticon button to open the wink picker, get more from
-  Escargot, or import a wink package. Replay received winks or add them to your collection.
+  one-to-one chats. Long-press the emoticon button to open the wink picker, hold a wink to
+  preview it before sending, or get more from Escargot. Replay received winks or save new ones
+  to your collection.
 - **Bring the group along.** Chat in persistent Messenger groups (MSNP18 circles), see members
   and their roles, create groups, invite people, and join or decline invitations. Owners and
   administrators can invite members; non-owners can leave.

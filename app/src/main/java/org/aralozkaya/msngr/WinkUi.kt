@@ -1,10 +1,10 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -36,61 +36,73 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
     var catalog by remember { mutableStateOf<List<WinkReference>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf(false) }
-    val settings by remember(context) { WinkPrefs.state(context) }.collectAsState()
+    val libraryChanges by context.winkStore().libraryChanges.collectAsState()
+    var preview by remember(account) { mutableStateOf<WinkReference?>(null) }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) generation++ }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(visible, account, generation) {
+    LaunchedEffect(visible, account, generation, libraryChanges) {
         if (visible && account != null) catalog = withContext(Dispatchers.IO) { context.winkStore().catalog(account) }
-    }
-    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null && account != null) scope.launch {
-            error = runCatching { withContext(Dispatchers.IO) {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytesBounded(MsnWink.MAX_CAB_BYTES) } ?: error("Could not read wink.")
-                val winks = MsnWinkPackage.install(bytes)
-                for ((reference, cab) in winks) context.winkStore().install(account, reference, cab)
-            }; generation++ }.exceptionOrNull()?.message
-        }
     }
     KeyboardPickerSheet(visible, onDismiss, "Winks", "wink_picker", expandable = true,
         header = {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Winks", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(settings.playWinks, { WinkPrefs.update(context, settings.copy(playWinks = !settings.playWinks)) }, { Text("Auto-play") })
-                    FilterChip(settings.sounds, { WinkPrefs.update(context, settings.copy(sounds = !settings.sounds)) }, { Text("Sound") })
-                }
-            }
+            Text("Winks", style = MaterialTheme.typography.titleMedium)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }, footer = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
-                TextButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import a file") }
             }
         }) {
         catalog.chunked(4).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { reference ->
-                    Column(Modifier.weight(1f).clickable(enabled = enabled && !sending) {
-                        if (account != null) scope.launch {
-                            sending = true
-                            try {
-                                val bytes = withContext(Dispatchers.IO) { context.winkStore().bytes(account, reference.metadata) }
-                                val result = if (bytes != null) onSend(reference, bytes) else Result.failure(IllegalStateException("Wink is unavailable."))
-                                error = result.exceptionOrNull()?.message
-                                if (result.isSuccess) onDismiss()
-                            } finally { sending = false }
-                        }
-                    }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        WinkThumbnail(reference, Modifier.size(52.dp))
-                        Text(reference.name, style = MaterialTheme.typography.labelSmall, maxLines = 2)
-                    }
+                    WinkPickerTile(reference, canSend = enabled, enabled = !sending,
+                        modifier = Modifier.weight(1f), onPreview = { preview = reference }, onSend = {
+                            if (account != null) scope.launch {
+                                sending = true
+                                try {
+                                    val bytes = withContext(Dispatchers.IO) { context.winkStore().bytes(account, reference.metadata) }
+                                    val result = if (bytes != null) onSend(reference, bytes)
+                                        else Result.failure(IllegalStateException("Wink is unavailable."))
+                                    error = result.exceptionOrNull()?.message
+                                    if (result.isSuccess) onDismiss()
+                                } finally { sending = false }
+                            }
+                        })
                 }
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         if (sending) LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+    LaunchedEffect(visible) { if (!visible) preview = null }
+    if (visible) preview?.let { WinkOverlay(it, { preview = null }) }
+}
+
+@Composable
+private fun WinkPickerTile(reference: WinkReference, canSend: Boolean, enabled: Boolean,
+    modifier: Modifier, onPreview: () -> Unit, onSend: () -> Unit) {
+    var menuExpanded by remember(reference.metadata.sha1d) { mutableStateOf(false) }
+    Box(modifier) {
+        Column(Modifier.fillMaxWidth().combinedClickable(
+            enabled = enabled,
+            onClickLabel = if (canSend) "Send wink" else "Show wink options",
+            onLongClickLabel = "Show wink options",
+            onClick = { if (canSend) onSend() else menuExpanded = true },
+            onLongClick = { menuExpanded = true },
+        ).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            WinkThumbnail(reference, Modifier.size(52.dp))
+            Text(reference.name, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+        }
+        DropdownMenuPopup(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+            DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
+                DropdownMenuItem(text = { Text("Preview") },
+                    leadingIcon = { Icon(Icons.Default.PlayArrow, null) },
+                    shape = MaterialTheme.shapes.medium,
+                    onClick = { menuExpanded = false; onPreview() })
+            }
+        }
     }
 }
 
@@ -113,6 +125,13 @@ internal fun WinkMessage(message: ChatMessage) {
     val reference = message.wink ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val account = context.winkAccount()
+    val libraryChanges by context.winkStore().libraryChanges.collectAsState()
+    val saved by produceState<Boolean?>(null, account, reference.metadata.sha1d, libraryChanges) {
+        value = withContext(Dispatchers.IO) { account?.let { context.winkStore().isSaved(it, reference.metadata) } ?: true }
+    }
+    var added by remember(account, reference.metadata.sha1d) { mutableStateOf(false) }
+    var saving by remember(account, reference.metadata.sha1d) { mutableStateOf(false) }
     var play by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -123,13 +142,20 @@ internal fun WinkMessage(message: ChatMessage) {
             message.winkTransferError != null -> Text(message.winkTransferError, style = MaterialTheme.typography.bodySmall)
             else -> {
                 TextButton(onClick = { play = true }, contentPadding = PaddingValues(0.dp)) { Text("Play again") }
-                TextButton(onClick = { scope.launch {
-                    val account = context.winkAccount() ?: return@launch
-                    status = withContext(Dispatchers.IO) { runCatching {
-                        val bytes = context.winkStore().bytes(account, reference.metadata) ?: error("Wink is no longer cached.")
-                        context.winkStore().install(account, reference, bytes)
-                        "Added to your winks"
-                    }.getOrElse { it.message ?: "Could not add wink." } }
+                if (saved == false && !added) TextButton(enabled = !saving, onClick = { scope.launch {
+                    val owner = account ?: return@launch
+                    saving = true
+                    try {
+                        withContext(Dispatchers.IO) {
+                            check(context.winkAccount() == owner) { "The selected account changed. Try again." }
+                            val bytes = context.winkStore().bytes(owner, reference.metadata) ?: error("Wink is no longer cached.")
+                            context.winkStore().install(owner, reference, bytes)
+                        }
+                        added = true
+                        status = "Added to your winks"
+                    } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch (error: Exception) { status = error.message ?: "Could not add wink." }
+                    finally { saving = false }
                 } }, contentPadding = PaddingValues(0.dp)) { Text("Add to my winks") }
             }
         }

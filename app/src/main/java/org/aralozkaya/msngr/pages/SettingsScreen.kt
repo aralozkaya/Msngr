@@ -72,7 +72,7 @@ enum class SettingsDestination(
     val parent: SettingsDestination? = null,
 ) {
     Appearance("Appearance"),
-    Emoticons("Emoticons"),
+    Emoticons("Emoticons & Winks"),
     MessengerPlus("Messenger Plus!"),
     ContactInvitations("Contact Invitations"),
     InAppNotifications("In-app notifications"),
@@ -96,7 +96,7 @@ internal enum class SettingsCategory(
         destination = SettingsDestination.Appearance,
     ),
     Emoticons(
-        title = "Emoticons",
+        title = "Emoticons & Winks",
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Emoticons,
     ),

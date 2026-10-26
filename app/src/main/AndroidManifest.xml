@@ -93,12 +93,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="msngr" android:host="winks" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="content" android:mimeType="application/vnd.ms-cab-compressed" />
-                <data android:mimeType="application/x-ms-messenger" />
-            </intent-filter>
         </activity>
         <activity
             android:name=".ChatActivity"

@@ -39,7 +39,6 @@ class WinkCatalogActivity : MsngrActivity() {
         val uri = intent.data
         if (uri != null) {
             when {
-                uri.scheme == "content" -> prepareImport(uri, "Wink")
                 uri.scheme == "msngr" && uri.host == "winks" -> uri.getQueryParameter("url")?.let { prepareImport(Uri.parse(it), "Wink") }
                 else -> prepareImport(uri, "Wink")
             }
@@ -55,8 +54,7 @@ class WinkCatalogActivity : MsngrActivity() {
         importJob = lifecycleScope.launch {
             try {
                 pending = withContext(Dispatchers.IO) {
-                    val bytes = if (uri.scheme == "content") contentResolver.openInputStream(uri)?.use { it.readBytesBounded(MsnWink.MAX_CAB_BYTES) }
-                        ?: error("Could not read package.") else WinkDownloads.download(uri.toString())
+                    val bytes = WinkDownloads.download(uri.toString())
                     MsnWinkPackage.install(bytes, name)
                 }
             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
@@ -155,7 +153,7 @@ internal object WinkDownloads {
     }.getOrNull()
 
     fun download(value: String): ByteArray {
-        var url = trustedPackageUrl(value) ?: error("This is not an Escargot wink download URL. You can import other wink packages from a file.")
+        var url = trustedPackageUrl(value) ?: error("Only Escargot wink download links are supported.")
         repeat(4) {
             val connection = java.net.URL(url).openConnection() as HttpURLConnection
             connection.apply { connectTimeout = 15_000; readTimeout = 20_000; instanceFollowRedirects = false }
