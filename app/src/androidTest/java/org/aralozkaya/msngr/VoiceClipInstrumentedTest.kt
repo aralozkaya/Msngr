@@ -244,7 +244,20 @@ class VoiceClipInstrumentedTest {
         compose.onNodeWithContentDescription("Send message").assertDoesNotExist()
         compose.onNodeWithContentDescription("Record voice clip").assertIsEnabled()
         compose.onNodeWithContentDescription("Message input").performClick()
-        Thread.sleep(500)
+        var lastY = Float.NaN
+        var stableSince = android.os.SystemClock.elapsedRealtime()
+        compose.waitUntil(10_000) {
+            var imeVisible = false
+            compose.activityRule.scenario.onActivity { activity ->
+                imeVisible = androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
+                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            }
+            val y = compose.onNodeWithContentDescription("Record voice clip").fetchSemanticsNode().boundsInRoot.center.y
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (!imeVisible || lastY.isNaN() || abs(y - lastY) > 1f) stableSince = now
+            lastY = y
+            imeVisible && now - stableSince >= 400
+        }
         val before = compose.onNodeWithContentDescription("Record voice clip").fetchSemanticsNode().boundsInRoot.center
         holdMicrophone()
         val after = compose.onNodeWithContentDescription("Recording voice clip").fetchSemanticsNode().boundsInRoot.center

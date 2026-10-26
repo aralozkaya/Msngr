@@ -1,0 +1,3 @@
+
+# Preserve the pinned upstream Ruffle bundle byte-for-byte.
+app/src/main/assets/ruffle/* -text

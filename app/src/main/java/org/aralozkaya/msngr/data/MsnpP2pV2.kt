@@ -18,6 +18,8 @@ internal class MsnpP2pV2Session(
     private val onDisplayPicture: (ByteArray) -> Unit,
     private val localVoiceClip: (String) -> LocalDisplayPicture? = { null },
     private val onVoiceClip: (MsnDisplayPicture, ByteArray) -> Unit = { _, _ -> },
+    private val localWink: (String) -> LocalDisplayPicture? = { null },
+    private val onWink: (MsnDisplayPicture, ByteArray) -> Unit = { _, _ -> },
 ) {
     val destination = "$remoteEmail;${remoteEndpointId.asP2pGuid()}"
     private val source = "$localEmail;${localEndpointId.asP2pGuid()}"
@@ -71,7 +73,7 @@ internal class MsnpP2pV2Session(
         val message = if (packet.tfCombination and TF_FIRST != 0) {
             if (incoming.size >= MAX_INCOMING_MESSAGES) return
             val total = packet.body.size.toLong() + packet.dataRemaining
-            val max = if (packet.sessionId == 0L) MAX_SLP_BYTES else MAX_PICTURE_BYTES
+            val max = if (packet.sessionId == 0L) MAX_SLP_BYTES else pendingCalls[packet.sessionId]?.picture?.takeIf { it.objectType == 8 }?.size?.coerceAtMost(org.aralozkaya.msngr.protocol.MsnWink.MAX_CAB_BYTES) ?: MAX_PICTURE_BYTES
             if (total !in 0..max.toLong()) return
             IncomingV2Message(ByteArray(total.toInt())).also { incoming[key] = it }
         } else {
@@ -87,10 +89,11 @@ internal class MsnpP2pV2Session(
             packet.sessionId == 0L && baseTf == TF_NONE -> handleSlp(message.body)
             baseTf and TF_MSN_OBJECT != 0 -> {
                 val pending = pendingCalls.remove(packet.sessionId)
-                if (pending?.picture?.objectType == 11) {
-                    if (pending.picture.matches(message.body)) {
-                        onVoiceClip(pending.picture, message.body)
-                        closeVoiceSession(pending.callId, packet.sessionId)
+                if (pending?.picture?.objectType in listOf(8, 11)) {
+                    if (pending!!.picture.matches(message.body)) {
+                        if (pending.picture.objectType == 8) onWink(pending.picture, message.body)
+                        else onVoiceClip(pending.picture, message.body)
+                        closeObjectSession(pending.callId, packet.sessionId)
                     }
                 } else if (pending == null || pending.picture.matches(message.body)) {
                     onDisplayPicture(message.body)
@@ -134,6 +137,11 @@ internal class MsnpP2pV2Session(
                     MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 11)
                 }
             }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localVoiceClip(it.sha1d)) }
+            ?: message.body.field("Context")?.let { context ->
+                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
+                    org.aralozkaya.msngr.protocol.MsnWink.parseOffer(String(it, Charsets.UTF_8).trimEnd('\u0000'))
+                }
+            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localWink(it.sha1d)) }
         val accepted = picture != null
         sendSlpResponse(message, sessionId, accepted)
         if (!accepted) return
@@ -154,10 +162,10 @@ internal class MsnpP2pV2Session(
             packageNumber = packageNumbers.incrementAndGet() and 0xffff,
             body = picture.bytes,
         )
-        if (picture.metadata.objectType == 11) closeVoiceSession(message.callId, sessionId)
+        if (picture.metadata.objectType in listOf(8, 11)) closeObjectSession(message.callId, sessionId)
     }
 
-    private suspend fun closeVoiceSession(callId: String, sessionId: Long) {
+    private suspend fun closeObjectSession(callId: String, sessionId: Long) {
         sendMessage(0, TF_FIRST, OP_NONE, 0, body = sipMessage(
             "BYE MSNMSGR:$destination MSNSLP/1.0", destination, source,
             MsnpP2pUtil.randomGuid(), callId, 0, "application/x-msnmsgr-sessionclosebody",
