@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -53,6 +54,47 @@ class ChatMessageListInstrumentedTest {
     @Test
     fun historyArrivingAfterEmptyCompositionStartsAtNewestMessageOnFirstLayout() {
         assertHistoryStartsAtBottom(delayed = true)
+    }
+
+    @Test
+    fun timelineTracksInPlaceMessageAdditionsEditsAndRemoval() {
+        val messages = mutableStateListOf<ChatMessage>()
+        val now = System.currentTimeMillis()
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = messages,
+                        listState = rememberLazyListState(),
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(),
+                    )
+                }
+            }
+        }
+
+        compose.runOnIdle { messages += message(1).copy(timestampMillis = now) }
+        compose.onNodeWithText("Message 1").assertIsDisplayed()
+        compose.onNodeWithText("Today").assertIsDisplayed()
+
+        // Same-size edits must refresh both the bubble and its day divider.
+        compose.runOnIdle { messages[0] = messages[0].copy(text = "Edited message", timestampMillis = 0L) }
+        compose.onNodeWithText("Edited message").assertIsDisplayed()
+        compose.onNodeWithText("Message 1").assertDoesNotExist()
+        compose.onNodeWithText("Today").assertDoesNotExist()
+
+        compose.runOnIdle { messages += message(2).copy(timestampMillis = now) }
+        compose.onNodeWithText("Message 2").assertIsDisplayed()
+        compose.onNodeWithText("Today").assertIsDisplayed()
+
+        compose.runOnIdle { messages.removeAt(0) }
+        compose.onNodeWithText("Edited message").assertDoesNotExist()
+        compose.onNodeWithText("Message 2").assertIsDisplayed()
+
+        compose.runOnIdle { messages.clear() }
+        compose.onNodeWithText("Message 2").assertDoesNotExist()
+        compose.onNodeWithText("Today").assertDoesNotExist()
+        compose.onNodeWithText(compose.activity.getString(R.string.empty_conversation_warning)).assertIsDisplayed()
     }
 
     private fun assertHistoryStartsAtBottom(delayed: Boolean) {

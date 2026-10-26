@@ -105,6 +105,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -596,7 +597,9 @@ internal fun ChatMessageList(
     // The first measure and subsequent IME resizes therefore show the newest message
     // without a corrective scroll. Storage and bubble grouping stay chronological.
     val dayLabels = rememberChatDayLabels()
-    val timeline = remember(messages, dayLabels.timeZone) { chatTimeline(messages, dayLabels.timeZone) }
+    val timeline by remember(messages, dayLabels.timeZone) {
+        derivedStateOf { chatTimeline(messages, dayLabels.timeZone) }
+    }
     val stickyDayAlpha = rememberChatStickyDayAlpha(listState)
     Box(
         modifier = modifier
