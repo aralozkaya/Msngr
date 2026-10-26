@@ -72,6 +72,7 @@
     <string name="notification_self_name">You</string>
     <string name="background_connection_title">Msngr is staying connected</string>
     <string name="chat_copy_message">Copy message</string>
+    <string name="chat_day_today">Today</string>
     <string name="chat_message_clip_label">Message</string>
     <string name="chat_message_copied">Message copied</string>
     <string name="empty_conversation_warning">Don\'t include information like passwords or credit card numbers in an instant message</string>

@@ -11,14 +11,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.MessageAuthor
@@ -27,6 +35,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.text.DateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.TimeZone
 
 @RunWith(AndroidJUnit4::class)
 class ChatMessageListInstrumentedTest {
@@ -118,8 +130,116 @@ class ChatMessageListInstrumentedTest {
         }
         val older = compose.onNodeWithText("Message 0").fetchSemanticsNode().boundsInRoot
         val newer = compose.onNodeWithText("Message 1").fetchSemanticsNode().boundsInRoot
+        val dateLabel = DateFormat.getDateInstance(DateFormat.LONG, compose.activity.resources.configuration.locales[0])
+            .format(Date(0L))
+        val divider = compose.onNodeWithText(dateLabel).fetchSemanticsNode().boundsInRoot
+        assertTrue(divider.bottom <= older.top)
         assertTrue(older.bottom <= newer.top)
-        assertTrue(older.top < with(compose.density) { 48.dp.toPx() })
+        assertTrue(divider.top < with(compose.density) { 48.dp.toPx() })
+    }
+
+    @Test fun regularChatSeparatesMessagesAcrossMidnight() = assertDayDividers(isGroup = false)
+
+    @Test fun groupChatSeparatesMessagesAndSenderGroupsAcrossMidnight() = assertDayDividers(isGroup = true)
+
+    private fun assertDayDividers(isGroup: Boolean) {
+        val zone = TimeZone.getDefault()
+        val midnight = chatDayStart(System.currentTimeMillis(), zone)
+        val yesterday = ChatDayLabels(
+            midnight, zone, compose.activity.resources.configuration.locales[0], "Today",
+        ).label(chatDayStart(midnight - 60_000, zone))
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.height(500.dp)) {
+                    ChatMessageList(
+                        messages = listOf(
+                            message(1).copy(timestampMillis = midnight - 60_000, senderName = "Alice"),
+                            message(2).copy(timestampMillis = midnight + 60_000, senderName = "Alice"),
+                        ),
+                        listState = rememberLazyListState(),
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(),
+                        isGroup = isGroup,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Today").assertIsDisplayed()
+        compose.onNodeWithText(yesterday).assertIsDisplayed()
+        compose.onAllNodesWithText("Alice").assertCountEquals(if (isGroup) 2 else 0)
+        val firstDivider = compose.onNodeWithText(yesterday).fetchSemanticsNode().boundsInRoot
+        val firstMessage = compose.onNodeWithText("Message 1").fetchSemanticsNode().boundsInRoot
+        val secondDivider = compose.onNodeWithText("Today").fetchSemanticsNode().boundsInRoot
+        val secondMessage = compose.onNodeWithText("Message 2").fetchSemanticsNode().boundsInRoot
+        assertTrue(firstDivider.bottom <= firstMessage.top)
+        assertTrue(firstMessage.bottom <= secondDivider.top)
+        assertTrue(secondDivider.bottom <= secondMessage.top)
+    }
+
+    @Test fun regularChatStickyDayHidesAfterIdleAndReturnsOnScroll() = assertStickyDayTimeout(isGroup = false)
+
+    @Test fun groupChatStickyDayHidesAfterIdleAndReturnsOnScroll() = assertStickyDayTimeout(isGroup = true)
+
+    private fun assertStickyDayTimeout(isGroup: Boolean) {
+        lateinit var state: LazyListState
+        lateinit var scope: CoroutineScope
+        val now = Calendar.getInstance().timeInMillis
+        compose.setContent {
+            MaterialTheme {
+                state = rememberLazyListState()
+                scope = rememberCoroutineScope()
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = (0L..99L).map { message(it).copy(timestampMillis = now) },
+                        listState = state,
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(top = 64.dp, bottom = 64.dp),
+                        isGroup = isGroup,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).assertDoesNotExist()
+        compose.mainClock.autoAdvance = false
+        var scroll: Job? = null
+        fun startScroll() {
+            compose.runOnIdle {
+                scroll = scope.launch {
+                    // Keep an actual list scroll active so the idle timer cannot start early.
+                    state.scroll {
+                        scrollBy(80f)
+                        awaitCancellation()
+                    }
+                }
+            }
+            compose.mainClock.advanceTimeBy(500)
+            compose.waitForIdle()
+            compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).assertIsDisplayed()
+        }
+        startScroll()
+        val chip = compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(with(compose.density) { 72.dp.toPx() }, chip.top, 1f)
+        compose.runOnIdle { scroll?.cancel() }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).assertIsDisplayed()
+        startScroll()
+        compose.runOnIdle { scroll?.cancel() }
+        compose.mainClock.advanceTimeBy(1_300)
+        compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(CHAT_STICKY_DAY_TIMEOUT_MILLIS)
+        compose.waitForIdle()
+        compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).assertDoesNotExist()
+        startScroll()
+        compose.runOnIdle { scroll?.cancel() }
+        compose.mainClock.advanceTimeByFrame()
+        val beforeDrag = compose.runOnIdle { state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset }
+        compose.onNodeWithTag(CHAT_STICKY_DAY_TAG).performTouchInput {
+            swipe(center, center + Offset(0f, 200f), durationMillis = 200)
+        }
+        compose.mainClock.advanceTimeBy(500)
+        compose.runOnIdle {
+            assertTrue(beforeDrag != (state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset))
+        }
     }
 
     @Test
