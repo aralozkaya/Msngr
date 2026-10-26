@@ -23,6 +23,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -139,6 +140,27 @@ class VoiceClipInstrumentedTest {
         assertNotNull(MsnVoiceClip.parse(sent!!.bytes()))
         assertTrue(sent!!.durationMillis in 1..15_000)
         compose.onNodeWithText("Message editor").assertIsDisplayed()
+    }
+
+    @Test fun fingerJitterDuringLockEntryDoesNotLockAndReleaseStops() {
+        composer()
+        val microphone = compose.onNodeWithContentDescription("Record voice clip").fetchSemanticsNode().boundsInRoot
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performTouchInput { down(microphone.center) }
+            // A real finger reports small moves while the lock slides in from behind the microphone.
+            repeat(30) { frame ->
+                compose.mainClock.advanceTimeBy(16)
+                compose.onRoot().performTouchInput {
+                    moveTo(Offset(microphone.center.x + (frame % 3 - 1) * 2f,
+                        microphone.center.y + (frame % 5 - 2) * microphone.height / 6f))
+                }
+            }
+            compose.mainClock.advanceTimeBy(1_000)
+            compose.onNodeWithContentDescription("Unlock recording").assertDoesNotExist()
+            compose.onRoot().performTouchInput { up() }
+        } finally { compose.mainClock.autoAdvance = true }
+        awaitPreview()
     }
 
     @Test fun dragToLockSurvivesReleaseAndUnlockStopsWithoutAFinger() {
