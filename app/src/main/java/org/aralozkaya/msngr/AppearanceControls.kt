@@ -117,13 +117,14 @@ internal fun AppearanceColorOption(mode: ColorMode, index: Int, count: Int, appe
             Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
         }
         AnimatedVisibility(visible = selected && mode != ColorMode.Dynamic) {
+            val colors = ListItemDefaults.segmentedColors()
+            // Keep the selected palette without making the expanded controls selectable.
             SegmentedListItem(
-                selected = true,
-                onClick = {},
-                shapes = ListItemDefaults.segmentedShapes(1, 2).copy(
-                    selectedShape =  ListItemDefaults.segmentedShapes(1, 2).shape
+                shapes = ListItemDefaults.segmentedShapes(1, 2),
+                colors = colors.copy(
+                    containerColor = colors.selectedContainerColor,
+                    contentColor = colors.selectedContentColor,
                 ),
-                colors = ListItemDefaults.segmentedColors(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 AppearanceColorControls(appearance.copy(colorMode = mode))
