@@ -44,7 +44,7 @@ class MsnpRosterUpdatesTest {
 
     @Test fun refreshUpdatesAccessLevelsWhileKeepingLiveMemberState() {
         val peer = GroupMember("peer@example.com", "Peer", Presence.Away,
-            avatarUri = "data:photo", role = GroupMemberRole.Administrator)
+            avatarUri = "data:photo", role = GroupMemberRole.Administrator, clientCapabilities = 0x800c)
         val group = Contact("group@live.com", "Test", "group@live.com", Presence.Online,
             isGroup = true, members = listOf(peer))
         val snapshot = AddressBookSnapshot(listOf(group.copy(members = listOf(

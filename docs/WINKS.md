@@ -1,6 +1,9 @@
 # Winks
 
-Long-press the emoticon button in an online one-to-one conversation, then choose **Winks**.
+Long-press the emoticon button in an online conversation, then choose **Winks**.
+In groups, every joined, non-offline recipient must advertise wink support. Offline members
+and the signed-in account are excluded. Unknown capabilities disable sending until confirmed;
+membership, presence, and client updates immediately refresh the menu and any open picker.
 The picker uses the same keyboard sheet as emoticons and Messenger Plus! colors. It includes
 15 original Messenger winks. Choose a tile to send it and play it locally. Hold a tile and
 choose **Preview** to play it without sending; closing the preview returns to the picker.
@@ -51,7 +54,7 @@ matching uses the package content hash rather than the sender or name. Default w
   including for matching saved or default winks. Retrying starts a fresh transfer with a new timeout;
   it requires the sender to still have the wink available.
 - Every completed transfer is checked against the advertised byte count and SHA-1 before parsing.
-  One-to-one online conversations are supported; group and offline wink delivery are unavailable.
+  Online private and group conversations are supported; offline wink delivery is unavailable.
 
 ## Protocol and package handling
 
@@ -59,6 +62,14 @@ Winks use `text/x-msnmsgr-datacast`, `ID: 2`, MSNObject `Type="8"`, and the `0x8
 The announcement uses MSNP MIME chunking for long original signatures. Unknown MSNObject attributes,
 including `stamp`, survive storage and forwarding. A sender's Creator/Friendly/SHA1C envelope is
 rebuilt for that sender while the original CAB/signature are preserved.
+
+Group announcements use circle `SDG` messages with `Message-Type: Wink`, the same datacast
+body and MSNObject, and circle segmentation for long signatures. The package is shared only
+with the recipients online when it was sent. Downloads reuse the sender's point-to-point
+MSNObject transport; completion, retries, sender attribution, caching, and playback belong to
+the originating group conversation. Cached packages avoid another transfer. Group protocol
+tests exercise real P2P packets with in-memory transports; live desktop group wink interoperability
+has not been verified.
 
 Downloads use the MSNObject EUF GUID `A4268EEC-FEC5-49E5-95C3-F126696BDBF6`, SLP AppID 1 and the
 P2Pv1 footer 1. P2Pv2's bridge footer stays zero. The existing bounded P2P transport is reused;

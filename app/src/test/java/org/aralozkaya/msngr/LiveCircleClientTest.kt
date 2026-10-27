@@ -25,15 +25,24 @@ import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.SsoToken
 import org.aralozkaya.msngr.data.StorageProfile
 import org.aralozkaya.msngr.data.parseCircleEnvelope
+import org.aralozkaya.msngr.data.groupFeatures
+import org.aralozkaya.msngr.data.GroupInkFormat
+import org.aralozkaya.msngr.data.MsnpP2pSession
+import org.aralozkaya.msngr.data.LocalDisplayPicture
+import org.aralozkaya.msngr.data.SwitchboardMimeMessage
+import org.aralozkaya.msngr.data.parseSwitchboardMime
+import org.aralozkaya.msngr.data.WinkStore
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.InkPoint
 import org.aralozkaya.msngr.protocol.InkStroke
 import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -42,6 +51,8 @@ import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
+import java.nio.file.Files
 
 class LiveCircleClientTest {
     private val me = "me@example.com"
@@ -211,6 +222,9 @@ class LiveCircleClientTest {
             withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
 
             // 1. Send outgoing group handwriting
+            transport.incoming.send(memberPresence("alice@example.com"))
+            transport.incoming.send(memberPresence("bob@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().groupFeatures(me).inkFormat != null } }
             val outgoingDrawing = InkDrawing(
                 canvasWidthPx = 220f,
                 canvasHeightPx = 90f,
@@ -369,6 +383,176 @@ class LiveCircleClientTest {
         } finally { client.close(); scope.cancel() }
     }
 
+    @Test fun groupFeaturesFollowCurrentMembersAndClientChangesAndGuardEverySend() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { error("Feature checks and group announcements do not need a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group.copy(members = listOf(
+                GroupMember(me), GroupMember("alice@example.com"), GroupMember("bob@example.com"),
+            ))), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() })
+        val drawing = InkDrawing(canvasWidthPx = 100f, canvasHeightPx = 50f,
+            strokes = listOf(InkStroke(listOf(InkPoint(1f, 2f), InkPoint(30f, 40f)))))
+        val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val wink = org.aralozkaya.msngr.protocol.WinkReference(
+            org.aralozkaya.msngr.protocol.MsnDisplayPicture.create(me, bytes, 8), "Screen Punch")
+        suspend fun awaitFeatures(ink: GroupInkFormat?, winks: Boolean) = withTimeout(2_000) {
+            client.contacts.first { it.single().groupFeatures(me).let { f -> f.inkFormat == ink && f.winks == winks } }
+        }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(
+                ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            assertTrue(client.sendInkMessage(groupId, drawing).isFailure)
+            assertTrue(client.sendWink(groupId, wink, bytes).isFailure)
+            assertTrue(transport.sent.none { it.verb == "SDG" })
+
+            // ILN can include a network ID before the nickname. Self and offline Bob lack support.
+            transport.incoming.send(MsnpCommand("ILN", parameters = listOf("AWY",
+                "1:alice@example.com;via=9:$groupId", "1", "Alice", "2416214060:1024", "0")))
+            awaitFeatures(GroupInkFormat.Isf, true)
+            client.sendInkMessage(groupId, drawing).getOrThrow()
+            client.sendWink(groupId, wink, bytes).getOrThrow()
+            val offer = parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!
+            assertEquals("Wink", offer.headers["message-type"])
+            assertTrue(offer.body.toString(Charsets.UTF_8).contains("ID: 2\r\nData: <msnobj"))
+            assertEquals(1, client.contacts.value.size) // Circle presence never adds a direct contact.
+
+            transport.incoming.send(memberPresence("bob@example.com", "0:0", "BSY"))
+            awaitFeatures(null, false)
+            val submitted = transport.sent.count { it.verb == "SDG" }
+            assertTrue(client.sendInkMessage(groupId, drawing).isFailure)
+            assertTrue(client.sendWink(groupId, wink, bytes).isFailure)
+            assertEquals(submitted, transport.sent.count { it.verb == "SDG" })
+
+            // Each feature has its own gate; GIF-only clients select the compatible wire format.
+            transport.incoming.send(memberPresence("bob@example.com", "4:0"))
+            awaitFeatures(GroupInkFormat.Gif, false)
+            client.sendInkMessage(groupId, drawing).getOrThrow()
+            val ink = parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!
+            assertEquals(Msnp18Protocol.INK_GIF_CONTENT_TYPE, ink.headers["content-type"])
+            assertNotNull(MsnInkCodec.decodeMimeBody(ink.headers["content-type"]!!, ink.body))
+            transport.incoming.send(MsnpCommand("FLN", parameters = listOf("1:bob@example.com;via=9:$groupId")))
+            awaitFeatures(GroupInkFormat.Isf, true)
+
+            // Leaving and returning without a fresh capability announcement cannot reuse old flags.
+            transport.incoming.send(roster(groupId, me))
+            withTimeout(2_000) { client.contacts.first { !it.single().presence.isOnline } }
+            transport.incoming.send(roster(groupId, me, "alice@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            awaitFeatures(null, false)
+            transport.incoming.send(memberPresence("alice@example.com", "32768:0"))
+            awaitFeatures(null, true)
+            transport.rejectSdg = true
+            client.sendWink(groupId, wink, bytes)
+            withTimeout(2_000) { client.messages.first { it[groupId]?.last()?.deliveryError != null } }
+            Unit
+        } finally { client.close(); scope.cancel() }
+    }
+
+    @Test fun groupWinkDownloadRetriesAndCachedOffersStayInTheirOwnConversations() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val directory = Files.createTempDirectory("group-wink").toFile()
+        val store = WinkStore(directory)
+        val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val sender = "alice@example.com"
+        val rejectFirstHandshake = AtomicBoolean(true)
+        val boards = CopyOnWriteArrayList<WinkPeerTransport>()
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = {
+                WinkPeerTransport(sender, me, bytes, rejectFirstHandshake.getAndSet(false)).also { boards += it }
+            },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group, group.copy(id = otherGroupId, email = otherGroupId)), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() }, winkStore = store)
+        val metadata = MsnDisplayPicture.create(sender, bytes, 8,
+            friendly = org.aralozkaya.msngr.protocol.MsnBase64.encode("Screen Punch\u0000".toByteArray(Charsets.UTF_16LE)))
+        suspend fun offer(id: String, offered: MsnDisplayPicture = metadata) {
+            MsnpCircles.winkMessages(id, sender, "remote", offered) { 0 }.forEach { transport.incoming.send(it) }
+        }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(
+                ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, sender))
+            transport.incoming.send(roster(otherGroupId, me, sender))
+            withTimeout(2_000) { client.contacts.first { it.all { c -> c.presence.isOnline } } }
+            offer(groupId)
+            val failed = withTimeout(2_000) {
+                client.messages.first { it[groupId]?.singleOrNull()?.winkTransferError != null }
+            }.getValue(groupId).single()
+            assertEquals(sender, failed.senderEmail)
+            client.retryMessage(failed).getOrThrow()
+            val downloaded = withTimeout(5_000) {
+                client.messages.first { it[groupId]?.singleOrNull()?.let { m -> !m.isWinkPending && m.winkTransferError == null } == true }
+            }.getValue(groupId).single()
+            assertTrue(downloaded.autoPlayWink)
+            assertArrayEquals(bytes, store.bytes(AccountIdentity.forLogin(me).storageId, metadata))
+            assertTrue(client.messages.value[sender].isNullOrEmpty())
+            assertEquals(2, boards.size)
+            assertTrue(boards.last().sent.any { it.verb == "MSG" })
+            val transfers = transport.sent.count { it.verb == "XFR" }
+            offer(otherGroupId)
+            withTimeout(2_000) { client.messages.first { it[otherGroupId]?.singleOrNull()?.autoPlayWink == true } }
+            assertEquals(transfers, transport.sent.count { it.verb == "XFR" })
+            assertEquals("Screen Punch", client.messages.value.getValue(otherGroupId).single().wink?.name)
+            offer(otherGroupId, metadata.copy(creator = "forged@example.com"))
+            transport.incoming.send(memberPresence(sender)) // Barrier after the rejected offer.
+            withTimeout(2_000) { client.contacts.first { it.first().members.any { m -> m.clientCapabilities != 0L } } }
+            assertEquals(1, client.messages.value.getValue(otherGroupId).size)
+            assertTrue(client.contacts.value.all { it.isGroup })
+            Unit
+        } finally { client.close(); scope.cancel(); directory.deleteRecursively() }
+    }
+
+    @Test fun groupWinkPackageIsServedOnlyToItsOnlineRecipientsWithoutAddingPrivateContacts() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val boards = java.util.concurrent.ConcurrentLinkedQueue<WinkRecipientTransport>()
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { boards.remove() },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group.copy(members = listOf(
+                GroupMember(me), GroupMember("alice@example.com"), GroupMember("bob@example.com"),
+            ))), circleTicket = "signed") }, fetchStorageProfile = { _, _ -> StorageProfile() })
+        suspend fun connect(peer: String): WinkRecipientTransport {
+            val board = WinkRecipientTransport(peer, me)
+            boards.add(board)
+            transport.incoming.send(MsnpCommand("RNG", parameters = listOf("session", "board.example:1864", "CKI", "key", peer, "Peer")))
+            withTimeout(2_000) { while (board.sent.none { it.verb == "ANS" }) delay(10) }
+            return board
+        }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(
+                ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(memberPresence("alice@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().groupFeatures(me).winks } }
+            client.sendWink(groupId, org.aralozkaya.msngr.protocol.WinkReference(MsnDisplayPicture.create(me, bytes, 8)), bytes).getOrThrow()
+            val metadata = client.messages.value.getValue(groupId).single().wink!!.metadata
+            val alice = connect("alice@example.com")
+            alice.request(metadata)
+            withTimeout(5_000) { while (alice.received.get() == null) delay(10) }
+            assertArrayEquals(bytes, alice.received.get())
+            assertTrue(client.contacts.value.all { it.isGroup })
+            assertTrue(client.messages.value["alice@example.com"].isNullOrEmpty())
+            val bob = connect("bob@example.com") // Bob was offline when this package was announced.
+            bob.request(metadata)
+            withTimeout(2_000) {
+                while (bob.sent.none { it.payload?.toString(Charsets.ISO_8859_1)?.contains("603 Decline") == true }) delay(10)
+            }
+            assertNull(bob.received.get())
+            Unit
+        } finally { client.close(); scope.cancel() }
+    }
+
+    private fun memberPresence(email: String, capabilities: String = "2416214060:1024", status: String = "NLN") =
+        MsnpCommand("NLN", parameters = listOf(status, "1:$email;via=9:$groupId",
+            email.substringBefore('@').replaceFirstChar { it.titlecase() }, capabilities, "0"))
+
     private fun roster(id: String, vararg emails: String): MsnpCommand {
         val body = "<circle><roster><id>IM</id>" + emails.joinToString("") { "<user><id>1:$it</id></user>" } + "</roster></circle>"
         return MsnpCommand("NFY", parameters = listOf("PUT"), payload =
@@ -388,11 +572,71 @@ private class CircleTransport : MsnpTransport {
             "CVR" -> listOf("14.0.8117.0416")
             "USR" -> if (command.parameters.getOrNull(1) == "I") listOf("SSO", "S", "policy", "nonce") else listOf("OK")
             "ADL", "RML" -> listOf("OK")
+            "XFR" -> listOf("SB", "board.example:1864", "CKI", "key")
             else -> null
         }
         if (params != null) incoming.send(MsnpCommand(command.verb, command.transactionId, params))
         if (command.verb == "SDG" && rejectSdg) incoming.send(MsnpCommand("933", command.transactionId))
     }
     override suspend fun receive() = incoming.receive()
+    override fun close() { incoming.close() }
+}
+
+/** Real MSNObject P2P packets inside an in-memory switchboard, without private wink offers. */
+private class WinkPeerTransport(
+    private val peer: String,
+    private val localEmail: String,
+    bytes: ByteArray,
+    private val rejectHandshake: Boolean,
+) : MsnpTransport {
+    private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
+    val sent = CopyOnWriteArrayList<MsnpCommand>()
+    private val metadata = MsnDisplayPicture.create(peer, bytes, 8)
+    private val remote = MsnpP2pSession(peer, localEmail,
+        sendPacket = { packet -> incoming.send(MsnpCommand("MSG", parameters = listOf(peer, "Alice"),
+            payload = Msnp18Protocol.p2pPayload(localEmail, packet, peer))) },
+        localPicture = { null }, onDisplayPicture = {},
+        localWink = { hash -> if (hash == metadata.sha1d) LocalDisplayPicture(metadata, bytes) else null })
+    override suspend fun connect(host: String, port: Int, timeoutMillis: Int) = Unit
+    override suspend fun send(command: MsnpCommand) {
+        sent += command
+        when (command.verb) {
+            "USR" -> incoming.send(MsnpCommand(if (rejectHandshake) "911" else "USR", command.transactionId, listOf("OK")))
+            "CAL" -> {
+                incoming.send(MsnpCommand("CAL", command.transactionId, listOf("RINGING", "session")))
+                incoming.send(MsnpCommand("JOI", parameters = listOf(command.parameters.first(), "Peer")))
+            }
+            "MSG" -> {
+                incoming.send(MsnpCommand("ACK", command.transactionId))
+                val payload = parseSwitchboardMime(command.payload!!) as SwitchboardMimeMessage.P2p
+                remote.handle(payload.bytes)
+            }
+        }
+    }
+    override suspend fun receive(): MsnpCommand = incoming.receive()
+    override fun close() { incoming.close() }
+}
+
+private class WinkRecipientTransport(private val peer: String, private val localEmail: String) : MsnpTransport {
+    private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
+    val sent = CopyOnWriteArrayList<MsnpCommand>()
+    val received = AtomicReference<ByteArray?>()
+    private val requester = MsnpP2pSession(peer, localEmail,
+        sendPacket = { packet -> incoming.send(MsnpCommand("MSG", parameters = listOf(peer, "Peer"),
+            payload = Msnp18Protocol.p2pPayload(localEmail, packet, peer))) },
+        localPicture = { null }, onDisplayPicture = {}, onWink = { _, data -> received.set(data) })
+    suspend fun request(metadata: MsnDisplayPicture) = requester.requestDisplayPicture(metadata)
+    override suspend fun connect(host: String, port: Int, timeoutMillis: Int) = Unit
+    override suspend fun send(command: MsnpCommand) {
+        sent += command
+        when (command.verb) {
+            "ANS" -> incoming.send(MsnpCommand("ANS", command.transactionId, listOf("OK")))
+            "MSG" -> {
+                incoming.send(MsnpCommand("ACK", command.transactionId))
+                requester.handle((parseSwitchboardMime(command.payload!!) as SwitchboardMimeMessage.P2p).bytes)
+            }
+        }
+    }
+    override suspend fun receive(): MsnpCommand = incoming.receive()
     override fun close() { incoming.close() }
 }

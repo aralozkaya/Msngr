@@ -27,6 +27,23 @@ class MsnpCirclesTest {
     private val group = Contact("00000000-0000-0000-0009-123456789abc@live.com", "Test",
         "00000000-0000-0000-0009-123456789abc@live.com", Presence.Online, isGroup = true)
 
+    @Test fun longWinkSignaturesSurviveCircleSegmentationAndKeepOriginalMetadata() {
+        val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val metadata = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("sender@example.com", bytes, 8)
+            .copy(extraAttributes = mapOf("stamp" to "signature".repeat(1500)))
+        var transaction = 0
+        val commands = MsnpCircles.winkMessages(group.id, metadata.creator, "endpoint", metadata) { ++transaction }
+        assertTrue(commands.size > 1)
+        assertTrue(commands.all { it.payload!!.size <= MsnpCircles.MAX_SDG_PAYLOAD_BYTES })
+        val assembler = CircleSegmentAssembler()
+        val envelope = commands.mapNotNull { assembler.accept(parseCircleEnvelope(it.payload!!)!!) }.single()
+        assertEquals("Wink", envelope.headers["message-type"])
+        val offer = org.aralozkaya.msngr.data.parseSwitchboardMime(
+            "Content-Type: ${Msnp18Protocol.NUDGE_CONTENT_TYPE}\r\n\r\n".toByteArray() + envelope.body,
+        ) as org.aralozkaya.msngr.data.SwitchboardMimeMessage.WinkOffer
+        assertEquals(metadata, offer.metadata)
+    }
+
     @Test fun unicodeMessagesUseUtf8LengthsAndSurviveEveryTcpBoundary() {
         val message = MsnpCircles.message(11, group.id, "member@example.com", "endpoint", "Merhaba, dünya 日本語")
         val wire = MsnpFrameCodec.encode(message)

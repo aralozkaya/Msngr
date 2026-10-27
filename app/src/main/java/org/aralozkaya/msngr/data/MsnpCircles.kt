@@ -4,6 +4,7 @@ import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
@@ -88,7 +89,6 @@ internal object MsnpCircles {
         startSegment: Int = 0,
         nextTransactionId: () -> Int,
     ): List<MsnpCommand> {
-        require(listOf(groupEmail, senderEmail, endpointId).none { '\r' in it || '\n' in it })
         val contentType = if (useGif) {
             Msnp18Protocol.INK_GIF_CONTENT_TYPE
         } else {
@@ -100,6 +100,28 @@ internal object MsnpCircles {
             MsnInkCodec.encodeBase64IsfPayload(drawing)
         }
         val body = encodedBody.toByteArray(Charsets.UTF_8)
+        return contentMessages(groupEmail, senderEmail, endpointId, "Ink", contentType, body,
+            startSegment, nextTransactionId)
+    }
+
+    fun winkMessages(
+        groupEmail: String,
+        senderEmail: String,
+        endpointId: String,
+        metadata: MsnDisplayPicture,
+        nextTransactionId: () -> Int,
+    ): List<MsnpCommand> {
+        require(metadata.objectType == 8)
+        return contentMessages(groupEmail, senderEmail, endpointId, "Wink", Msnp18Protocol.NUDGE_CONTENT_TYPE,
+            "ID: 2\r\nData: ${metadata.toXml()}\r\n\r\n".toByteArray(Charsets.UTF_8), 0, nextTransactionId)
+    }
+
+    private fun contentMessages(
+        groupEmail: String, senderEmail: String, endpointId: String,
+        type: String, contentType: String, body: ByteArray,
+        startSegment: Int, nextTransactionId: () -> Int,
+    ): List<MsnpCommand> {
+        require(listOf(groupEmail, senderEmail, endpointId).none { '\r' in it || '\n' in it })
         val normalizedEpid = endpointId.trim('{', '}')
 
         fun buildHeaders(segment: Int, firstSegment: Boolean): ByteArray = buildString {
@@ -111,7 +133,7 @@ internal object MsnpCircles {
                 append("Content-Length: ${body.size}\r\n")
                 append("Content-Type: $contentType\r\n")
                 append("Content-Transfer-Encoding: 7bit\r\n")
-                append("Message-Type: Ink\r\n")
+                append("Message-Type: $type\r\n")
                 append("MIME-Version: 1.0\r\n")
             }
             append("\r\n")

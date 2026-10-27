@@ -202,6 +202,36 @@ class WinkInstrumentedTest {
         }
     }
 
+    @Test fun groupWinkPickerSendsAndClosesWhenAnOnlineClientLosesSupport() {
+        installedFixture()
+        val peer = org.aralozkaya.msngr.data.GroupMember("peer@example.test", presence = Presence.Busy, clientCapabilities = 0x800c)
+        val group = mutableStateOf(Contact("circle", "Group", "circle@live.com", Presence.Online, isGroup = true,
+            members = listOf(peer, org.aralozkaya.msngr.data.GroupMember("offline@example.test"))))
+        val sends = java.util.concurrent.atomic.AtomicInteger(0)
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            ChatScreen("", {}, group.value, messages = emptyList(), isHistoryLoaded = true, canLoadOlderMessages = false,
+                isTyping = false, onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {},
+                onSendTyping = {}, onSendNudge = {}, onLoadOlderMessages = {},
+                onSendWink = { _, _ -> sends.incrementAndGet(); Result.success(Unit) })
+        } } }
+        fun openPicker() {
+            compose.onNodeWithContentDescription("Show emoticons").performTouchInput { longClick() }
+            compose.onNodeWithText("Winks").assertIsEnabled().performClick()
+            compose.onNodeWithTag("wink_picker").assertIsDisplayed()
+        }
+        openPicker()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Bouncy Ball").performClick()
+        compose.waitUntil(5_000) { sends.get() == 1 }
+        compose.onNodeWithTag("wink_picker").assertDoesNotExist()
+        openPicker()
+        compose.runOnIdle { group.value = group.value.copy(members = listOf(peer.copy(clientCapabilities = 0))) }
+        compose.onNodeWithTag("wink_picker").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Show emoticons").performTouchInput { longClick() }
+        compose.onNodeWithText("Winks").assertIsNotEnabled()
+        assertEquals(1, sends.get())
+    }
+
     @Test fun holdingAWinkPreviewsWithoutSendingAndTapStillSends() {
         installedFixture()
         WinkPrefs.update(context, WinkSettings(playWinks = false, sounds = false))

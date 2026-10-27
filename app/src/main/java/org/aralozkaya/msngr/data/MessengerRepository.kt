@@ -76,6 +76,7 @@ data class GroupMember(
     val avatarUri: String? = null,
     val storageId: String? = null,
     val role: GroupMemberRole = GroupMemberRole.Unknown,
+    val clientCapabilities: Long = 0L,
 )
 
 internal fun Contact.withGroupPresence(ownEmail: String): Contact = if (!isGroup) this else copy(
@@ -511,7 +512,10 @@ class MockMsnp18Client(
         require(wink.metadata.matches(bytes))
         requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes))
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
-        check(contact?.isGroup != true && contact?.isBlocked != true && contact?.presence?.isOnline == true)
+        check(contact?.isBlocked != true && contact?.presence?.isOnline == true)
+        check(contact.isGroup != true || contact.groupFeatures(signedInEmail).winks) {
+            "All online group members must support winks."
+        }
         appendMessage(ChatMessage(ids.incrementAndGet(), contactId, MessageAuthor.Me, "Wink: ${wink.name}",
             System.currentTimeMillis(), wink = wink, autoPlayWink = true))
     }
@@ -528,6 +532,10 @@ class MockMsnp18Client(
     override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> {
         val nonEmpty = drawing.strokes.filter { it.points.isNotEmpty() }
         if (nonEmpty.isEmpty()) return Result.success(Unit)
+        val contact = mutableContacts.value.firstOrNull { it.id == contactId }
+        if (contact?.isGroup == true && contact.groupFeatures(signedInEmail).inkFormat == null) {
+            return Result.failure(IllegalStateException("All online group members must support handwriting."))
+        }
         appendMessage(
             ChatMessage(
                 id = ids.incrementAndGet(),
