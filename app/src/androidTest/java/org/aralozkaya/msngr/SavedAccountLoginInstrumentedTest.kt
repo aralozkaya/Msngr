@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ActivityScenario
@@ -105,6 +107,29 @@ class SavedAccountLoginInstrumentedTest {
         assertEquals("Bob profile", SessionPrefs.mergeServerProfile(
             context, UserProfileSnapshot("Server Bob", bob, Presence.Online), account = bobMock,
         ).username)
+    }
+
+    @Test
+    fun keyboardNextFocusesPasswordAndDoneSignsIn() {
+        selectAlice()
+        compose.onAllNodes(hasSetTextAction())[0].performClick().performImeAction()
+        compose.onAllNodes(hasSetTextAction())[1].assertIsFocused().performImeAction()
+        compose.waitUntil(8_000) {
+            compose.onAllNodesWithText("Alice profile")
+                .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+        }
+        assertEquals(alice, context.appContainer.messengerRepository.profile.value.email)
+    }
+
+    @Test
+    fun keyboardDoneDoesNotSubmitInvalidCredentials() {
+        for ((email, password) in listOf(alice to "", "invalid" to "password")) {
+            compose.onAllNodes(hasSetTextAction())[0].performTextReplacement(email)
+            compose.onAllNodes(hasSetTextAction())[1].performTextReplacement(password)
+            compose.onAllNodes(hasSetTextAction())[1].performImeAction()
+            compose.onNodeWithText("Welcome to Msngr").assertExists()
+            assertFalse(SessionPrefs.canOpenAuthenticatedScreens(context))
+        }
     }
 
     @Test

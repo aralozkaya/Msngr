@@ -92,10 +92,10 @@ fun ProfilePage(
     val repository = remember(context) { context.appContainer.messengerRepository }
     val initial = remember(repository) { repository.profile.value }
     var usernameEditorValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initial.username, TextRange(initial.username.length)))
+        mutableStateOf(TextFieldValue(initial.username))
     }
     var statusMessageEditorValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initial.statusMessage, TextRange(initial.statusMessage.length)))
+        mutableStateOf(TextFieldValue(initial.statusMessage))
     }
     val usernameDraft = usernameEditorValue.text
     val statusMessageDraft = statusMessageEditorValue.text
