@@ -184,7 +184,8 @@ internal class LiveMsnp18Client(
     private data class SharedVoice(val data: LocalDisplayPicture, val createdAt: Long)
     private val sharedVoiceClips = ConcurrentHashMap<String, SharedVoice>()
     private val sharedWinks = ConcurrentHashMap<String, SharedVoice>()
-    private val pendingWinks = ConcurrentHashMap<String, Long>()
+    private class PendingWink(val messageId: Long)
+    private val pendingWinks = ConcurrentHashMap<String, PendingWink>()
     private val winkLimiter = NudgeRateLimiter()
     private val pendingVoiceClips = ConcurrentHashMap<String, Long>()
     private val circleDeliveries = ConcurrentHashMap<Int, Pair<String, Long>>()
@@ -791,6 +792,7 @@ internal class LiveMsnp18Client(
     }
 
     override suspend fun retryMessage(message: ChatMessage): Result<Unit> {
+        if (message.author == MessageAuthor.Contact && message.wink != null) return retryWinkDownload(message)
         while (true) {
             val conversations = mutableMessages.value
             val messages = conversations[message.contactId].orEmpty()
@@ -811,6 +813,51 @@ internal class LiveMsnp18Client(
                     conversations + (message.contactId to updated),
                 )
             ) return deliverMessage(pending)
+        }
+    }
+
+    private suspend fun retryWinkDownload(message: ChatMessage): Result<Unit> = withContext(Dispatchers.IO) {
+        val account = signedInStorageAccount
+        var pendingMessage: ChatMessage
+        while (true) {
+            val conversations = mutableMessages.value
+            val messages = conversations[message.contactId].orEmpty()
+            val current = messages.firstOrNull { it.id == message.id } ?: message
+            if (current.author != MessageAuthor.Contact || current.wink == null ||
+                current.isWinkPending || current.winkTransferError == null) return@withContext Result.success(Unit)
+            pendingMessage = current.copy(isWinkPending = true, winkTransferError = null, autoPlayWink = false)
+            val updated = if (messages.any { it.id == current.id }) {
+                messages.map { if (it.id == current.id) pendingMessage else it }
+            } else (messages + pendingMessage).sortedBy { it.timestampMillis }
+            if (mutableMessages.compareAndSet(conversations, conversations + (message.contactId to updated))) break
+        }
+        val metadata = pendingMessage.wink!!.metadata
+        val contactId = message.contactId
+        val key = "$contactId\n${metadata.creator.lowercase()}\n${metadata.sha1d}"
+        val pending = PendingWink(message.id)
+        if (pendingWinks.putIfAbsent(key, pending) != null) {
+            val error = IllegalStateException("This wink is already downloading. Try again shortly.")
+            updateWink(contactId, message.id, error.message)
+            return@withContext Result.failure(error)
+        }
+        startWinkTimeout(key, contactId, pending)
+        try {
+            check(account.isNotBlank()) { "Sign in before retrying this wink." }
+            val email = contactEmail(contactId)
+            check(!isGroup(email)) { "Winks are not supported in group chats." }
+            check(mutableContacts.value.none { it.id == contactId && it.isBlocked }) { "Unblock this contact before retrying." }
+            val session = switchboardFor(email)
+            check(account == signedInStorageAccount) { "The selected account changed. Try again." }
+            session.retryWink(metadata)
+            Result.success(Unit)
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            if (pendingWinks.remove(key, pending) && account == signedInStorageAccount)
+                updateWink(contactId, message.id, "Wink download was interrupted.")
+            throw cancel
+        } catch (error: Exception) {
+            if (pendingWinks.remove(key, pending) && account == signedInStorageAccount)
+                updateWink(contactId, message.id, error.message ?: "Wink download failed.")
+            Result.failure(error)
         }
     }
 
@@ -2629,7 +2676,8 @@ internal class LiveMsnp18Client(
                 if (isGroup(contactId)) return
                 val key = "$contactId\n${event.senderEmail.lowercase()}\n${event.metadata.sha1d}"
                 val id = messageIds.incrementAndGet()
-                if (pendingWinks.putIfAbsent(key, id) != null) return
+                val pending = PendingWink(id)
+                if (pendingWinks.putIfAbsent(key, pending) != null) return
                 val mine = event.senderEmail.equals(signedInEmail, true)
                 val name = runCatching { MsnBase64.decode(event.metadata.friendly)?.toString(Charsets.UTF_16LE)?.trimEnd('\u0000') }
                     .getOrNull()?.takeIf { it.isNotBlank() && it.length <= 120 } ?: "Wink"
@@ -2637,14 +2685,11 @@ internal class LiveMsnp18Client(
                     "Wink: $name", System.currentTimeMillis(), wink = org.aralozkaya.msngr.protocol.WinkReference(event.metadata, name), isWinkPending = true))
                 if (!mine) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id)) }
                 mutableTyping.update { it + (contactId to false) }
-                scope.launch {
-                    delay(45_000)
-                    if (pendingWinks.remove(key, id)) updateWink(contactId, id, "Wink download timed out.")
-                }
+                startWinkTimeout(key, contactId, pending)
             }
             is SwitchboardEvent.WinkReceived -> {
                 val key = "$contactId\n${event.senderEmail.lowercase()}\n${event.metadata.sha1d}"
-                val id = pendingWinks.remove(key) ?: return
+                val id = pendingWinks.remove(key)?.messageId ?: return
                 val account = signedInStorageAccount
                 scope.launch {
                     val error = runCatching {
@@ -2776,6 +2821,14 @@ internal class LiveMsnp18Client(
             conversations + (contactId to conversations[contactId].orEmpty().map {
                 if (it.id == id) it.copy(isWinkPending = false, winkTransferError = error, autoPlayWink = error == null) else it
             })
+        }
+    }
+
+    private fun startWinkTimeout(key: String, contactId: String, pending: PendingWink) {
+        scope.launch {
+            delay(45_000)
+            // Each attempt has its own identity, so an old timeout cannot fail a retry.
+            if (pendingWinks.remove(key, pending)) updateWink(contactId, pending.messageId, "Wink download timed out.")
         }
     }
 

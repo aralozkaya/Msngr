@@ -136,6 +136,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
@@ -1152,8 +1153,13 @@ private fun EmoticonAndHandwritingMenuButton(
             }
         }
 
+        BackHandler(enabled = menuExpanded) {
+            menuExpanded = false
+            draggedOption = null
+        }
         DropdownMenuPopup(
             expanded = menuExpanded,
+            properties = PopupProperties(focusable = false),
             onDismissRequest = {
                 menuExpanded = false
                 draggedOption = null
@@ -1483,7 +1489,9 @@ internal fun MessageBubble(
     textSize: Int = NativeTextStyle.DEFAULT_SIZE,
 ) {
     var showDeliveryError by rememberSaveable(message.id) { mutableStateOf(false) }
+    var showWinkOptions by rememberSaveable(message.id) { mutableStateOf(false) }
     val deliveryError = message.deliveryError
+    val winkTransferFailed = message.wink != null && !message.isWinkPending && message.winkTransferError != null
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -1551,7 +1559,7 @@ internal fun MessageBubble(
                     }
                 }
                 if (message.wink != null) {
-                    WinkMessage(message)
+                    WinkMessage(message, onShowOptions = { showWinkOptions = true })
                 } else if (message.isVoiceClip) {
                     VoiceClipMessage(message)
                 } else if (message.inkDrawing != null) {
@@ -1585,31 +1593,36 @@ internal fun MessageBubble(
                         style = MaterialTheme.typography.labelSmall,
                         color = supportingColor,
                     )
-                    if (message.author == MessageAuthor.Me) {
-                        if (deliveryError != null) {
-                            IconButton(
-                                onClick = { showDeliveryError = true },
-                                modifier = Modifier.size(24.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.ErrorOutline,
-                                    contentDescription = stringResource(R.string.chat_message_failed),
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        } else if (message.isSending) {
+                    if (winkTransferFailed || (message.author == MessageAuthor.Me && deliveryError != null)) {
+                        IconButton(
+                            onClick = {
+                                if (winkTransferFailed) showWinkOptions = true else showDeliveryError = true
+                            },
+                            modifier = Modifier.size(24.dp),
+                        ) {
                             Icon(
-                                Icons.Default.Schedule,
-                                contentDescription = stringResource(R.string.chat_message_sending),
-                                tint = supportingColor,
-                                modifier = Modifier.size(16.dp),
+                                Icons.Default.ErrorOutline,
+                                contentDescription = stringResource(
+                                    if (winkTransferFailed) R.string.wink_download_failed else R.string.chat_message_failed,
+                                ),
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp),
                             )
                         }
+                    } else if (message.author == MessageAuthor.Me && message.isSending) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = stringResource(R.string.chat_message_sending),
+                            tint = supportingColor,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
             }
         }
+    }
+    if (showWinkOptions && message.wink != null) {
+        WinkMessageSheet(message, onDismiss = { showWinkOptions = false }, onRetry = onRetry)
     }
     if (showDeliveryError && deliveryError != null) {
         AlertDialog(

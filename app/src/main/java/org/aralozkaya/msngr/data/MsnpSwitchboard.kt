@@ -74,6 +74,7 @@ internal class MsnpSwitchboardSession(
     private data class OutgoingPicturePacket(val destination: String, val bytes: ByteArray)
     private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED)
     private val otherPicturePeers = ConcurrentHashMap<String, MsnpP2pSession>()
+    private val winkPeers = ConcurrentHashMap<String, MsnpP2pSession>()
     private val pendingOwnMessages = ArrayDeque<MsnpCommand>()
     private val chunkAssembler = SwitchboardChunkAssembler()
     private val pendingMessageAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
@@ -155,6 +156,15 @@ internal class MsnpSwitchboardSession(
 
     suspend fun sendWink(metadata: MsnDisplayPicture) {
         for (payload in org.aralozkaya.msngr.protocol.MsnWink.payloads(metadata)) sendPayload(payload, "A")
+    }
+
+    suspend fun retryWink(metadata: MsnDisplayPicture) {
+        check(!closed.get()) { "The conversation is disconnected. Try again." }
+        val sender = metadata.creator.normalizedSwitchboardIdentity()
+        check(sender == contactEmail) { "The wink sender does not match this conversation." }
+        val cached = cachedWink(metadata)
+        if (cached != null) eventSink(SwitchboardEvent.WinkReceived(sender, metadata, cached))
+        else (winkPeers[sender] ?: pictureSession).requestDisplayPicture(metadata, retry = true)
     }
 
     suspend fun sendVoiceClip(metadata: MsnDisplayPicture) {
@@ -317,7 +327,7 @@ internal class MsnpSwitchboardSession(
                 val cached = cachedWink(message.metadata)
                 if (cached != null) eventSink(SwitchboardEvent.WinkReceived(sender, message.metadata, cached))
                 else if (!closed.get()) p2pPeer(sender, normalizeEndpointId(rawSender.substringAfter(';', "")))
-                    ?.requestDisplayPicture(message.metadata)
+                    ?.also { winkPeers[sender] = it }?.requestDisplayPicture(message.metadata)
             }
             SwitchboardMimeMessage.Typing -> if (!mine) eventSink(SwitchboardEvent.Typing(sender))
             SwitchboardMimeMessage.Nudge -> eventSink(SwitchboardEvent.Nudge(sender))

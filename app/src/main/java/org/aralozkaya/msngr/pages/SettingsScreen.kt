@@ -600,7 +600,7 @@ fun EmoticonSettingsScreen(
                 onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(sounds = it)) },
                 shapes = ListItemDefaults.segmentedShapes(index = 3, count = itemCount), modifier = Modifier.settingsRow(),
                 trailingContent = { Switch(winkSettings.sounds, null) },
-                supportingContent = { Text("Wink sounds respect silent and vibrate mode.") },
+                supportingContent = { Text("Wink sounds use your media volume.") },
                 content = { Text("Wink sounds") })
         }
     }

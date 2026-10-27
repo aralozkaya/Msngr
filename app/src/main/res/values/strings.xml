@@ -84,6 +84,7 @@
     <string name="chat_dismiss_status">Dismiss</string>
     <string name="chat_message_sending">Sending</string>
     <string name="chat_message_failed">Message not sent</string>
+    <string name="wink_download_failed">Wink download failed</string>
     <string name="chat_message_retry">Retry</string>
     <string name="emoticon_search_hint">Search emoticons</string>
     <string name="emoticon_search_back">Back to emoticons</string>

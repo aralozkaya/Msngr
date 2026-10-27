@@ -1073,8 +1073,10 @@ class MessengerRepository(
     fun retryMessage(contactId: String, messageId: Long) {
         scope.launch {
             val message = messageSnapshot(contactId, messageId) ?: return@launch
-            if (message.author == MessageAuthor.Me && !message.isNudge &&
-                !message.isSending && message.deliveryError != null
+            if ((message.author == MessageAuthor.Me && !message.isNudge &&
+                !message.isSending && message.deliveryError != null) ||
+                (message.author == MessageAuthor.Contact && message.wink != null &&
+                    !message.isWinkPending && message.winkTransferError != null)
             ) {
                 client.retryMessage(message)
             }
