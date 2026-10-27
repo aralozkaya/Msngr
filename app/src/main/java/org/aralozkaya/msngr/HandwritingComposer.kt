@@ -772,7 +772,6 @@ internal fun HandwritingComposerPanel(
                             IconButton(
                                 onClick = onSwitchToTypeMode,
                                 colors = unselectedButtonColors,
-                                shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier
                                     .size(40.dp)
                                     .testTag(HANDWRITING_TYPE_BUTTON_TAG),
@@ -800,7 +799,6 @@ internal fun HandwritingComposerPanel(
                                     } else {
                                         unselectedButtonColors
                                     },
-                                    shapes = IconButtonDefaults.shapes(),
                                     modifier = Modifier
                                         .size(40.dp)
                                         .testTag(HANDWRITING_PEN_BUTTON_TAG),
@@ -824,7 +822,6 @@ internal fun HandwritingComposerPanel(
                                     } else {
                                         unselectedButtonColors
                                     },
-                                    shapes = IconButtonDefaults.shapes(),
                                     modifier = Modifier
                                         .size(40.dp)
                                         .testTag(HANDWRITING_ERASER_BUTTON_TAG),
@@ -847,7 +844,6 @@ internal fun HandwritingComposerPanel(
                                 onClick = state::undo,
                                 enabled = enabled && state.canUndo,
                                 colors = unselectedButtonColors,
-                                shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier
                                     .size(40.dp)
                                     .testTag(HANDWRITING_UNDO_BUTTON_TAG),
@@ -864,7 +860,6 @@ internal fun HandwritingComposerPanel(
                                 onClick = state::redo,
                                 enabled = enabled && state.canRedo,
                                 colors = unselectedButtonColors,
-                                shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier
                                     .size(40.dp)
                                     .testTag(HANDWRITING_REDO_BUTTON_TAG),
@@ -882,7 +877,6 @@ internal fun HandwritingComposerPanel(
                                     onClick = { showColorMenu = true },
                                     enabled = enabled,
                                     colors = unselectedButtonColors,
-                                    shapes = IconButtonDefaults.shapes(),
                                     modifier = Modifier
                                         .size(40.dp)
                                         .testTag(HANDWRITING_COLOR_BUTTON_TAG),
@@ -912,7 +906,6 @@ internal fun HandwritingComposerPanel(
                                     onClick = { showGridMenu = true },
                                     enabled = enabled,
                                     colors = unselectedButtonColors,
-                                    shapes = IconButtonDefaults.shapes(),
                                     modifier = Modifier
                                         .size(40.dp)
                                         .testTag(HANDWRITING_GRID_BUTTON_TAG),
@@ -933,7 +926,6 @@ internal fun HandwritingComposerPanel(
                         IconButton(
                             onClick = { showOverflowMenu = true },
                             colors = unselectedButtonColors,
-                            shapes = IconButtonDefaults.shapes(),
                             modifier = Modifier
                                 .size(40.dp)
                                 .testTag(HANDWRITING_OVERFLOW_BUTTON_TAG),

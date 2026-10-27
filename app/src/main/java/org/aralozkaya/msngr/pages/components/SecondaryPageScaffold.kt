@@ -46,7 +46,6 @@ fun SecondaryPageScaffold(
                     navigationIcon = {
                         IconButton(
                             onClick = onBack,
-                            shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
