@@ -108,6 +108,59 @@ class WinkProtocolTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun retryReplacesAStalledWinkRequestInBothP2pVersions() = runBlocking {
+        for (v2 in listOf(false, true)) {
+            val bytes = cab()
+            val metadata = MsnDisplayPicture.create("owner@example.test", bytes, 8)
+            lateinit var requester: MsnpP2pSession
+            lateinit var owner: MsnpP2pSession
+            var dropPackets = true
+            var received: ByteArray? = null
+            requester = MsnpP2pSession("peer@example.test", metadata.creator,
+                { if (!dropPackets) owner.handle(it) }, { null }, { fail("Wink routed as display picture") },
+                localEndpointId = "11111111-1111-1111-1111-111111111111",
+                remoteEndpointId = if (v2) "22222222-2222-2222-2222-222222222222" else null,
+                onWink = { _, data -> received = data })
+            owner = MsnpP2pSession(metadata.creator, "peer@example.test", { requester.handle(it) }, { null }, {},
+                localEndpointId = "22222222-2222-2222-2222-222222222222",
+                remoteEndpointId = if (v2) "11111111-1111-1111-1111-111111111111" else null,
+                localWink = { LocalDisplayPicture(metadata, bytes) })
+            requester.requestDisplayPicture(metadata)
+            dropPackets = false
+            requester.requestDisplayPicture(metadata)
+            assertNull("A normal duplicate must still be suppressed (P2Pv2=$v2)", received)
+            requester.requestDisplayPicture(metadata, retry = true)
+            assertArrayEquals("Retry must start a fresh transfer (P2Pv2=$v2)", bytes, received)
+        }
+    }
+
+    @Test fun deletingCustomWinksPreservesDefaultsOtherAccountsAndReceivedCopies() {
+        val directory = Files.createTempDirectory("wink-delete").toFile()
+        try {
+            val bundledBytes = cab()
+            val bundled = WinkReference(MsnDisplayPicture.create("bundled", bundledBytes, 8), "Bundled")
+            val store = WinkStore(directory) { listOf(bundled to bundledBytes) }
+            val bytes = fixture("screen-punch-lzx.cab")
+            val custom = WinkReference(MsnDisplayPicture.create("peer", bytes, 8), "Custom")
+            store.receive("account", "peer", custom, bytes)
+            store.install("account", custom, bytes)
+            store.install("other", custom, bytes)
+            val changes = store.libraryChanges.value
+            assertTrue(store.isDefault(bundled.metadata.copy(creator = "peer")))
+            assertFalse(store.isDefault(custom.metadata))
+            assertTrue(runCatching { store.remove("account", bundled.metadata) }.isFailure)
+            store.remove("account", custom.metadata)
+            assertTrue(store.libraryChanges.value > changes)
+            assertEquals(listOf(bundled), store.catalog("account"))
+            assertFalse(store.isSaved("account", custom.metadata))
+            assertTrue(store.isSaved("other", custom.metadata))
+            assertArrayEquals(bytes, store.bytes("account", custom.metadata))
+            store.clearReceived("account")
+            assertNull(store.bytes("account", custom.metadata))
+            assertArrayEquals(bundledBytes, store.bytes("account", bundled.metadata))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun savedWinksIncludeDefaultsAndInstalledPackagesButNotReceivedCache() {
         val directory = Files.createTempDirectory("wink-saved-state").toFile()
         try {

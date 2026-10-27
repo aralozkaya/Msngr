@@ -113,11 +113,66 @@ class WinkInstrumentedTest {
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
     }
 
-    @Test fun silentVibrateAndTheUserSoundSwitchMuteWinks() {
-        assertTrue(shouldMuteWink(true, android.media.AudioManager.RINGER_MODE_SILENT))
-        assertTrue(shouldMuteWink(true, android.media.AudioManager.RINGER_MODE_VIBRATE))
-        assertTrue(shouldMuteWink(false, android.media.AudioManager.RINGER_MODE_NORMAL))
-        assertFalse(shouldMuteWink(true, android.media.AudioManager.RINGER_MODE_NORMAL))
+    @Test fun winkDialogUsesMediaVolumeAndHonorsTheUserSoundSwitch() {
+        val reference = installedFixture()
+        WinkPrefs.update(context, WinkSettings(sounds = false))
+        val web = AtomicReference<WinkWebView>()
+        compose.setContent { MaterialTheme { WinkOverlay(reference, {}, onPlayerCreated = web::set) } }
+        compose.waitUntil(10_000) { web.get() != null }
+        compose.runOnIdle {
+            val window = generateSequence(web.get().parent) { it.parent }
+                .filterIsInstance<androidx.compose.ui.window.DialogWindowProvider>().first().window
+            assertEquals(android.media.AudioManager.STREAM_MUSIC, window.volumeControlStream)
+        }
+        val volume = AtomicReference<String?>()
+        compose.waitUntil(10_000) {
+            compose.runOnIdle { web.get().evaluateJavascript("window.winkPlayer?.ruffle().volume?.toString()", volume::set) }
+            volume.get() == "\"0\""
+        }
+    }
+
+    @Test fun openingTheEmoticonMenuKeepsTheEditorAndKeyboardFocused() {
+        installedFixture()
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            ChatScreen("", {}, Contact("peer", "Peer", "peer@example.test", Presence.Online),
+                messages = emptyList(), isHistoryLoaded = true, canLoadOlderMessages = false,
+                isTyping = false, onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {},
+                onSendTyping = {}, onSendNudge = {}, onLoadOlderMessages = {})
+        } } }
+        androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription("Message input"))
+            .perform(androidx.test.espresso.action.ViewActions.click())
+        var editor: android.view.View? = null
+        androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription("Message input"))
+            .check { view, error -> if (error != null) throw error; editor = view }
+        fun keyboardVisible(): Boolean {
+            var visible = false
+            compose.runOnIdle {
+                visible = androidx.core.view.ViewCompat.getRootWindowInsets(editor!!)
+                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            }
+            return visible
+        }
+        compose.waitUntil(5_000) { keyboardVisible() }
+        compose.onNodeWithContentDescription("Show emoticons").performTouchInput { longClick() }
+        compose.onNodeWithText("Winks").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(editor!!.hasFocus()) }
+        assertTrue("The menu must leave the keyboard visible", keyboardVisible())
+    }
+
+    @Test fun onlyCustomWinksOfferDeleteAndDeletingRefreshesThePicker() {
+        installedFixture()
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            WinkPicker(true, true, {}) { _, _ -> Result.success(Unit) }
+        } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Bouncy Ball").performTouchInput { longClick() }
+        compose.onNodeWithText("Preview").assertIsDisplayed()
+        compose.onNodeWithText("Delete").assertDoesNotExist()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithText("Screen Punch").performTouchInput { longClick() }
+        compose.onNodeWithText("Delete").assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Screen Punch").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("Bouncy Ball").assertIsDisplayed()
     }
 
     @Test fun composerOpensWinksFromTheHandwritingMenuAndUsesTheSharedPicker() {
@@ -171,7 +226,7 @@ class WinkInstrumentedTest {
         assertEquals(1, sends.get())
     }
 
-    @Test fun savingAReceivedWinkHidesSaveInEveryBubbleAndDefaultsNeverOfferSave() {
+    @Test fun winkSheetTracksSavesAcrossSendersAndManualImportsAndProtectsDefaults() {
         SessionPrefs.completeLogin(context, "wink-save-${System.nanoTime()}@example.test", "mock-password", false,
             ProviderOptions.ESCARGOT, ServerOverrides(), true)
         val account = context.winkAccount()!!
@@ -180,18 +235,121 @@ class WinkInstrumentedTest {
             org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("peer@example.test", bytes, 8), "Screen Punch")
         context.winkStore().receive(account, "peer", reference, bytes)
         val bundled = context.winkStore().catalog(account).first { it.name == "Bouncy Ball" }
-        val messages = listOf(reference, reference.copy(metadata = reference.metadata.copy(creator = "other@example.test")), bundled)
+        val otherSender = reference.copy(metadata = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("other@example.test", bytes, 8))
+        val manualImport = reference.copy(metadata = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("catalog@example.test", bytes, 8,
+            location = "manual.cab"), name = "Imported wink")
+        val messages = listOf(reference, otherSender, bundled)
             .mapIndexed { index, wink -> org.aralozkaya.msngr.data.ChatMessage(index.toLong(), "peer",
                 org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = wink) }
         compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.statusBarsPadding().padding(16.dp)) { messages.forEach { WinkMessage(it) } }
+            Column(Modifier.statusBarsPadding().padding(16.dp)) {
+                messages.forEach { MessageBubble(it, useOriginalEmoticons = true) }
+            }
         } } }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to my winks").fetchSemanticsNodes().size == 2 }
-        compose.onAllNodesWithText("Play again").assertCountEquals(3)
-        compose.onAllNodesWithText("Add to my winks")[0].performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to my winks").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        compose.onNodeWithText("Add to saved winks").assertDoesNotExist()
+        compose.onNodeWithTag("wink_message_0").performClick()
+        compose.onNodeWithTag("wink_message_sheet").assertIsDisplayed()
+        compose.onNodeWithText("Play").assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Add to saved winks").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Remove from saved winks").fetchSemanticsNodes().isNotEmpty() }
         assertTrue(context.winkStore().isSaved(account, reference.metadata))
-        compose.onAllNodesWithText("Play again").assertCountEquals(3)
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("wink_message_sheet").fetchSemanticsNodes().isEmpty() }
+
+        compose.onNodeWithTag("wink_message_1").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Remove from saved winks").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Remove from saved winks").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
+        assertFalse(context.winkStore().isSaved(account, reference.metadata))
+
+        // A catalog import changes the open sheet even with different sender/name metadata.
+        context.winkStore().install(account, manualImport, bytes)
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Remove from saved winks").fetchSemanticsNodes().isNotEmpty() }
+        context.winkStore().clearReceived(account)
+        compose.onNodeWithText("Remove from saved winks").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
+        assertArrayEquals(bytes, context.winkStore().bytes(account, reference.metadata))
+        compose.onNodeWithText("Play").assertIsDisplayed()
+
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("wink_message_sheet").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("wink_message_2").performClick()
+        compose.onNodeWithText("Play").assertIsDisplayed()
+        compose.onNodeWithText("Add to saved winks").assertDoesNotExist()
+        compose.onNodeWithText("Remove from saved winks").assertDoesNotExist()
+    }
+
+    @Test fun failedWinkIconOpensTheSheetAndRetriesWithOtherActionsDisabled() {
+        SessionPrefs.completeLogin(context, "wink-retry-${System.nanoTime()}@example.test", "mock-password", false,
+            ProviderOptions.ESCARGOT, ServerOverrides(), true)
+        val bytes = instrumentation.context.assets.open("winks/screen-punch.cab").use { it.readBytes() }
+        val reference = org.aralozkaya.msngr.protocol.WinkReference(
+            org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("peer@example.test", bytes, 8), "Screen Punch")
+        var message by mutableStateOf(org.aralozkaya.msngr.data.ChatMessage(1, "peer",
+            org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference,
+            winkTransferError = "Wink download timed out."))
+        compose.setContent { MaterialTheme { Surface {
+            MessageBubble(message, useOriginalEmoticons = true, onRetry = {
+                message = message.copy(isWinkPending = true, winkTransferError = null)
+            })
+        } } }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Wink download timed out.").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("wink_message_sheet").assertIsDisplayed()
+        compose.onNodeWithText("Wink download timed out.").assertIsDisplayed()
+        compose.onNodeWithText("Play").assertIsDisplayed().assertIsNotEnabled()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Add to saved winks").assertIsNotEnabled()
+        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Wink download failed").assertDoesNotExist()
+        compose.onNodeWithTag("wink_message_sheet").assertIsDisplayed()
+        assertEquals(1L, message.id)
+        assertTrue(message.isWinkPending)
+        compose.onNodeWithText("Play").assertIsNotEnabled()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Add to saved winks").assertIsNotEnabled()
+
+        context.winkStore().receive(context.winkAccount()!!, message.contactId, reference, bytes)
+        compose.runOnIdle { message = message.copy(isWinkPending = false) }
+        compose.onNodeWithText("Play").assertIsEnabled()
+        compose.onNodeWithText("Add to saved winks").assertIsEnabled()
+        compose.onNodeWithContentDescription("Wink download failed").assertDoesNotExist()
+    }
+
+    @Test fun matchingSavedAndDefaultWinksDoNotBypassDownloadFailure() {
+        val reference = installedFixture()
+        val account = context.winkAccount()!!
+        val bundled = context.winkStore().catalog(account).first { it.name == "Bouncy Ball" }
+        var message by mutableStateOf(org.aralozkaya.msngr.data.ChatMessage(1, "peer",
+            org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference,
+            winkTransferError = "Wink download timed out."))
+        compose.setContent { MaterialTheme { Surface {
+            MessageBubble(message, useOriginalEmoticons = true, onRetry = {})
+        } } }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Play").assertIsNotEnabled()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Remove from saved winks").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Remove from saved winks").assertIsNotEnabled().performTouchInput { click() }
+        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled()
+        assertTrue(context.winkStore().isSaved(account, reference.metadata))
+        compose.onNodeWithContentDescription("Close wink").assertDoesNotExist()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("wink_message_sheet").fetchSemanticsNodes().isEmpty() }
+
+        compose.runOnIdle { message = message.copy(wink = bundled) }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed()
+        compose.onNodeWithTag("wink_message_1").performClick()
+        compose.onNodeWithText("Play").assertIsNotEnabled().performTouchInput { click() }
+        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("Add to saved winks").assertDoesNotExist()
+        compose.onNodeWithText("Remove from saved winks").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Close wink").assertDoesNotExist()
     }
 
     @Test fun autoplayLivesInEmoticonsAndWinksSettingsAndPersists() {

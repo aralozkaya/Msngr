@@ -4,7 +4,9 @@ Long-press the emoticon button in an online one-to-one conversation, then choose
 The picker uses the same keyboard sheet as emoticons and Messenger Plus! colors. It includes
 15 original Messenger winks. Choose a tile to send it and play it locally. Hold a tile and
 choose **Preview** to play it without sending; closing the preview returns to the picker.
-Preview is available even when sending is unavailable.
+Preview is available even when sending is unavailable. Custom saved winks also offer **Delete**
+in this menu; bundled defaults cannot be deleted. Opening the emoticon button's menu keeps the
+keyboard open until a picker is selected.
 
 **Get more winks** opens Escargot's wink catalog in an in-app browser. The site's **InstallContent**
 button originally called a Windows ActiveX object, rather than a custom URL handler. Msngr translates
@@ -17,6 +19,11 @@ An external browser can also launch an Escargot package import with
 Escargot protocol. Local-file and content-provider imports are not supported. Additional winks received from
 contacts can still be saved to the collection.
 
+Tap a wink in a conversation to open its standard Material bottom sheet with the thumbnail,
+name, and **Play** action. Custom winks offer **Add to saved winks** or **Remove from saved winks**.
+The sheet updates when the library changes, including saves from another chat or the catalog;
+matching uses the package content hash rather than the sender or name. Default winks cannot be removed.
+
 ## Playback and storage
 
 - Ruffle 0.7.1 is bundled locally. No CDN, Flash plugin, or native Flash runtime is required.
@@ -28,14 +35,21 @@ contacts can still be saved to the collection.
   latest wink for each conversation; reopening saved history does not replay old winks.
 - The **Play winks automatically** and **Wink sounds** switches are under **Emoticons & Winks**
   in app settings. The selector contains no playback switches.
-  Silent/vibrate mutes audio. The Android animation scale being zero uses a thumbnail.
-  Explicit **Play again** can play with auto-play disabled; reduced motion still uses a thumbnail.
+  Audio uses media volume, including in silent and vibrate mode, and the volume buttons adjust
+  media volume during playback. The Android animation scale being zero uses a thumbnail.
+  Explicit **Play** can play with auto-play disabled; reduced motion still uses a thumbnail.
 - Downloads reuse a matching bundled/library/cached CAB by SHA1D. History stores only references,
   not another CAB for each message. The received cache is limited to 32 MiB / 256 items per account;
-  installed winks are kept separately, up to 64 MiB / 512 items. Bundled or already saved winks
-  do not offer **Add to my winks** in message bubbles; saving one updates every matching bubble.
+  installed winks are kept separately, up to 64 MiB / 512 items. The message action sheet offers
+  storage actions according to the current library state. Removing a saved wink keeps the open
+  message's received copy available for replay.
   Clearing a conversation removes its
   received-cache references; installed winks and bundled defaults remain available.
+- Failed or timed-out incoming downloads show the same error icon used by failed outgoing messages.
+  Tapping the icon or the wink opens the action sheet with the failure details and **Retry**.
+  The sheet's playback and saved-wink options stay visible but disabled while a download is pending or failed,
+  including for matching saved or default winks. Retrying starts a fresh transfer with a new timeout;
+  it requires the sender to still have the wink available.
 - Every completed transfer is checked against the advertised byte count and SHA-1 before parsing.
   One-to-one online conversations are supported; group and offline wink delivery are unavailable.
 

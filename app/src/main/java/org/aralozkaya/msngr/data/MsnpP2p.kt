@@ -43,14 +43,15 @@ internal class MsnpP2pSession(
     private val incoming = ConcurrentHashMap<Pair<Int, Int>, IncomingP2pMessage>()
     private val pendingCalls = ConcurrentHashMap<Int, PendingDisplayPicture>()
 
-    suspend fun requestDisplayPicture(picture: MsnDisplayPicture) {
+    suspend fun requestDisplayPicture(picture: MsnDisplayPicture, retry: Boolean = false) {
         v2?.let {
-            it.requestDisplayPicture(picture)
+            it.requestDisplayPicture(picture, retry)
             return
         }
         val now = System.nanoTime()
         pendingCalls.entries
-            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
+            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS ||
+                (retry && it.value.picture.sha1d == picture.sha1d) }
             .forEach { pendingCalls.remove(it.key, it.value) }
         if (pendingCalls.values.any { it.picture.sha1d == picture.sha1d }) return
         if (pendingCalls.size >= MAX_PENDING_CALLS) return

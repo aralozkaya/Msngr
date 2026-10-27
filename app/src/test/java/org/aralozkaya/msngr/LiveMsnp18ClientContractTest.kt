@@ -145,7 +145,8 @@ class LiveMsnp18ClientContractTest {
     }
 
     private fun syncClient(notification: ContractNotificationTransport, switchboard: ContractSwitchboardTransport,
-        blocked: Boolean = false, nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter()) = LiveMsnp18Client(
+        blocked: Boolean = false, nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter(),
+        winkStore: org.aralozkaya.msngr.data.WinkStore? = null) = LiveMsnp18Client(
         transport = notification,
         switchboardTransportFactory = { switchboard },
         authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
@@ -154,7 +155,43 @@ class LiveMsnp18ClientContractTest {
         ))) },
         fetchStorageProfile = { _, _ -> StorageProfile() },
         nudgeLimiter = nudgeLimiter,
+        winkStore = winkStore,
     )
+
+    @Test fun retryDownloadsARestoredWinkIntoTheSameMessageWithoutDuplicates() = runBlocking {
+        val directory = java.nio.file.Files.createTempDirectory("wink-retry").toFile()
+        val store = org.aralozkaya.msngr.data.WinkStore(directory)
+        val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val metadata = MsnDisplayPicture.create(contact.email, bytes, 8)
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email).apply {
+            remoteWink = LocalDisplayPicture(metadata, bytes)
+        }
+        val client = syncClient(notification, switchboard, winkStore = store)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val restored = org.aralozkaya.msngr.data.ChatMessage(42, contact.id, MessageAuthor.Contact,
+                "Wink", 123, wink = org.aralozkaya.msngr.protocol.WinkReference(metadata, "Screen Punch"),
+                winkTransferError = "Wink download was interrupted.")
+            val retries = (1..5).map { async(Dispatchers.Default) { client.retryMessage(restored) } }
+            retries.forEach { it.await().getOrThrow() }
+            val received = withTimeout(5_000) {
+                client.messages.first { it[contact.id]?.singleOrNull()?.autoPlayWink == true }
+                    .getValue(contact.id).single()
+            }
+            assertEquals(restored.copy(winkTransferError = null, autoPlayWink = true), received)
+            val account = AccountIdentity.forServer(email, serverConfig, false).storageId
+            assertArrayEquals(bytes, store.bytes(account, metadata))
+            fun winkRequests() = switchboard.sent.count {
+                it.payload?.toString(Charsets.UTF_8)?.contains("INVITE MSNMSGR:") == true
+            }
+            val requestsBefore = winkRequests()
+            assertEquals(1, requestsBefore)
+            client.retryMessage(restored).getOrThrow()
+            assertEquals(listOf(received), client.messages.value.getValue(contact.id))
+            assertEquals(requestsBefore, winkRequests())
+        } finally { client.close(); directory.deleteRecursively() }
+    }
 
     @Test fun nudgeCooldownProtectsConcurrentSendsWithoutDisconnecting() = runBlocking {
         var time = 0L
@@ -2111,6 +2148,7 @@ private class ContractSwitchboardTransport(
     val closed = CompletableDeferred<Unit>()
     private val incoming = Channel<MsnpCommand>(Channel.UNLIMITED)
     var remotePicture: LocalDisplayPicture? = null
+    var remoteWink: LocalDisplayPicture? = null
     var textDeliveryGate: CompletableDeferred<Unit>? = null
     var nudgeDeliveryGate: CompletableDeferred<Unit>? = null
     var rejectText: Boolean = false
@@ -2167,6 +2205,7 @@ private class ContractSwitchboardTransport(
                             )
                         },
                         localPicture = { remotePicture },
+                        localWink = { hash -> remoteWink?.takeIf { it.metadata.sha1d == hash } },
                         onDisplayPicture = { receivedPictures.trySend(it) },
                     ).also { remotePeer = it }
                     peer.handle(message.bytes)

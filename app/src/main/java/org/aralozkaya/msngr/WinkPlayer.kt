@@ -19,10 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -31,9 +33,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.*
 import java.io.ByteArrayInputStream
-
-internal fun shouldMuteWink(soundsEnabled: Boolean, ringerMode: Int): Boolean =
-    !soundsEnabled || ringerMode != AudioManager.RINGER_MODE_NORMAL
 
 internal fun Context.winkStore() = (applicationContext as MsngrApplication).winkStore
 internal fun Context.winkAccount(): String? = SessionPrefs.preferenceAccount(this)?.storageId
@@ -140,7 +139,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
     val motionAllowed = android.provider.Settings.Global.getFloat(context.contentResolver,
         android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
     val animate = motionAllowed && (!automatic || settings.playWinks)
-    var muted by remember { mutableStateOf(shouldMuteWink(settings.sounds, audio.ringerMode)) }
+    val muted = !settings.sounds
     LaunchedEffect(reference.metadata.sha1d, account) {
         wink = withContext(Dispatchers.IO) { account?.let { context.winkStore().bytes(it, reference.metadata) }?.let(MsnWinkPackage::parse) }
         if (wink == null) error = "This wink is no longer cached."
@@ -151,14 +150,6 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) { player?.release(); dismiss() } }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); player?.release() }
-    }
-    DisposableEffect(context, settings.sounds) {
-        val receiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(c: Context?, i: android.content.Intent?) { muted = shouldMuteWink(settings.sounds, audio.ringerMode) }
-        }
-        androidx.core.content.ContextCompat.registerReceiver(context, receiver,
-            android.content.IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
-        onDispose { context.unregisterReceiver(receiver) }
     }
     DisposableEffect(readyDuration, muted) {
         // A short sound may duck other media. Losing focus immediately mutes this wink.
@@ -171,7 +162,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
             val result = if (android.os.Build.VERSION.SDK_INT >= 26) {
                 android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                     .setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE).build())
                     .setOnAudioFocusChangeListener(listener).build().also { request = it }.let(audio::requestAudioFocus)
             } else {
                 @Suppress("DEPRECATION")
@@ -189,6 +180,12 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         }
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        DisposableEffect(window) {
+            val previousStream = window?.volumeControlStream
+            window?.volumeControlStream = AudioManager.STREAM_MUSIC
+            onDispose { if (previousStream != null) window?.volumeControlStream = previousStream }
+        }
         Box(Modifier.fillMaxSize().clickable { onDismiss() }, contentAlignment = Alignment.Center) {
             val image = remember(wink) { winkThumbnail(wink?.thumbnail)?.asImageBitmap() }
             if (image != null && (readyDuration == null || !animate)) Image(image, reference.name, Modifier.size(160.dp))

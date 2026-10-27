@@ -29,6 +29,19 @@ internal class WinkStore(
         return reference.metadata.sha1d == metadata.sha1d && cab.isFile && cab.length() == metadata.size.toLong()
     }
 
+    @Synchronized fun isDefault(metadata: MsnDisplayPicture): Boolean = defaults.containsKey(metadata.sha1d)
+
+    @Synchronized fun remove(account: String, metadata: MsnDisplayPicture) {
+        require(!isDefault(metadata)) { "Default winks cannot be deleted." }
+        val library = area(account, "library")
+        val stem = metadata.sha1d.key()
+        for (extension in listOf("cab", "properties")) {
+            val file = File(library, "$stem.$extension")
+            check(!file.exists() || file.delete()) { "Could not delete wink." }
+        }
+        mutableLibraryChanges.value += 1
+    }
+
     @Synchronized fun bytes(account: String, metadata: MsnDisplayPicture): ByteArray? {
         defaults[metadata.sha1d]?.second?.takeIf(metadata::matches)?.let { return it.copyOf() }
         for (kind in listOf("library", "received")) {

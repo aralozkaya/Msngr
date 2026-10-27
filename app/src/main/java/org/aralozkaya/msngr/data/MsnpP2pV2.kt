@@ -29,10 +29,11 @@ internal class MsnpP2pV2Session(
     private val incoming = ConcurrentHashMap<Pair<Long, Int>, IncomingV2Message>()
     private val pendingCalls = ConcurrentHashMap<Long, PendingV2Picture>()
 
-    suspend fun requestDisplayPicture(picture: MsnDisplayPicture) {
+    suspend fun requestDisplayPicture(picture: MsnDisplayPicture, retry: Boolean = false) {
         val now = System.nanoTime()
         pendingCalls.entries
-            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
+            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS ||
+                (retry && it.value.picture.sha1d == picture.sha1d) }
             .forEach { pendingCalls.remove(it.key, it.value) }
         if (pendingCalls.values.any { it.picture.sha1d == picture.sha1d }) return
         if (pendingCalls.size >= MAX_PENDING_CALLS) return
