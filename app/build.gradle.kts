@@ -5,6 +5,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// GitHub's default Java CodeQL checkout omits submodules. Managed-source extraction
+// does not need the native codec or WASM assets; normal APK CI verifies both.
+val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
+    !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
+
 val ruffleSource = rootProject.layout.projectDirectory.dir("third_party/ruffle")
 val ruffleCommit = providers.exec {
     workingDir(ruffleSource)
@@ -18,6 +23,7 @@ val verifyBundledRuffle by tasks.registering {
     val assets = layout.projectDirectory.dir("src/main/assets/ruffle")
     inputs.file(manifest)
     inputs.dir(assets)
+    inputs.file(ruffleSource.file("web/packages/selfhosted/package.json"))
     inputs.property("sourceCommit", ruffleCommit)
     doLast {
         @Suppress("UNCHECKED_CAST")
@@ -38,7 +44,9 @@ val verifyBundledRuffle by tasks.registering {
     }
 }
 
-tasks.named("preBuild") { dependsOn(verifyBundledRuffle) }
+tasks.named("preBuild") {
+    if (!javaOnlyCodeQl) dependsOn(verifyBundledRuffle)
+}
 
 tasks.register("writeDependencyInventory") {
     group = "verification"
@@ -111,8 +119,6 @@ android {
     // Java/Kotlin CodeQL extraction compiles all managed sources without needing
     // a native linker. Its default runner cannot download additional NDKs.
     // Keep JNI enabled for normal builds and for C/C++ CodeQL extraction.
-    val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
-        !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
     if (!javaOnlyCodeQl) {
         ndkVersion = "28.2.13676358"
         externalNativeBuild {
