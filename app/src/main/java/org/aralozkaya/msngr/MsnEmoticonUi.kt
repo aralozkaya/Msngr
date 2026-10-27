@@ -6,6 +6,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.SystemClock
 import android.text.Editable
+import android.text.InputFilter
+import android.text.InputType
+import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
@@ -247,12 +250,13 @@ internal fun MsnEmoticonEditor(
             MsnEditText(context).also { editor ->
                 editor.allowUnicodeEmoji = allowUnicodeEmoji
                 editor.showSoftInputOnFocus = !keepSheetOpenOnTap
-                editor.configureSingleLine(singleLine)
+                editor.configureSingleLine(singleLine, autoCorrect = onSearch == null)
                 editor.setExternalValue(value)
                 initialSelection?.let { selection ->
+                    val length = editor.text?.length ?: 0
                     editor.setSelection(
-                        selection.start.coerceIn(0, value.length),
-                        selection.end.coerceIn(0, value.length),
+                        selection.start.coerceIn(0, length),
+                        selection.end.coerceIn(0, length),
                     )
                 }
                 val actionModeCallback = MessengerPlusSelectionActionModeCallback(
@@ -315,7 +319,7 @@ internal fun MsnEmoticonEditor(
             editor.allowUnicodeEmoji = allowUnicodeEmoji
             editor.isEnabled = enabled
             editor.showSoftInputOnFocus = !keepSheetOpenOnTap
-            editor.configureSingleLine(singleLine)
+            editor.configureSingleLine(singleLine, autoCorrect = onSearch == null)
             if (onSearch != null) editor.imeOptions = EditorInfo.IME_ACTION_SEARCH
             // Even an unchanged hint rebuilds TextView's layout and dismisses its
             // selection handles and action mode when selection triggers recomposition.
@@ -738,9 +742,32 @@ internal class MsnEditText(context: Context) : EditText(context) {
     init {
         background = null
         gravity = Gravity.CENTER_VERTICAL
-        inputType = android.text.InputType.TYPE_CLASS_TEXT or
-            android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
-            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        inputType = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
+            InputType.TYPE_TEXT_FLAG_AUTO_CORRECT or
+            InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        filters = filters + InputFilter { source, start, end, dest, destStart, destEnd ->
+            val input = source.subSequence(start, end).toString()
+            val emojiRanges = if (allowUnicodeEmoji) emptyList() else buildString {
+                append(dest, 0, destStart)
+                append(input)
+                append(dest, destEnd, dest.length)
+            }.unicodeEmojiRanges().mapNotNull { range ->
+                // A separately committed selector can turn an existing plain symbol into emoji.
+                val from = (range.first - destStart).coerceAtLeast(0)
+                val to = (range.last + 1 - destStart).coerceAtMost(input.length)
+                if (from < to) from until to else null
+            }
+            if (emojiRanges.isEmpty()) null else {
+                // Filter only the incoming edit, preserving span offsets and IME composition.
+                SpannableStringBuilder(input).apply {
+                    if (source is Spanned) {
+                        TextUtils.copySpansFrom(source, start, end, Any::class.java, this, 0)
+                    }
+                    emojiRanges.asReversed().forEach { delete(it.first, it.last + 1) }
+                }
+            }
+        }
         imeOptions = EditorInfo.IME_ACTION_NONE
         minLines = 1
         setHorizontallyScrolling(false)
@@ -771,36 +798,32 @@ internal class MsnEditText(context: Context) : EditText(context) {
 
                 override fun afterTextChanged(editable: Editable) {
                     if (applyingValue) return
-                    val rawValue = editable.toString()
-                    val sanitizedValue = if (allowUnicodeEmoji) rawValue else rawValue.withoutUnicodeEmoji()
-                    if (sanitizedValue != rawValue) {
-                        val cursor = selectionStart.coerceAtLeast(0)
-                        applyingValue = true
-                        setText(sanitizedValue)
-                        setSelection(cursor.coerceAtMost(sanitizedValue.length))
-                        applyingValue = false
-                    }
                     renderEmoticons()
-                    onValueChanged(sanitizedValue)
+                    onValueChanged(editable.toString())
                 }
             },
         )
     }
 
     fun setExternalValue(value: String) {
-        if (text.toString() == value) return
+        val safeValue = if (allowUnicodeEmoji) value else value.withoutUnicodeEmoji()
+        if (text.toString() == safeValue) return
         applyingValue = true
-        setText(value)
-        setSelection(value.length)
+        setText(safeValue)
+        setSelection(safeValue.length)
         applyingValue = false
         renderEmoticons()
     }
 
-    fun configureSingleLine(singleLine: Boolean) {
-        if (singleLineEditor == singleLine) return
-        singleLineEditor = singleLine
-        setSingleLine(singleLine)
-        imeOptions = if (singleLine) EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NONE
+    fun configureSingleLine(singleLine: Boolean, autoCorrect: Boolean = true) {
+        if (singleLineEditor != singleLine) {
+            singleLineEditor = singleLine
+            setSingleLine(singleLine)
+            imeOptions = if (singleLine) EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NONE
+        }
+        val nextInputType = if (autoCorrect) inputType or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
+            else inputType and InputType.TYPE_TEXT_FLAG_AUTO_CORRECT.inv()
+        if (inputType != nextInputType) inputType = nextInputType
     }
 
     fun replaceSelection(replacement: String, selectReplacement: Boolean) {
@@ -869,8 +892,8 @@ internal class MsnEditText(context: Context) : EditText(context) {
         mutateText { editable ->
             editable.replace(0, editable.length, replacement)
             setSelection(
-                selectionStart.coerceIn(0, replacement.length),
-                selectionEnd.coerceIn(0, replacement.length),
+                selectionStart.coerceIn(0, editable.length),
+                selectionEnd.coerceIn(0, editable.length),
             )
         }
     }

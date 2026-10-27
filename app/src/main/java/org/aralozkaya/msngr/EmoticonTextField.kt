@@ -2,6 +2,7 @@
 
 package org.aralozkaya.msngr
 
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ internal fun EmoticonOutlinedTextField(
     isError: Boolean = false,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = false,
 ) {
     var editorValue by remember { mutableStateOf(TextFieldValue(value)) }
@@ -55,6 +57,7 @@ internal fun EmoticonOutlinedTextField(
         isError = isError,
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         singleLine = singleLine,
     )
 }

@@ -330,66 +330,14 @@ private const val MSN_MENU_TOKEN_START = 0xE000
 
 /** Removes Unicode emoji committed by an IME or paste while retaining ordinary Unicode text. */
 internal fun String.withoutUnicodeEmoji(): String {
-    val sanitized = StringBuilder(length)
-    var changed = false
-    var index = 0
-    while (index < length) {
-        val codePoint = codePointAt(index)
-        val nextIndex = index + Character.charCount(codePoint)
-        val keycapEnd = if (codePoint == '#'.code || codePoint == '*'.code ||
-            codePoint in '0'.code..'9'.code
-        ) {
-            keycapSequenceEnd(nextIndex)
-        } else {
-            null
+    val ranges = unicodeEmojiRanges()
+    if (ranges.isEmpty()) return this
+    return buildString(length) {
+        var previousEnd = 0
+        for (range in ranges) {
+            append(this@withoutUnicodeEmoji, previousEnd, range.first)
+            previousEnd = range.last + 1
         }
-        when {
-            keycapEnd != null -> {
-                changed = true
-                index = keycapEnd
-            }
-            codePoint.isUnicodeEmojiCodePoint() -> {
-                changed = true
-                index = nextIndex
-            }
-            else -> {
-                sanitized.appendCodePoint(codePoint)
-                index = nextIndex
-            }
-        }
+        append(this@withoutUnicodeEmoji, previousEnd, this@withoutUnicodeEmoji.length)
     }
-    return if (changed) sanitized.toString() else this
 }
-
-private fun String.keycapSequenceEnd(indexAfterBase: Int): Int? {
-    var cursor = indexAfterBase
-    if (cursor < length && codePointAt(cursor) == VARIATION_SELECTOR_16) {
-        cursor += Character.charCount(VARIATION_SELECTOR_16)
-    }
-    if (cursor >= length || codePointAt(cursor) != COMBINING_ENCLOSING_KEYCAP) return null
-    return cursor + Character.charCount(COMBINING_ENCLOSING_KEYCAP)
-}
-
-private fun Int.isUnicodeEmojiCodePoint(): Boolean = when {
-    this in 0x1F000..0x1FAFF -> true
-    this in 0x2600..0x27BF -> true
-    this in 0x2B00..0x2BFF -> true
-    this in 0xE0020..0xE007F -> true
-    this in 0x2194..0x2199 || this in 0x21A9..0x21AA -> true
-    this in 0x231A..0x231B || this == 0x2328 || this == 0x23CF -> true
-    this in 0x23E9..0x23F3 || this in 0x23F8..0x23FA -> true
-    this in 0x25AA..0x25AB || this == 0x25B6 || this == 0x25C0 -> true
-    this in 0x25FB..0x25FE -> true
-    this == 0x00A9 || this == 0x00AE || this == 0x203C || this == 0x2049 -> true
-    this == 0x2122 || this == 0x2139 || this == 0x24C2 -> true
-    this == 0x2934 || this == 0x2935 || this == 0x3030 || this == 0x303D -> true
-    this == 0x3297 || this == 0x3299 -> true
-    this == ZERO_WIDTH_JOINER || this == VARIATION_SELECTOR_15 -> true
-    this == VARIATION_SELECTOR_16 || this == COMBINING_ENCLOSING_KEYCAP -> true
-    else -> false
-}
-
-private const val ZERO_WIDTH_JOINER = 0x200D
-private const val COMBINING_ENCLOSING_KEYCAP = 0x20E3
-private const val VARIATION_SELECTOR_15 = 0xFE0E
-private const val VARIATION_SELECTOR_16 = 0xFE0F
