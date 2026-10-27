@@ -59,7 +59,9 @@ and manual dispatch. It resolves debug/release/test Maven dependencies through G
 records both submodule commits and Ruffle's npm version, and scans those exact identities
 plus the pinned Ruffle `Cargo.lock` with OSV-Scanner. Scanner failures and findings fail
 the check. The inventory and JSON report are retained as workflow artifacts. The release
-workflow requires this scan to pass before building and attaching APKs.
+workflow builds and packages APKs in parallel with the scan and requires both jobs to pass
+before attaching files to a release. Manual release-validation runs keep the same security
+check and retain packaged APKs as artifacts without publishing them.
 
 The Rust lockfile includes upstream desktop/build dependencies as well as web dependencies.
 Treat those findings as requiring investigation: determine whether a vulnerable package
