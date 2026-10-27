@@ -1,0 +1,54 @@
+name: Update Ruffle
+
+on:
+  schedule:
+    - cron: '43 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-ruffle
+  cancel-in-progress: false
+
+jobs:
+  stable-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Download and verify the latest stable source/runtime pair
+        run: python3 tools/update_ruffle.py --update
+      - name: Open or update the release PR
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: codex/update-ruffle
+          commit-message: Update Ruffle source submodule and verified runtime
+          title: Update Ruffle to the latest stable release
+          body: |
+            Updates the pinned upstream source and its matching official self-hosted JS/WASM runtime together.
+
+            The updater verifies npm SHA-512 integrity, the runtime's embedded source commit and version, and each bundled file's SHA-256. Android CI and dependency vulnerability scans must pass before merging. Check wink playback on a device before approval.
+          add-paths: |
+            third_party/ruffle
+            third_party/ruffle-runtime.json
+            app/src/main/assets/ruffle
+      # PRs created with GITHUB_TOKEN do not trigger pull_request workflows.
+      # Explicit dispatch runs the checks on the exact update branch instead.
+      - name: Start checks for the automated PR
+        if: ${{ steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh workflow run android-ci.yml --ref codex/update-ruffle
+          gh workflow run dependency-security.yml --ref codex/update-ruffle

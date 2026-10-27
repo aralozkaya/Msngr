@@ -1,18 +1,14 @@
 # Ruffle playback runtime
 
-Pinned upstream release: **0.7.1** (`@ruffle-rs/ruffle` self-hosted package).
+This is the official `@ruffle-rs/ruffle` self-hosted runtime.
+Both WebAssembly variants and their loader chunks are required by Ruffle feature
+detection. Source maps are omitted. Licenses are included alongside the runtime.
+No runtime CDN or update request is used.
 
-Source: https://github.com/ruffle-rs/ruffle/releases/tag/v0.7.1
-Package: https://registry.npmjs.org/@ruffle-rs/ruffle/-/ruffle-0.7.1.tgz
+The authoritative version, source commit and hashes are in `third_party/ruffle-runtime.json`.
+The upstream source is pinned by the `third_party/ruffle` Git submodule. The daily
+Update Ruffle workflow opens a PR updating that source and the matching runtime together.
+See `docs/DEPENDENCIES.md` for verification, updates, and vulnerability checks.
 
-Both WebAssembly variants and their loader chunks are required by Ruffle feature detection. Source maps are omitted. Licenses are included alongside the runtime. No runtime CDN or update request is used.
-
-SHA-256 checksums:
-
-- `172de42e6619eac8f371.wasm`: `1ed33b9b71a6b01b9aafafed660be343ffeb2d246c5d79e6425a32bf93e38207`
-- `878d548199cddef07035.wasm`: `af9b6a13a8f5e8d305bc3ce28a4edf3f6242df1183e8576ad4ca086e9f21eaea`
-- `core.ruffle.16d61072ac7fdc4d5013.js`: `d27c6bdce2a34afb32e8dfa40970bc7e86cbcb912f92db7eb3e1ac70e943bd82`
-- `core.ruffle.994eeef0a471a88cd0e3.js`: `d89e507ee60d550629e9229aa1e4dd4f9e75ec7db271e0135cbc87dab042ea51`
-- `ruffle.js`: `26036a94567088dfb3de88a759e8ed10a4cea07b29500af36f345eef42420098`
-
-To update: replace the complete JS/WASM set from a tagged official self-hosted release, retain its licenses, update these checksums, and run the wink instrumentation test with network access blocked by the host.
+To update locally: run `python tools/update_ruffle.py --update`, then run wink
+instrumentation with network access blocked by the host. Retain the runtime licenses.

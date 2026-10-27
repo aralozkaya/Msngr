@@ -1,0 +1,60 @@
+name: Dependency security
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  vulnerability-scan:
+    name: Check dependency vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platforms;android-37.0 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Verify Ruffle and inventory bundled libraries
+        run: |
+          python3 tools/update_ruffle.py
+          python3 tools/dependency_inventory.py
+      - name: Resolve app and test dependencies
+        run: bash ./gradlew --no-daemon :app:writeDependencyInventory
+      - name: Scan resolved Maven dependencies, bundled libraries, and Ruffle's Rust dependencies
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --output-file=app/build/reports/dependencies/vulnerabilities.json
+            --lockfile=osv-scanner:app/build/reports/dependencies/maven.json
+            --lockfile=osv-scanner:app/build/reports/dependencies/third-party.json
+            --lockfile=third_party/ruffle/Cargo.lock
+      - name: Summarize vulnerability findings
+        if: ${{ always() }}
+        run: python3 tools/report_vulnerabilities.py
+      - name: Upload inventory and vulnerability report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/reports/dependencies/
+          if-no-files-found: warn
+          retention-days: 14

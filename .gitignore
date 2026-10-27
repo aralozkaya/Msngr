@@ -4,6 +4,7 @@
 **/build/
 .externalNativeBuild/
 .cxx/
+__pycache__/
 *.iml
 local.properties
 

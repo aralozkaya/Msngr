@@ -154,6 +154,9 @@ opening it again. See [background behavior and device setup](docs/PUSH_NOTIFICAT
 
 ## Build from source
 
+Initialize the pinned third-party libraries with `git submodule update --init` before
+building. See [dependency updates and vulnerability checks](docs/DEPENDENCIES.md).
+
 Open the repository in Android Studio with support for the pinned Android Gradle Plugin
 **9.2.1**, use a compatible Gradle JDK (Android Studio's bundled JDK is the usual starting point),
 and install Android SDK Platform **37**. Configure the SDK through Android Studio or your local
