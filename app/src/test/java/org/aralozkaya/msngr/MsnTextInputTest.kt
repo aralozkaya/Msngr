@@ -22,6 +22,10 @@ class MsnTextInputTest {
             "A🇹🇷B" to "AB",
             "A1️⃣B" to "AB",
             "A↩️B" to "AB",
+            "A☝🏽B" to "AB",
+            "A👩‍❤‍👨B" to "AB",
+            "A©️B" to "AB",
+            "A#️⃣B" to "AB",
         )
         emojiExamples.forEach { (input, expected) ->
             assertEquals(expected, input.withoutUnicodeEmoji())
@@ -29,6 +33,27 @@ class MsnTextInputTest {
 
         val ordinaryText = "Türkçe العربية 中文 :) :d (y) (S)"
         assertEquals(ordinaryText, ordinaryText.withoutUnicodeEmoji())
+    }
+
+    @Test
+    fun emojiFilteringPreservesTextSymbolsAndLanguageJoiners() {
+        val texts = listOf(
+            "© 2026 ® ™ ☆ ↔ ↩ ☺ ❤ ♠ # * 0123456789",
+            "क्\u200Dष ه\u200D می\u200Cروم",
+            "Text presentation: ❤\uFE0E ☀\uFE0E",
+            "Alchemical symbol: \uD83D\uDF01",
+        )
+        texts.forEach { text -> assertEquals(text, text.withoutUnicodeEmoji()) }
+        assertEquals("क्\u200Dष ©", "क्\u200Dष😀 ©".withoutUnicodeEmoji())
+    }
+
+    @Test
+    fun emojiFilteringRemovesSubdivisionFlagsWithTheirTags() {
+        val flag = buildString {
+            listOf(0x1F3F4, 0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067, 0xE007F)
+                .forEach { appendCodePoint(it) }
+        }
+        assertEquals("beforeafter", "before${flag}after".withoutUnicodeEmoji())
     }
 
     @Test

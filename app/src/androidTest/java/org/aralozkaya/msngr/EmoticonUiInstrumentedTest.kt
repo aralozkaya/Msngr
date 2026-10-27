@@ -1,9 +1,12 @@
 package org.aralozkaya.msngr
 
 import android.graphics.Typeface
+import android.text.InputType
 import android.text.style.ReplacementSpan
 import android.text.style.StyleSpan
 import android.view.ActionMode
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -148,6 +151,54 @@ class EmoticonUiInstrumentedTest {
     fun editorConstructionDoesNotRequireAnAttachedSelectionListener() {
         compose.runOnIdle {
             MsnEditText(compose.activity)
+        }
+    }
+
+    @Test
+    fun filteringEmojiKeepsTheCursorAndImeComposingWord() {
+        compose.runOnIdle {
+            val editor = MsnEditText(compose.activity)
+            editor.setExternalValue("abcd")
+            editor.setSelection(2)
+            val connection = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+            connection.commitText("😀", 1)
+            assertEquals("abcd", editor.text.toString())
+            assertEquals(2, editor.selectionStart)
+
+            connection.setComposingText("x😀y", 1)
+            assertEquals("abxycd", editor.text.toString())
+            assertEquals(4, editor.selectionStart)
+            assertEquals(2, BaseInputConnection.getComposingSpanStart(editor.text))
+            assertEquals(4, BaseInputConnection.getComposingSpanEnd(editor.text))
+            connection.setComposingText("z", 1)
+            assertEquals("abzcd", editor.text.toString())
+            assertEquals(3, editor.selectionStart)
+
+            connection.finishComposingText()
+            editor.setExternalValue("a©b")
+            editor.setSelection(2)
+            connection.commitText("\uFE0F", 1)
+            assertEquals("a©b", editor.text.toString())
+            assertEquals(2, editor.selectionStart)
+        }
+    }
+
+    @Test
+    fun editorRequestsAutocorrectionForProseAndAllowsUnicodeSearchQueries() {
+        compose.runOnIdle {
+            val editor = MsnEditText(compose.activity)
+            for (singleLine in listOf(false, true)) {
+                editor.configureSingleLine(singleLine)
+                val info = EditorInfo()
+                checkNotNull(editor.onCreateInputConnection(info))
+                assertTrue(info.inputType and InputType.TYPE_TEXT_FLAG_AUTO_CORRECT != 0)
+                assertEquals(singleLine, info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE == 0)
+            }
+            editor.configureSingleLine(true, autoCorrect = false)
+            assertEquals(0, editor.inputType and InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+            editor.allowUnicodeEmoji = true
+            editor.setExternalValue("😀 © क्\u200Dष")
+            assertEquals("😀 © क्\u200Dष", editor.text.toString())
         }
     }
 
