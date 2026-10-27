@@ -109,4 +109,23 @@ no personal access token is required. Require **Check dependency vulnerabilities
 **Build and test Android** in the branch ruleset. The checked-in ruleset definition includes
 both checks; changing that JSON alone does not change the live GitHub ruleset.
 
-The update workflows open PRs for review; they do not enable automatic merging.
+## Automatic merging
+
+The **Auto-merge dependency updates** workflow enables squash auto-merge for same-repository
+Dependabot PRs and Ruffle PRs created by `github-actions[bot]` on `codex/update-ruffle`.
+It waits for successful **Build and test Android** and **Check dependency vulnerabilities**
+results from GitHub Actions on the PR's current commit. Missing, pending, failed, or stale
+results do not qualify. GitHub enforces the same two checks in the live branch ruleset,
+alongside the existing CodeQL, review, conversation-resolution, and up-to-date-branch rules.
+
+The automation runs trusted default-branch code and reads PR metadata through GitHub's API;
+it never executes PR code with its merge token. File allowlists restrict it to dependency
+declarations, Gradle wrapper/lockfiles, Actions versions, the libsiren gitlink, and Ruffle's
+source/runtime files. Forks, drafts, contributor-authored PRs, application code changes,
+and submodule URL changes require manual handling. The final merge request is bound to the
+commit whose checks passed, so a concurrent push cannot silently change the decision.
+
+Repository auto-merge must be enabled. The existing approving-review requirement is retained;
+automatic merging waits for that approval as well as the required checks. Failed security
+checks, unresolved review threads, CodeQL blockers, conflicts, and outdated branches keep
+the PR open. This policy becomes active after its workflow is merged to the default branch.

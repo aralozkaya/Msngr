@@ -281,6 +281,10 @@ libraries on PRs and daily. Dependabot opens dependency update PRs, and a separa
 workflow updates Ruffle's source pin and matching runtime together. See
 [dependency updates, scan coverage, and existing findings](docs/DEPENDENCIES.md).
 
+Trusted dependency update PRs are eligible for automatic squash merging after their current
+commit passes the Android build and vulnerability checks. Existing GitHub review and CodeQL
+requirements still apply. Other contributions continue through the normal review process.
+
 The **Require Android CI** ruleset requires this check from GitHub Actions with the latest
 `main` changes before merging. It has no bypass actors, so approval bypass still requires a
 successful build. Its importable configuration is checked in at

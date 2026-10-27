@@ -38,7 +38,7 @@ jobs:
           body: |
             Updates the pinned upstream source and its matching official self-hosted JS/WASM runtime together.
 
-            The updater verifies npm SHA-512 integrity, the runtime's embedded source commit and version, and each bundled file's SHA-256. Android CI and dependency vulnerability scans must pass before merging. Check wink playback on a device before approval.
+            The updater verifies npm SHA-512 integrity, the runtime's embedded source commit and version, and each bundled file's SHA-256. Automatic squash merging waits for Android CI, dependency vulnerability scans, and the repository's remaining merge requirements. Check wink playback on a device before approval.
           add-paths: |
             third_party/ruffle
             third_party/ruffle-runtime.json
