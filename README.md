@@ -156,18 +156,22 @@ opening it again. See [background behavior and device setup](docs/PUSH_NOTIFICAT
 
 ### Clone and update the checkout
 
-Install Git, then clone the repository **with its submodules**:
+Install Git and Python **3.11+**, then clone the repository and initialize its pinned
+dependencies using the setup helper:
 
 ```sh
-git clone --recurse-submodules https://github.com/aralozkaya/Msngr.git
+git clone https://github.com/aralozkaya/Msngr.git
 cd Msngr
+python tools/setup_dependencies.py
 ```
 
+Use `python3` in these commands if that is your Python executable's name.
+
 For contributions through a fork, use your fork's clone URL instead. If you already
-cloned the repository without submodules, initialize them from the repository root:
+cloned the repository, run the same helper from the repository root:
 
 ```sh
-git submodule update --init --recursive
+python tools/setup_dependencies.py
 ```
 
 After pulling changes or switching branches, synchronize the submodules to the commits
@@ -177,14 +181,18 @@ selected by that checkout. For example, to update a clean checkout on `main`:
 git switch main
 git pull --ff-only
 git fetch origin --tags
-git submodule sync --recursive
-git submodule update --init --recursive
+python tools/setup_dependencies.py
 ```
 
-Run the last two commands after switching to another branch as well. Use the pinned
-commits: `git submodule update --remote` selects different dependency versions and is
-intended for a reviewed dependency update. GitHub's **Download ZIP** does not include
-the submodule contents, so use a Git clone for development.
+Run the helper after switching to another branch as well. It downloads libsiren and
+only Ruffle's version, license, and dependency metadata. Ruffle's upstream test SWFs
+are excluded to avoid antivirus detections and long Windows test-file paths. Its
+submodule is configured to skip automatic full checkouts; do not use a recursive clone
+or force a full Ruffle checkout. The app's bundled playback runtime is unchanged.
+
+Use the pinned commits: `git submodule update --remote` selects different dependency
+versions and is intended for a reviewed dependency update. GitHub's **Download ZIP**
+does not include submodule metadata, so use a Git clone for development.
 
 ### Set up Android Studio and the SDK
 
@@ -204,7 +212,7 @@ Accept the SDK licenses. Configure the SDK location through Android Studio, an
 `sdk.dir=/path/to/Android/Sdk`. Set `JAVA_HOME` to JDK 21 for command-line builds.
 Use the included **Gradle 9.4.1 wrapper**; a separate Gradle installation is unnecessary.
 
-Python **3.11+** is needed for the dependency maintenance scripts and their tests.
+Python **3.11+** is needed for dependency setup, maintenance scripts, and their tests.
 Normal APK builds use the bundled, verified Ruffle runtime and do not require Node.js,
 npm, or a Rust toolchain. Keep account credentials and signing keys out of Git.
 

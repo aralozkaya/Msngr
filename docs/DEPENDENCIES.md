@@ -3,8 +3,17 @@
 Initialize the pinned dependencies after cloning or switching branches:
 
 ```sh
-git submodule update --init
+python tools/setup_dependencies.py
 ```
+
+The helper uses a blobless, sparse Ruffle checkout containing only the lockfile,
+manifest, version metadata, and licenses. Its upstream test SWFs are neither fetched
+nor checked out, avoiding antivirus detections and long Windows paths. Ruffle's
+`.gitmodules` update policy is `none` so ordinary recursive submodule updates skip it;
+the helper handles its pinned revision explicitly. All CI workflows use the same helper.
+Existing full checkouts are narrowed without restoring deleted SWF fixtures. Previously
+downloaded Git objects may remain in those clones, but future filtered updates do not
+fetch excluded fixtures. Do not force a full Ruffle checkout.
 
 Use the committed gitlinks. `git submodule update --remote` changes the selected
 versions and requires the same review and tests as a dependency update PR.

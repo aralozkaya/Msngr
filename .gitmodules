@@ -7,3 +7,4 @@
 	path = third_party/ruffle
 	url = https://github.com/ruffle-rs/ruffle.git
 	shallow = true
+	update = none

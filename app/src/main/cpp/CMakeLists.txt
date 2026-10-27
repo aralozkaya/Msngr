@@ -5,7 +5,7 @@ set(SIREN_UPSTREAM "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/libsiren
 set(SIREN_PATCH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/patches/libsiren-hardening.patch")
 set(SIREN_PATCHED "${CMAKE_CURRENT_BINARY_DIR}/libsiren")
 if(NOT EXISTS "${SIREN_UPSTREAM}/siren7.h")
-    message(FATAL_ERROR "Initialize dependencies first: git submodule update --init")
+    message(FATAL_ERROR "Initialize dependencies first: python tools/setup_dependencies.py")
 endif()
 # Keep upstream pristine. Reapply the reviewed safety fixes to build-local copies.
 # A conflicting update must fail configuration instead of dropping the fixes.

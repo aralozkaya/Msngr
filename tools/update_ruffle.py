@@ -12,6 +12,7 @@ import subprocess
 import tarfile
 from pathlib import Path
 from urllib.request import Request, urlopen
+from setup_dependencies import configure_ruffle_checkout
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "third_party/ruffle"
@@ -95,11 +96,12 @@ def verify(root=ROOT):
 
 
 def update():
+    configure_ruffle_checkout(SOURCE)
     release = json.loads(download("https://api.github.com/repos/ruffle-rs/ruffle/releases/latest", 2_000_000))
     version = release["tag_name"].removeprefix("v")
     if release["draft"] or release["prerelease"] or not VERSION.fullmatch(version):
         raise ValueError("Expected an official stable Ruffle release")
-    git("fetch", "--depth=1", UPSTREAM, f"refs/tags/v{version}")
+    git("fetch", "--filter=blob:none", "--depth=1", UPSTREAM, f"refs/tags/v{version}")
     commit = git("rev-parse", "FETCH_HEAD^{commit}")
     package = json.loads(download(f"https://registry.npmjs.org/@ruffle-rs/ruffle/{version}", 1_000_000))
     integrity = package["dist"]["integrity"]
