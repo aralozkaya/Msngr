@@ -11,6 +11,8 @@ buildscript {
             "org.bouncycastle:bcprov-jdk18on:1.86",
             "org.bouncycastle:bcutil-jdk18on:1.86",
             "org.jdom:jdom2:2.0.6.1",
+            "org.apache.httpcomponents:httpclient:4.5.14",
+            "org.apache.httpcomponents:httpmime:4.5.14",
         )
     }
 }
@@ -18,4 +20,15 @@ buildscript {
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
+}
+
+// Android lint runs in its own tool configuration, outside the plugin classpath.
+val patchedBuildDependencies = buildscript.configurations.getByName("classpath")
+    .resolutionStrategy.forcedModules.map { "${it.group}:${it.name}:${it.version}" }.toTypedArray()
+allprojects {
+    configurations.matching {
+        it.name == "androidLintTool" || it.name.startsWith("lint", ignoreCase = true)
+    }.configureEach {
+        resolutionStrategy.force(*patchedBuildDependencies)
+    }
 }

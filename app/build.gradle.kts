@@ -77,16 +77,15 @@ tasks.named("preBuild") {
 
 tasks.register("writeDependencyInventory") {
     group = "verification"
-    description = "Exports resolved app and test Maven dependencies for vulnerability scanning."
+    description = "Exports all resolved project and buildscript Maven dependencies for vulnerability scanning."
     val inventory = layout.buildDirectory.file("reports/dependencies/maven.json")
     outputs.file(inventory)
     // Resolve again on scheduled scans; never trust a stale inventory from another build.
     outputs.upToDateWhen { false }
     doLast {
-        val names = setOf("debugRuntimeClasspath", "releaseRuntimeClasspath",
-            "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
-        val classpaths = configurations.filter { it.name in names } + rootProject.allprojects.flatMap { project ->
-            project.buildscript.configurations.filter { it.name == "classpath" && it.isCanBeResolved }
+        val classpaths = rootProject.allprojects.flatMap { project ->
+            project.configurations.filter { it.isCanBeResolved } +
+                project.buildscript.configurations.filter { it.isCanBeResolved }
         }
         val dependencies = classpaths.flatMap { configuration ->
             configuration.resolvedConfiguration.rethrowFailure()
