@@ -119,8 +119,9 @@ original sample count. Audio and format validation enforce the 15-second limit.
 
 The separate native codec library is built from
 [Youness Alaoui's libsiren](https://github.com/kakaroto/libsiren/tree/c7724c03d4a6daf4d6dff9e917c14ce5071dce66).
-Its source, license, build instructions, and local bounds fixes are included in
-`app/src/main/cpp/libsiren/`. The JNI bridge serializes access to upstream's
+Its source and license are pinned in the `third_party/libsiren` submodule; CMake applies
+the reviewed local safety patch to build-local copies. See [dependency maintenance](DEPENDENCIES.md).
+The JNI bridge serializes access to upstream's
 shared scratch state. Android records PCM with AudioRecord and plays decoded
 PCM with AudioTrack. No Messenger DLL or server transcoder is used.
 

@@ -1,6 +1,105 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+// GitHub's default Java CodeQL checkout omits submodules. Managed-source extraction
+// does not need the native codec or WASM assets; normal APK CI verifies both.
+val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
+    !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
+// Resolving Maven identities does not compile native code. Avoid downloading an
+// NDK for this one task; every APK task still configures and builds the codec.
+val dependencyInventoryOnly = gradle.startParameter.taskNames.isNotEmpty() &&
+    gradle.startParameter.taskNames.all { it in setOf(":app:writeDependencyInventory", "writeDependencyInventory") }
+
+val ruffleSource = rootProject.layout.projectDirectory.dir("third_party/ruffle")
+val ruffleCommit = providers.exec {
+    workingDir(ruffleSource)
+    commandLine("git", "rev-parse", "HEAD")
+}.standardOutput.asText.map { it.trim() }
+
+val verifyBundledRuffle by tasks.registering {
+    group = "verification"
+    description = "Checks that the bundled Ruffle runtime matches the pinned source and file hashes."
+    val manifest = rootProject.layout.projectDirectory.file("third_party/ruffle-runtime.json")
+    val assets = layout.projectDirectory.dir("src/main/assets/ruffle")
+    inputs.file(manifest)
+    inputs.dir(assets)
+    inputs.dir(rootProject.layout.projectDirectory.dir("third_party/ruffle-build"))
+    inputs.file(rootProject.layout.projectDirectory.file("third_party/patches/ruffle-security.patch"))
+    inputs.file(ruffleSource.file("web/packages/selfhosted/package.json"))
+    inputs.property("sourceCommit", ruffleCommit)
+    doLast {
+        @Suppress("UNCHECKED_CAST")
+        val metadata = groovy.json.JsonSlurper().parse(manifest.asFile) as Map<String, Any>
+        check(metadata["sourceCommit"] == ruffleCommit.get()) {
+            "Ruffle source/runtime mismatch. Run python tools/update_ruffle.py --update."
+        }
+        @Suppress("UNCHECKED_CAST")
+        val hashes = metadata["files"] as Map<String, String>
+        val actual = assets.asFile.listFiles()!!.filter { it.name != "README.md" }.map { it.name }.toSet()
+        check(actual == hashes.keys) { "Ruffle runtime files differ from the locked file set" }
+        hashes.forEach { (name, expected) ->
+            check(name.matches(Regex("[a-zA-Z0-9_.-]+"))) { "Invalid Ruffle asset name" }
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(assets.file(name).asFile.readBytes()).joinToString("") { "%02x".format(it) }
+            check(digest == expected) { "Ruffle integrity check failed: $name" }
+        }
+        fun sha256(file: File) = MessageDigest.getInstance("SHA-256")
+            .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+        val inventoryFile = rootProject.file("third_party/ruffle-build/inventory.json")
+        check(metadata["dependencyInventory"] == sha256(inventoryFile)) {
+            "Ruffle dependency inventory hash mismatch"
+        }
+        metadata["sourceBuild"]?.let { expected ->
+            val buildFile = rootProject.file("third_party/ruffle-build/manifest.json")
+            check(expected == sha256(buildFile)) { "Ruffle source build metadata hash mismatch" }
+            @Suppress("UNCHECKED_CAST")
+            val buildInfo = groovy.json.JsonSlurper().parse(buildFile) as Map<String, Any>
+            check(buildInfo["sourceCommit"] == metadata["sourceCommit"] &&
+                buildInfo["version"] == metadata["version"]) { "Ruffle source build identity mismatch" }
+            @Suppress("UNCHECKED_CAST")
+            (buildInfo["inputs"] as Map<String, String>).forEach { (path, hash) ->
+                check(path.matches(Regex("third_party/(ruffle-build|patches)/[a-zA-Z0-9_.-]+"))) {
+                    "Invalid Ruffle source build input path"
+                }
+                check(sha256(rootProject.file(path)) == hash) { "Ruffle source build input hash mismatch: $path" }
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    if (!javaOnlyCodeQl) dependsOn(verifyBundledRuffle)
+}
+
+tasks.register("writeDependencyInventory") {
+    group = "verification"
+    description = "Exports resolved app and test Maven dependencies for vulnerability scanning."
+    val inventory = layout.buildDirectory.file("reports/dependencies/maven.json")
+    outputs.file(inventory)
+    // Resolve again on scheduled scans; never trust a stale inventory from another build.
+    outputs.upToDateWhen { false }
+    doLast {
+        val names = setOf("debugRuntimeClasspath", "releaseRuntimeClasspath",
+            "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
+        val dependencies = configurations.filter { it.name in names }.flatMap { configuration ->
+            configuration.resolvedConfiguration.rethrowFailure()
+            configuration.incoming.resolutionResult.allComponents.mapNotNull { it.moduleVersion }
+        }.filter { it.group.isNotEmpty() && it.version != "unspecified" }
+            .distinctBy { "${it.group}:${it.name}:${it.version}" }
+            .sortedBy { "${it.group}:${it.name}:${it.version}" }
+            .map { mapOf("package" to mapOf("name" to "${it.group}:${it.name}",
+                "version" to it.version, "ecosystem" to "Maven")) }
+        check(dependencies.isNotEmpty()) { "No resolved dependencies to scan" }
+        inventory.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(
+                mapOf("results" to listOf(mapOf("packages" to dependencies))))))
+        }
+    }
 }
 
 val releaseTag = providers.gradleProperty("releaseTag")
@@ -47,9 +146,7 @@ android {
     // Java/Kotlin CodeQL extraction compiles all managed sources without needing
     // a native linker. Its default runner cannot download additional NDKs.
     // Keep JNI enabled for normal builds and for C/C++ CodeQL extraction.
-    val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
-        !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
-    if (!javaOnlyCodeQl) {
+    if (!javaOnlyCodeQl && !dependencyInventoryOnly) {
         ndkVersion = "28.2.13676358"
         externalNativeBuild {
             cmake {

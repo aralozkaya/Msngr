@@ -19,6 +19,10 @@
           {
             "context": "Build and test Android",
             "integration_id": 15368
+          },
+          {
+            "context": "Check dependency vulnerabilities",
+            "integration_id": 15368
           }
         ]
       }
