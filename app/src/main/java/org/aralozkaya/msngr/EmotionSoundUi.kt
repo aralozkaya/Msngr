@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -197,7 +200,7 @@ internal fun EmotionSoundDropdown(
 
 @Composable
 internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
-    onSend: suspend (EmotionSound) -> Result<Unit>) {
+    onSend: suspend (EmotionSound) -> Result<Unit>, catalogService: EmotionSoundService? = null) {
     val context = LocalContext.current
     val player = rememberEmotionSoundController()
     val scope = rememberCoroutineScope()
@@ -207,45 +210,63 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     val searchController = remember { MessengerPlusEditorController() }
     val iconButtonSize = IconButtonDefaults.smallContainerSize(widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow)
     var catalog by remember(player.account, player.server) { mutableStateOf(MsnEmotionSound.builtIns) }
-    var popular by remember(player.server) { mutableStateOf<List<EmotionSound>>(emptyList()) }
+    val soundService = remember(player.server, catalogService) { catalogService ?: EmotionSoundService(player.server) }
+    // Null means not loaded; a successful empty catalog is still a completed load.
+    var popular by remember(soundService) { mutableStateOf<List<EmotionSound>?>(null) }
+    var catalogError by remember(soundService) { mutableStateOf<String?>(null) }
+    var catalogAttempt by remember(soundService) { mutableIntStateOf(0) }
     var online by remember { mutableStateOf(false) }
     var category by remember { mutableIntStateOf(0) }
     var randomDialog by remember(player.account, player.server) { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
+    var actionBusy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    val loadingOnline = online && popular == null && catalogError == null
+    val busy = actionBusy || loadingOnline
     LaunchedEffect(visible, changes, player.account) {
         if (visible && player.account != null) catalog = withContext(Dispatchers.IO) { store.catalog(player.account, player.server) }
         if (!visible) { player.stop(); randomDialog = false }
     }
-    LaunchedEffect(visible, online, player.server) {
-        if (visible && online && popular.isEmpty()) {
-            busy = true
-            try { popular = EmotionSoundService(player.server).popular() }
+    LaunchedEffect(visible, online, soundService, catalogAttempt) {
+        if (visible && online && popular == null && catalogError == null) {
+            try { popular = soundService.popular() }
             catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { error = failure.message }
-            finally { busy = false }
+            catch (failure: Exception) { catalogError = failure.message ?: "Online sounds could not be loaded." }
         }
     }
     fun action(block: suspend () -> Unit) { scope.launch {
-        busy = true; error = null; status = null
+        actionBusy = true; error = null; status = null
         try { block() } catch (cancel: CancellationException) { throw cancel }
         catch (failure: Exception) { error = failure.message ?: "The sound could not be downloaded." }
-        finally { busy = false }
+        finally { actionBusy = false }
     } }
     KeyboardPickerSheet(visible, onDismiss, "Emotion sounds", "emotion_sound_picker", expandable = true,
         header = {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Emotion sounds", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                FilterChip(selected = !online, onClick = { online = false; error = null }, label = { Text("My sounds", style = MaterialTheme.typography.labelSmall) })
-                Spacer(Modifier.width(8.dp))
-                FilterChip(selected = online, onClick = { online = true; error = null }, label = { Text("Online", style = MaterialTheme.typography.labelSmall) })
+                Row(
+                    modifier = Modifier.selectableGroup().testTag("emotion_sound_source"),
+                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                ) {
+                    ToggleButton(
+                        checked = !online, onCheckedChange = { online = false; error = null },
+                        buttonSize = ToggleButtonSize.ExtraSmall,
+                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                        modifier = Modifier.testTag("emotion_sound_local").semantics { role = Role.RadioButton },
+                    ) { Text("Local") }
+                    ToggleButton(
+                        checked = online, onCheckedChange = { online = true; error = null },
+                        buttonSize = ToggleButtonSize.ExtraSmall,
+                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                        modifier = Modifier.testTag("emotion_sound_online").semantics { role = Role.RadioButton },
+                    ) { Text("Online") }
+                }
             }
             CompactSearchField(search, "Search sounds", "Clear sound search",
                 Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (actionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
             (error ?: player.error ?: status)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -261,11 +282,21 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             }
         }) {
         val query = search.text.toString().trim().removePrefix("#")
-        val results = (if (online) popular else catalog).filter { sound ->
+        val results = (if (online) popular.orEmpty() else catalog).filter { sound ->
             (category == 0 || sound.category == 0 || sound.category == category) &&
                 (query.isBlank() || sound.name.messengerPlusPlainText().contains(query, true) || sound.id.contains(query, true))
         }
-        if (results.isEmpty()) Text(if (online) "No matching sounds. Enter a sound ID to download, or try Random." else "No matching sounds.")
+        when {
+            loadingOnline -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                LoadingIndicator(Modifier.testTag("emotion_sound_online_loading").semantics { contentDescription = "Loading online sounds" })
+            }
+            online && catalogError != null -> {
+                Text(catalogError!!, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { catalogError = null; catalogAttempt++ }, modifier = Modifier.testTag("emotion_sound_online_retry")) { Text("Retry") }
+            }
+            results.isEmpty() -> Text(if (online) "No matching sounds. Enter a sound ID to download, or try Random." else "No matching sounds.",
+                modifier = Modifier.testTag("emotion_sound_empty"))
+        }
         results.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { sound ->
@@ -274,19 +305,21 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                         IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { if (player.activeId == sound.id) player.stop() else player.play(sound) }) {
                             Icon(if (player.activeId == sound.id) Icons.Default.Stop else Icons.Default.PlayArrow, if (player.activeId == sound.id) "Stop sound" else "Preview $name")
                         }
-                        TooltipBox(
-                            modifier = Modifier.weight(1f),
-                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                            tooltip = { PlainTooltip { Text(name) } },
-                            state = rememberTooltipState(),
-                        ) {
-                            Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth().clickable(enabled = enabled && !busy, onClickLabel = "Send sound") { action {
-                                    val (loaded, _) = player.load(sound)
-                                    onSend(loaded).getOrThrow()
-                                    onDismiss()
-                                } }.padding(vertical = 6.dp))
+                        // TooltipBox applies its modifier to an inner anchor, so weight its outer wrapper.
+                        Box(Modifier.weight(1f)) {
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                tooltip = { PlainTooltip { Text(name) } },
+                                state = rememberTooltipState(),
+                            ) {
+                                Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clickable(enabled = enabled && !busy, onClickLabel = "Send sound") { action {
+                                        val (loaded, _) = player.load(sound)
+                                        onSend(loaded).getOrThrow()
+                                        onDismiss()
+                                    } }.padding(vertical = 6.dp))
+                            }
                         }
                         if (online) IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { action { val (saved, _) = player.load(sound, save = true); status = "Added ${saved.name.messengerPlusPlainText()}" } }) {
                             Icon(Icons.Default.Download, "Download $name")

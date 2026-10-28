@@ -5,7 +5,8 @@ the same keyboard-aware sheet as emoticons, including an expandable height and a
 search field that can coexist with the keyboard. It works in private and group conversations.
 It does not check recipients' client capabilities: other clients can display the text fallback.
 
-**My sounds** contains the 17 native built-in sounds and downloaded sounds saved to this
+The connected **Local / Online** button group chooses the sound source. **Local** contains
+the 17 native built-in sounds and downloaded sounds saved to this
 account. Tap a name to send; the play button previews it. Sound names occupy one line, with
 ellipsis for overflow; long-press or hover over a name to show it in full in a tooltip. Rows use
 narrow play and download/remove buttons and omit sound-ID subtext. **Online** offers Escargot's published
@@ -14,9 +15,13 @@ sound ID (optionally starting with `#`) to download it directly. The category me
 Expressive grouped items and selection shapes. **Random** opens a dialog where you can choose
 **Any language** or one of the 24 native Plus! sound languages, then download a candidate in the
 selected category (or a random category for **Any category**). Preview, try another, **Keep**, or
-**Discard** it; only **Keep** adds it to My sounds. Closing the dialog cancels its work and stops
+**Discard** it; only **Keep** adds it to Local. Closing the dialog cancels its work and stops
 preview playback. Language IDs match the installed native `Sounds.Languages` / `Lang01`–`Lang24`
 table.
+The initial online catalog fetch shows the same Expressive shape-morphing loading indicator as
+contact requests. Empty-result text appears only after a successful load; failures offer Retry.
+Switching back to Local cancels an unfinished catalog load. Completed empty catalogs are cached
+just like populated catalogs.
 The native quick panel's name search also filters its local collection; the Plus! service does
 not define a remote full-database name-search endpoint.
 
@@ -120,6 +125,9 @@ preference persistence, and real-service random/ID downloads plus saving/removin
 `RandomEmotionSoundInstrumentedTest` verifies native language-ID requests, preview without caching,
 explicit Keep/Discard, clearing candidates when filters change, failed-download retries without
 autoplay, and discarding responses that arrive after the dialog closes.
+`EmotionSoundCatalogInstrumentedTest` holds catalog responses to verify the loading state,
+completed empty results, caching, retries, cancellation of late responses, mutually exclusive source
+selection, and accessible row actions after loading a long sound name.
 Pass `-e emotionSoundScreenshots true` for screenshots containing only synthetic test UI.
 
 The fixture README records provenance. Desktop group delivery and physical-device power usage
