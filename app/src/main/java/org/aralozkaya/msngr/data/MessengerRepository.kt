@@ -628,7 +628,6 @@ class MockMsnp18Client(
                 mutableEvents.emit(MessengerEvent.IncomingNudge(contactId))
             }
         }
-        Unit
     }
 
     override suspend fun blockContact(contactId: String) {

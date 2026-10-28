@@ -25,6 +25,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -46,6 +51,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -70,8 +76,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -244,7 +248,7 @@ private fun LoginReadyRoute(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var email by rememberSaveable { mutableStateOf(initial.email) }
-    var password by rememberSaveable { mutableStateOf(initial.password) }
+    val passwordState = rememberTextFieldState(initial.password)
     var rememberCredentials by rememberSaveable { mutableStateOf(initial.savePassword) }
     var selectedProvider by rememberSaveable { mutableStateOf(initial.provider) }
     var customServers by remember { mutableStateOf(initial.customServers) }
@@ -263,7 +267,7 @@ private fun LoginReadyRoute(
     fun formIdentity() = AccountIdentity.forLogin(email, selectedProvider, customServers, useMockServer)
 
     fun applySavedAccount(snapshot: LoginSnapshot) {
-        password = snapshot.password
+        passwordState.setTextAndPlaceCursorAtEnd(snapshot.password)
         rememberCredentials = snapshot.savePassword
         automaticSignInEnabled = snapshot.automaticSignIn
         selectedProvider = snapshot.provider
@@ -280,7 +284,7 @@ private fun LoginReadyRoute(
         if (snapshot.email.isNotBlank()) {
             applySavedAccount(snapshot)
         } else {
-            password = ""
+            passwordState.setTextAndPlaceCursorAtEnd("")
             rememberCredentials = false
             automaticSignInEnabled = false
             loginPresence = Presence.Online
@@ -319,7 +323,7 @@ private fun LoginReadyRoute(
             repository.signIn(
                 SignInRequest(
                     email = normalizedEmail,
-                    password = password,
+                    password = passwordState.text.toString(),
                     serverConfig = resolved,
                     initialPresence = requestedPresence,
                 ),
@@ -330,7 +334,7 @@ private fun LoginReadyRoute(
                     SessionPrefs.completeLogin(
                         context = context,
                         email = normalizedEmail,
-                        password = password,
+                        password = passwordState.text.toString(),
                         savePassword = rememberCredentials,
                         provider = selectedProvider,
                         customServers = customServers,
@@ -348,7 +352,7 @@ private fun LoginReadyRoute(
             }.onFailure { error ->
                 if (isAutomatic) {
                     SessionPrefs.invalidateRememberedCredentials(context)
-                    password = ""
+                    passwordState.setTextAndPlaceCursorAtEnd("")
                     automaticSignInEnabled = false
                 }
                 errorMessage =
@@ -373,7 +377,7 @@ private fun LoginReadyRoute(
     LoginScreen(
         email = email,
         rememberedAccounts = rememberedAccounts,
-        password = password,
+        passwordState = passwordState,
         rememberCredentials = rememberCredentials,
         automaticSignInEnabled = automaticSignInEnabled,
         loginPresence = loginPresence,
@@ -388,11 +392,10 @@ private fun LoginReadyRoute(
             applySavedAccount(snapshot)
             SessionPrefs.selectLoginAccount(context, snapshot.accountIdentity)
         },
-        onPasswordChange = { password = it },
         onRememberChange = { remember ->
             rememberCredentials = remember
             if (!remember) {
-                password = ""
+                passwordState.setTextAndPlaceCursorAtEnd("")
                 automaticSignInEnabled = false
                 SessionPrefs.disableRememberedCredentials(context, account = formIdentity())
                 rememberedAccounts = SessionPrefs.rememberedProfiles(context)
@@ -448,7 +451,7 @@ private fun LoginReadyRoute(
 private fun LoginScreen(
     email: String,
     rememberedAccounts: List<LoginSnapshot>,
-    password: String,
+    passwordState: TextFieldState,
     rememberCredentials: Boolean,
     automaticSignInEnabled: Boolean,
     loginPresence: Presence,
@@ -459,7 +462,6 @@ private fun LoginScreen(
     mockOptionRevealed: Boolean,
     onEmailChange: (String) -> Unit,
     onSavedAccountSelected: (LoginSnapshot) -> Unit,
-    onPasswordChange: (String) -> Unit,
     onRememberChange: (Boolean) -> Unit,
     onAutomaticSignInChange: (Boolean) -> Unit,
     onLoginPresenceChange: (Presence) -> Unit,
@@ -476,13 +478,8 @@ private fun LoginScreen(
     val presenceMenuInteractionSource = remember { MutableInteractionSource() }
     val validEmail = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val passwordFocusRequester = remember { FocusRequester() }
-    val canSignIn = validEmail && password.isNotEmpty() && !submitting
+    val canSignIn = validEmail && passwordState.text.isNotEmpty() && !submitting
     val submitSignIn: () -> Unit = { if (canSignIn) onSignIn() }
-    val passwordVisualTransformation = if (passwordShown) {
-        VisualTransformation.None
-    } else {
-        PasswordVisualTransformation()
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -571,9 +568,13 @@ private fun LoginScreen(
                             { Text("Enter a valid email address.") }
                         } else null,
                     )
-                    EmoticonOutlinedTextField(
-                        value = password,
-                        onValueChange = { onPasswordChange(it.withoutUnicodeEmoji()) },
+                    OutlinedSecureTextField(
+                        state = passwordState,
+                        inputTransformation = InputTransformation {
+                            val text = asCharSequence().toString()
+                            val filtered = text.withoutUnicodeEmoji()
+                            if (filtered != text) replace(0, length, filtered)
+                        },
                         modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
                         label = { Text("Password") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
@@ -597,10 +598,9 @@ private fun LoginScreen(
                                 }
                             }
                         },
-                        visualTransformation = passwordVisualTransformation,
+                        textObfuscationMode = if (passwordShown) TextObfuscationMode.Visible else TextObfuscationMode.Hidden,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { submitSignIn() }),
-                        singleLine = true,
+                        onKeyboardAction = { submitSignIn() },
                         enabled = !submitting,
                     )
                     Column {
@@ -692,7 +692,7 @@ private fun LoginScreen(
                     Button(
                         onClick = submitSignIn,
                         shapes = ButtonDefaults.shapes(),
-                        enabled = validEmail && password.isNotEmpty(),
+                        enabled = validEmail && passwordState.text.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         LoadingButtonContent(

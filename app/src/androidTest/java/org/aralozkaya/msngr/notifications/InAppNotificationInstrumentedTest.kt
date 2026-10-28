@@ -68,7 +68,7 @@ class InAppNotificationInstrumentedTest {
         val foreground = withContext(Dispatchers.Main) { Activity().also(visibility::onActivityStarted) }
         val vibrations = AtomicInteger()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet(); Unit }
+        val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet() }
         val events = MutableSharedFlow<MessengerEvent>()
         val peer = "in-app-peer@example.test"
         val group = "in-app-group@example.test"
@@ -187,7 +187,7 @@ class InAppNotificationInstrumentedTest {
                 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
                 val vibrations = AtomicInteger()
                 InAppNotificationPrefs.update(context) { settings }
-                val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet(); Unit }
+                val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet() }
                 try {
                     withContext(Dispatchers.Main) {
                         controller.show(InAppNotification(InAppNotificationType.Message, "Peer", "Hello", peer))
@@ -251,7 +251,7 @@ class InAppNotificationInstrumentedTest {
         val vibrations = AtomicInteger()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
-        val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet(); Unit }
+        val controller = InAppNotificationController(context, visibility, scope) { vibrations.incrementAndGet() }
         try {
             InAppNotificationPrefs.customize(context, "PEER", "Peer", false) { it.copy(vibrate = false) }
             InAppNotificationPrefs.reload(context)

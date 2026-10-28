@@ -307,7 +307,7 @@ class LiveCircleClientTest {
             assertEquals("Alice", aliceMsg.senderName)
             assertTrue(aliceMsg.isInk)
             assertEquals(0x008000, aliceMsg.inkDrawing!!.strokes.single().colorRgb)
-            assertEquals(200, aliceMsg.inkDrawing!!.strokes.single().widthHimetric)
+            assertEquals(200, aliceMsg.inkDrawing.strokes.single().widthHimetric)
             assertEquals(1, client.contacts.value.single().unreadCount)
             withTimeout(2_000) {
                 while (events.none { it == MessengerEvent.IncomingMessage(groupId, aliceMsg.id) }) yield()
@@ -343,7 +343,7 @@ class LiveCircleClientTest {
             assertEquals("Bob", bobMsg.senderName)
             assertTrue(bobMsg.isInk)
             assertEquals(0xFF0000, bobMsg.inkDrawing!!.strokes.single().colorRgb)
-            assertNotNull(bobMsg.inkDrawing!!.fallbackGifBytes)
+            assertNotNull(bobMsg.inkDrawing.fallbackGifBytes)
             assertEquals(2, client.contacts.value.single().unreadCount)
 
             // 4. Server rejection (933) marks the outgoing group handwriting message as failed

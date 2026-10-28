@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 
 /** Retains selection information that the String overload of OutlinedTextField hides. */
 @Composable
@@ -28,7 +27,6 @@ internal fun EmoticonOutlinedTextField(
     trailingIcon: (@Composable () -> Unit)? = null,
     supportingText: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
-    visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = false,
@@ -55,7 +53,6 @@ internal fun EmoticonOutlinedTextField(
         trailingIcon = trailingIcon,
         supportingText = supportingText,
         isError = isError,
-        visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         singleLine = singleLine,

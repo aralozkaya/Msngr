@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -35,7 +36,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 /** Compact Material decoration around the app's glyph-rendering, selection-aware editor. */
@@ -77,59 +77,12 @@ internal fun CompactSearchField(
             },
     ) {
         CompositionLocalProvider(LocalTextStyle provides textStyle, LocalContentColor provides contentColor) {
-            TextFieldDefaults.DecorationBox(
-                value = state.text.toString(),
+            TextFieldDefaults.decorator(
+                state = state,
                 enabled = enabled,
-                singleLine = true,
-                visualTransformation = VisualTransformation.None,
+                lineLimits = TextFieldLineLimits.SingleLine,
+                outputTransformation = null,
                 interactionSource = interactionSource,
-                innerTextField = {
-                    MsnEmoticonEditor(
-                        value = state.text.toString(),
-                        onValueChange = { value ->
-                            state.edit {
-                                replace(0, length, value)
-                                val nativeSelection = controller.snapshot().selection
-                                selection = TextRange(
-                                    nativeSelection.start.coerceIn(0, length),
-                                    nativeSelection.end.coerceIn(0, length),
-                                )
-                            }
-                        },
-                        controller = controller,
-                        initialSelection = state.selection,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = enabled,
-                        convertTypedShortcuts = settings.convertTypedShortcuts,
-                        useOriginalEmoticons = settings.useOriginalEmoticons,
-                        messengerPlusEnabled = false,
-                        hideControlCharacters = false,
-                        allowUnicodeEmoji = true,
-                        singleLine = true,
-                        hint = "",
-                        contentDescription = placeholder,
-                        contentPadding = PaddingValues(0.dp),
-                        onSearch = controller::hideKeyboard,
-                        onSelectionChanged = { selection ->
-                            val value = controller.snapshot().text
-                            state.edit {
-                                if (toString() != value) replace(0, length, value)
-                                this.selection = selection
-                            }
-                        },
-                        onFocusChanged = { focused ->
-                            if (focused && focusInteraction == null) {
-                                val interaction = FocusInteraction.Focus()
-                                focusInteraction = interaction
-                                interactionSource.tryEmit(interaction)
-                            } else if (!focused) {
-                                focusInteraction?.let { interactionSource.tryEmit(FocusInteraction.Unfocus(it)) }
-                                focusInteraction = null
-                            }
-                            onFocusChanged(focused)
-                        },
-                    )
-                },
                 placeholder = { Text(placeholder, style = textStyle) },
                 leadingIcon = leadingIcon,
                 trailingIcon = {
@@ -155,7 +108,53 @@ internal fun CompactSearchField(
                         unfocusedIndicatorLineThickness = 0.dp,
                     )
                 },
-            )
+            ).Decoration {
+                MsnEmoticonEditor(
+                    value = state.text.toString(),
+                    onValueChange = { value ->
+                        state.edit {
+                            replace(0, length, value)
+                            val nativeSelection = controller.snapshot().selection
+                            selection = TextRange(
+                                nativeSelection.start.coerceIn(0, length),
+                                nativeSelection.end.coerceIn(0, length),
+                            )
+                        }
+                    },
+                    controller = controller,
+                    initialSelection = state.selection,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = enabled,
+                    convertTypedShortcuts = settings.convertTypedShortcuts,
+                    useOriginalEmoticons = settings.useOriginalEmoticons,
+                    messengerPlusEnabled = false,
+                    hideControlCharacters = false,
+                    allowUnicodeEmoji = true,
+                    singleLine = true,
+                    hint = "",
+                    contentDescription = placeholder,
+                    contentPadding = PaddingValues(0.dp),
+                    onSearch = controller::hideKeyboard,
+                    onSelectionChanged = { selection ->
+                        val value = controller.snapshot().text
+                        state.edit {
+                            if (toString() != value) replace(0, length, value)
+                            this.selection = selection
+                        }
+                    },
+                    onFocusChanged = { focused ->
+                        if (focused && focusInteraction == null) {
+                            val interaction = FocusInteraction.Focus()
+                            focusInteraction = interaction
+                            interactionSource.tryEmit(interaction)
+                        } else if (!focused) {
+                            focusInteraction?.let { interactionSource.tryEmit(FocusInteraction.Unfocus(it)) }
+                            focusInteraction = null
+                        }
+                        onFocusChanged(focused)
+                    },
+                )
+            }
         }
     }
 }

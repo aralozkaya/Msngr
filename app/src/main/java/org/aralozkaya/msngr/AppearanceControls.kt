@@ -52,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -323,7 +324,7 @@ internal fun MainColorDialog(initialArgb: Int, onSelect: (Int) -> Unit, onDismis
                 ColorWheel(hue, saturation, brightness, { h, s -> update(h, s, brightness) },
                     Modifier.align(Alignment.CenterHorizontally), testTag = "main_color_wheel")
                 Text("Brightness", style = MaterialTheme.typography.labelMedium)
-                Slider(brightness, { update(hue, saturation, it) },
+                Slider(rememberSliderState(brightness).apply { value = brightness }, { update(hue, saturation, it) },
                     modifier = Modifier.semantics { contentDescription = "Brightness" })
                 OutlinedTextField(input, {
                     input = it.take(7)

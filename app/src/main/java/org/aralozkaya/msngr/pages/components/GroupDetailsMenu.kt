@@ -90,7 +90,7 @@ internal fun GroupDetailsMenu(
                             else -> MenuDefaults.standaloneItemShape
                         },
                         modifier = Modifier.testTag("group_notification_settings"),
-                        onClick = { expanded = false; onOpenNotifications?.invoke() },
+                        onClick = { expanded = false; onOpenNotifications.invoke() },
                     )
                 }
             }
