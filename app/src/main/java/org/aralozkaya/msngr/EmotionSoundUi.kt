@@ -8,6 +8,7 @@ import android.media.AudioManager
 import android.media.MediaDataSource
 import android.media.MediaPlayer
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -21,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -109,12 +112,12 @@ internal class EmotionSoundController(private val context: Context, val account:
         }
         return result
     }
-    fun stop() { job?.cancel(); job = null; activeId = null }
-    fun play(sound: EmotionSound) {
+    fun stop() { job?.cancel(); job = null; activeId = null; error = null }
+    fun play(sound: EmotionSound, previewBytes: ByteArray? = null) {
         stop(); error = null; activeId = sound.id
         job = scope.launch {
             try {
-                val (_, bytes) = load(sound)
+                val bytes = previewBytes ?: load(sound).second
                 checkAccount()
                 EmotionSoundAudio.play(context, bytes)
             } catch (cancel: CancellationException) { throw cancel }
@@ -142,6 +145,56 @@ internal fun rememberEmotionSoundController(): EmotionSoundController {
 
 internal val emotionSoundCategories = listOf("Any category", "Cartoons / Games", "TV / Movies", "Music", "Vocals", "Sound Effects")
 
+/** Indexes are the native Sounds.Languages / Lang01..Lang24 protocol IDs. Zero omits lngId. */
+internal val emotionSoundLanguages = listOf(
+    "Any language", "Arabic", "Catalan", "Chinese", "Danish", "German", "Greek", "English",
+    "Spanish", "Finnish", "French", "Hebrew", "Portuguese", "Italian", "Japanese", "Korean",
+    "Dutch", "Norwegian", "Russian", "Swedish", "Thai", "Turkish", "Kurdish", "Estonian", "Hungarian",
+)
+
+@Composable
+internal fun EmotionSoundDropdown(
+    selected: Int,
+    options: List<String>,
+    label: String,
+    tag: String,
+    onSelected: (Int) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            modifier = Modifier.testTag(tag).semantics { contentDescription = label },
+        ) {
+            Text(options[selected])
+            Icon(Icons.Default.ArrowDropDown, null)
+        }
+        DropdownMenuPopup(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+            DropdownMenuGroup(
+                modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()).testTag("${tag}_menu"),
+                shapes = MenuDefaults.groupShape(0, 1),
+                interactionSource = interactionSource,
+            ) {
+                options.forEachIndexed { index, name ->
+                    SelectableDropdownMenuItem(
+                        selected = index == selected,
+                        text = { Text(name) },
+                        shapes = MenuDefaults.itemShape(index, options.size),
+                        trailingContent = if (index == selected) {
+                            { Icon(Icons.Default.Check, "Selected") }
+                        } else null,
+                        modifier = Modifier.testTag("${tag}_$index"),
+                        onClick = { expanded = false; onSelected(index) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
     onSend: suspend (EmotionSound) -> Result<Unit>) {
@@ -151,17 +204,18 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     val store = context.emotionSoundStore()
     val changes by store.changes.collectAsState()
     val search = rememberTextFieldState()
+    val searchController = remember { MessengerPlusEditorController() }
     var catalog by remember(player.account, player.server) { mutableStateOf(MsnEmotionSound.builtIns) }
     var popular by remember(player.server) { mutableStateOf<List<EmotionSound>>(emptyList()) }
     var online by remember { mutableStateOf(false) }
     var category by remember { mutableIntStateOf(0) }
-    var categoryMenu by remember { mutableStateOf(false) }
+    var randomDialog by remember(player.account, player.server) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(visible, changes, player.account) {
         if (visible && player.account != null) catalog = withContext(Dispatchers.IO) { store.catalog(player.account, player.server) }
-        if (!visible) player.stop()
+        if (!visible) { player.stop(); randomDialog = false }
     }
     LaunchedEffect(visible, online, player.server) {
         if (visible && online && popular.isEmpty()) {
@@ -186,7 +240,8 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 Spacer(Modifier.width(8.dp))
                 FilterChip(selected = online, onClick = { online = true; error = null }, label = { Text("Online", style = MaterialTheme.typography.labelSmall) })
             }
-            CompactSearchField(search, "Search sounds or enter a sound ID", "Clear sound search", Modifier.fillMaxWidth().testTag("emotion_sound_search"))
+            CompactSearchField(search, "Search sounds or enter a sound ID", "Clear sound search",
+                Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -194,23 +249,15 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 if (player.activeId != null) IconButton(onClick = player::stop) { Icon(Icons.Default.Stop, "Stop sound") }
-                Box {
-                    TextButton(onClick = { categoryMenu = true }, enabled = !busy) { Text(emotionSoundCategories[category]); Icon(Icons.Default.ArrowDropDown, null) }
-                    DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
-                        emotionSoundCategories.forEachIndexed { index, name -> DropdownMenuItem(text = { Text(name) }, onClick = { category = index; categoryMenu = false }) }
-                    }
-                }
+                EmotionSoundDropdown(category, emotionSoundCategories, "Sound category", "emotion_sound_category",
+                    onSelected = { category = it }, enabled = !busy)
                 if (hash != null) TextButton(enabled = !busy, onClick = { action {
                     val (sound, _) = player.load(EmotionSound(hash, "Emotion sound"), save = true)
                     status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
                 } }) { Icon(Icons.Default.Download, null); Text("Download") }
-                else TextButton(enabled = !busy, onClick = { action {
-                    player.checkAccount()
-                    val (sound, bytes) = EmotionSoundService(player.server).random(if (category == 0) (1..5).random() else category)
-                    player.checkAccount()
-                    withContext(Dispatchers.IO) { store.put(player.account!!, player.server, sound, bytes, save = true) }
-                    status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
-                } }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
+                else TextButton(enabled = !busy, onClick = {
+                    player.stop(); searchController.clearFocusAndHideKeyboard(); randomDialog = true
+                }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
             }
         }) {
         val query = search.text.toString().trim().removePrefix("#")
@@ -245,6 +292,11 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+    }
+    if (visible && randomDialog) {
+        RandomEmotionSoundDialog(category, onDismiss = { randomDialog = false }, onKept = { sound ->
+            status = "Added ${sound.name.messengerPlusPlainText()}"; online = false; randomDialog = false
+        })
     }
 }
 

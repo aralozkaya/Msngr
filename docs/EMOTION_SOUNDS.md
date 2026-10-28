@@ -8,8 +8,13 @@ It does not check recipients' client capabilities: other clients can display the
 **My sounds** contains the 17 native built-in sounds and downloaded sounds saved to this
 account. Tap a name to send; the play button previews it. **Online** offers Escargot's published
 popular sounds, with name/ID filtering, previews and download buttons. Enter any 12-digit
-sound ID (optionally starting with `#`) to download it directly. **Random** downloads and saves
-a sound in the selected category, or chooses a category when **Any category** is selected.
+sound ID (optionally starting with `#`) to download it directly. The category menu uses Material 3
+Expressive grouped items and selection shapes. **Random** opens a dialog where you can choose
+**Any language** or one of the 24 native Plus! sound languages, then download a candidate in the
+selected category (or a random category for **Any category**). Preview, try another, **Keep**, or
+**Discard** it; only **Keep** adds it to My sounds. Closing the dialog cancels its work and stops
+preview playback. Language IDs match the installed native `Sounds.Languages` / `Lang01`–`Lang24`
+table.
 The native quick panel's name search also filters its local collection; the Plus! service does
 not define a remote full-database name-search endpoint.
 
@@ -110,6 +115,9 @@ Account-codec tests cover migration and round-tripping the new URL.
 `EmotionSoundInstrumentedTest` checks the group composer menu, keyboard-aware search and send,
 styled text bubbles, native playback sheet, actual platform audio playback, pause cleanup,
 preference persistence, and real-service random/ID downloads plus saving/removing/replaying.
+`RandomEmotionSoundInstrumentedTest` verifies native language-ID requests, preview without caching,
+explicit Keep/Discard, clearing candidates when filters change, failed-download retries without
+autoplay, and discarding responses that arrive after the dialog closes.
 Pass `-e emotionSoundScreenshots true` for screenshots containing only synthetic test UI.
 
 The fixture README records provenance. Desktop group delivery and physical-device power usage

@@ -25,7 +25,7 @@ internal class EmotionSoundService(private val server: String, private val http:
     suspend fun random(category: Int, language: Int = 0): Pair<EmotionSound, ByteArray> = withContext(Dispatchers.IO) {
         require(category in 1..5 && language in 0..255)
         val bytes = http.get(base + "random?catId=$category" + if (language > 0) "&lngId=$language" else "")
-        check(!bytes.contentEquals(byteArrayOf('0'.code.toByte()))) { "No sounds were found in this category." }
+        check(!bytes.contentEquals(byteArrayOf('0'.code.toByte()))) { "No sounds were found for this category and language." }
         MsnEmotionSound.downloaded(bytes) to bytes
     }
     suspend fun popular(): List<EmotionSound> = withContext(Dispatchers.IO) {
