@@ -1,0 +1,293 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
+package org.aralozkaya.msngr
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.MediaDataSource
+import android.media.MediaPlayer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.*
+import org.aralozkaya.msngr.data.EmotionSoundService
+import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
+import org.aralozkaya.msngr.protocol.EmotionSound
+import org.aralozkaya.msngr.protocol.MsnEmotionSound
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+internal fun Context.emotionSoundStore() = (applicationContext as MsngrApplication).emotionSoundStore
+
+/** At most one player, with media volume and transient audio focus; no background playback. */
+internal object EmotionSoundAudio {
+    private var cancelCurrent: (() -> Unit)? = null
+    private var currentPlayer: MediaPlayer? = null
+    internal val isPlaying: Boolean get() = runCatching { currentPlayer?.isPlaying == true }.getOrDefault(false)
+    @Suppress("DEPRECATION")
+    suspend fun play(context: Context, bytes: ByteArray) {
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val player = MediaPlayer()
+        val activity = context as? android.app.Activity
+        val previousStream = activity?.volumeControlStream
+        var cancel: (() -> Unit)? = null
+        val focus = AudioManager.OnAudioFocusChangeListener { change -> if (change < 0) cancel?.invoke() }
+        try {
+            cancelCurrent?.invoke()
+            currentPlayer = player
+            check(audio.requestAudioFocus(focus, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { "Audio is in use. Try again." }
+            activity?.volumeControlStream = AudioManager.STREAM_MUSIC
+            player.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+            player.setDataSource(object : MediaDataSource() {
+                override fun getSize() = bytes.size.toLong()
+                override fun close() = Unit
+                override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
+                    if (position < 0 || position >= bytes.size) return -1
+                    val count = minOf(size, bytes.size - position.toInt())
+                    bytes.copyInto(buffer, offset, position.toInt(), position.toInt() + count)
+                    return count
+                }
+            })
+            withTimeout(20_000) {
+                suspendCancellableCoroutine { continuation ->
+                    cancel = { continuation.cancel() }; cancelCurrent = cancel
+                    player.setOnPreparedListener {
+                        if (continuation.isActive) {
+                            if (it.duration !in 1..15_000) continuation.resumeWithException(IllegalStateException("The emotion sound is too long."))
+                            else it.start()
+                        }
+                    }
+                    player.setOnCompletionListener { if (continuation.isActive) continuation.resume(Unit) }
+                    player.setOnErrorListener { _, _, _ ->
+                        if (continuation.isActive) continuation.resumeWithException(IllegalStateException("The emotion sound could not be played.")); true
+                    }
+                    player.prepareAsync()
+                }
+            }
+        } finally {
+            if (cancelCurrent === cancel) cancelCurrent = null
+            if (currentPlayer === player) currentPlayer = null
+            player.release()
+            audio.abandonAudioFocus(focus)
+            if (previousStream != null) activity.volumeControlStream = previousStream
+        }
+    }
+}
+
+@Stable
+internal class EmotionSoundController(private val context: Context, val account: String?, val server: String, private val scope: CoroutineScope) {
+    var activeId by mutableStateOf<String?>(null); private set
+    var error by mutableStateOf<String?>(null); private set
+    private var job: Job? = null
+    fun checkAccount() { check(account != null && SessionPrefs.preferenceAccount(context)?.storageId == account && SessionPrefs.readServerConfig(context).emotionSoundServer == server) { "The selected account changed. Open the sound picker again." } }
+    suspend fun load(sound: EmotionSound, save: Boolean = false): Pair<EmotionSound, ByteArray> {
+        checkAccount()
+        val cached = withContext(Dispatchers.IO) { context.emotionSoundStore().bytes(account!!, server, sound) }
+        val result = if (cached != null) MsnEmotionSound.downloaded(cached, sound) to cached else EmotionSoundService(server).download(sound)
+        checkAccount()
+        withContext(Dispatchers.IO) {
+            val saveCustom = save && result.first.builtInCode == null
+            if (cached == null || (saveCustom && !context.emotionSoundStore().isSaved(account!!, server, sound)))
+                context.emotionSoundStore().put(account!!, server, result.first, result.second, saveCustom)
+        }
+        return result
+    }
+    fun stop() { job?.cancel(); job = null; activeId = null }
+    fun play(sound: EmotionSound) {
+        stop(); error = null; activeId = sound.id
+        job = scope.launch {
+            try {
+                val (_, bytes) = load(sound)
+                checkAccount()
+                EmotionSoundAudio.play(context, bytes)
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { error = failure.message ?: "The sound could not be played." }
+            finally { if (job === currentCoroutineContext()[Job]) { activeId = null; job = null } }
+        }
+    }
+}
+
+@Composable
+internal fun rememberEmotionSoundController(): EmotionSoundController {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val account = SessionPrefs.preferenceAccount(context)?.storageId
+    val server = SessionPrefs.readServerConfig(context).emotionSoundServer
+    val controller = remember(account, server, scope) { EmotionSoundController(context, account, server, scope) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(controller, lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) controller.stop() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); controller.stop() }
+    }
+    return controller
+}
+
+internal val emotionSoundCategories = listOf("Any category", "Cartoons / Games", "TV / Movies", "Music", "Vocals", "Sound Effects")
+
+@Composable
+internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
+    onSend: suspend (EmotionSound) -> Result<Unit>) {
+    val context = LocalContext.current
+    val player = rememberEmotionSoundController()
+    val scope = rememberCoroutineScope()
+    val store = context.emotionSoundStore()
+    val changes by store.changes.collectAsState()
+    val search = rememberTextFieldState()
+    var catalog by remember(player.account, player.server) { mutableStateOf(MsnEmotionSound.builtIns) }
+    var popular by remember(player.server) { mutableStateOf<List<EmotionSound>>(emptyList()) }
+    var online by remember { mutableStateOf(false) }
+    var category by remember { mutableIntStateOf(0) }
+    var categoryMenu by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(visible, changes, player.account) {
+        if (visible && player.account != null) catalog = withContext(Dispatchers.IO) { store.catalog(player.account, player.server) }
+        if (!visible) player.stop()
+    }
+    LaunchedEffect(visible, online, player.server) {
+        if (visible && online && popular.isEmpty()) {
+            busy = true
+            try { popular = EmotionSoundService(player.server).popular() }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { error = failure.message }
+            finally { busy = false }
+        }
+    }
+    fun action(block: suspend () -> Unit) { scope.launch {
+        busy = true; error = null; status = null
+        try { block() } catch (cancel: CancellationException) { throw cancel }
+        catch (failure: Exception) { error = failure.message ?: "The sound could not be downloaded." }
+        finally { busy = false }
+    } }
+    KeyboardPickerSheet(visible, onDismiss, "Emotion sounds", "emotion_sound_picker", expandable = true,
+        header = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Emotion sounds", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                FilterChip(selected = !online, onClick = { online = false; error = null }, label = { Text("My sounds", style = MaterialTheme.typography.labelSmall) })
+                Spacer(Modifier.width(8.dp))
+                FilterChip(selected = online, onClick = { online = true; error = null }, label = { Text("Online", style = MaterialTheme.typography.labelSmall) })
+            }
+            CompactSearchField(search, "Search sounds or enter a sound ID", "Clear sound search", Modifier.fillMaxWidth().testTag("emotion_sound_search"))
+        }, footer = {
+            val hash = MsnEmotionSound.hash(search.text.toString())
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            (error ?: player.error ?: status)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                if (player.activeId != null) IconButton(onClick = player::stop) { Icon(Icons.Default.Stop, "Stop sound") }
+                Box {
+                    TextButton(onClick = { categoryMenu = true }, enabled = !busy) { Text(emotionSoundCategories[category]); Icon(Icons.Default.ArrowDropDown, null) }
+                    DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
+                        emotionSoundCategories.forEachIndexed { index, name -> DropdownMenuItem(text = { Text(name) }, onClick = { category = index; categoryMenu = false }) }
+                    }
+                }
+                if (hash != null) TextButton(enabled = !busy, onClick = { action {
+                    val (sound, _) = player.load(EmotionSound(hash, "Emotion sound"), save = true)
+                    status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
+                } }) { Icon(Icons.Default.Download, null); Text("Download") }
+                else TextButton(enabled = !busy, onClick = { action {
+                    player.checkAccount()
+                    val (sound, bytes) = EmotionSoundService(player.server).random(if (category == 0) (1..5).random() else category)
+                    player.checkAccount()
+                    withContext(Dispatchers.IO) { store.put(player.account!!, player.server, sound, bytes, save = true) }
+                    status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
+                } }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
+            }
+        }) {
+        val query = search.text.toString().trim().removePrefix("#")
+        val results = (if (online) popular else catalog).filter { sound ->
+            (category == 0 || sound.category == 0 || sound.category == category) &&
+                (query.isBlank() || sound.name.messengerPlusPlainText().contains(query, true) || sound.id.contains(query, true))
+        }
+        if (results.isEmpty()) Text(if (online) "No matching sounds. Enter a sound ID to download, or try Random." else "No matching sounds.")
+        results.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { sound ->
+                    Row(Modifier.weight(1f).testTag("emotion_sound_${sound.id}"), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { if (player.activeId == sound.id) player.stop() else player.play(sound) }) {
+                            Icon(if (player.activeId == sound.id) Icons.Default.Stop else Icons.Default.PlayArrow, if (player.activeId == sound.id) "Stop sound" else "Preview ${sound.name.messengerPlusPlainText()}")
+                        }
+                        Column(Modifier.weight(1f).clickable(enabled = enabled && !busy, onClickLabel = "Send sound") { action {
+                            val (loaded, _) = player.load(sound)
+                            onSend(loaded).getOrThrow()
+                            onDismiss()
+                        } }.padding(vertical = 6.dp)) {
+                            Text(sound.name.messengerPlusPlainText(), style = MaterialTheme.typography.bodyMedium, maxLines = 2,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            if (sound.builtInCode == null) Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (online) IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { action { val (saved, _) = player.load(sound, save = true); status = "Added ${saved.name.messengerPlusPlainText()}" } }) {
+                            Icon(Icons.Default.Download, "Download ${sound.name.messengerPlusPlainText()}")
+                        } else if (sound.builtInCode == null) IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { action {
+                            player.checkAccount(); withContext(Dispatchers.IO) { store.remove(player.account!!, player.server, sound) }
+                        } }) { Icon(Icons.Default.Delete, "Remove ${sound.name.messengerPlusPlainText()}") }
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EmotionSoundMessageSheet(message: org.aralozkaya.msngr.data.ChatMessage, onDismiss: () -> Unit) {
+    val sound = message.emotionSound?.sound ?: return
+    val context = LocalContext.current
+    val player = rememberEmotionSoundController()
+    val scope = rememberCoroutineScope()
+    val store = context.emotionSoundStore()
+    val changes by store.changes.collectAsState()
+    var saved by remember(sound.id, player.account) { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(changes, sound.id) { saved = withContext(Dispatchers.IO) { player.account?.let { store.isSaved(it, player.server, sound) } == true } }
+    ModalBottomSheet(onDismissRequest = onDismiss,
+        sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)),
+        modifier = Modifier.testTag("emotion_sound_message_sheet")) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.AutoMirrored.Filled.VolumeUp, null, Modifier.size(64.dp))
+            Text(sound.name.messengerPlusPlainText(), Modifier.padding(vertical = 16.dp), style = MaterialTheme.typography.titleLarge)
+            if (sound.builtInCode == null) Text("#${sound.id}", style = MaterialTheme.typography.labelMedium)
+            val active = player.activeId == sound.id
+            SegmentedListItem(onClick = { if (active) player.stop() else player.play(sound) }, enabled = !busy,
+                shapes = ListItemDefaults.segmentedShapes(0, if (sound.builtInCode == null) 2 else 1),
+                leadingContent = { Icon(if (active) Icons.Default.Stop else Icons.Default.PlayArrow, null) },
+                content = { Text(if (active) "Stop" else "Play") })
+            if (sound.builtInCode == null) SegmentedListItem(onClick = { scope.launch {
+                busy = true; error = null
+                try {
+                    player.checkAccount()
+                    if (saved) withContext(Dispatchers.IO) { store.remove(player.account!!, player.server, sound) }
+                    else player.load(sound, save = true)
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (failure: Exception) { error = failure.message }
+                finally { busy = false }
+            } }, enabled = !busy,
+                shapes = ListItemDefaults.segmentedShapes(1, 2),
+                leadingContent = { Icon(if (saved) Icons.Default.Delete else Icons.Default.Add, null) },
+                content = { Text(if (saved) "Remove from saved sounds" else "Add to saved sounds") })
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            (error ?: player.error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}

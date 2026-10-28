@@ -35,6 +35,10 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   button to open the wink picker, hold a wink to
   preview it before sending, or get more from Escargot. Replay received winks or save new ones
   to your collection.
+- **Add an emotion sound.** Send Messenger Plus! [Emotion Sounds](docs/EMOTION_SOUNDS.md) from
+  the emoticon button's menu in private and group chats. Preview built-ins, search saved and
+  popular sounds, download by ID or at random, and save received sounds. Tap a sound message
+  for playback controls; automatic playback can be disabled in Messenger Plus! settings.
 - **Bring the group along.** Chat in persistent Messenger groups (MSNP18 circles), see members
   and their roles, create groups, invite people, and join or decline invitations. Owners and
   administrators can invite members; non-owners can leave.

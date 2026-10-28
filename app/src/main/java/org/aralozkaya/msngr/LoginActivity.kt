@@ -830,6 +830,15 @@ private fun CustomServerDialog(
                     { draft = draft.copy(activitiesServerEnabled = it) },
                     { draft = draft.copy(activitiesServer = it) },
                 )
+                EmoticonOutlinedTextField(
+                    value = draft.emotionSoundServer,
+                    onValueChange = { draft = draft.copy(emotionSoundServer = it) },
+                    label = { Text("Emotion sounds service URL") },
+                    supportingText = { Text("Full HTTP or HTTPS base URL, ending in /esnd/snd/") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth().testTag("emotion_sound_server"),
+                )
                 OptionalServerField("Mail", draft.mailServerEnabled, draft.mailServer, {
                     draft = draft.copy(mailServerEnabled = it)
                 }, { draft = draft.copy(mailServer = it) })

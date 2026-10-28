@@ -49,6 +49,38 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class LiveMsnp18ClientContractTest {
+    @Test fun emotionSoundTextPreservesPaddingAndQueuesOnlyLivePeerSoundsOnce() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard)
+        val repository = MessengerRepository(client, scope = CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        val sound = org.aralozkaya.msngr.protocol.EmotionSound("012345ABCDEF", "[b]Contract sound[/b]")
+        val source = org.aralozkaya.msngr.protocol.MsnEmotionSound.message(sound)
+        val style = NativeTextStyle(italic = true, colorRgb = 0x123456)
+        try {
+            repository.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            repository.updateTextStyle(contact.id, style)
+            repository.sendEmotionSound(contact.id, sound).getOrThrow()
+            val outgoing = parseSwitchboardMime(switchboard.sent.last { it.verb == "MSG" && it.payload?.toString(Charsets.UTF_8)?.contains("Data{") == true }.payload!!) as SwitchboardMimeMessage.Text
+            assertEquals(source, outgoing.value)
+            assertEquals(style, outgoing.style)
+            val queued = repository.pendingEmotionSounds.value.getValue(contact.id)
+            repository.consumePendingEmotionSound(contact.id, queued.id)
+            fun deliver(sender: String, body: String) { switchboard.deliver(MsnpCommand("MSG", parameters = listOf(sender, "Name"), payload = Msnp18Protocol.textPayload(body, style))) }
+            deliver(contact.email, "\u0004#[b]Contract hello[/b]")
+            val incoming = withTimeout(2_000) { repository.pendingEmotionSounds.first { it.isNotEmpty() }.getValue(contact.id) }
+            assertEquals("builtin-35", incoming.emotionSound!!.sound.id)
+            assertEquals(style, incoming.nativeStyle)
+            assertTrue(incoming.autoPlayEmotionSound)
+            repository.consumePendingEmotionSound(contact.id, incoming.id)
+            deliver(email, "\u0004#[b]Own desktop echo[/b]")
+            withTimeout(2_000) { client.messages.first { it[contact.id]?.size == 3 } }
+            assertFalse(client.messages.value.getValue(contact.id).last().autoPlayEmotionSound)
+            delay(100)
+            assertTrue(repository.pendingEmotionSounds.value.isEmpty())
+        } finally { repository.logout() }
+    }
+
     @Test fun acknowledgedButUnappliedStorageRemovalPreservesTheAdvertisedPicture() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val bytes = mockDisplayPictureBytes()

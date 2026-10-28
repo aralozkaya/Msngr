@@ -448,7 +448,7 @@ fun MessengerPlusSettingsScreen(
             SegmentedListItem(
                 checked = settings.enabled,
                 onCheckedChange = { MessengerPlusPrefs.setEnabled(context, it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
                 modifier = Modifier.settingsRow().testTag("messenger_plus_enabled"),
                 trailingContent = {
                     Switch(checked = settings.enabled, onCheckedChange = null)
@@ -462,7 +462,7 @@ fun MessengerPlusSettingsScreen(
                 checked = settings.shouldHideControlCharacters,
                 onCheckedChange = { MessengerPlusPrefs.setHideControlCharacters(context, it) },
                 enabled = !settings.enabled,
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
                 modifier = Modifier.settingsRow().testTag("messenger_plus_hide_control_characters"),
                 trailingContent = {
                     Switch(
@@ -475,6 +475,17 @@ fun MessengerPlusSettingsScreen(
                     Text("Hide formatting codes when rendering is off. Always on while rendering is enabled.")
                 },
                 content = { Text("Hide control characters") },
+            )
+        }
+        item(key = "emotion-sounds-autoplay") {
+            SegmentedListItem(
+                checked = settings.playEmotionSounds,
+                onCheckedChange = { MessengerPlusPrefs.setPlayEmotionSounds(context, it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                modifier = Modifier.settingsRow().testTag("emotion_sound_autoplay"),
+                trailingContent = { Switch(checked = settings.playEmotionSounds, onCheckedChange = null) },
+                supportingContent = { Text("Play new emotion sounds while their conversation is open.") },
+                content = { Text("Play emotion sounds automatically") },
             )
         }
     }

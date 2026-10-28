@@ -60,6 +60,37 @@ class LiveCircleClientTest {
     private val otherGroupId = "00000000-0000-0000-0009-123456789abd@live.com"
     private val group = Contact(groupId, "Test", groupId, Presence.Online, isGroup = true)
 
+    @Test fun styledEmotionSoundsUseNormalGroupTextAndDoNotRequireClientCapabilities() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { error("Group emotion sounds use circle text") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() })
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            val custom = org.aralozkaya.msngr.protocol.MsnEmotionSound.message(org.aralozkaya.msngr.protocol.EmotionSound("012345ABCDEF", "[b]Group sound[/b]"))
+            val style = NativeTextStyle(italic = true, colorRgb = 0x123456)
+            for (text in listOf("\u0004#[b][c=#FF6600]Group hello[/c][/b]", custom)) {
+                client.sendStyledMessage(groupId, text, null, style).getOrThrow()
+                val sent = parseCircleEnvelope(transport.sent.last { it.verb == "SDG" }.payload!!)!!
+                assertEquals(text, sent.body.toString(Charsets.UTF_8))
+                assertEquals(style, NativeTextStyle.fromFormatHeader(sent.headers["x-mms-im-format"]))
+                transport.incoming.send(MsnpCircles.message(0, groupId, "alice@example.com", "peer", text, style = style))
+                withTimeout(2_000) { client.messages.first { it[groupId]?.lastOrNull()?.author == org.aralozkaya.msngr.data.MessageAuthor.Contact } }
+                val received = client.messages.value.getValue(groupId).last()
+                assertEquals(text, received.text)
+                assertEquals(style, received.nativeStyle)
+                assertEquals("alice@example.com", received.senderEmail)
+                assertNotNull(received.emotionSound)
+                assertTrue(received.autoPlayEmotionSound)
+            }
+        } finally { client.close(); scope.cancel() }
+    }
+
     @Test fun voiceClipsNeverOpenASwitchboardOrSubmitAGroupMessage() = runBlocking {
         val transport = CircleTransport()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

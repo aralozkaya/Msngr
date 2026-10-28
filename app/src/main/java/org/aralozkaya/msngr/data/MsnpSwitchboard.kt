@@ -134,7 +134,8 @@ internal class MsnpSwitchboardSession(
 
     suspend fun sendText(text: String, style: NativeTextStyle = NativeTextStyle()) {
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(text)
-        val normalized = encoded.trimMessengerPlusWhitespace().text
+        val normalized = if (org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(encoded) != null) encoded
+            else encoded.trimMessengerPlusWhitespace().text
         if (normalized.isEmpty()) return
         sendPayload(Msnp18Protocol.textPayload(normalized, style), acknowledgement = "A")
     }

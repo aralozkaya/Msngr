@@ -105,9 +105,20 @@ class StoredAccountCodecTest {
                 activitiesServer = "apps.example.com",
                 mailServerEnabled = true,
                 mailServer = "mail.example.com",
+                emotionSoundServer = "https://sounds.example.com/custom/snd/",
             ),
         )
 
         assertEquals(original, StoredAccountCodec.decode(StoredAccountCodec.encode(original)))
+    }
+
+    @Test fun versionFourRetainsAutomaticSignInAndAddsTheSoundService() {
+        val original = StoredAccountDto(email = "fixture@example.test", password = "test", remember = true,
+            automaticSignIn = true, loginPresence = Presence.Away)
+        val encoded = StoredAccountCodec.encode(original)
+        // V5 appended only the sound URL; reconstruct the exact V4 prefix.
+        val oldLength = encoded.size - 2 - original.customServers.emotionSoundServer.toByteArray().size
+        val legacy = encoded.copyOf(oldLength).apply { this[3] = 4 }
+        assertEquals(original, StoredAccountCodec.decode(legacy))
     }
 }
