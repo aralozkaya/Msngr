@@ -91,7 +91,8 @@ checks because PRs made with `GITHUB_TOKEN` do not trigger `pull_request` workfl
 ## Vulnerability checks
 
 **Dependency security** runs on PRs, merge queues, pushes to main, daily schedules,
-and manual dispatch. It resolves debug/release/test and Gradle plugin/buildscript Maven dependencies,
+and manual dispatch. It resolves every resolvable Gradle project/buildscript configuration,
+including app/test, compiler and Android lint dependencies,
 records both submodule commits and Ruffle's npm version, and scans those exact identities
 plus Ruffle's selected WASM dependencies with OSV-Scanner. Cargo regenerates that inventory
 from the pinned source, target, features and lockfile and compares it with the committed
