@@ -157,7 +157,9 @@ private fun SettingsRoute(
                 SettingsDestination.About -> AboutSettingsScreen(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,
+                    onLicenses = { selectedDestination = SettingsDestination.Licenses },
                 )
+                SettingsDestination.Licenses -> org.aralozkaya.msngr.pages.OpenSourceLicensesScreen(innerPadding)
                 SettingsDestination.Updates -> UpdateSettingsScreen(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,

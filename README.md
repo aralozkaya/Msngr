@@ -28,6 +28,8 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   drag up to lock hands-free recording, then preview, send, and play
   [voice clips](docs/VOICE_CLIPS.md) in one-to-one chats with online contacts.
   Voice clips do not work in group chats.
+- **Draw a message.** Switch to handwriting, choose a pen size and ink color, and use the
+  eraser, undo, and redo tools before sending. Compatible groups support handwriting too.
 - **Send a wink.** Send and receive classic animated [winks](docs/WINKS.md) with sound in
   one-to-one chats and groups whose online members all support winks. Long-press the emoticon
   button to open the wink picker, hold a wink to
@@ -58,50 +60,164 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 
 ## Screenshots
 
-These are the developer's screenshots from **October 18, 2026**. All 14 screenshots are included
-with embedded metadata removed. Select a preview to open the full image.
+The original **October 18, 2026** gallery is joined by **15 new emulator captures from
+October 28, 2026**, covering the chat tools, appearance options, and settings missing from the
+earlier screenshots. The new captures use the debug app's **mock server and sample data**.
+Select any preview to open its full-resolution image.
 
 ### Find your people
 
-| Contacts & groups | Quick actions | Sort & filter |
-| :---: | :---: | :---: |
-| <a href="docs/screenshots/contacts.png"><img src="docs/screenshots/contacts.png" width="240" alt="Main contact list with profile card, search, groups, and contact presence"></a> | <a href="docs/screenshots/contact-actions.png"><img src="docs/screenshots/contact-actions.png" width="240" alt="Expanded plus menu offering Add a contact and Create a group"></a> | <a href="docs/screenshots/sort-and-filter.png"><img src="docs/screenshots/sort-and-filter.png" width="240" alt="Sort sheet with status or name sorting and a switch to hide offline groups and contacts"></a> |
+<table>
+  <tr>
+    <th width="33%">Contacts & groups</th>
+    <th width="33%">Quick actions</th>
+    <th width="33%">Sort & filter</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/contacts.png"><img src="docs/screenshots/contacts.png" width="240" alt="Main contact list with profile card, search, groups, and contact presence"></a></td>
+    <td align="center"><a href="docs/screenshots/contact-actions.png"><img src="docs/screenshots/contact-actions.png" width="240" alt="Expanded plus menu offering Add a contact and Create a group"></a></td>
+    <td align="center"><a href="docs/screenshots/sort-and-filter.png"><img src="docs/screenshots/sort-and-filter.png" width="240" alt="Sort by status or name and hide offline groups and contacts"></a></td>
+  </tr>
+</table>
 
 ### Make an entrance
 
-| Sign in | Choose a custom service | Edit your profile |
-| :---: | :---: | :---: |
-| <a href="docs/screenshots/sign-in.png"><img src="docs/screenshots/sign-in.png" width="240" alt="Sign-in form with remember me, automatic sign-in, initial presence, and service selection"></a> | <a href="docs/screenshots/custom-service.png"><img src="docs/screenshots/custom-service.png" width="240" alt="Custom MSNP service dialog with notification host, ports, configuration host, and optional service overrides"></a> | <a href="docs/screenshots/edit-profile.png"><img src="docs/screenshots/edit-profile.png" width="240" alt="Profile editor with a picture, display name, and gradient personal message"></a> |
+<table>
+  <tr>
+    <th width="33%">Sign in</th>
+    <th width="33%">Custom service</th>
+    <th width="33%">Edit your profile</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/sign-in.png"><img src="docs/screenshots/sign-in.png" width="240" alt="Sign-in form with remembered credentials, automatic sign-in, presence, and service selection"></a></td>
+    <td align="center"><a href="docs/screenshots/custom-service.png"><img src="docs/screenshots/custom-service.png" width="240" alt="Custom MSNP service hosts, ports, and optional service overrides"></a></td>
+    <td align="center"><a href="docs/screenshots/edit-profile.png"><img src="docs/screenshots/edit-profile.png" width="240" alt="Profile editor with display picture, name, and gradient personal message"></a></td>
+  </tr>
+</table>
 
-### Messenger Plus! colors
+### Make it yours
 
-<a href="docs/screenshots/messenger-plus-colors.png"><img src="docs/screenshots/messenger-plus-colors.png" width="280" alt="Messenger Plus! color sheet with Text color and Background color controls, a Custom color option, preset palette, and Gradient mode below a personal message with a red-to-blue text gradient"></a>
+<table>
+  <tr>
+    <th width="33%">Messenger Plus! colors</th>
+    <th width="33%">Display pictures</th>
+    <th width="33%">Custom main color</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/messenger-plus-colors.png"><img src="docs/screenshots/messenger-plus-colors.png" width="240" alt="Messenger Plus! text and background colors, presets, and gradient controls"></a></td>
+    <td align="center"><a href="docs/screenshots/display-pictures.png"><img src="docs/screenshots/display-pictures.png" width="240" alt="Bundled Messenger display-picture collection with version filters and picture preview"></a></td>
+    <td align="center"><a href="docs/screenshots/main-color.png"><img src="docs/screenshots/main-color.png" width="240" alt="Main color dialog with color wheel, brightness, hex entry, and Material palette preview"></a></td>
+  </tr>
+</table>
 
-Style display names and personal messages with **text and background colors**, using preset
-colors, custom colors, or gradients for either. The screenshot shows the color palette and
-formatting controls alongside a personal message with a text gradient.
+Style names and personal messages with text and background colors, including gradients.
+Choose a classic display picture or build an app palette from your own main color.
+
+### Bring back the Messenger look
+
+<table>
+  <tr>
+    <th width="33%">Appearance & scene controls</th>
+    <th width="33%">Classic scene collection</th>
+    <th width="33%">Scenes in dark mode</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/appearance-settings.png"><img src="docs/screenshots/appearance-settings.png" width="240" alt="Scene selection, chat artwork and dark mode tint switches, and main color swatches"></a></td>
+    <td align="center"><a href="docs/screenshots/scene-picker.png"><img src="docs/screenshots/scene-picker.png" width="240" alt="Searchable classic Messenger scene gallery with the selected Daisy Hill scene"></a></td>
+    <td align="center"><a href="docs/screenshots/scene-dark.png"><img src="docs/screenshots/scene-dark.png" width="240" alt="Contact list in dark mode with Daisy Hill artwork and matching app colors"></a></td>
+  </tr>
+</table>
+
+Classic [Messenger scenes](docs/SCENES.md) supply artwork and matching light or dark palettes.
+Control scene artwork in chats and its tint in dark mode independently.
 
 ### Keep the conversation going
 
-| Private messages & nudges | Group messages & sender names | Contact details & controls |
-| :---: | :---: | :---: |
-| <a href="docs/screenshots/private-chat.png"><img src="docs/screenshots/private-chat.png" width="240" alt="Private chat showing incoming nudges, text messages, and timestamps"></a> | <a href="docs/screenshots/group-chat.png"><img src="docs/screenshots/group-chat.png" width="240" alt="Group conversation with member count, sender attribution, messages, and nudges"></a> | <a href="docs/screenshots/contact-profile.png"><img src="docs/screenshots/contact-profile.png" width="240" alt="Contact profile with picture, offline status, email, block, erase history, and delete actions"></a> |
+<table>
+  <tr>
+    <th width="33%">Private messages & nudges</th>
+    <th width="33%">Classic emoticons</th>
+    <th width="33%">Animated winks</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/private-chat.png"><img src="docs/screenshots/private-chat.png" width="240" alt="Private chat showing incoming nudges, text messages, and timestamps"></a></td>
+    <td align="center"><a href="docs/screenshots/emoticon-picker.png"><img src="docs/screenshots/emoticon-picker.png" width="240" alt="Original MSN emoticon picker open below a private conversation"></a></td>
+    <td align="center"><a href="docs/screenshots/wink-picker.png"><img src="docs/screenshots/wink-picker.png" width="240" alt="Wink picker with original animated Messenger wink thumbnails and names"></a></td>
+  </tr>
+</table>
 
-### Manage your active sessions
+### Say more than words
 
-<a href="docs/screenshots/active-sessions.png"><img src="docs/screenshots/active-sessions.png" width="280" alt="Active sessions dialog showing Android and desktop device names, online and busy presence, and individual, other-session, and all-session logout options"></a>
+<table>
+  <tr>
+    <th width="33%">Voice clips</th>
+    <th width="33%">Handwriting</th>
+    <th width="33%">Group conversations</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/voice-clips.png"><img src="docs/screenshots/voice-clips.png" width="240" alt="Private chat with a recorded voice clip ready to preview, delete, or send"></a></td>
+    <td align="center"><a href="docs/screenshots/handwriting.png"><img src="docs/screenshots/handwriting.png" width="240" alt="Handwriting composer with a sample drawing, drawing tools, colors, and send control"></a></td>
+    <td align="center"><a href="docs/screenshots/group-chat.png"><img src="docs/screenshots/group-chat.png" width="240" alt="Group conversation with member count, sender names, messages, and nudges"></a></td>
+  </tr>
+</table>
 
-Choose exactly where to log out while keeping remembered credentials on the phone. See the
-[session support notes](docs/MULTI_PRESENCE.md) for device names, remote logout, and automatic
-sign-out of other sessions.
+[Voice clips](docs/VOICE_CLIPS.md) are available in online one-to-one chats. Handwriting and
+[winks](docs/WINKS.md) also work in groups when the online members support them.
 
-### Catch up with your community
+### Bring the group along
 
-<a href="docs/screenshots/requests-and-invitations.png"><img src="docs/screenshots/requests-and-invitations.png" width="280" alt="Requests and invitations page with separate contact request and group invitation cards"></a>
+<table>
+  <tr>
+    <th width="33%">Create a group</th>
+    <th width="33%">Members & roles</th>
+    <th width="33%">Contact controls</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/create-group.png"><img src="docs/screenshots/create-group.png" width="240" alt="Group creation form with a name, selected members, and optional invitation message"></a></td>
+    <td align="center"><a href="docs/screenshots/group-details.png"><img src="docs/screenshots/group-details.png" width="240" alt="Group details with the owner role, presence, member search, and invite and notification actions"></a></td>
+    <td align="center"><a href="docs/screenshots/contact-profile.png"><img src="docs/screenshots/contact-profile.png" width="240" alt="Contact profile with picture, presence, email, block, erase history, and delete actions"></a></td>
+  </tr>
+</table>
 
-Respond to contact requests and group invitations from the same page.
+### Stay in control
 
-<a href="docs/screenshots/android-notifications.png"><img src="docs/screenshots/android-notifications.png" width="720" alt="Android notification shade showing a group invitation, contact request, and Msngr's ongoing connection notification"></a>
+<table>
+  <tr>
+    <th width="33%">Active sessions</th>
+    <th width="33%">Requests & invitations</th>
+    <th width="33%">In-app notifications</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/active-sessions.png"><img src="docs/screenshots/active-sessions.png" width="240" alt="Connected Android and desktop devices with presence and individual or combined sign-out actions"></a></td>
+    <td align="center"><a href="docs/screenshots/requests-and-invitations.png"><img src="docs/screenshots/requests-and-invitations.png" width="240" alt="Separate contact request and group invitation cards with response actions"></a></td>
+    <td align="center"><a href="docs/screenshots/notification-settings.png"><img src="docs/screenshots/notification-settings.png" width="240" alt="In-app banner and vibration preferences with separate message, group, nudge, and request controls"></a></td>
+  </tr>
+</table>
+
+Manage [connected sessions](docs/MULTI_PRESENCE.md), respond to requests and invitations,
+and choose which events appear while you use the app.
+
+### Choose your setup
+
+<table>
+  <tr>
+    <th width="33%">Settings</th>
+    <th width="33%">Connection & picture sync</th>
+    <th width="33%">App updates</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/settings.png"><img src="docs/screenshots/settings.png" width="240" alt="Settings categories for appearance, emoticons, Messenger Plus!, invitations, notifications, connection, and updates"></a></td>
+    <td align="center"><a href="docs/screenshots/connection-settings.png"><img src="docs/screenshots/connection-settings.png" width="240" alt="Connection settings for other sessions, background connectivity, and display-picture synchronization"></a></td>
+    <td align="center"><a href="docs/screenshots/app-updates.png"><img src="docs/screenshots/app-updates.png" width="240" alt="Debug build update settings explaining the signed-release requirement, with automatic checking, interval, and prerelease controls disabled"></a></td>
+  </tr>
+</table>
+
+The updater requires a signed release build; its controls are disabled in the debug capture.
+See [app updates](docs/APP_UPDATES.md) for the release workflow.
+
+### Android alerts & offline delivery
+
+<a href="docs/screenshots/android-notifications.png"><img src="docs/screenshots/android-notifications.png" width="720" alt="Android notification shade showing a group invitation, contact request, and ongoing connection notification"></a>
 
 Android alerts surface requests and invitations alongside the ongoing background connection.
 
@@ -437,6 +553,18 @@ The endpoint presets and protocol behavior were checked against:
 | [Contact requests](docs/CONTACT_REQUESTS.md) · [Request messages](docs/REQUEST_MESSAGES.md) | Accept/decline flows, invitation text, and service limitations. |
 | [Background notifications](docs/PUSH_NOTIFICATIONS.md) · [Active sessions](docs/MULTI_PRESENCE.md) | Android delivery, reconnects, device names, and remote logout. |
 | [Picture synchronization](docs/PROFILE_PICTURE_SYNC.md) | Roaming identity, same-account picture transfers, removals, and desktop interoperability. |
+
+## License
+
+Msngr's original code and documentation are licensed under the
+**[BSD Zero Clause License (0BSD)](COPYING)**. It permits use, modification, and
+redistribution, including commercial use, without an attribution requirement.
+
+Third-party code keeps its own licenses; bundled artwork and media are not relicensed
+by `COPYING`. Read the [library audit and redistribution notes](THIRD_PARTY_NOTICES.md).
+Offline notices are available in **Settings → About → Open-source licenses**.
+The release workflow includes `Msngr-corresponding-source.zip`, and APKs contain the libsiren and
+MPL-covered library sources in `assets/licenses/library-sources.zip`.
 
 ## Made with AI? Yes, really.
 

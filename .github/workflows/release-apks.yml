@@ -97,4 +97,5 @@ jobs:
           gh release upload --repo "$GITHUB_REPOSITORY" --clobber -- \
             "$RELEASE_TAG" \
             "$RUNNER_TEMP/release-apks/"*.apk \
+            "$RUNNER_TEMP/release-apks/Msngr-corresponding-source.zip" \
             "$RUNNER_TEMP/release-apks/SHA256SUMS.txt"
