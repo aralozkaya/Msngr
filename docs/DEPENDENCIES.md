@@ -91,7 +91,7 @@ checks because PRs made with `GITHUB_TOKEN` do not trigger `pull_request` workfl
 ## Vulnerability checks
 
 **Dependency security** runs on PRs, merge queues, pushes to main, daily schedules,
-and manual dispatch. It resolves debug/release/test Maven dependencies through Gradle,
+and manual dispatch. It resolves debug/release/test and Gradle plugin/buildscript Maven dependencies,
 records both submodule commits and Ruffle's npm version, and scans those exact identities
 plus Ruffle's selected WASM dependencies with OSV-Scanner. Cargo regenerates that inventory
 from the pinned source, target, features and lockfile and compares it with the committed
@@ -114,6 +114,8 @@ Cargo.lock contains desktop/TLS dependencies that are not part of this Android r
 scanning that entire workspace had also reported unrelated findings.
 
 Dependabot also opens Gradle update PRs daily and GitHub Actions update PRs weekly.
+Gradle updates are grouped so related Android plugin, Kotlin compiler, wrapper and
+library versions can be checked together.
 **Submit dependency graph** submits resolved Gradle dependencies on main so GitHub can
 create vulnerability alerts and supported security update PRs. Review transitive alerts
 even when Dependabot cannot automatically update their parent dependency.

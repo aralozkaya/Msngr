@@ -197,13 +197,13 @@ does not include submodule metadata, so use a Git clone for development.
 
 ### Set up Android Studio and the SDK
 
-Open the **repository root** in Android Studio with support for Android Gradle Plugin
-**9.2.1**. Select **JDK 21** as the Gradle JDK to match CI, and install these packages
+Open the **repository root** in Android Studio with support for the Android Gradle Plugin
+version in [the version catalog](gradle/libs.versions.toml). Select **JDK 21** as the Gradle JDK to match CI, and install these packages
 through Android Studio's SDK Manager:
 
 | Package | Version |
 | --- | --- |
-| Android SDK Platform | API 37 (`platforms;android-37.0`) |
+| Android SDK Platform | API 37.1 (`platforms;android-37.1`) |
 | Android SDK Build-Tools | 36.0.0 |
 | Android NDK (Side by side) | 28.2.13676358 |
 | CMake | 3.22.1 |
@@ -211,7 +211,7 @@ through Android Studio's SDK Manager:
 Accept the SDK licenses. Configure the SDK location through Android Studio, an
 `ANDROID_HOME` environment variable, or an untracked `local.properties` file containing
 `sdk.dir=/path/to/Android/Sdk`. Set `JAVA_HOME` to JDK 21 for command-line builds.
-Use the included **Gradle 9.4.1 wrapper**; a separate Gradle installation is unnecessary.
+Use the included **Gradle wrapper**; a separate Gradle installation is unnecessary.
 
 Python **3.11+** is needed for dependency setup, maintenance scripts, and their tests.
 Normal APK builds use the bundled, verified Ruffle runtime and do not require Node.js,

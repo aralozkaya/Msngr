@@ -3,12 +3,14 @@ package org.aralozkaya.msngr.ui.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import com.materialkolor.dynamiccolor.ColorSpec.SpecVersion
 import com.materialkolor.hct.Hct
 import com.materialkolor.scheme.SchemeTonalSpot
 
 /** All Material roles come from one HCT seed, including surfaces and fixed colors. */
 internal fun seededColorScheme(seedArgb: Int, isDark: Boolean): ColorScheme {
-    val scheme = SchemeTonalSpot(Hct.fromInt(seedArgb), isDark, 0.0)
+    // Preserve the established palette and fixed roles across light/dark modes.
+    val scheme = SchemeTonalSpot(Hct.fromInt(seedArgb), isDark, 0.0, specVersion = SpecVersion.SPEC_2021)
     return lightColorScheme(
         primary = Color(scheme.primary),
         onPrimary = Color(scheme.onPrimary),

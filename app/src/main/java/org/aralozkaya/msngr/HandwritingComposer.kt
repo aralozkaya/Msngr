@@ -453,7 +453,7 @@ internal fun HandwritingComposerPanel(
                                 )
                             }
                         },
-                        trailingIcon = if (state.penSize == option && state.activeTool == WlmHandwritingTool.Pen) {
+                        trailingContent = if (state.penSize == option && state.activeTool == WlmHandwritingTool.Pen) {
                             { Icon(Icons.Default.Check, contentDescription = null) }
                         } else null,
                         onClick = {
@@ -485,7 +485,7 @@ internal fun HandwritingComposerPanel(
                         } else {
                             MenuDefaults.middleItemShape
                         },
-                        trailingIcon = if (state.activeTool == WlmHandwritingTool.Eraser && state.eraserMode == mode) {
+                        trailingContent = if (state.activeTool == WlmHandwritingTool.Eraser && state.eraserMode == mode) {
                             { Icon(Icons.Default.Check, contentDescription = null) }
                         } else null,
                         onClick = {
@@ -593,7 +593,7 @@ internal fun HandwritingComposerPanel(
                     DropdownMenuItem(
                         text = { Text(style.label) },
                         shape = MenuDefaults.itemShape(index, WlmGridStyle.entries.size).shape,
-                        trailingIcon = if (state.gridStyle == style) {
+                        trailingContent = if (state.gridStyle == style) {
                             { Icon(Icons.Default.Check, contentDescription = null) }
                         } else null,
                         onClick = {
@@ -696,7 +696,7 @@ internal fun HandwritingComposerPanel(
 
                 if (!state.hasStrokes && activeStrokePoints.isEmpty()) {
                     Text(
-                        text = "Draw handwriting message here…",
+                        text = "Draw handwriting message hereâ€¦",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier
                             .align(Alignment.TopStart)

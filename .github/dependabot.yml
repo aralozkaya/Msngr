@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: daily
     open-pull-requests-limit: 10
+    groups:
+      android-dependencies:
+        patterns: ['*']
   - package-ecosystem: github-actions
     directory: /
     schedule:
