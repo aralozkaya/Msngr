@@ -248,7 +248,6 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             (error ?: player.error ?: status)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                if (player.activeId != null) IconButton(onClick = player::stop) { Icon(Icons.Default.Stop, "Stop sound") }
                 EmotionSoundDropdown(category, emotionSoundCategories, "Sound category", "emotion_sound_category",
                     onSelected = { category = it }, enabled = !busy)
                 if (hash != null) TextButton(enabled = !busy, onClick = { action {
