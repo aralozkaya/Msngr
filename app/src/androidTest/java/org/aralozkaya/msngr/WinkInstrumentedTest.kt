@@ -169,10 +169,10 @@ class WinkInstrumentedTest {
         compose.onNodeWithText("Preview").assertIsDisplayed()
         compose.onNodeWithText("Delete").assertDoesNotExist()
         androidx.test.espresso.Espresso.pressBack()
-        compose.onNodeWithText("Screen Punch").performTouchInput { longClick() }
+        compose.onNodeWithText("Screen Punch").performScrollTo().assertIsDisplayed().performTouchInput { longClick() }
         compose.onNodeWithText("Delete").assertIsDisplayed().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Screen Punch").fetchSemanticsNodes().isEmpty() }
-        compose.onNodeWithText("Bouncy Ball").assertIsDisplayed()
+        compose.onNodeWithText("Bouncy Ball").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun composerOpensWinksFromTheHandwritingMenuAndUsesTheSharedPicker() {

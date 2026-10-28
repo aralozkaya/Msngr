@@ -1,9 +1,10 @@
 # Ruffle playback runtime
 
-This self-hosted runtime is built from the official Ruffle 0.7.1 source with the
-reviewed XML/ZIP security patch recorded in `third_party/ruffle-build/manifest.json`.
-The source submodule remains pinned to the official release. See `docs/DEPENDENCIES.md`
-for the patch, locked dependencies, build tools, and verification procedure.
+The selected runtime and its provenance are recorded in `third_party/ruffle-runtime.json`.
+A `sourceBuild` entry selects official Ruffle source with the recorded security patch;
+`package` and `integrity` entries select an official npm bundle. The source submodule
+stays pinned to the matching official release. See `docs/DEPENDENCIES.md` for build
+inputs, dependency inventory, update instructions, and verification.
 Both WebAssembly variants and their loader chunks are required by Ruffle feature
 detection. Source maps are omitted. Licenses are included alongside the runtime.
 No runtime CDN or update request is used.
