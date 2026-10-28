@@ -155,29 +155,120 @@ opening it again. See [background behavior and device setup](docs/PUSH_NOTIFICAT
 
 ## Build from source
 
-Open the repository in Android Studio with support for the pinned Android Gradle Plugin
-**9.2.1**, use a compatible Gradle JDK (Android Studio's bundled JDK is the usual starting point),
-and install Android SDK Platform **37**. Configure the SDK through Android Studio or your local
-`local.properties` file. The repository includes the Gradle **9.4.1** wrapper.
-Voice clips also use **NDK 28.2.13676358** and **CMake 3.22.1**; Gradle installs
-missing pinned packages when their Android SDK licenses have been accepted.
+### Clone and update the checkout
 
-From PowerShell in the repository root:
+Install Git and Python **3.11+**, then clone the repository and initialize its pinned
+dependencies using the setup helper:
+
+```sh
+git clone https://github.com/aralozkaya/Msngr.git
+cd Msngr
+python tools/setup_dependencies.py
+```
+
+Use `python3` in these commands if that is your Python executable's name.
+
+For contributions through a fork, use your fork's clone URL instead. If you already
+cloned the repository, run the same helper from the repository root:
+
+```sh
+python tools/setup_dependencies.py
+```
+
+After pulling changes or switching branches, synchronize the submodules to the commits
+selected by that checkout. For example, to update a clean checkout on `main`:
+
+```sh
+git switch main
+git pull --ff-only
+git fetch origin --tags
+python tools/setup_dependencies.py
+```
+
+Run the helper after switching to another branch as well. It downloads libsiren and
+only Ruffle's version, license, and dependency metadata. Ruffle's upstream test SWFs
+are excluded to avoid antivirus detections and long Windows test-file paths. Its
+submodule is configured to skip automatic full checkouts; do not use a recursive clone
+or force a full Ruffle checkout. Normal APK builds use the committed, verified runtime.
+
+Use the pinned commits: `git submodule update --remote` selects different dependency
+versions and is intended for a reviewed dependency update. GitHub's **Download ZIP**
+does not include submodule metadata, so use a Git clone for development.
+
+### Set up Android Studio and the SDK
+
+Open the **repository root** in Android Studio with support for Android Gradle Plugin
+**9.2.1**. Select **JDK 21** as the Gradle JDK to match CI, and install these packages
+through Android Studio's SDK Manager:
+
+| Package | Version |
+| --- | --- |
+| Android SDK Platform | API 37 (`platforms;android-37.0`) |
+| Android SDK Build-Tools | 36.0.0 |
+| Android NDK (Side by side) | 28.2.13676358 |
+| CMake | 3.22.1 |
+
+Accept the SDK licenses. Configure the SDK location through Android Studio, an
+`ANDROID_HOME` environment variable, or an untracked `local.properties` file containing
+`sdk.dir=/path/to/Android/Sdk`. Set `JAVA_HOME` to JDK 21 for command-line builds.
+Use the included **Gradle 9.4.1 wrapper**; a separate Gradle installation is unnecessary.
+
+Python **3.11+** is needed for dependency setup, maintenance scripts, and their tests.
+Normal APK builds use the bundled, verified Ruffle runtime and do not require Node.js,
+npm, or a Rust toolchain. Keep account credentials and signing keys out of Git.
+
+### Build and run
+
+Run these commands from the repository root. On Windows PowerShell:
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:installDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
-To run the local unit tests:
+The install command requires a running Android emulator or a connected device with USB
+debugging enabled. Launch Msngr and use the debug-only **Use mock server** switch for
+development without a service account, or sign in through the app to use a real service.
+On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`.
+
+To build both APK variants and compile the device tests:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest
+```
+
+| Output | Location |
+| --- | --- |
+| Debug APK, signed with the debug key | `app/build/outputs/apk/debug/app-debug.apk` |
+| Release APK, unsigned locally | `app/build/outputs/apk/release/app-release-unsigned.apk` |
+| Instrumentation test APK | `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` |
+
+### Develop and test a change
+
+Create a branch before editing, for example `git switch -c feature/my-change`.
+Kotlin and Compose code lives in `app/src/main/java`, JVM tests in `app/src/test`,
+device tests in `app/src/androidTest`, and the native codec bridge in `app/src/main/cpp`.
+The source dependencies under `third_party` are separate Git repositories; keep local
+codec changes in the reviewed patch described in [dependency maintenance](docs/DEPENDENCIES.md).
+
+Run the JVM tests and dependency-tooling tests before opening a pull request:
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest
+python -m unittest discover -s tools/tests -v
 ```
 
-On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. Instrumentation tests require
-an Android device or emulator. The checked-in tests use synthetic fixtures, mock clients, and
-in-memory transports; no community-service credentials are needed.
+With an emulator or device connected, run instrumentation tests using
+`.\gradlew.bat :app:connectedDebugAndroidTest`. To target just the two bundled libraries:
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.class=org.aralozkaya.msngr.WinkInstrumentedTest,org.aralozkaya.msngr.VoiceClipInstrumentedTest"
+```
+
+Regular tests use synthetic fixtures, mock clients, and in-memory transports; they need
+no community-service credentials. Live interoperability tests are opt-in and documented
+with their features. Device tests can change the selected account/session, so check the
+app's sign-in state afterward. Include the checks you ran in your pull request.
 
 ### Pull request checks
 
@@ -186,11 +277,37 @@ merge queues. It runs the unit tests, builds the debug and release APKs, and com
 instrumentation-test APK. Unit-test reports are retained as workflow artifacts for seven days.
 Device instrumentation tests still require an emulator or device.
 
+**Dependency security** scans resolved Android dependencies and the pinned third-party
+libraries on PRs and daily. Dependabot opens dependency update PRs, and a separate daily
+workflow updates Ruffle's source pin and matching runtime together. See
+[dependency updates, scan coverage, and existing findings](docs/DEPENDENCIES.md).
+
+Trusted dependency update PRs are eligible for automatic squash merging after their current
+commit passes the Android build and vulnerability checks. Existing GitHub review and CodeQL
+requirements still apply. Other contributions continue through the normal review process.
+
 The **Require Android CI** ruleset requires this check from GitHub Actions with the latest
 `main` changes before merging. It has no bypass actors, so approval bypass still requires a
 successful build. Its importable configuration is checked in at
 [`.github/rulesets/require-android-build.json`](.github/rulesets/require-android-build.json).
 Keep the job name, this configuration, and the live ruleset's status-check name in sync.
+
+### Validate release packaging
+
+The **Build release APKs** workflow compiles, packages, verifies, and signs APKs when
+all four Android signing secrets are configured; otherwise it produces a debug APK
+and an explicitly unsigned release APK. It generates `SHA256SUMS.txt` in either case.
+Partial signing configuration fails with a message naming the missing secret.
+
+To exercise that pipeline without publishing, open **Actions → Build release APKs →
+Run workflow**, select the branch to validate, and enter a supported version tag such
+as `v1.2.3`. Download the `release-apks` workflow artifact to inspect the output.
+The manual run never attaches files to a GitHub release.
+
+Publishing a GitHub release runs the same packaging pipeline for its tag. APK compilation
+runs independently of the vulnerability scan; publication requires both to pass. Known
+security findings remain a release blocker until fixed or reviewed with a documented,
+narrowly scoped exception. The security gate is retained for release validation as well.
 
 ## Downloads
 

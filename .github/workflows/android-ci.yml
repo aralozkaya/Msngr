@@ -1,8 +1,9 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     types: [checks_requested]
   push:
@@ -28,6 +29,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Initialize pinned dependencies without upstream SWF fixtures
+        run: python3 tools/setup_dependencies.py
+
       - name: Set up Java 21
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -50,6 +54,9 @@ jobs:
           :app:assembleDebug
           :app:assembleRelease
           :app:assembleDebugAndroidTest
+
+      - name: Check dependency tooling
+        run: python3 -m unittest discover -s tools/tests -v
 
       - name: Upload unit test reports
         if: ${{ always() }}

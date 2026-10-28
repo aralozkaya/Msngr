@@ -1,0 +1,5 @@
+# This exact RustSec record is an informational maintenance notice. It remains
+# visible in the summary. Other ttf-parser advisories and all vulnerabilities block.
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+reason = "Informational unmaintained notice, not a vulnerability classification; accepted as a maintenance warning."

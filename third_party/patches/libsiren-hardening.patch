@@ -1,0 +1,83 @@
+--- a/decoder.c
++++ b/decoder.c
+@@ -26,6 +26,7 @@
+ Siren7_NewDecoder (int sample_rate)
+ {
+   SirenDecoder decoder = (SirenDecoder) malloc (sizeof (struct stSirenDecoder));
++  if (decoder == NULL) return NULL;
+   decoder->sample_rate = sample_rate;
+ 
+   decoder->WavHeader.riff.RiffId = ME_TO_LE32 (RIFF_ID);
+@@ -144,6 +145,7 @@
+   envelope_bits =
+       decode_envelope (number_of_regions, decoder_standard_deviation,
+       absolute_region_power_index, esf_adjustment);
++  if (envelope_bits < 0) return 7;
+ 
+   number_of_available_bits -= envelope_bits;
+ 
+--- a/encoder.c
++++ b/encoder.c
+@@ -28,6 +28,7 @@
+ Siren7_NewEncoder (int sample_rate)
+ {
+   SirenEncoder encoder = (SirenEncoder) malloc (sizeof (struct stSirenEncoder));
++  if (encoder == NULL) return NULL;
+   encoder->sample_rate = sample_rate;
+ 
+   encoder->WavHeader.riff.RiffId = ME_TO_LE32 (RIFF_ID);
+--- a/huffman.c
++++ b/huffman.c
+@@ -27,6 +27,7 @@
+ static short current_word = 0;
+ static int bit_idx = 0;
+ static int *bitstream_ptr = NULL;
++static int words_remaining = 0;
+ 
+ int
+ next_bit (void)
+@@ -35,7 +36,9 @@
+     return -1;
+ 
+   if (bit_idx == 0) {
++    if (words_remaining <= 0) return 0;
+     current_word = *bitstream_ptr++;
++    words_remaining--;
+     bit_idx = 16;
+   }
+ 
+@@ -48,6 +51,7 @@
+   bitstream_ptr = stream;
+   current_word = *bitstream_ptr;
+   bit_idx = 0;
++  words_remaining = 20;
+ }
+ 
+ 
+@@ -153,6 +157,8 @@
+ 
+     absolute_region_power_index[i] =
+         absolute_region_power_index[i - 1] - index - 12;
++    if (absolute_region_power_index[i] < -24 || absolute_region_power_index[i] > 39)
++      return -1;
+     decoder_standard_deviation[i] =
+         standard_deviation[absolute_region_power_index[i] + 24];
+   }
+@@ -382,7 +388,7 @@
+         coefs_ptr++;
+       }
+ 
+-      noise = decoder_standard_deviation[region] * noise_category5[i];
++      noise = decoder_standard_deviation[region] * noise_category5[i < 20 ? i : 19];
+     } else if (category == 6) {
+       i = 0;
+       for (j = 0; j < region_size; j++) {
+@@ -390,7 +396,7 @@
+           i++;
+       }
+ 
+-      noise = decoder_standard_deviation[region] * noise_category6[i];
++      noise = decoder_standard_deviation[region] * noise_category6[i < 20 ? i : 19];
+     } else if (category == 7) {
+       noise = decoder_standard_deviation[region] * noise_category7;
+     } else {
