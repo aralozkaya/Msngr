@@ -1,0 +1,251 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 5f492ff..9d6e755 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,45 +1,6 @@
+ [workspace]
+-members = [
+-    "core",
+-    "core/macros",
+-    "core/build_playerglobal",
+-    "desktop",
+-    "swf",
+-    "flv",
+-    "web",
+-    "web/packages/extension/safari",
+-    "wstr",
+-    "scanner",
+-
+-    "exporter",
+-    "exporter/integration_tests",
+-
+-    "frontend-utils",
+-
+-    "render",
+-    "render/canvas",
+-    "render/naga-agal",
+-    "render/pixel_bender",
+-    "render/pixel_bender/assembly_tests",
+-    "render/wgpu",
+-    "render/webgl",
+-
+-    "video",
+-    "video/software",
+-    "video/external",
+-
+-    "tests",
+-    "tests/fs-tests-runner",
+-    "tests/input-format",
+-    "tests/socket-format",
+-    "tests/mocket",
+-    "tests/framework",
+-
+-    "tools/asc",
+-    "tools/fuzzer",
+-    "tools/stub-report",
+-]
+-default-members = ["desktop"]
++members = ["web"]
++default-members = ["web"]
+ resolver = "2"
+ 
+ [workspace.package]
+@@ -54,7 +15,7 @@ version = "0.7.1"
+ rand = { version = "0.10.1", default-features = false }
+ png = "0.18.1"
+ proc-macro2 = "1.0.106"
+-zip = { version = "8.6.0", default-features = false }
++zip = { version = "=9.0.5", default-features = false }
+ quote = "1.0.45"
+ tracing = "0.1.43"
+ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+@@ -87,7 +48,7 @@ num-traits = "0.2.19"
+ serde = "1.0.228"
+ thiserror = "2.0.18"
+ url = "2.5.8"
+-quick-xml = "0.37.5"
++quick-xml = "=0.41.0"
+ regress = { git = "https://github.com/ruffle-rs/regras3", rev = "6d48179d6bd448f2cc66b76352c9f048dde968d1" }
+ # Make sure to match wasm-bindgen-cli version to this everywhere.
+ wasm-bindgen = "=0.2.127"
+diff --git a/core/common/src/xml.rs b/core/common/src/xml.rs
+index a3f8c2b..ba5db9e 100644
+--- a/core/common/src/xml.rs
++++ b/core/common/src/xml.rs
+@@ -3,6 +3,49 @@ use regress::Regex;
+ use std::str::Utf8Error;
+ use std::sync::LazyLock;
+ 
++/// Preserve Flash's whole-text unescaping across quick-xml's reference events.
++/// In particular, AVM2 must see `&&amp;` together rather than decode `&amp;` alone.
++#[derive(Default)]
++pub struct XmlEventBuffer<'a> {
++    pending: Option<Result<quick_xml::events::Event<'a>, quick_xml::Error>>,
++}
++
++impl<'a> XmlEventBuffer<'a> {
++    pub fn read_event(
++        &mut self,
++        mut read: impl FnMut() -> Result<quick_xml::events::Event<'a>, quick_xml::Error>,
++    ) -> Result<quick_xml::events::Event<'a>, quick_xml::Error> {
++        use quick_xml::events::{BytesText, Event};
++        let mut event = self.pending.take().unwrap_or_else(&mut read)?;
++        if !matches!(event, Event::Text(_) | Event::GeneralRef(_)) {
++            return Ok(event);
++        }
++        let mut text = Vec::new();
++        loop {
++            match event {
++                Event::Text(value) => text.extend_from_slice(&value),
++                Event::GeneralRef(value) => {
++                    text.push(b'&');
++                    text.extend_from_slice(&value);
++                    text.push(b';');
++                }
++                _ => unreachable!(),
++            }
++            match read() {
++                Ok(next @ (Event::Text(_) | Event::GeneralRef(_))) => event = next,
++                other => {
++                    self.pending = Some(other);
++                    break;
++                }
++            }
++        }
++        let text = String::from_utf8(text).map_err(|error| {
++            quick_xml::Error::Encoding(quick_xml::encoding::EncodingError::Utf8(error.utf8_error()))
++        })?;
++        Ok(Event::Text(BytesText::from_escaped(text)))
++    }
++}
++
+ // Matches XML entities like &amp; or &#39; or &#x1F600;
+ // We exclude both ';' and '&' from the middle to avoid matching across multiple
+ // ampersands - e.g. in "& &thing;" we want to match only "&thing;", not "& &thing;"
+@@ -56,6 +99,7 @@ fn custom_unescape(input: &[u8], entity_regex: &Regex) -> Result<String, Utf8Err
+             Err(
+                 XmlEscapeError::InvalidCharRef(_)
+                 | XmlEscapeError::UnrecognizedEntity(_, _)
++                | XmlEscapeError::TooManyNestedEntities
+                 | XmlEscapeError::UnterminatedEntity(_),
+             ) => result.push_str(entity),
+         }
+@@ -67,3 +111,41 @@ fn custom_unescape(input: &[u8], entity_regex: &Regex) -> Result<String, Utf8Err
+ 
+     Ok(result)
+ }
++
++#[cfg(test)]
++mod security_update_tests {
++    use super::*;
++    use quick_xml::{Reader, NsReader, events::Event};
++
++    #[test]
++    fn reference_chunks_preserve_flash_unescaping_and_text_boundaries() {
++        let mut reader = Reader::from_str("<a>A &amp; B &&amp; &unknown; &#65; &</a>");
++        reader.config_mut().allow_dangling_amp = true;
++        let mut events = XmlEventBuffer::default();
++        assert!(matches!(events.read_event(|| reader.read_event()).unwrap(), Event::Start(_)));
++        let Event::Text(text) = events.read_event(|| reader.read_event()).unwrap() else { panic!("expected one text node") };
++        assert_eq!(avm1_unescape(&text).unwrap(), "A & B && &unknown; A &");
++        assert_eq!(avm2_unescape(&text).unwrap(), "A & B &&amp; &unknown; A &");
++        assert!(matches!(events.read_event(|| reader.read_event()).unwrap(), Event::End(_)));
++        assert!(matches!(events.read_event(|| reader.read_event()).unwrap(), Event::Eof));
++    }
++
++    #[test]
++    fn namespace_limit_rejects_excess_declarations() {
++        let mut xml = String::from("<a");
++        for i in 0..257 { xml.push_str(&format!(" xmlns:p{i}=\"urn:{i}\"")); }
++        xml.push_str("/>");
++        let mut reader = NsReader::from_str(&xml);
++        assert!(reader.read_event().is_err());
++    }
++
++    #[test]
++    fn namespace_resolution_survives_buffered_text() {
++        let mut reader = NsReader::from_str("<a>one&amp;two<p:b xmlns:p=\"urn:test\"/></a>");
++        let mut events = XmlEventBuffer::default();
++        assert!(matches!(events.read_event(|| reader.read_event()).unwrap(), Event::Start(_)));
++        assert!(matches!(events.read_event(|| reader.read_event()).unwrap(), Event::Text(_)));
++        let Event::Empty(start) = events.read_event(|| reader.read_event()).unwrap() else { panic!("expected child") };
++        assert_eq!(reader.resolver().resolve_element(start.name()).0, quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(b"urn:test")));
++    }
++}
+diff --git a/core/src/avm1/globals/xml.rs b/core/src/avm1/globals/xml.rs
+index 60e9082..ea3f43c 100644
+--- a/core/src/avm1/globals/xml.rs
++++ b/core/src/avm1/globals/xml.rs
+@@ -141,12 +141,14 @@ impl<'gc> Xml<'gc> {
+     ) -> Result<(), quick_xml::Error> {
+         let data_utf8 = data.to_utf8_lossy();
+         let mut parser = Reader::from_str(&data_utf8);
++        parser.config_mut().allow_dangling_amp = true;
++        let mut events = ruffle_common::xml::XmlEventBuffer::default();
+         let mut open_tags = vec![self.root()];
+ 
+         self.0.status.set(XmlStatus::NoError);
+ 
+         loop {
+-            let event = parser.read_event().map_err(|error| {
++            let event = events.read_event(|| parser.read_event()).map_err(|error| {
+                 self.0.status.set(match error {
+                     quick_xml::Error::Syntax(_)
+                     | quick_xml::Error::InvalidAttr(AttrError::ExpectedEq(_))
+diff --git a/core/src/avm2/e4x.rs b/core/src/avm2/e4x.rs
+index 8ee1632..a2a15ca 100644
+--- a/core/src/avm2/e4x.rs
++++ b/core/src/avm2/e4x.rs
+@@ -804,6 +804,8 @@ impl<'gc> E4XNode<'gc> {
+ 
+         let data_utf8 = string.to_utf8_lossy();
+         let mut parser = NsReader::from_str(&data_utf8);
++        parser.config_mut().allow_dangling_amp = true;
++        let mut events = ruffle_common::xml::XmlEventBuffer::default();
+         let mut open_tags: Vec<E4XNode<'gc>> = vec![];
+ 
+         let mut top_level = vec![];
+@@ -863,7 +865,7 @@ impl<'gc> E4XNode<'gc> {
+         }
+ 
+         loop {
+-            let event = match parser.read_event() {
++            let event = match events.read_event(|| parser.read_event()) {
+                 Ok(event) => event,
+                 Err(XmlError::IllFormed(IllFormedError::MismatchedEndTag { expected, found })) => {
+                     // We must accept </a/>, </a />, and </a b="c">
+@@ -886,7 +888,7 @@ impl<'gc> E4XNode<'gc> {
+                 }
+                 Err(XmlError::Syntax(syntax_error)) => {
+                     let code = match syntax_error {
+-                        XmlSyntaxError::UnclosedPIOrXmlDecl => {
++                        XmlSyntaxError::UnclosedPI | XmlSyntaxError::UnclosedXmlDecl => {
+                             XmlErrorCode::UnterminatedProcessingInstruction
+                         }
+                         XmlSyntaxError::UnclosedComment => XmlErrorCode::UnterminatedComment,
+@@ -1007,6 +1009,7 @@ impl<'gc> E4XNode<'gc> {
+                 }
+                 // These are completely ignored by AVM2
+                 Event::Decl(_) | Event::DocType(_) => {}
++                Event::GeneralRef(_) => unreachable!("XmlEventBuffer coalesces references into text"),
+                 Event::Eof => break,
+             }
+         }
+@@ -1057,7 +1060,7 @@ impl<'gc> E4XNode<'gc> {
+                 .map_err(|_| make_xml_error(activation, XmlErrorCode::ElementMalformed))?;
+             let value = AvmString::new_utf8(activation.gc(), value_str);
+ 
+-            let (ns, local_name) = parser.resolve_attribute(attribute.key);
++            let (ns, local_name) = parser.resolver().resolve_attribute(attribute.key);
+ 
+             let local_name = ruffle_wstr::from_utf8_bytes(local_name.into_inner());
+             let name = activation.strings().intern_wstr(local_name).into();
+@@ -1106,7 +1109,7 @@ impl<'gc> E4XNode<'gc> {
+             attribute_nodes.push(attribute);
+         }
+ 
+-        let (ns, local_name) = parser.resolve_element(bs.name());
++        let (ns, local_name) = parser.resolver().resolve_element(bs.name());
+ 
+         let local_name = ruffle_wstr::from_utf8_bytes(local_name.into_inner());
+         let name = activation.strings().intern_wstr(local_name).into();
