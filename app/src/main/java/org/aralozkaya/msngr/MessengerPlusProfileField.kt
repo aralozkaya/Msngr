@@ -79,7 +79,6 @@ internal fun MessengerPlusProfileField(
                                 ),
                             ),
                             enabled = enabled,
-                            shapes = IconButtonDefaults.shapes(),
                         ) {
                             if (emoticonsOpen) {
                                 Icon(

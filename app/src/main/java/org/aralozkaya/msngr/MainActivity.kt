@@ -300,14 +300,12 @@ private fun MsngrApp(
                         ) {
                             IconButton(
                                 onClick = onOpenProfile,
-                                shapes = IconButtonDefaults.shapes(),
                             ) {
                                 Icon(Icons.Default.Person, contentDescription = "Open profile")
                             }
                         }
                         IconButton(
                             onClick = { menuExpanded = true },
-                            shapes = IconButtonDefaults.shapes(),
                         ) {
                             BadgedBox(badge = {
                                 if (pendingCount > 0) {
