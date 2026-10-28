@@ -72,7 +72,7 @@ class EmotionSoundInstrumentedTest {
         compose.onNodeWithText("Category: Sound Effects").assertIsDisplayed()
         compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithTag("emotion_sound_random_dialog").assertDoesNotExist()
-        Espresso.onView(ViewMatchers.withContentDescription("Search sounds or enter a sound ID")).perform(ViewActions.click(), ViewActions.replaceText("hello"))
+        Espresso.onView(ViewMatchers.withContentDescription("Search sounds")).perform(ViewActions.click(), ViewActions.replaceText("hello"))
         compose.onNodeWithText("Hello!").assertIsDisplayed()
         compose.onNodeWithText("Bye!").assertDoesNotExist()
         Espresso.closeSoftKeyboard()

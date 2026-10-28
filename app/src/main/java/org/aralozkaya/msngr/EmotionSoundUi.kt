@@ -205,6 +205,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     val changes by store.changes.collectAsState()
     val search = rememberTextFieldState()
     val searchController = remember { MessengerPlusEditorController() }
+    val iconButtonSize = IconButtonDefaults.smallContainerSize(widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow)
     var catalog by remember(player.account, player.server) { mutableStateOf(MsnEmotionSound.builtIns) }
     var popular by remember(player.server) { mutableStateOf<List<EmotionSound>>(emptyList()) }
     var online by remember { mutableStateOf(false) }
@@ -240,7 +241,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 Spacer(Modifier.width(8.dp))
                 FilterChip(selected = online, onClick = { online = true; error = null }, label = { Text("Online", style = MaterialTheme.typography.labelSmall) })
             }
-            CompactSearchField(search, "Search sounds or enter a sound ID", "Clear sound search",
+            CompactSearchField(search, "Search sounds", "Clear sound search",
                 Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
@@ -268,24 +269,30 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
         results.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { sound ->
+                    val name = sound.name.messengerPlusPlainText()
                     Row(Modifier.weight(1f).testTag("emotion_sound_${sound.id}"), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { if (player.activeId == sound.id) player.stop() else player.play(sound) }) {
-                            Icon(if (player.activeId == sound.id) Icons.Default.Stop else Icons.Default.PlayArrow, if (player.activeId == sound.id) "Stop sound" else "Preview ${sound.name.messengerPlusPlainText()}")
+                        IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { if (player.activeId == sound.id) player.stop() else player.play(sound) }) {
+                            Icon(if (player.activeId == sound.id) Icons.Default.Stop else Icons.Default.PlayArrow, if (player.activeId == sound.id) "Stop sound" else "Preview $name")
                         }
-                        Column(Modifier.weight(1f).clickable(enabled = enabled && !busy, onClickLabel = "Send sound") { action {
-                            val (loaded, _) = player.load(sound)
-                            onSend(loaded).getOrThrow()
-                            onDismiss()
-                        } }.padding(vertical = 6.dp)) {
-                            Text(sound.name.messengerPlusPlainText(), style = MaterialTheme.typography.bodyMedium, maxLines = 2,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            if (sound.builtInCode == null) Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
+                        TooltipBox(
+                            modifier = Modifier.weight(1f),
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                            tooltip = { PlainTooltip { Text(name) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth().clickable(enabled = enabled && !busy, onClickLabel = "Send sound") { action {
+                                    val (loaded, _) = player.load(sound)
+                                    onSend(loaded).getOrThrow()
+                                    onDismiss()
+                                } }.padding(vertical = 6.dp))
                         }
-                        if (online) IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { action { val (saved, _) = player.load(sound, save = true); status = "Added ${saved.name.messengerPlusPlainText()}" } }) {
-                            Icon(Icons.Default.Download, "Download ${sound.name.messengerPlusPlainText()}")
-                        } else if (sound.builtInCode == null) IconButton(modifier = Modifier.size(40.dp), enabled = !busy, onClick = { action {
+                        if (online) IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { action { val (saved, _) = player.load(sound, save = true); status = "Added ${saved.name.messengerPlusPlainText()}" } }) {
+                            Icon(Icons.Default.Download, "Download $name")
+                        } else if (sound.builtInCode == null) IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { action {
                             player.checkAccount(); withContext(Dispatchers.IO) { store.remove(player.account!!, player.server, sound) }
-                        } }) { Icon(Icons.Default.Delete, "Remove ${sound.name.messengerPlusPlainText()}") }
+                        } }) { Icon(Icons.Default.Delete, "Remove $name") }
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))

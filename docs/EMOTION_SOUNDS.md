@@ -6,7 +6,9 @@ search field that can coexist with the keyboard. It works in private and group c
 It does not check recipients' client capabilities: other clients can display the text fallback.
 
 **My sounds** contains the 17 native built-in sounds and downloaded sounds saved to this
-account. Tap a name to send; the play button previews it. **Online** offers Escargot's published
+account. Tap a name to send; the play button previews it. Sound names occupy one line, with
+ellipsis for overflow; long-press or hover over a name to show it in full in a tooltip. Rows use
+narrow play and download/remove buttons and omit sound-ID subtext. **Online** offers Escargot's published
 popular sounds, with name/ID filtering, previews and download buttons. Enter any 12-digit
 sound ID (optionally starting with `#`) to download it directly. The category menu uses Material 3
 Expressive grouped items and selection shapes. **Random** opens a dialog where you can choose
