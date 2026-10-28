@@ -51,7 +51,6 @@ internal fun GroupDetailsMenu(
     Box {
         IconButton(
             onClick = { expanded = true },
-            shapes = IconButtonDefaults.shapes(),
         ) {
             Icon(Icons.Default.MoreVert, contentDescription = "Group options")
         }

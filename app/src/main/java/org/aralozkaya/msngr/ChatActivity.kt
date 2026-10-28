@@ -442,7 +442,6 @@ internal fun ChatScreen(
                         navigationIcon = {
                             IconButton(
                                 onClick = onBack,
-                                shapes = IconButtonDefaults.shapes(),
                                 modifier = Modifier.semantics {
                                     if (otherUnreadCount > 0) stateDescription = "$otherUnreadCount unread messages in other chats"
                                 },
@@ -858,7 +857,6 @@ private fun MessageComposer(
                                     IconButton(
                                         onClick = onSendNudge,
                                         enabled = nudgeEnabled,
-                                        shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
                                             Icons.Default.NotificationsActive,
@@ -899,9 +897,7 @@ private fun MessageComposer(
                                 .requiredHeight(56.dp)
                                 .aspectRatio(1f, true),
                             onClick = onSendMessage,
-                            shapes = IconButtonDefaults.shapes(
-                                pressedShape = IconButtonDefaults.mediumPressedShape,
-                            ),
+                            shapes = IconButtonDefaults.shapes(),
                             enabled = enabled && draft.hasMessengerPlusVisibleContent(),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
@@ -1094,7 +1090,6 @@ private fun EmoticonAndHandwritingMenuButton(
                 }
             },
             enabled = enabled,
-            shapes = IconButtonDefaults.shapes(),
             modifier = Modifier
                 .testTag(EMOTICON_MODE_BUTTON_TAG)
                 .semantics {
@@ -1415,7 +1410,6 @@ internal fun EmoticonPanel(
                 IconButton(
                     onClick = state::deleteBackward,
                     enabled = canDelete,
-                    shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Backspace,

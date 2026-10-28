@@ -191,7 +191,7 @@ internal fun GroupEditorDialog(
                     keyboardActions = KeyboardActions(onDone = { addEmail() }),
                     trailingIcon = {
                         IconButton(onClick = {if (email.isBlank()) showContactPicker = true else addEmail()}, enabled = !busy,
-                            shapes = IconButtonDefaults.shapes(), modifier = Modifier.testTag("group-add-email")) {
+                            modifier = Modifier.testTag("group-add-email")) {
                             Icon(if (email.isBlank()) Icons.Default.Contacts else Icons.Default.Add, contentDescription = "Add email")
                         }
                     },
@@ -214,7 +214,7 @@ internal fun GroupEditorDialog(
                                     supportingContent = contact?.let { { Text(address) } },
                                     trailingContent = {
                                         IconButton(onClick = { selected = selected - address; error = null }, enabled = !busy,
-                                            shapes = IconButtonDefaults.shapes(), modifier = Modifier.testTag("group-remove-$address")) {
+                                            modifier = Modifier.testTag("group-remove-$address")) {
                                             Icon(Icons.Default.Close, contentDescription = "Remove $address")
                                         }
                                     },

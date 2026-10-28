@@ -348,7 +348,6 @@ fun ProfilePage(
                                             ),
                                         ),
                                         enabled = !savingProfile,
-                                        shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Clear,
