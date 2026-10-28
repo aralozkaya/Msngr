@@ -20,7 +20,7 @@ val ruffleCommit = providers.exec {
     commandLine("git", "rev-parse", "HEAD")
 }.standardOutput.asText.map { it.trim() }
 
-val verifyBundledRuffle by tasks.registering {
+val verifyBundledRuffle = tasks.register("verifyBundledRuffle") {
     group = "verification"
     description = "Checks that the bundled Ruffle runtime matches the pinned source and file hashes."
     val manifest = rootProject.layout.projectDirectory.file("third_party/ruffle-runtime.json")
@@ -85,7 +85,10 @@ tasks.register("writeDependencyInventory") {
     doLast {
         val names = setOf("debugRuntimeClasspath", "releaseRuntimeClasspath",
             "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
-        val dependencies = configurations.filter { it.name in names }.flatMap { configuration ->
+        val classpaths = configurations.filter { it.name in names } + rootProject.allprojects.flatMap { project ->
+            project.buildscript.configurations.filter { it.name == "classpath" && it.isCanBeResolved }
+        }
+        val dependencies = classpaths.flatMap { configuration ->
             configuration.resolvedConfiguration.rethrowFailure()
             configuration.incoming.resolutionResult.allComponents.mapNotNull { it.moduleVersion }
         }.filter { it.group.isNotEmpty() && it.version != "unspecified" }
@@ -141,7 +144,7 @@ val appVersion = if (releaseTag == null) {
 android {
     namespace = "org.aralozkaya.msngr"
     compileSdk {
-        version = release(37)
+        version = release(37) { minorApiLevel = 1 }
     }
     // Java/Kotlin CodeQL extraction compiles all managed sources without needing
     // a native linker. Its default runner cannot download additional NDKs.

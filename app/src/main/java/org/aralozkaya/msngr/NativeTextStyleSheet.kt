@@ -221,15 +221,15 @@ private fun NativeTextSizeSlider(size: Int, onSizeChange: (Int) -> Unit, modifie
     }
     val sliderState = rememberSliderState(
         steps = NativeTextSizeStops.size - 2,
-        valueRange = 0f..NativeTextSizeStops.lastIndex.toFloat(),
+        trackRange = 0f..NativeTextSizeStops.lastIndex.toFloat(),
     ).apply {
         // Keep exact values from the number field visible between slider stops.
         shouldAutoSnap = false
         value = position
-        onValueChange = { onSizeChange(NativeTextSizeStops[it.roundToInt()]) }
     }
     Slider(
         state = sliderState,
+        onValueChange = { onSizeChange(NativeTextSizeStops[it.roundToInt()]) },
         modifier = modifier.semantics {
             contentDescription = "Text size"
             stateDescription = "$size pt"
@@ -280,7 +280,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
                     NativeFontStyle.entries.forEachIndexed { index, option ->
                         DropdownMenuItem(
                             text = { NativeFontStyleLabel(option) },
-                            trailingIcon = if (option == selected) {
+                            trailingContent = if (option == selected) {
                                 { Icon(Icons.Default.Check, contentDescription = "Selected") }
                             } else null,
                             shape = MenuDefaults.itemShape(index, NativeFontStyle.entries.size).shape,

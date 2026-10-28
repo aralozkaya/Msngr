@@ -326,7 +326,7 @@ private fun MsngrApp(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.requests_title)) },
                                     leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                                    trailingIcon = if (requestCount > 0) {
+                                    trailingContent = if (requestCount > 0) {
                                         { CountBadge(requestCount, "requests-menu-badge") }
                                     } else null,
                                     onClick = { menuExpanded = false; onOpenRequests() },
@@ -345,7 +345,7 @@ private fun MsngrApp(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Settings") },
-                                    trailingIcon = if (updateState.hasUpdate) {
+                                    trailingContent = if (updateState.hasUpdate) {
                                         { UpdateBadge(Modifier.testTag("updates-settings-menu-badge")) }
                                     } else null,
                                     leadingIcon = {
@@ -381,7 +381,7 @@ private fun MsngrApp(
                             ) {
                                 DropdownMenuItem(
                                     text = {
-                                        Text(if (sessions.size > 1) "Log out…" else "Log out",
+                                        Text(if (sessions.size > 1) "Log outâ€¦" else "Log out",
                                             color = MaterialTheme.colorScheme.error)
                                     },
                                     supportingText = if (sessions.size > 1) {
