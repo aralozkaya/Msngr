@@ -9,6 +9,10 @@ plugins {
 // does not need the native codec or WASM assets; normal APK CI verifies both.
 val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT").isPresent &&
     !providers.environmentVariable("CODEQL_EXTRACTOR_CPP_ROOT").isPresent
+// Resolving Maven identities does not compile native code. Avoid downloading an
+// NDK for this one task; every APK task still configures and builds the codec.
+val dependencyInventoryOnly = gradle.startParameter.taskNames.isNotEmpty() &&
+    gradle.startParameter.taskNames.all { it in setOf(":app:writeDependencyInventory", "writeDependencyInventory") }
 
 val ruffleSource = rootProject.layout.projectDirectory.dir("third_party/ruffle")
 val ruffleCommit = providers.exec {
@@ -142,7 +146,7 @@ android {
     // Java/Kotlin CodeQL extraction compiles all managed sources without needing
     // a native linker. Its default runner cannot download additional NDKs.
     // Keep JNI enabled for normal builds and for C/C++ CodeQL extraction.
-    if (!javaOnlyCodeQl) {
+    if (!javaOnlyCodeQl && !dependencyInventoryOnly) {
         ndkVersion = "28.2.13676358"
         externalNativeBuild {
             cmake {
