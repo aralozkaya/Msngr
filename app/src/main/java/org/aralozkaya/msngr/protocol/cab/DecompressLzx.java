@@ -1,4 +1,5 @@
 /*
+ * Modified for Msngr on 2026-10-28: relocated package and local interface/exception shims.
  * Copyright 2012 dorkbox, llc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

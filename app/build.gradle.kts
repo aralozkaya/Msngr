@@ -15,7 +15,9 @@ val dependencyInventoryOnly = gradle.startParameter.taskNames.isNotEmpty() &&
     gradle.startParameter.taskNames.all { it in setOf(":app:writeDependencyInventory", "writeDependencyInventory") }
 
 val ruffleSource = rootProject.layout.projectDirectory.dir("third_party/ruffle")
-val ruffleCommit = providers.exec {
+val ruffleCommit = if (!ruffleSource.file(".git").asFile.exists() && ruffleSource.file("UPSTREAM_COMMIT").asFile.exists()) {
+    providers.fileContents(ruffleSource.file("UPSTREAM_COMMIT")).asText.map { it.trim() }
+} else providers.exec {
     workingDir(ruffleSource)
     commandLine("git", "rev-parse", "HEAD")
 }.standardOutput.asText.map { it.trim() }
@@ -74,6 +76,49 @@ val verifyBundledRuffle = tasks.register("verifyBundledRuffle") {
 tasks.named("preBuild") {
     if (!javaOnlyCodeQl) dependsOn(verifyBundledRuffle)
 }
+
+val verifyLibraryLicenses = tasks.register("verifyLibraryLicenses") {
+    group = "verification"
+    description = "Rejects stale library notices, source copies, or unaudited release/debug dependencies."
+    doLast {
+        val auditFile = rootProject.file("third_party/library-audit.json")
+        @Suppress("UNCHECKED_CAST")
+        val audit = groovy.json.JsonSlurper().parse(auditFile) as Map<String, Any>
+        fun digest(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        @Suppress("UNCHECKED_CAST")
+        val components = audit["components"] as List<Map<String, Any>>
+        for (variant in listOf("release", "debug")) {
+            val reviewed = components.filter { it["ecosystem"] == "Maven" && (it["variants"] as List<*>).contains(variant) }.associate {
+                it["name"].toString() to it["artifactSha256"].toString()
+            }
+            val resolved = configurations.getByName("${variant}RuntimeClasspath").resolvedConfiguration.resolvedArtifacts
+                .associate { it.moduleVersion.id.toString() to digest(it.file) }
+            check(resolved == reviewed) { "$variant libraries changed. Regenerate and review tools/library_licenses.py's notices." }
+        }
+        check(audit["ruffleSourceCommit"] == ruffleCommit.get()) { "Ruffle's license audit is stale" }
+        check(audit["ruffleInventorySha256"] == digest(rootProject.file("third_party/ruffle-build/inventory.json"))) { "Ruffle dependency notices are stale" }
+        check(audit["libsirenPatchSha256"] == digest(rootProject.file("third_party/patches/libsiren-hardening.patch"))) { "libsiren's source copy is stale" }
+        val sirenRoot = rootProject.file("third_party/libsiren")
+        val sirenCommit = if (!File(sirenRoot, ".git").exists() && File(sirenRoot, "UPSTREAM_COMMIT").exists()) {
+            File(sirenRoot, "UPSTREAM_COMMIT").readText().trim()
+        } else providers.exec { workingDir(sirenRoot); commandLine("git", "rev-parse", "HEAD") }.standardOutput.asText.get().trim()
+        check(audit["libsirenCommit"] == sirenCommit) { "libsiren's license audit is stale" }
+        @Suppress("UNCHECKED_CAST")
+        (audit["inputs"] as Map<String, String>).forEach { (name, expected) ->
+            val normalized = rootProject.file(name).readText().replace("\r\n", "\n").toByteArray(Charsets.UTF_8)
+            check(MessageDigest.getInstance("SHA-256").digest(normalized).joinToString("") { "%02x".format(it) } == expected) {
+                "License notice/source input changed: $name. Regenerate the library notices."
+            }
+        }
+        @Suppress("UNCHECKED_CAST")
+        (audit["files"] as Map<String, String>).forEach { (name, expected) ->
+            check(name.matches(Regex("[A-Za-z0-9_.-]+"))) { "Invalid license bundle filename" }
+            check(digest(file("src/main/assets/licenses/$name")) == expected) { "Library notice/source bundle changed: $name" }
+        }
+    }
+}
+tasks.named("preBuild") { if (!javaOnlyCodeQl) dependsOn(verifyLibraryLicenses) }
 
 tasks.register("writeDependencyInventory") {
     group = "verification"

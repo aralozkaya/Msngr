@@ -1,5 +1,9 @@
 # Third-party dependencies and security updates
 
+Library licensing, offline notices, corresponding source distribution, and the build's
+license-audit gate are documented in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+Dependency updates must refresh both security provenance and reviewed license coverage.
+
 Initialize the pinned dependencies after cloning or switching branches:
 
 ```sh

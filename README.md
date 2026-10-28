@@ -554,6 +554,18 @@ The endpoint presets and protocol behavior were checked against:
 | [Background notifications](docs/PUSH_NOTIFICATIONS.md) · [Active sessions](docs/MULTI_PRESENCE.md) | Android delivery, reconnects, device names, and remote logout. |
 | [Picture synchronization](docs/PROFILE_PICTURE_SYNC.md) | Roaming identity, same-account picture transfers, removals, and desktop interoperability. |
 
+## License
+
+Msngr's original code and documentation are licensed under the
+**[BSD Zero Clause License (0BSD)](COPYING)**. It permits use, modification, and
+redistribution, including commercial use, without an attribution requirement.
+
+Third-party code keeps its own licenses; bundled artwork and media are not relicensed
+by `COPYING`. Read the [library audit and redistribution notes](THIRD_PARTY_NOTICES.md).
+Offline notices are available in **Settings → About → Open-source licenses**.
+The release workflow includes `Msngr-corresponding-source.zip`, and APKs contain the libsiren and
+MPL-covered library sources in `assets/licenses/library-sources.zip`.
+
 ## Made with AI? Yes, really.
 
 AI tools were used to help make Msngr, including during development and writing this documentation.

@@ -81,6 +81,7 @@ enum class SettingsDestination(
     ConnectionInformation("Connection information", parent = Connection),
     Updates("App updates"),
     About("About"),
+    Licenses("Open-source licenses", parent = About),
 }
 
 internal enum class SettingsCategory(
@@ -647,6 +648,7 @@ fun ConnectionInformationScreen(
 fun AboutSettingsScreen(
     innerPadding: PaddingValues,
     scrollBehavior: TopAppBarScrollBehavior,
+    onLicenses: () -> Unit = {},
 ) {
     PageContentList(
         innerPadding = innerPadding,
@@ -669,6 +671,8 @@ fun AboutSettingsScreen(
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsValue("Developer", "Aral Özkaya")
+                Text("Msngr code: BSD Zero Clause (0BSD). Uses libsiren under LGPL-2.1-or-later and other open-source libraries.")
+                androidx.compose.material3.TextButton(onClick = onLicenses) { Text("Open-source licenses") }
                 Text(
                     "Thanks to the Escargot, NINA, CrossTalk, Pidgin, and retro-computing communities for keeping Messenger history alive.",
                     style = MaterialTheme.typography.bodyMedium,

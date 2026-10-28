@@ -32,6 +32,7 @@ fi
 mkdir -p "$artifact_dir"
 cp "$debug_apk" "$artifact_dir/Msngr-debug.apk"
 cp "$unsigned_apk" "$artifact_dir/Msngr-release-unsigned.apk"
+python3 tools/package_corresponding_source.py --output "$artifact_dir/Msngr-corresponding-source.zip"
 java -jar "$build_tools/lib/apksigner.jar" verify "$artifact_dir/Msngr-debug.apk"
 
 if [[ "$has_signing_secrets" == true ]]; then
@@ -57,7 +58,7 @@ fi
 
 (
   cd "$artifact_dir"
-  sha256sum -- *.apk > SHA256SUMS.txt
+  sha256sum -- *.apk Msngr-corresponding-source.zip > SHA256SUMS.txt
 )
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
@@ -68,6 +69,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
       printf -- '- `Msngr-release.apk`\n'
     fi
     printf -- '- `Msngr-release-unsigned.apk`\n'
+    printf -- '- `Msngr-corresponding-source.zip` (application and native library source)\n'
     printf -- '- `SHA256SUMS.txt`\n'
   } >> "$GITHUB_STEP_SUMMARY"
 fi
