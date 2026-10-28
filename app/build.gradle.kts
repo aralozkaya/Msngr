@@ -23,6 +23,8 @@ val verifyBundledRuffle by tasks.registering {
     val assets = layout.projectDirectory.dir("src/main/assets/ruffle")
     inputs.file(manifest)
     inputs.dir(assets)
+    inputs.dir(rootProject.layout.projectDirectory.dir("third_party/ruffle-build"))
+    inputs.file(rootProject.layout.projectDirectory.file("third_party/patches/ruffle-security.patch"))
     inputs.file(ruffleSource.file("web/packages/selfhosted/package.json"))
     inputs.property("sourceCommit", ruffleCommit)
     doLast {
@@ -40,6 +42,27 @@ val verifyBundledRuffle by tasks.registering {
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(assets.file(name).asFile.readBytes()).joinToString("") { "%02x".format(it) }
             check(digest == expected) { "Ruffle integrity check failed: $name" }
+        }
+        fun sha256(file: File) = MessageDigest.getInstance("SHA-256")
+            .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+        val inventoryFile = rootProject.file("third_party/ruffle-build/inventory.json")
+        check(metadata["dependencyInventory"] == sha256(inventoryFile)) {
+            "Ruffle dependency inventory hash mismatch"
+        }
+        metadata["sourceBuild"]?.let { expected ->
+            val buildFile = rootProject.file("third_party/ruffle-build/manifest.json")
+            check(expected == sha256(buildFile)) { "Ruffle source build metadata hash mismatch" }
+            @Suppress("UNCHECKED_CAST")
+            val buildInfo = groovy.json.JsonSlurper().parse(buildFile) as Map<String, Any>
+            check(buildInfo["sourceCommit"] == metadata["sourceCommit"] &&
+                buildInfo["version"] == metadata["version"]) { "Ruffle source build identity mismatch" }
+            @Suppress("UNCHECKED_CAST")
+            (buildInfo["inputs"] as Map<String, String>).forEach { (path, hash) ->
+                check(path.matches(Regex("third_party/(ruffle-build|patches)/[a-zA-Z0-9_.-]+"))) {
+                    "Invalid Ruffle source build input path"
+                }
+                check(sha256(rootProject.file(path)) == hash) { "Ruffle source build input hash mismatch: $path" }
+            }
         }
     }
 }

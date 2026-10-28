@@ -13,6 +13,7 @@ import tarfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 from setup_dependencies import configure_ruffle_checkout
+from ruffle_build import inventory_bytes, INVENTORY, BUILD_INFO
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "third_party/ruffle"
@@ -92,6 +93,19 @@ def verify(root=ROOT):
     loader = (assets / "ruffle.js").read_text(encoding="utf-8")
     if f'commitHash:"{head}"' not in loader or f'versionNumber:"{version}"' not in loader:
         raise ValueError("Ruffle loader does not match the source")
+    for key, path in (("dependencyInventory", INVENTORY), ("sourceBuild", BUILD_INFO)):
+        if key in lock:
+            if lock[key] != hashlib.sha256((root / path).read_bytes()).hexdigest():
+                raise ValueError("Ruffle provenance hash mismatch: " + key)
+    if "sourceBuild" in lock:
+        info = json.loads((root / BUILD_INFO).read_text())
+        if info["sourceCommit"] != head or info["version"] != version:
+            raise ValueError("Ruffle source build identity mismatch")
+        for name, expected in info["inputs"].items():
+            if not re.fullmatch(r"third_party/(?:ruffle-build|patches)/[a-zA-Z0-9_.-]+", name):
+                raise ValueError("Invalid Ruffle build input path")
+            if hashlib.sha256((root / name).read_bytes()).hexdigest() != expected:
+                raise ValueError("Ruffle source build input hash mismatch: " + name)
     return lock
 
 
@@ -101,6 +115,11 @@ def update():
     version = release["tag_name"].removeprefix("v")
     if release["draft"] or release["prerelease"] or not VERSION.fullmatch(version):
         raise ValueError("Expected an official stable Ruffle release")
+    current = json.loads(LOCK.read_text())
+    if current.get("sourceBuild") and version == current["version"]:
+        verify()
+        print(f"Ruffle {version} is still the latest stable release; preserving the verified patched runtime")
+        return
     git("fetch", "--filter=blob:none", "--depth=1", UPSTREAM, f"refs/tags/v{version}")
     commit = git("rev-parse", "FETCH_HEAD^{commit}")
     package = json.loads(download(f"https://registry.npmjs.org/@ruffle-rs/ruffle/{version}", 1_000_000))
@@ -110,6 +129,8 @@ def update():
     files = runtime_files(archive, integrity, version, commit)
     lock = {"version": version, "sourceCommit": commit, "package": url, "integrity": integrity,
             "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())}}
+    inventory = inventory_bytes(lock)
+    lock["dependencyInventory"] = hashlib.sha256(inventory).hexdigest()
     # Network/identity checks finish before changing the checkout or bundled files.
     git("checkout", "--detach", commit)
     old = json.loads(LOCK.read_text())["files"] if LOCK.exists() else {}
@@ -120,6 +141,7 @@ def update():
             (ASSETS / name).unlink()
     for name, data in files.items():
         (ASSETS / name).write_bytes(data)
+    (ROOT / INVENTORY).write_bytes(inventory)
     LOCK.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8", newline="\n")
     verify()
     print(f"Verified Ruffle {version} at {commit}")

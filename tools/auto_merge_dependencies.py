@@ -20,7 +20,7 @@ GRADLE_FILES = {
     "gradle.lockfile", "buildscript-gradle.lockfile", "app/gradle.lockfile",
     "app/buildscript-gradle.lockfile", "third_party/libsiren",
 }
-RUFFLE_FILES = {"third_party/ruffle", "third_party/ruffle-runtime.json"}
+RUFFLE_FILES = {"third_party/ruffle", "third_party/ruffle-runtime.json", "third_party/ruffle-build/inventory.json"}
 
 
 class GitHub:

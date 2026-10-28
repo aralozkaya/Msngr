@@ -39,22 +39,49 @@ submodule; build with Android NDK 28.2.13676358 to rebuild or replace the shared
 ## Ruffle
 
 `third_party/ruffle` pins the official source repository at a stable release.
-The APK uses the matching official `@ruffle-rs/ruffle` prebuilt self-hosted runtime,
-so normal Android builds do not need Rust, Node.js, or a runtime network download.
-`third_party/ruffle-runtime.json` records the source commit, package SHA-512 integrity,
-and SHA-256 of every bundled JS/WASM/license file. Gradle verifies the source commit,
-file set, and hashes before building. Both WASM variants and loader chunks are kept.
+Normal Android builds use the committed self-hosted JS/WASM runtime and need neither
+Rust nor Node.js. The current 0.7.1 runtime is rebuilt from that official source with
+`third_party/patches/ruffle-security.patch`: quick-xml 0.41.0 fixes the two reported XML
+denial-of-service issues, and zip 9.0.5 fixes the ZIP advisories. XML API adaptations
+preserve Flash text/entity handling and retain the new namespace limit. The source
+submodule remains pristine; the patch applies only to a separate production checkout.
+
+`third_party/ruffle-runtime.json` records every bundled file's SHA-256, the source
+commit, and hashes of the dependency inventory and source-build manifest. The latter
+binds the patch, patched Cargo.lock, version seal, and tool versions. Official package
+updates instead record npm SHA-512 integrity. Gradle verifies the selected provenance
+and file set before building. Both WASM variants and loader chunks are kept.
 
 The daily **Update Ruffle** workflow checks the latest stable release. It downloads
 the package from the official npm registry, verifies its integrity and embedded
 source commit/version, and updates the submodule, complete asset set, and manifest
 together. It opens or refreshes `codex/update-ruffle`; unchanged releases produce no
-new PR. The same operation is available locally with Python 3.11+:
+new PR. While 0.7.1 remains the latest stable release, it preserves our patched bundle.
+A newer official release replaces it in a PR and must pass the same tests and security
+gate. The same operation is available locally with Python 3.11+ and Rust/Cargo 1.99.1:
 
 ```sh
 python tools/update_ruffle.py --update
 python tools/update_ruffle.py
 ```
+
+To rebuild the patched runtime, install the versions in
+`third_party/ruffle-build/manifest.json`, Java 21, npm, clang/libclang, and the Rust
+`wasm32-unknown-unknown` target and `rust-src` component, then run:
+
+```sh
+python tools/ruffle_build.py --rebuild
+```
+
+The helper creates an ignored production checkout under `app/build`, excludes upstream
+SWF fixtures before checkout, applies the pinned patch and lockfile, and builds both
+WASM variants plus the self-hosted package. It prints the resulting directory and does
+not replace the committed bundle. Install the result with
+`python tools/ruffle_build.py --install-built PATH_TO_PRINTED_SOURCE_CHECKOUT`; it validates
+the patch, lockfile, version seal, loader identity and complete bundle, then regenerates
+the inventory and provenance hashes. Run the app's real playback tests before committing
+a new source build. Build inputs are pinned; byte-for-byte reproduction across different
+host toolchains has not been established.
 
 Ruffle is deliberately excluded from Dependabot's generic submodule updater because
 an arbitrary source commit can lack a matching published runtime. The stable-release
@@ -66,24 +93,25 @@ checks because PRs made with `GITHUB_TOKEN` do not trigger `pull_request` workfl
 **Dependency security** runs on PRs, merge queues, pushes to main, daily schedules,
 and manual dispatch. It resolves debug/release/test Maven dependencies through Gradle,
 records both submodule commits and Ruffle's npm version, and scans those exact identities
-plus the pinned Ruffle `Cargo.lock` with OSV-Scanner. Scanner failures and findings fail
+plus Ruffle's selected WASM dependencies with OSV-Scanner. Cargo regenerates that inventory
+from the pinned source, target, features and lockfile and compares it with the committed
+inventory; normal and build/proc-macro dependencies are included, while tests and desktop-only
+dependencies are excluded. Unexpected dependency resolution or a stale inventory fails.
+Scanner failures and vulnerability findings fail
 the check. The inventory and JSON report are retained as workflow artifacts. The release
 workflow builds and packages APKs in parallel with the scan and requires both jobs to pass
 before attaching files to a release. Manual release-validation runs keep the same security
 check and retain packaged APKs as artifacts without publishing them.
 
-The Rust lockfile includes upstream desktop/build dependencies as well as web dependencies.
-Treat those findings as requiring investigation: determine whether a vulnerable package
-is compiled into the bundled WASM before assessing app impact. Do not silently suppress
-findings merely to make CI green. OSV reports known advisories; it does not audit native
-code, discover unknown bugs, or prove the prebuilt WASM was produced from its claimed source.
+The only nonblocking advisory is `RUSTSEC-2026-0192`, explicitly classified by RustSec
+as an informational unmaintained notice for `ttf-parser`. It stays visible as a maintenance
+warning in the job summary. `.github/osv-scanner.toml` accepts that exact record; it does
+not ignore the package or other advisories. Actual vulnerabilities continue to block.
 
-The initial scan on October 27, 2026 reported advisory records in 11 crates in Ruffle
-0.7.1's upstream lockfile, including `quick-xml` (used by Ruffle core) and several
-desktop/TLS dependencies. The 160 resolved Android Maven dependencies and the direct
-bundled-library identities had no reported findings in that scan. No advisory exclusions
-have been added. The strict scan currently fails until these upstream findings are
-remediated or their applicability is reviewed and any exceptions are narrowly documented.
+OSV reports known published advisories; it does not audit native code, discover unknown
+bugs, or establish that absence of a finding means safety. The original full upstream
+Cargo.lock contains desktop/TLS dependencies that are not part of this Android runtime;
+scanning that entire workspace had also reported unrelated findings.
 
 Dependabot also opens Gradle update PRs daily and GitHub Actions update PRs weekly.
 **Submit dependency graph** submits resolved Gradle dependencies on main so GitHub can

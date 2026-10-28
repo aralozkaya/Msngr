@@ -1,15 +1,15 @@
 {
   "version": "0.7.1",
   "sourceCommit": "89a7049965f3090e706265670df309a5128233ac",
-  "package": "https://registry.npmjs.org/@ruffle-rs/ruffle/-/ruffle-0.7.1.tgz",
-  "integrity": "sha512-6ZWxx/cfX3RoNyQ1AVimECSae4gKqMxdPimOD+chiIcOFiJS0ATGKcjkretxNT03lqNUpiSyJjF55AuvvZ+QeA==",
+  "sourceBuild": "b34cd4df6434411cd34ee0a2344894d5ed6b05210d8f0a647f218d13d7183c4b",
+  "dependencyInventory": "7fcb34a2d6f52f6b5ffe0f97b36c97550f840cd8197f98ea7cca33e7a72fbcee",
   "files": {
-    "172de42e6619eac8f371.wasm": "1ed33b9b71a6b01b9aafafed660be343ffeb2d246c5d79e6425a32bf93e38207",
-    "878d548199cddef07035.wasm": "af9b6a13a8f5e8d305bc3ce28a4edf3f6242df1183e8576ad4ca086e9f21eaea",
+    "219ee882cd61bfc5b208.wasm": "3d713d04946dbaab5d6494863a594ea696229e66f05d70c3d69d46abe7f01017",
     "LICENSE_APACHE": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
     "LICENSE_MIT": "4de9338a7879c68e911742a7d691f0797ff1ef8d8a6fb978b0c711e258fe959c",
-    "core.ruffle.16d61072ac7fdc4d5013.js": "d27c6bdce2a34afb32e8dfa40970bc7e86cbcb912f92db7eb3e1ac70e943bd82",
-    "core.ruffle.994eeef0a471a88cd0e3.js": "d89e507ee60d550629e9229aa1e4dd4f9e75ec7db271e0135cbc87dab042ea51",
-    "ruffle.js": "26036a94567088dfb3de88a759e8ed10a4cea07b29500af36f345eef42420098"
+    "b4398e596314a5371e8b.wasm": "66256dc11a5bdacd8292e361e4a05d4790a9fff28aae24716f9fbe16253844fc",
+    "core.ruffle.a84bd9c06d389af76eea.js": "e8bfc31419a51266da4886f141781fa0f7e9081b89778854f60bdef721422bb4",
+    "core.ruffle.d641d5eb723ec084ca79.js": "d8bfd5900587833b5ba55edc9a6f6179433e0c968944731c937cbc2a0f02758a",
+    "ruffle.js": "14e0f6f89cdc80572778244fcf4df4bb58fb8442c59f237b74bc1cca67ca72be"
   }
 }

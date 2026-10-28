@@ -188,7 +188,7 @@ Run the helper after switching to another branch as well. It downloads libsiren 
 only Ruffle's version, license, and dependency metadata. Ruffle's upstream test SWFs
 are excluded to avoid antivirus detections and long Windows test-file paths. Its
 submodule is configured to skip automatic full checkouts; do not use a recursive clone
-or force a full Ruffle checkout. The app's bundled playback runtime is unchanged.
+or force a full Ruffle checkout. Normal APK builds use the committed, verified runtime.
 
 Use the pinned commits: `git submodule update --remote` selects different dependency
 versions and is intended for a reviewed dependency update. GitHub's **Download ZIP**

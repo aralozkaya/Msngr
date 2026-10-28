@@ -36,6 +36,9 @@ jobs:
       - name: Verify Ruffle and inventory bundled libraries
         run: |
           python3 tools/update_ruffle.py
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup default 1.99.1
+          python3 tools/ruffle_build.py --verify-inventory
           python3 tools/dependency_inventory.py
       - name: Resolve app and test dependencies
         run: bash ./gradlew --no-daemon :app:writeDependencyInventory
@@ -44,10 +47,11 @@ jobs:
         with:
           scan-args: |-
             --format=json
+            --config=.github/osv-scanner.toml
             --output-file=app/build/reports/dependencies/vulnerabilities.json
             --lockfile=osv-scanner:app/build/reports/dependencies/maven.json
             --lockfile=osv-scanner:app/build/reports/dependencies/third-party.json
-            --lockfile=third_party/ruffle/Cargo.lock
+            --lockfile=osv-scanner:third_party/ruffle-build/inventory.json
       - name: Summarize vulnerability findings
         if: ${{ always() }}
         run: python3 tools/report_vulnerabilities.py

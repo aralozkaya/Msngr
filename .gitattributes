@@ -5,3 +5,5 @@ app/src/main/assets/ruffle/LICENSE_* -text
 app/src/main/assets/ruffle/README.md text eol=lf
 # Unified diffs use a single space for blank context lines. Keep patches LF-only.
 third_party/patches/*.patch text eol=lf -whitespace
+third_party/ruffle-build/* text eol=lf
+third_party/ruffle-runtime.json text eol=lf
