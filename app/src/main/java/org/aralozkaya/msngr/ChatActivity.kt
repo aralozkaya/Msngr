@@ -153,6 +153,7 @@ import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.data.groupFeatures
 import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
 import androidx.lifecycle.repeatOnLifecycle
@@ -298,6 +299,7 @@ private fun ChatRoute(
         onDraftChange = { repository.updateDraft(contactId, it) },
         contact = contact ?: lastKnownContact?.copy(presence = Presence.Offline),
         ownPresence = profile.presence,
+        ownEmail = profile.email,
         isConversationAvailable = contact != null,
         messages = conversation?.messages.orEmpty(),
         isHistoryLoaded = conversation?.isHistoryLoaded == true,
@@ -344,7 +346,9 @@ internal fun ChatScreen(
     otherUnreadCount: Int = 0,
     nudgeCooldownMillis: Long = 0L,
     ownPresence: Presence = Presence.Online,
+    ownEmail: String = "",
 ) {
+    val groupFeatures = contact?.takeIf { it.isGroup }?.groupFeatures(ownEmail)
     val nudgeShakeState = rememberNudgeShakeState()
     var handledNudgeShakeCount by rememberSaveable(contact?.id) { mutableIntStateOf(0) }
     LaunchedEffect(nudgeShakeCount) {
@@ -513,12 +517,14 @@ internal fun ChatScreen(
                 onNativeStyleChange = onNativeStyleChange,
                 onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
-                handwritingEnabled = isConversationAvailable && contact?.presence?.isOnline != false,
+                handwritingEnabled = isConversationAvailable && contact?.presence?.isOnline != false &&
+                    (contact?.isGroup != true || groupFeatures?.inkFormat != null),
                 voiceClipsVisible = contact?.isGroup != true,
                 voiceClipsEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline != false,
                 onSendVoiceClip = onSendVoiceClip,
-                winksVisible = contact?.isGroup != true,
-                winksEnabled = isConversationAvailable && contact?.isGroup != true && contact?.isBlocked != true && contact?.presence?.isOnline == true,
+                winksMenuEnabled = groupFeatures?.winks != false,
+                winksEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline == true &&
+                    groupFeatures?.winks != false,
                 onSendWink = onSendWink,
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
@@ -683,7 +689,7 @@ internal fun ChatMessageList(
 private fun MessageComposer(
     enabled: Boolean = true,
     handwritingEnabled: Boolean = enabled,
-    winksVisible: Boolean = true,
+    winksMenuEnabled: Boolean = true,
     winksEnabled: Boolean = enabled,
     voiceClipsVisible: Boolean = true,
     voiceClipsEnabled: Boolean = enabled,
@@ -728,7 +734,7 @@ private fun MessageComposer(
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
     WinkPicker(showWinks, winksEnabled, { showWinks = false }, onSendWink)
-    LaunchedEffect(winksVisible) { if (!winksVisible) showWinks = false }
+    LaunchedEffect(winksMenuEnabled) { if (!winksMenuEnabled) showWinks = false }
     MessengerPlusColorSheet(colorSheet)
     if (showTextStyle) NativeTextStyleSheet(
         style = nativeStyle,
@@ -837,7 +843,7 @@ private fun MessageComposer(
                                 EmoticonAndHandwritingMenuButton(
                                     enabled = enabled,
                                     handwritingEnabled = handwritingEnabled,
-                                    winksEnabled = winksVisible,
+                                    winksEnabled = winksMenuEnabled,
                                     onSelectWinks = {
                                         colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
                                         handwritingMode = false; editorController.hideKeyboard(); showWinks = true

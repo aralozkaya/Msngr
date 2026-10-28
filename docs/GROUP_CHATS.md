@@ -26,8 +26,16 @@ accepted groups. Ad hoc multi-party switchboard conversations are outside this i
 
 A group is online only when at least one other member is online. The signed-in account never
 counts toward availability, including its other endpoints. Offline groups reuse the dismissible
-contact-status snackbar and disable the composer, nudges, and sending while retaining the draft. A group
-removed from the roster disappears from the main page; its open conversation retains its history
+contact-status snackbar and disable the composer, nudges, and sending while retaining the draft.
+
+Handwriting and winks are enabled independently only when all joined, non-offline recipients
+advertise support for that feature. Offline members and the signed-in account are ignored;
+unknown capabilities disable the feature until a fresh circle `NLN`/`ILN` confirms support.
+Busy and Away members still count. Handwriting uses ISF when all recipients accept it and GIF
+when that is their common supported format. Presence changes and membership refreshes update
+the controls; the send and retry paths check again before submitting a message.
+
+A group removed from the roster disappears from the main page; its open conversation retains its history
 and shows an unavailable notice. Groups and Other Contacts have a 24 dp gap and collapse independently
 with Material 3 Expressive segmented list items and motion. The child rows slide together from
 behind their stationary header as one clipped container, preserving their heights and spacing.

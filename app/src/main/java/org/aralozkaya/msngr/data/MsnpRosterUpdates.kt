@@ -22,6 +22,7 @@ internal fun mergeAddressBookUpdate(
                         ?: old?.displayName ?: member.displayName,
                     presence = old?.presence ?: member.presence,
                     avatarUri = old?.avatarUri ?: member.avatarUri,
+                    clientCapabilities = old?.clientCapabilities ?: member.clientCapabilities,
                 )
             }
         }

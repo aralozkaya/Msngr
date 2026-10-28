@@ -40,7 +40,7 @@ submodule; build with Android NDK 28.2.13676358 to rebuild or replace the shared
 
 `third_party/ruffle` pins the official source repository at a stable release.
 Normal Android builds use the committed self-hosted JS/WASM runtime and need neither
-Rust nor Node.js. The current 0.7.1 runtime is rebuilt from that official source with
+Rust nor Node.js. The 0.7.1 runtime is rebuilt from that official source with
 `third_party/patches/ruffle-security.patch`: quick-xml 0.41.0 fixes the two reported XML
 denial-of-service issues, and zip 9.0.5 fixes the ZIP advisories. XML API adaptations
 preserve Flash text/entity handling and retain the new namespace limit. The source

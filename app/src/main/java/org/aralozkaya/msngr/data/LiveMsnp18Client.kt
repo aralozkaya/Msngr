@@ -183,7 +183,8 @@ internal class LiveMsnp18Client(
     private val pictureSessions = ConcurrentHashMap<String, MsnpP2pSession>()
     private data class SharedVoice(val data: LocalDisplayPicture, val createdAt: Long)
     private val sharedVoiceClips = ConcurrentHashMap<String, SharedVoice>()
-    private val sharedWinks = ConcurrentHashMap<String, SharedVoice>()
+    private data class SharedWink(val data: LocalDisplayPicture, val createdAt: Long, val recipients: Set<String>)
+    private val sharedWinks = ConcurrentHashMap<String, SharedWink>()
     private class PendingWink(val messageId: Long)
     private val pendingWinks = ConcurrentHashMap<String, PendingWink>()
     private val winkLimiter = NudgeRateLimiter()
@@ -844,9 +845,15 @@ internal class LiveMsnp18Client(
         try {
             check(account.isNotBlank()) { "Sign in before retrying this wink." }
             val email = contactEmail(contactId)
-            check(!isGroup(email)) { "Winks are not supported in group chats." }
+            checkGroupAvailable(email)
+            val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
+            if (group != null) check(group.members.any {
+                it.email.equals(metadata.creator, true) && it.presence.isOnline
+            }) {
+                "The wink sender is no longer online in this group."
+            }
             check(mutableContacts.value.none { it.id == contactId && it.isBlocked }) { "Unblock this contact before retrying." }
-            val session = switchboardFor(email)
+            val session = switchboardFor(if (group != null) metadata.creator else email)
             check(account == signedInStorageAccount) { "The selected account changed. Try again." }
             session.retryWink(metadata)
             Result.success(Unit)
@@ -864,7 +871,11 @@ internal class LiveMsnp18Client(
     override suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val email = contactEmail(contactId)
-            check(!isGroup(email)) { "Winks are not supported in group chats." }
+            checkGroupAvailable(email)
+            val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
+            check(group == null || group.groupFeatures(signedInEmail).winks) {
+                "All online group members must support winks."
+            }
             check(wink.metadata.matches(bytes)) { "Wink data does not match its metadata." }
             requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes)) { "Invalid wink package." }
             val metadata = MsnDisplayPicture.create(signedInEmail, bytes, 8,
@@ -873,7 +884,8 @@ internal class LiveMsnp18Client(
                 .copy(extraAttributes = wink.metadata.extraAttributes)
             val reference = wink.copy(metadata = metadata)
             winkStore?.receive(signedInStorageAccount, email, reference, bytes)
-            sharedWinks["${email.lowercase()}\n${metadata.sha1d}"] = SharedVoice(LocalDisplayPicture(metadata, bytes), System.nanoTime())
+            sharedWinks["${email.lowercase()}\n${metadata.sha1d}"] = SharedWink(
+                LocalDisplayPicture(metadata, bytes), System.nanoTime(), emptySet())
             val message = ChatMessage(messageIds.incrementAndGet(), email.lowercase(), MessageAuthor.Me,
                 "Wink: ${wink.name}", System.currentTimeMillis(), isSending = true, wink = reference)
             appendMessage(message)
@@ -904,7 +916,10 @@ internal class LiveMsnp18Client(
                 "Messages cannot be sent to a blocked contact."
             }
             if (message.wink != null) {
-                check(!isGroup(email)) { "Winks are not supported in group chats." }
+                val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
+                check(group == null || group.groupFeatures(signedInEmail).winks) {
+                    "All online group members must support winks."
+                }
                 check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
                     "Winks require the contact to be online."
                 }
@@ -915,8 +930,15 @@ internal class LiveMsnp18Client(
                 val now = System.nanoTime()
                 sharedWinks.entries.removeIf { now - it.value.createdAt > 600_000_000_000L }
                 while (sharedWinks.size >= 16) sharedWinks.entries.minByOrNull { it.value.createdAt }?.let { sharedWinks.remove(it.key, it.value) }
-                sharedWinks["${email.lowercase()}\n${metadata.sha1d}"] = SharedVoice(LocalDisplayPicture(metadata, bytes), now)
-                switchboardFor(email).sendWink(metadata)
+                val recipients = group?.members?.filter {
+                    it.presence.isOnline && !it.email.equals(signedInEmail, true)
+                }?.map { it.email.lowercase() }?.toSet() ?: setOf(email.lowercase())
+                sharedWinks["${email.lowercase()}\n${metadata.sha1d}"] = SharedWink(LocalDisplayPicture(metadata, bytes), now, recipients)
+                if (group != null) {
+                    sendCircleMessages(message, MsnpCircles.winkMessages(
+                        email, signedInEmail, machineGuid, metadata, ::nextTransactionId,
+                    ))
+                } else switchboardFor(email).sendWink(metadata)
             } else if (message.voiceClip != null) {
                 check(!isGroup(email)) { "Voice clips are not supported in group chats." }
                 check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
@@ -933,27 +955,18 @@ internal class LiveMsnp18Client(
                 switchboardFor(email).sendVoiceClip(metadata)
             } else if (message.inkDrawing != null) {
                 if (isGroup(email)) {
+                    val format = mutableContacts.value.first { it.id == email.lowercase() }
+                        .groupFeatures(signedInEmail).inkFormat
+                    check(format != null) { "All online group members must support handwriting." }
                     val commands = MsnpCircles.inkMessages(
                         groupEmail = email,
                         senderEmail = signedInEmail,
                         endpointId = machineGuid,
                         drawing = message.inkDrawing,
+                        useGif = format == GroupInkFormat.Gif,
                         nextTransactionId = ::nextTransactionId,
                     )
-                    for (command in commands) {
-                        val transaction = checkNotNull(command.transactionId)
-                        circleDeliveries[transaction] = message.contactId to message.id
-                        try {
-                            send(command)
-                        } catch (error: Exception) {
-                            circleDeliveries.remove(transaction)
-                            throw error
-                        }
-                        scope.launch {
-                            delay(NOTIFICATION_TRANSACTION_TIMEOUT_MILLIS)
-                            circleDeliveries.remove(transaction)
-                        }
-                    }
+                    sendCircleMessages(message, commands)
                 } else {
                     check(
                         mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline,
@@ -1865,6 +1878,23 @@ internal class LiveMsnp18Client(
 
     private fun isGroup(id: String): Boolean = mutableContacts.value.any { it.id == id.lowercase() && it.isGroup }
 
+    private suspend fun sendCircleMessages(message: ChatMessage, commands: List<MsnpCommand>) {
+        for (command in commands) {
+            val transaction = checkNotNull(command.transactionId)
+            circleDeliveries[transaction] = message.contactId to message.id
+            try {
+                send(command)
+            } catch (error: Exception) {
+                circleDeliveries.remove(transaction)
+                throw error
+            }
+            scope.launch {
+                delay(NOTIFICATION_TRANSACTION_TIMEOUT_MILLIS)
+                circleDeliveries.remove(transaction)
+            }
+        }
+    }
+
     private fun checkGroupAvailable(id: String) {
         val contact = mutableContacts.value.firstOrNull { it.id == id.lowercase() }
         if (contact?.isGroup == true) check(contact.presence.isOnline && !contact.isBlocked) {
@@ -1896,6 +1926,16 @@ internal class LiveMsnp18Client(
             return
         }
         val contentType = envelope.headers["content-type"].orEmpty().substringBefore(';').trim()
+        if (type.equals("Wink", true) || contentType.equals(Msnp18Protocol.NUDGE_CONTENT_TYPE, true)) {
+            val offer = parseSwitchboardMime(
+                "Content-Type: ${Msnp18Protocol.NUDGE_CONTENT_TYPE}\r\n\r\n".toByteArray() + envelope.body,
+            ) as? SwitchboardMimeMessage.WinkOffer ?: return
+            if (!offer.metadata.creator.equals(sender, true) || group.members.none { it.email.equals(sender, true) }) return
+            val senderEndpoint = normalizeEndpointId(envelope.routing["from"].orEmpty().substringAfter(";epid=", ""))
+            if (mine && senderEndpoint == normalizeEndpointId(machineGuid)) return
+            receiveCircleWink(group, sender, offer.metadata)
+            return
+        }
         val isInk = type.equals("Ink", ignoreCase = true) ||
             contentType.equals(Msnp18Protocol.INK_ISF_CONTENT_TYPE, ignoreCase = true) ||
             contentType.equals(Msnp18Protocol.INK_GIF_CONTENT_TYPE, ignoreCase = true)
@@ -1936,6 +1976,72 @@ internal class LiveMsnp18Client(
         }
     }
 
+    private fun receiveCircleWink(group: Contact, sender: String, metadata: MsnDisplayPicture) {
+        if (!winkLimiter.allowReceivedAlert(group.id, sender)) return
+        val key = "${group.id}\n$sender\n${metadata.sha1d}"
+        val id = messageIds.incrementAndGet()
+        val pending = PendingWink(id)
+        if (pendingWinks.putIfAbsent(key, pending) != null) return
+        val mine = sender.equals(signedInEmail, true)
+        val name = winkName(metadata)
+        appendMessage(ChatMessage(id, group.id, if (mine) MessageAuthor.Me else MessageAuthor.Contact,
+            "Wink: $name", System.currentTimeMillis(),
+            senderEmail = sender, senderName = group.members.firstOrNull { it.email.equals(sender, true) }?.displayName ?: sender,
+            wink = org.aralozkaya.msngr.protocol.WinkReference(metadata, name), isWinkPending = true))
+        if (!mine) {
+            incrementUnread(group.id)
+            mutableEvents.tryEmit(MessengerEvent.IncomingMessage(group.id, id))
+        }
+        mutableTyping.update { it + (group.id to false) }
+        startWinkTimeout(key, group.id, pending)
+        val account = signedInStorageAccount
+        scope.launch {
+            try {
+                val cached = winkStore?.bytes(account, metadata)
+                if (cached != null) completeWinkTransfer(sender, metadata, cached)
+                else {
+                    // The announcement belongs to the circle; MSNObject bytes use the sender's
+                    // existing point-to-point transport without creating a private wink message.
+                    val session = switchboardFor(sender)
+                    check(account == signedInStorageAccount) { "The selected account changed. Try again." }
+                    session.retryWink(metadata)
+                }
+            } catch (error: Exception) {
+                if (pendingWinks.remove(key, pending) && account == signedInStorageAccount)
+                    updateWink(group.id, id, error.message ?: "Wink download failed.")
+            }
+        }
+    }
+
+    private fun winkName(metadata: MsnDisplayPicture): String = runCatching {
+        MsnBase64.decode(metadata.friendly)?.toString(Charsets.UTF_16LE)?.trimEnd('\u0000')
+    }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 120 } ?: "Wink"
+
+    /** One object download can satisfy offers in several conversations with the same sender. */
+    private fun completeWinkTransfer(sender: String, metadata: MsnDisplayPicture, bytes: ByteArray) {
+        val suffix = "\n${sender.lowercase()}\n${metadata.sha1d}"
+        val waiting = pendingWinks.entries.filter { it.key.endsWith(suffix) }
+            .filter { pendingWinks.remove(it.key, it.value) }
+        if (waiting.isEmpty()) return
+        val account = signedInStorageAccount
+        scope.launch {
+            val validationError = runCatching {
+                check(metadata.matches(bytes)) { "Wink data does not match its metadata." }
+                requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes)) { "Unsupported or invalid wink package." }
+            }.exceptionOrNull()
+            for ((key, pending) in waiting) {
+                if (account != signedInStorageAccount) return@launch
+                val contactId = key.substringBefore('\n')
+                val reference = mutableMessages.value[contactId]?.firstOrNull { it.id == pending.messageId }?.wink ?: continue
+                val error = validationError ?: runCatching {
+                    winkStore?.receive(account, contactId, reference, bytes)
+                }.exceptionOrNull()
+                if (account == signedInStorageAccount) updateWink(contactId, pending.messageId,
+                    error?.let { "Wink could not be opened: ${it.message ?: "invalid package"}" })
+            }
+        }
+    }
+
     private fun receiveCirclePublication(command: MsnpCommand) {
         val envelope = parseCircleEnvelope(command.payload ?: return) ?: return
         val id = envelope.groupId ?: return
@@ -1955,7 +2061,9 @@ internal class LiveMsnp18Client(
         updateContact(id) { group -> group?.copy(
             nickname = publication?.name ?: group.nickname,
             members = when {
-                !removed.isNullOrEmpty() -> group.members.map { if (it.email == removed) it.copy(presence = Presence.Offline) else it }
+                !removed.isNullOrEmpty() -> group.members.map {
+                    if (it.email == removed) it.copy(presence = Presence.Offline, clientCapabilities = 0L) else it
+                }
                 publication?.roster != null -> {
                     val online = publication.roster.toSet()
                     val known = group.members.associateBy(GroupMember::email)
@@ -1964,7 +2072,8 @@ internal class LiveMsnp18Client(
                             mutableContacts.value.firstOrNull { it.email.equals(email, true) }?.displayName ?: email)
                         member.copy(presence = if (email in online) {
                             if (member.presence.isOnline) member.presence else Presence.Online
-                        } else Presence.Offline)
+                        } else Presence.Offline,
+                            clientCapabilities = if (email in online && member.presence.isOnline) member.clientCapabilities else 0L)
                     }
                 }
                 else -> group.members
@@ -1988,12 +2097,22 @@ internal class LiveMsnp18Client(
             "FLN" -> Presence.Offline
             else -> null
         }
+        val hasNetworkId = command.verb == "ILN" && command.parameters.getOrNull(2)?.toIntOrNull() != null
+        val nicknameIndex = if (hasNetworkId) 3 else 2
         val name = if (command.verb == "NLN" || command.verb == "ILN")
-            command.parameters.getOrNull(2)?.decodeMsnpValue() else null
+            command.parameters.getOrNull(nicknameIndex)?.decodeMsnpValue() else null
         updateContact(id) { group -> group?.copy(members = group.members.toMutableList().apply {
             val index = indexOfFirst { it.email == email }
             val previous = getOrNull(index) ?: GroupMember(email)
-            val member = previous.copy(displayName = name ?: previous.displayName, presence = status ?: previous.presence)
+            val member = previous.copy(
+                displayName = name ?: previous.displayName,
+                presence = status ?: previous.presence,
+                clientCapabilities = when {
+                    status?.isOnline == true -> parseClientCapabilities(command.parameters.getOrNull(nicknameIndex + 1))
+                    status == Presence.Offline -> 0L
+                    else -> previous.clientCapabilities
+                },
+            )
             if (index < 0) add(member) else set(index, member)
         }) }
         return true
@@ -2590,14 +2709,7 @@ internal class LiveMsnp18Client(
         if (mutableContacts.value.firstOrNull { it.id == inviterEmail.lowercase() }?.isBlocked == true) return
         val (host, port) = endpoint.parseNotificationEndpoint(switchboardFallbackPort)
         val id = if (fromOwnSession) "" else inviterEmail.lowercase()
-        if (!fromOwnSession) updateContact(inviterEmail) { existing ->
-            existing ?: Contact(
-                id = id,
-                nickname = null,
-                email = inviterEmail,
-                presence = Presence.Online,
-            )
-        }
+        if (!fromOwnSession && !isGroupWinkPeer(id)) ensureSwitchboardContact(id)
         lateinit var session: MsnpSwitchboardSession
         val previousSession = switchboards[id]
         session = MsnpSwitchboardSession(
@@ -2641,12 +2753,22 @@ internal class LiveMsnp18Client(
             session.close()
             return
         }
-        updateContact(id) { existing -> existing ?: Contact(
-            id = id, nickname = null, email = id, presence = Presence.Online,
-        ) }
+        if (!isGroupWinkPeer(id)) ensureSwitchboardContact(id)
         pictureSessions[id] = session.pictureSession
         switchboards[id] = session
     }
+
+    private fun ensureSwitchboardContact(id: String) {
+        updateContact(id) { existing -> existing ?: Contact(id, null, id, Presence.Online) }
+    }
+
+    private fun isGroupWinkPeer(id: String): Boolean =
+        sharedWinks.entries.any { (key, shared) ->
+            isGroup(key.substringBefore('\n')) && id in shared.recipients &&
+                System.nanoTime() - shared.createdAt <= 600_000_000_000L
+        } || pendingWinks.keys.any { key ->
+            isGroup(key.substringBefore('\n')) && key.substringAfter('\n').substringBefore('\n') == id
+        }
 
     private fun handleSwitchboardEvent(
         session: MsnpSwitchboardSession,
@@ -2670,6 +2792,10 @@ internal class LiveMsnp18Client(
             session.close()
             return
         }
+        if (event is SwitchboardEvent.Text || event is SwitchboardEvent.Ink ||
+            event is SwitchboardEvent.WinkOffered || event is SwitchboardEvent.VoiceClipOffered ||
+            event is SwitchboardEvent.Nudge
+        ) ensureSwitchboardContact(contactId)
         when (event) {
             SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
             is SwitchboardEvent.WinkOffered -> {
@@ -2679,8 +2805,7 @@ internal class LiveMsnp18Client(
                 val pending = PendingWink(id)
                 if (pendingWinks.putIfAbsent(key, pending) != null) return
                 val mine = event.senderEmail.equals(signedInEmail, true)
-                val name = runCatching { MsnBase64.decode(event.metadata.friendly)?.toString(Charsets.UTF_16LE)?.trimEnd('\u0000') }
-                    .getOrNull()?.takeIf { it.isNotBlank() && it.length <= 120 } ?: "Wink"
+                val name = winkName(event.metadata)
                 appendMessage(ChatMessage(id, contactId, if (mine) MessageAuthor.Me else MessageAuthor.Contact,
                     "Wink: $name", System.currentTimeMillis(), wink = org.aralozkaya.msngr.protocol.WinkReference(event.metadata, name), isWinkPending = true))
                 if (!mine) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id)) }
@@ -2688,18 +2813,7 @@ internal class LiveMsnp18Client(
                 startWinkTimeout(key, contactId, pending)
             }
             is SwitchboardEvent.WinkReceived -> {
-                val key = "$contactId\n${event.senderEmail.lowercase()}\n${event.metadata.sha1d}"
-                val id = pendingWinks.remove(key)?.messageId ?: return
-                val account = signedInStorageAccount
-                scope.launch {
-                    val error = runCatching {
-                        check(event.metadata.matches(event.bytes))
-                        val reference = mutableMessages.value[contactId]?.firstOrNull { it.id == id }?.wink ?: return@launch
-                        requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(event.bytes)) { "Unsupported or invalid wink package." }
-                        winkStore?.receive(account, contactId, reference, event.bytes)
-                    }.exceptionOrNull()?.let { "Wink could not be opened: ${it.message ?: "invalid package"}" }
-                    if (account == signedInStorageAccount) updateWink(contactId, id, error)
-                }
+                completeWinkTransfer(event.senderEmail, event.metadata, event.bytes)
             }
             is SwitchboardEvent.VoiceClipOffered -> {
                 if (isGroup(contactId)) return
@@ -2814,7 +2928,10 @@ internal class LiveMsnp18Client(
     }
 
     private fun localWinkSnapshot(peer: String, hash: String): LocalDisplayPicture? =
-        sharedWinks["${peer.lowercase()}\n$hash"]?.takeIf { System.nanoTime() - it.createdAt <= 600_000_000_000L }?.data
+        sharedWinks.values.firstOrNull {
+            it.data.metadata.sha1d == hash && peer.lowercase() in it.recipients &&
+                System.nanoTime() - it.createdAt <= 600_000_000_000L
+        }?.data
 
     private fun updateWink(contactId: String, id: Long, error: String?) {
         mutableMessages.update { conversations ->

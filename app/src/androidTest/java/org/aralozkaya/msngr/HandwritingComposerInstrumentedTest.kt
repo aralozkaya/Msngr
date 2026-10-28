@@ -202,9 +202,10 @@ class HandwritingComposerInstrumentedTest {
                         isGroup = true,
                         members = listOf(
                             GroupMember("aralozkaya@escargot.chat", "Aral", Presence.Online),
-                            GroupMember("mrlistenerr@escargot.chat", "Mr Listener", Presence.Online),
+                            GroupMember("mrlistenerr@escargot.chat", "Mr Listener", Presence.Online, clientCapabilities = 0x800c),
                         ),
                     ),
+                    ownEmail = "aralozkaya@escargot.chat",
                     messages = messages,
                     isHistoryLoaded = true,
                     canLoadOlderMessages = false,
