@@ -11,7 +11,7 @@ lifecycleRuntimeKtx = "2.11.0"
 tinkAndroid = "1.24.0"
 workRuntime = "2.11.2"
 materialColorUtilities = "4.0.5"
-markdownRenderer = "0.41.0"
+markdownRenderer = "0.46.0"
 
 [libraries]
 material-color-utilities = { module = "com.materialkolor:material-color-utilities", version.ref = "materialColorUtilities" }
