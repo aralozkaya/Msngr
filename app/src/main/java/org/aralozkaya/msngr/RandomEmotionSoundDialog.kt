@@ -38,6 +38,9 @@ internal fun RandomEmotionSoundDialog(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val busy = downloading || saving
+    val categoryLabel = candidate?.first?.let { sound ->
+        if (sound.category in 1 until emotionSoundCategories.size) emotionSoundCategories[sound.category] else "Unknown"
+    } ?: emotionSoundCategories[category]
 
     fun download() {
         player.stop()
@@ -63,7 +66,7 @@ internal fun RandomEmotionSoundDialog(
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Find a sound, preview it, then choose whether to keep it.")
-                Text("Category: ${emotionSoundCategories[category]}", style = MaterialTheme.typography.labelLarge)
+                Text("Category: $categoryLabel", style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Language", Modifier.weight(1f))
                     EmotionSoundDropdown(language, emotionSoundLanguages, "Sound language", "emotion_sound_language",

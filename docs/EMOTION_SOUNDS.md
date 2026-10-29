@@ -17,7 +17,10 @@ Expressive grouped items and selection shapes. **Random** opens a dialog where y
 **Any language** or one of the 24 native Plus! sound languages, then download a candidate in the
 selected category (or a random category for **Any category**). Preview, try another, **Keep**, or
 **Discard** it; only **Keep** adds it to Local. Closing the dialog cancels its work and stops
-preview playback. Language IDs match the installed native `Sounds.Languages` / `Lang01`–`Lang24`
+preview playback. Once fetched, the category label shows the sound's metadata category, or
+**Unknown** when absent. Starting another download or changing language resets it to the original
+request filter, which continues to govern subsequent downloads.
+Language IDs match the installed native `Sounds.Languages` / `Lang01`–`Lang24`
 table.
 The initial online catalog fetch shows the same Expressive shape-morphing loading indicator as
 contact requests. Empty-result text appears only after a successful load; failures offer Retry.

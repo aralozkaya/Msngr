@@ -52,14 +52,14 @@ class RandomEmotionSoundInstrumentedTest {
 
     @After fun restoreTransientAccount() { SessionPrefs.logout() }
 
-    private fun showDialog(response: (String) -> ByteArray = { bytes }) {
+    private fun showDialog(category: Int = 5, response: (String) -> ByteArray = { bytes }) {
         val service = EmotionSoundService(MsnEmotionSound.DEFAULT_SERVER, EmotionSoundHttp { url ->
             requests += url
             response(url)
         })
         val open = mutableStateOf(true)
         compose.setContent { MaterialTheme {
-            if (open.value) RandomEmotionSoundDialog(5, onDismiss = { open.value = false },
+            if (open.value) RandomEmotionSoundDialog(category, onDismiss = { open.value = false },
                 onKept = { kept.set(it); open.value = false }, service = service)
         } }
     }
@@ -81,6 +81,50 @@ class RandomEmotionSoundInstrumentedTest {
             }
             image.recycle()
         }
+    }
+
+    @Test fun anyCategoryShowsTheFetchedCategoryAndResetsForTheNextCandidate() {
+        val attempts = AtomicInteger()
+        val release = CountDownLatch(1)
+        try {
+            showDialog(category = 0) {
+                val category = if (attempts.incrementAndGet() == 1) 3 else {
+                    check(release.await(15, TimeUnit.SECONDS))
+                    4
+                }
+                bytes.copyOf().apply { this[size - 128 + 93] = category.toByte() }
+            }
+            compose.onNodeWithText("Category: Any category").assertIsDisplayed()
+            fetch(); awaitCandidate()
+            compose.onNodeWithText("Category: Music").assertIsDisplayed()
+            compose.onNodeWithText("Category: Any category").assertDoesNotExist()
+            screenshot("emotion-random-fetched-category.png")
+            fetch()
+            compose.waitUntil(5_000) { attempts.get() == 2 }
+            compose.onNodeWithText("Category: Any category").assertIsDisplayed()
+            compose.onNodeWithTag("emotion_sound_random_keep").assertIsNotEnabled()
+            release.countDown()
+            awaitCandidate()
+            compose.onNodeWithText("Category: Vocals").assertIsDisplayed()
+            compose.onNodeWithTag("emotion_sound_language").performClick()
+            compose.onNodeWithTag("emotion_sound_language_7").performScrollTo().performClick()
+            compose.onNodeWithText("Category: Any category").assertIsDisplayed()
+            assertNotKept()
+        } finally { release.countDown() }
+    }
+
+    @Test fun fetchedCategoryDoesNotChangeTheRequestFilterAndMissingMetadataShowsUnknown() {
+        val attempts = AtomicInteger()
+        showDialog {
+            bytes.copyOf().apply { this[size - 128 + 93] = if (attempts.incrementAndGet() == 1) 3 else 0 }
+        }
+        compose.onNodeWithText("Category: Sound Effects").assertIsDisplayed()
+        fetch(); awaitCandidate()
+        compose.onNodeWithText("Category: Music").assertIsDisplayed()
+        fetch(); awaitCandidate()
+        compose.onNodeWithText("Category: Unknown").assertIsDisplayed()
+        assertEquals(List(2) { MsnEmotionSound.DEFAULT_SERVER + "random?catId=5" }, requests.toList())
+        assertNotKept()
     }
 
     @Test fun selectedLanguageUsesItsNativeIdAndPreviewIsOnlySavedWhenKept() {
