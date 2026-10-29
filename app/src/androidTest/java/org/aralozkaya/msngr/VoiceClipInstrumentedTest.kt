@@ -33,7 +33,10 @@ import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.protocol.MsnVoiceClip
 import org.aralozkaya.msngr.protocol.SirenCodec
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import kotlin.math.abs

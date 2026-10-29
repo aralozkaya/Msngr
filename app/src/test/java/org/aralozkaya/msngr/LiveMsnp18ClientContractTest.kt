@@ -24,8 +24,8 @@ import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockServerData
 import org.aralozkaya.msngr.data.MsnpP2pSession
-import org.aralozkaya.msngr.data.NudgeRateLimiter
 import org.aralozkaya.msngr.data.NudgeCooldownException
+import org.aralozkaya.msngr.data.NudgeRateLimiter
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.SsoToken
 import org.aralozkaya.msngr.data.StorageProfile
