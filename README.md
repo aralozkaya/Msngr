@@ -359,8 +359,16 @@ does not include submodule metadata, so use a Git clone for development.
 ### Set up Android Studio and the SDK
 
 Open the **repository root** in Android Studio with support for the Android Gradle Plugin
-version in [the version catalog](gradle/libs.versions.toml). Select **JDK 21** as the Gradle JDK to match CI, and install these packages
-through Android Studio's SDK Manager:
+version in [the version catalog](gradle/libs.versions.toml). Android Studio Rabbit 1
+(2026.2.1) supports AGP through 9.4; see the
+[Studio/AGP compatibility table](https://developer.android.com/build/releases/about-agp#android_gradle_plugin_and_android_studio_compatibility)
+before upgrading either tool. A command-line build can succeed even when Studio cannot
+sync an unsupported AGP version, leaving false unresolved references in the editor.
+After changing dependencies, run **File > Sync Project with Gradle Files**, then
+build the app to refresh library and generated resource references.
+
+Select **JDK 21** as the Gradle JDK to match CI, and install these packages through
+Android Studio's SDK Manager:
 
 | Package | Version |
 | --- | --- |
