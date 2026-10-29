@@ -242,25 +242,23 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     } }
     KeyboardPickerSheet(visible, onDismiss, "Emotion sounds", "emotion_sound_picker", expandable = true,
         header = {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Emotion sounds", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                Row(
-                    modifier = Modifier.selectableGroup().testTag("emotion_sound_source"),
-                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                ) {
-                    ToggleButton(
-                        checked = !online, onCheckedChange = { online = false; error = null },
-                        buttonSize = ToggleButtonSize.ExtraSmall,
-                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                        modifier = Modifier.testTag("emotion_sound_local").semantics { role = Role.RadioButton },
-                    ) { Text("Local") }
-                    ToggleButton(
-                        checked = online, onCheckedChange = { online = true; error = null },
-                        buttonSize = ToggleButtonSize.ExtraSmall,
-                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                        modifier = Modifier.testTag("emotion_sound_online").semantics { role = Role.RadioButton },
-                    ) { Text("Online") }
-                }
+            Text("Emotion sounds", style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth().selectableGroup().testTag("emotion_sound_source"),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            ) {
+                ToggleButton(
+                    checked = !online, onCheckedChange = { online = false; error = null },
+                    buttonSize = ToggleButtonSize.ExtraSmall,
+                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                    modifier = Modifier.weight(1f).testTag("emotion_sound_local").semantics { role = Role.RadioButton },
+                ) { Text("Local") }
+                ToggleButton(
+                    checked = online, onCheckedChange = { online = true; error = null },
+                    buttonSize = ToggleButtonSize.ExtraSmall,
+                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                    modifier = Modifier.weight(1f).testTag("emotion_sound_online").semantics { role = Role.RadioButton },
+                ) { Text("Online") }
             }
             CompactSearchField(search, "Search sounds", "Clear sound search",
                 Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
