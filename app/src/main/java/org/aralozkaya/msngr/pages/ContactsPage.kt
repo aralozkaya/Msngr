@@ -294,7 +294,8 @@ private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, o
         onClick = onToggle,
         shapes = ListItemDefaults.segmentedShapes(
             index = 0,
-            count = ( if (expanded) count else 0 ) + 1
+            // An empty expanded section still contains the header and an empty-state row.
+            count = if (expanded) count.coerceAtLeast(1) + 1 else 1,
         ),
         colors = ListItemDefaults.segmentedColors(),
         modifier = Modifier.fillMaxWidth()
