@@ -242,7 +242,8 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     } }
     KeyboardPickerSheet(visible, onDismiss, "Emotion sounds", "emotion_sound_picker", expandable = true,
         header = {
-            Text("Emotion sounds", style = MaterialTheme.typography.titleSmall)
+            CompactSearchField(search, "Search sounds", "Clear sound search",
+                Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
             Row(
                 modifier = Modifier.fillMaxWidth().selectableGroup().testTag("emotion_sound_source"),
                 horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -260,8 +261,6 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                     modifier = Modifier.weight(1f).testTag("emotion_sound_online").semantics { role = Role.RadioButton },
                 ) { Text("Online") }
             }
-            CompactSearchField(search, "Search sounds", "Clear sound search",
-                Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
             if (actionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
