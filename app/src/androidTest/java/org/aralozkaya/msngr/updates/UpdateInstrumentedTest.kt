@@ -9,6 +9,7 @@ import android.os.SystemClock
 import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.aralozkaya.msngr.createDisplayPictureCaptureUri
 import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -20,7 +21,6 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
 import java.io.IOException
-import org.aralozkaya.msngr.createDisplayPictureCaptureUri
 import java.util.UUID
 
 class UpdateInstrumentedTest {

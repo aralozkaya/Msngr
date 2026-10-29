@@ -27,13 +27,13 @@ import org.aralozkaya.msngr.AccountIdentity
 import org.aralozkaya.msngr.MessengerPlusTextCodec
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.aralozkaya.msngr.NativeTextStyle
-import org.aralozkaya.msngr.protocol.InkDrawing
-import org.aralozkaya.msngr.protocol.InkPoint
-import org.aralozkaya.msngr.protocol.InkStroke
 import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.protocol.InkDrawing
+import org.aralozkaya.msngr.protocol.InkPoint
+import org.aralozkaya.msngr.protocol.InkStroke
 import org.aralozkaya.msngr.trimMessengerPlusWhitespace
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 import java.util.Locale

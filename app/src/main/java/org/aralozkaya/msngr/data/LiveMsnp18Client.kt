@@ -40,14 +40,14 @@ import org.aralozkaya.msngr.deviceEndpointName
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
-import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnVoiceClip
-import org.aralozkaya.msngr.protocol.VoiceClip
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
+import org.aralozkaya.msngr.protocol.VoiceClip
 import org.aralozkaya.msngr.trimMessengerPlusWhitespace
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 import org.w3c.dom.Element

@@ -3,8 +3,8 @@ package org.aralozkaya.msngr.data
 import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
-import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
