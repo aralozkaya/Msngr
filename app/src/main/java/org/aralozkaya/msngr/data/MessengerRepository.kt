@@ -120,7 +120,10 @@ data class ChatMessage(
     val isWinkPending: Boolean = false,
     val winkTransferError: String? = null,
     val autoPlayWink: Boolean = false,
+    val autoPlayEmotionSound: Boolean = false,
 ) {
+    val emotionSound: org.aralozkaya.msngr.protocol.EmotionSoundMessage?
+        get() = if (author != MessageAuthor.System && !isInk && !isVoiceClip && wink == null) org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(text) else null
     val isInk: Boolean get() = inkDrawing != null
     val isVoiceClip: Boolean get() = voiceClip != null || isVoiceClipPending || voiceClipTransferError != null
 }
@@ -467,7 +470,8 @@ class MockMsnp18Client(
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(
             text.withoutUnicodeEmoji(),
         )
-        val normalized = encoded.trimMessengerPlusWhitespace().text
+        val normalized = if (org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(encoded) != null) encoded
+            else encoded.trimMessengerPlusWhitespace().text
         if (normalized.isEmpty()) return Result.success(Unit)
         appendMessage(
             ChatMessage(
@@ -624,7 +628,6 @@ class MockMsnp18Client(
                 mutableEvents.emit(MessengerEvent.IncomingNudge(contactId))
             }
         }
-        Unit
     }
 
     override suspend fun blockContact(contactId: String) {
@@ -761,6 +764,12 @@ class MessengerRepository(
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
     val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
+    private val mutablePendingEmotionSounds = MutableStateFlow<Map<String, ChatMessage>>(emptyMap())
+    private val queuedEmotionSoundIds = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    val pendingEmotionSounds = mutablePendingEmotionSounds.asStateFlow()
+    fun consumePendingEmotionSound(contactId: String, id: Long) {
+        mutablePendingEmotionSounds.update { if (it[contactId]?.id == id) it - contactId else it }
+    }
     private val mutablePendingWinks = MutableStateFlow<Map<String, ChatMessage>>(emptyMap())
     private val queuedWinkIds = java.util.concurrent.ConcurrentHashMap<String, Long>()
     val pendingWinks = mutablePendingWinks.asStateFlow()
@@ -818,6 +827,12 @@ class MessengerRepository(
                     if (lastSignInRequest != null && messages == client.messages.value) {
                         historyStore.merge(messages)
                         messages.forEach { (contactId, entries) ->
+                            entries.lastOrNull { it.autoPlayEmotionSound && it.emotionSound != null }?.let { message ->
+                                if (message.id > (queuedEmotionSoundIds[contactId] ?: Long.MIN_VALUE)) {
+                                    queuedEmotionSoundIds[contactId] = message.id
+                                    mutablePendingEmotionSounds.update { it + (contactId to message) }
+                                }
+                            }
                             entries.lastOrNull { it.autoPlayWink && it.wink != null && it.winkTransferError == null }?.let { message ->
                                 if (message.id > (queuedWinkIds[contactId] ?: Long.MIN_VALUE)) {
                                     queuedWinkIds[contactId] = message.id
@@ -846,6 +861,8 @@ class MessengerRepository(
                 mutableRequestAccount.value = null
                 mutablePendingNudgeShakes.value = emptySet()
                 mutablePendingWinks.value = emptyMap()
+                mutablePendingEmotionSounds.value = emptyMap()
+                queuedEmotionSoundIds.clear()
                 queuedWinkIds.clear()
             }
             mutableSignOutReason.value = null
@@ -1072,6 +1089,15 @@ class MessengerRepository(
     suspend fun sendInkNow(contactId: String, drawing: InkDrawing): Result<Unit> =
         client.sendInkMessage(contactId, drawing)
 
+    suspend fun sendEmotionSound(contactId: String, sound: org.aralozkaya.msngr.protocol.EmotionSound): Result<Unit> {
+        val result = client.sendStyledMessage(contactId, org.aralozkaya.msngr.protocol.MsnEmotionSound.message(sound), null,
+            textStyles.value[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle())
+        if (result.isSuccess) client.messages.value[contactId]?.lastOrNull { it.author == MessageAuthor.Me && it.emotionSound?.sound?.id == sound.id }?.let { message ->
+            mutablePendingEmotionSounds.update { it + (contactId to message) }
+        }
+        return result
+    }
+
     suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> =
         client.sendWink(contactId, wink, bytes)
 
@@ -1189,6 +1215,8 @@ class MessengerRepository(
             client.deleteContact(contactId, block)
             clearPendingNudgeShake(contactId)
             mutablePendingWinks.update { it - contactId }
+            mutablePendingEmotionSounds.update { it - contactId }
+            queuedEmotionSoundIds.remove(contactId)
             onConversationRead(contactId)
             Result.success(Unit)
         } catch (error: CancellationException) {
@@ -1227,6 +1255,8 @@ class MessengerRepository(
         historyMutationMutex.withLock {
             clearPendingNudgeShake(contactId)
             mutablePendingWinks.update { it - contactId }
+            mutablePendingEmotionSounds.update { it - contactId }
+            queuedEmotionSoundIds.remove(contactId)
             historyStore.clearContact(contactId)
             client.clearMessages(contactId)
         }
@@ -1237,6 +1267,8 @@ class MessengerRepository(
             historyMutationMutex.withLock {
                 mutablePendingNudgeShakes.value = emptySet()
                 mutablePendingWinks.value = emptyMap()
+                mutablePendingEmotionSounds.value = emptyMap()
+                queuedEmotionSoundIds.clear()
                 client.clearMessages()
                 historyStore.clearAll()
             }
@@ -1273,6 +1305,8 @@ class MessengerRepository(
 
     fun logout() {
         mutablePendingWinks.value = emptyMap()
+        mutablePendingEmotionSounds.value = emptyMap()
+        queuedEmotionSoundIds.clear()
         queuedWinkIds.clear()
         mutableRequestAccount.value = null
         mutablePendingNudgeShakes.value = emptySet()

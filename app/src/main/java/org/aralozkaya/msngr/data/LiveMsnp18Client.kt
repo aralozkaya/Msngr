@@ -758,7 +758,9 @@ internal class LiveMsnp18Client(
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(
             text.withoutUnicodeEmoji(),
         )
-        val normalized = encoded.trimMessengerPlusWhitespace().text
+        // Plus! pads custom sound announcements to a minimum length understood by native clients.
+        val normalized = if (org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(encoded) != null) encoded
+            else encoded.trimMessengerPlusWhitespace().text
         if (normalized.isEmpty()) return Result.success(Unit)
         val email = contactEmail(contactId)
         val message = ChatMessage(
@@ -1963,6 +1965,8 @@ internal class LiveMsnp18Client(
             nativeStyle = if (nudge || isInk) NativeTextStyle() else
                 NativeTextStyle.fromFormatHeader(envelope.headers["x-mms-im-format"]),
             inkDrawing = inkDrawing,
+            autoPlayEmotionSound = !mine && !nudge && !isInk &&
+                org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(String(envelope.body, StandardCharsets.UTF_8)) != null,
         )
         appendMessage(message)
         typingJobs.remove(id)?.cancel()
@@ -2861,6 +2865,7 @@ internal class LiveMsnp18Client(
                     contactId = contactId,
                     author = if (mine) MessageAuthor.Me else MessageAuthor.Contact,
                     text = event.text,
+                    autoPlayEmotionSound = !mine && org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(event.text) != null,
                     nativeStyle = event.style,
                     timestampMillis = System.currentTimeMillis(),
                 )

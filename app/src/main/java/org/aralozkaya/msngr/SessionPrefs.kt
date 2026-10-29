@@ -36,6 +36,7 @@ data class ServerOverrides(
     val activitiesServer: String = "",
     val mailServerEnabled: Boolean = false,
     val mailServer: String = "",
+    val emotionSoundServer: String = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
 ) {
     fun normalized(): ServerOverrides = copy(
         mainServer = mainServer.trim(),
@@ -47,6 +48,7 @@ data class ServerOverrides(
         socialServer = socialServer.trim(),
         activitiesServer = activitiesServer.trim(),
         mailServer = mailServer.trim(),
+        emotionSoundServer = emotionSoundServer.trim(),
     )
 
     fun hasRequiredServers(): Boolean =
@@ -63,7 +65,8 @@ data class ServerOverrides(
             (!value.storageServerEnabled || value.storageServer.isNotEmpty()) &&
             (!value.socialServerEnabled || value.socialServer.isNotEmpty()) &&
             (!value.activitiesServerEnabled || value.activitiesServer.isNotEmpty()) &&
-            (!value.mailServerEnabled || value.mailServer.isNotEmpty())
+            (!value.mailServerEnabled || value.mailServer.isNotEmpty()) &&
+            org.aralozkaya.msngr.protocol.MsnEmotionSound.server(value.emotionSoundServer) != null
     }
 
     fun toResolved(): ServerConfig {
@@ -92,6 +95,8 @@ data class ServerOverrides(
                 value.mainServer,
             ),
             mailServer = optional(value.mailServerEnabled, value.mailServer, value.mainServer),
+            emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.server(value.emotionSoundServer)
+                ?: org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
         )
     }
 
@@ -111,6 +116,7 @@ data class ServerConfig(
     val socialServer: String,
     val activitiesServer: String,
     val mailServer: String,
+    val emotionSoundServer: String = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
 )
 
 /** Each remembered account has its own encrypted credentials and service configuration. */
@@ -164,11 +170,14 @@ object ServerPresets {
     private val escargot = ServerOverrides(
         mainServer = "ds.escargot.nina.chat",
         configServer = "mconf.escargot.nina.chat",
+        emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
     )
 
     private val crossTalk = ServerOverrides(
         mainServer = "ms.msgrsvcs.ctsrv.gay",
         configServer = "conf.msgrsvcs.ctsrv.gay",
+        // Reroute does not replace Plus! URLs. Use the restored public sound library independently of MSNP.
+        emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
         authServerEnabled = true,
         authServer = "ctas.login.ugnet.gay",
         addressBookServerEnabled = true,
@@ -574,7 +583,8 @@ private object SessionRuntime {
 
 /** Binary codec avoids persisting a partly encrypted object graph or relying on reflection. */
 internal object StoredAccountCodec {
-    private const val VERSION = 4
+    private const val VERSION = 5
+    private const val AUTOMATIC_SIGN_IN_VERSION = 4
     private const val MOCK_SERVER_VERSION = 3
     private const val LEGACY_VERSION = 2
 
@@ -601,6 +611,7 @@ internal object StoredAccountCodec {
             output.writeBoolean(value.useMockServer)
             output.writeBoolean(value.automaticSignIn)
             output.writeUTF(value.loginPresence.name)
+            output.writeUTF(value.customServers.emotionSoundServer)
         }
         bytes.toByteArray()
     }
@@ -651,13 +662,16 @@ internal object StoredAccountCodec {
                 mailServer = mail.second,
             ),
             useMockServer = if (version >= MOCK_SERVER_VERSION) it.readBoolean() else false,
-            automaticSignIn = if (version >= VERSION) it.readBoolean() else false,
-            loginPresence = if (version >= VERSION) {
+            automaticSignIn = if (version >= AUTOMATIC_SIGN_IN_VERSION) it.readBoolean() else false,
+            loginPresence = if (version >= AUTOMATIC_SIGN_IN_VERSION) {
                 Presence.fromStorageValue(it.readUTF())
             } else {
                 Presence.Online
             },
-        )
+        ).let { account ->
+            if (version >= 5) account.copy(customServers = account.customServers.copy(emotionSoundServer = it.readUTF()))
+            else account
+        }
     }
 
     private fun DataOutputStream.writeOptional(enabled: Boolean, value: String) {

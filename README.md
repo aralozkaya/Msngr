@@ -35,6 +35,13 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   button to open the wink picker, hold a wink to
   preview it before sending, or get more from Escargot. Replay received winks or save new ones
   to your collection.
+- **Add an emotion sound.** Send Messenger Plus! [Emotion Sounds](docs/EMOTION_SOUNDS.md) from
+  the emoticon button's menu in private and group chats. Preview 17 built-ins and saved sounds
+  in **Local**, or browse and download the public catalog in **Online**. Search by name or sound
+  ID, filter by category, or fetch a random sound with an optional language filter. Preview random
+  downloads before choosing **Keep** or **Discard**. Sound messages retain their text styling;
+  tap one to replay it or save a received custom sound. Disable automatic playback in
+  **Settings → Messenger Plus!**. Your saved library is separate for each account and sound service.
 - **Bring the group along.** Chat in persistent Messenger groups (MSNP18 circles), see members
   and their roles, create groups, invite people, and join or decline invitations. Owners and
   administrators can invite members; non-owners can leave.
@@ -60,9 +67,11 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 
 ## Screenshots
 
-The original **October 18, 2026** gallery is joined by **15 new emulator captures from
-October 28, 2026**, covering the chat tools, appearance options, and settings missing from the
-earlier screenshots. The new captures use the debug app's **mock server and sample data**.
+The original **October 18, 2026** gallery and the **October 28** expansion are joined by
+**six new emulator captures from October 29, 2026**, showing Emotion Sounds and their settings.
+The custom-service screenshot is also refreshed to show its sound-service URL field.
+The new captures use the debug app's **mock Messenger account and sample conversations**.
+Online [sound listings](https://escargot.chat/sounds/) and downloads come from the public sound service.
 Select any preview to open its full-resolution image.
 
 ### Find your people
@@ -90,7 +99,7 @@ Select any preview to open its full-resolution image.
   </tr>
   <tr>
     <td align="center"><a href="docs/screenshots/sign-in.png"><img src="docs/screenshots/sign-in.png" width="240" alt="Sign-in form with remembered credentials, automatic sign-in, presence, and service selection"></a></td>
-    <td align="center"><a href="docs/screenshots/custom-service.png"><img src="docs/screenshots/custom-service.png" width="240" alt="Custom MSNP service hosts, ports, and optional service overrides"></a></td>
+    <td align="center"><a href="docs/screenshots/custom-service.png"><img src="docs/screenshots/custom-service.png" width="240" alt="Custom MSNP service dialog scrolled to optional companion endpoints, including the Emotion sounds service URL"></a></td>
     <td align="center"><a href="docs/screenshots/edit-profile.png"><img src="docs/screenshots/edit-profile.png" width="240" alt="Profile editor with display picture, name, and gradient personal message"></a></td>
   </tr>
 </table>
@@ -164,6 +173,42 @@ Control scene artwork in chats and its tint in dark mode independently.
 [Voice clips](docs/VOICE_CLIPS.md) are available in online one-to-one chats. Handwriting and
 [winks](docs/WINKS.md) also work in groups when the online members support them.
 
+### Add an emotion sound
+
+<table>
+  <tr>
+    <th width="33%">Local sound library</th>
+    <th width="33%">Online sounds</th>
+    <th width="33%">Random sound preview</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/emotion-sounds-local.png"><img src="docs/screenshots/emotion-sounds-local.png" width="240" alt="Emotion Sounds sheet with search above Local and Online tabs, built-in sounds, preview buttons, and category and random actions"></a></td>
+    <td align="center"><a href="docs/screenshots/emotion-sounds-online.png"><img src="docs/screenshots/emotion-sounds-online.png" width="240" alt="Online sound catalog with one-line names and narrow preview and download buttons"></a></td>
+    <td align="center"><a href="docs/screenshots/emotion-sounds-random.png"><img src="docs/screenshots/emotion-sounds-random.png" width="240" alt="Fetched random sound showing its category, language filter, preview, Try another, Keep, and Discard controls"></a></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <th width="33%">Choose a language</th>
+    <th width="33%">Replay & save</th>
+    <th width="33%">Autoplay preference</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/emotion-sounds-language.png"><img src="docs/screenshots/emotion-sounds-language.png" width="240" alt="Random sound language dropdown with Material 3 Expressive selection shapes and English selected"></a></td>
+    <td align="center"><a href="docs/screenshots/emotion-sounds-playback.png"><img src="docs/screenshots/emotion-sounds-playback.png" width="240" alt="Sound message playback sheet with Play and Add to saved sounds beneath a conversation containing styled sound text"></a></td>
+    <td align="center"><a href="docs/screenshots/messenger-plus-settings.png"><img src="docs/screenshots/messenger-plus-settings.png" width="240" alt="Messenger Plus! rendering settings and the Play emotion sounds automatically switch turned off"></a></td>
+  </tr>
+</table>
+
+Hold the emoticon button and choose **Emotion sounds** to open the keyboard-aware picker.
+Tap a sound's name to send it, or use its play button to preview. Long-press a shortened name
+to read it in full. Random downloads stay out of your library until you choose **Keep**.
+Sounds work in private and group conversations, including messages with Messenger Plus! styling.
+Explicit previews and replay remain available with autoplay off. Custom services can set their
+own **Emotion sounds service URL** in the [custom-service dialog](docs/screenshots/custom-service.png).
+See [Emotion Sounds](docs/EMOTION_SOUNDS.md) for the library, service presets, and protocol details.
+
 ### Bring the group along
 
 <table>
@@ -235,7 +280,7 @@ Msngr is a **client**: you sign in with an account from your selected community 
 | --- | --- |
 | **Escargot** | Built-in preset. The implementation supports private chats, offline messages, groups, invitations, and session management on Escargot. |
 | **CrossTalk** | Built-in endpoint preset. Feature availability depends on the service; the Escargot checks do not establish equivalent CrossTalk coverage. |
-| **Custom MSNP service** | Configure notification and switchboard ports, a configuration host, and optional companion-service endpoints. Requires compatible MSNP18 authentication and services. |
+| **Custom MSNP service** | Configure notification and switchboard ports, a configuration host, and optional companion-service endpoints, including the Emotion Sounds base URL. Requires compatible MSNP18 authentication and services. |
 | **Mock server** | Debug builds include a local simulation for exploring and testing the interface without a live service account. |
 
 **Android 7.0+ (API 24)** is supported by the app's minimum SDK setting. The project currently
@@ -489,6 +534,9 @@ mode. Credential encryption does not provide end-to-end chat encryption.
   retain their original timestamps, notify through the Messages channel, and are removed from the
   server only after durable local storage. Retries and reconnects deduplicate server message IDs.
   Offline nudges and typing are disabled. See [`docs/OFFLINE_MESSAGES.md`](docs/OFFLINE_MESSAGES.md).
+- Messenger Plus! Emotion Sounds travel as ordinary styled text in private and group chats.
+  Audio downloads use the selected sound-service URL, with a saved library and replay cache
+  scoped to each account and service. See [`docs/EMOTION_SOUNDS.md`](docs/EMOTION_SOUNDS.md).
 - Existing accepted MSNP18 groups (circles) appear in a separate Groups section. Group chats
   support text, typing, nudges, sender names, member details, separate saved histories, and Android
   message notifications with inline replies. See [`docs/GROUP_CHATS.md`](docs/GROUP_CHATS.md).
@@ -548,6 +596,7 @@ The endpoint presets and protocol behavior were checked against:
 | Documentation | What you will find |
 | --- | --- |
 | [Private offline messages](docs/OFFLINE_MESSAGES.md) | Queue retrieval, timestamps, deduplication, and delivery limits. |
+| [Emotion Sounds](docs/EMOTION_SOUNDS.md) | Built-ins, online browsing, random previews, styled messages, autoplay, and custom sound-service URLs. |
 | [Group chats](docs/GROUP_CHATS.md) · [Group creation](docs/GROUP_CREATION.md) | Circles, membership, invitations, roles, and interoperability checks. |
 | [Adding contacts](docs/ADDING_CONTACTS.md) · [Deleting contacts](docs/DELETING_CONTACTS.md) | Contact management and retained history. |
 | [Contact requests](docs/CONTACT_REQUESTS.md) · [Request messages](docs/REQUEST_MESSAGES.md) | Accept/decline flows, invitation text, and service limitations. |

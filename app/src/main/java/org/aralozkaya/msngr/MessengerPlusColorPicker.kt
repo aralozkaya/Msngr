@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,7 +91,7 @@ internal fun MessengerPlusCustomColorDialog(
                 )
                 Text("Brightness", style = MaterialTheme.typography.labelMedium)
                 Slider(
-                    value = brightness,
+                    state = rememberSliderState(brightness).apply { value = brightness },
                     onValueChange = {
                         brightness = it
                         colorInput = hsvColorToken(hue, saturation, it)

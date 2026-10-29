@@ -83,7 +83,7 @@ internal class RealtimeNotificationBridge(
                             contactName = contact?.displayName?.messengerPlusPlainText()
                                 ?: event.contactId.substringBefore('@'),
                             contactAvatarUri = contact?.avatarUri,
-                            messageText = message.text.messengerPlusPlainText(),
+                            messageText = (message.emotionSound?.displayText ?: message.text).messengerPlusPlainText(),
                             sentAtMillis = message.timestampMillis,
                             isGroup = contact?.isGroup == true,
                             senderName = (message.senderName ?: senderContact?.displayName)

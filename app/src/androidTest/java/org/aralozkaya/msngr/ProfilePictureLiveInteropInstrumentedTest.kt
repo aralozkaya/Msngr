@@ -84,7 +84,7 @@ class ProfilePictureLiveInteropInstrumentedTest {
             val bytes = context.readProfilePictureBytes(requireNotNull(animated.avatarUri))
             assertNotNull(GifDisplayPicture.parse(bytes))
             val destination = File(context.getExternalFilesDir(null), "native-original.gif")
-            assertTrue(context.saveContactPicture(animated.avatarUri!!, Uri.fromFile(destination)))
+            assertTrue(context.saveContactPicture(animated.avatarUri, Uri.fromFile(destination)))
             assertArrayEquals(bytes, destination.readBytes())
             phase.writeText("complete")
         } finally {

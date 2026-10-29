@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 data class MessengerPlusSettings(
     val enabled: Boolean = true,
     val hideControlCharacters: Boolean = true,
+    val playEmotionSounds: Boolean = true,
 ) {
     val shouldHideControlCharacters: Boolean get() = enabled || hideControlCharacters
 }
@@ -48,9 +49,15 @@ object MessengerPlusPrefs {
         }
     }
 
+    fun setPlayEmotionSounds(context: Context, enabled: Boolean) {
+        AccountPreferences.preferences(context, PREFS_NAME).edit { putBoolean("play_emotion_sounds", enabled) }
+        mutableSettings.value = read(context)
+    }
+
     private fun read(context: Context): MessengerPlusSettings = MessengerPlusSettings(
         enabled = AccountPreferences.preferences(context, PREFS_NAME)
             .getBoolean(KEY_ENABLED, true),
+        playEmotionSounds = AccountPreferences.preferences(context, PREFS_NAME).getBoolean("play_emotion_sounds", true),
         hideControlCharacters = AccountPreferences.preferences(context, PREFS_NAME)
             .getBoolean(KEY_HIDE_CONTROL_CHARACTERS, true),
     )

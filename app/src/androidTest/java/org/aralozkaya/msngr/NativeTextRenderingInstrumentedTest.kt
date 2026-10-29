@@ -234,7 +234,12 @@ internal fun renderTextGlyphs(result: TextLayoutResult): Bitmap {
 
 internal fun assertRenderedItalic(result: TextLayoutResult, weight: Int, label: String) {
     val input = result.layoutInput
-    val upright = TextMeasurer(input.fontFamilyResolver, input.density, input.layoutDirection).measure(
+    val upright = TextMeasurer(
+        defaultFontFamilyResolver = input.fontFamilyResolver,
+        defaultLocaleList = input.defaultLocaleList,
+        defaultDensity = input.density,
+        defaultLayoutDirection = input.layoutDirection,
+    ).measure(
         text = AnnotatedString(input.text.text),
         style = input.style.merge(nativeFontRendering(weight, false).spanStyle(weight, false)),
         constraints = input.constraints,
