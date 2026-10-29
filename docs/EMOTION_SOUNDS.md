@@ -5,8 +5,8 @@ the same keyboard-aware sheet as emoticons, including an expandable height and a
 search field that can coexist with the keyboard. It works in private and group conversations.
 It does not check recipients' client capabilities: other clients can display the text fallback.
 
-The connected **Local / Online** button group spans its own full-width row below the search field,
-with equally wide buttons, and chooses the sound source. **Local** contains
+Fixed **Local / Online** text tabs share a full-width row below the search field and choose
+the sound source. An underline identifies the active view. **Local** contains
 the 17 native built-in sounds and downloaded sounds saved to this
 account. Tap a name to send; the play button previews it. Sound names occupy one line, with
 ellipsis for overflow; long-press or hover over a name to show it in full in a tooltip. Rows use

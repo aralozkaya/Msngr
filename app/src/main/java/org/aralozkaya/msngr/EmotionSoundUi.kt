@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,11 +20,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -244,22 +242,23 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
         header = {
             CompactSearchField(search, "Search sounds", "Clear sound search",
                 Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
-            Row(
-                modifier = Modifier.fillMaxWidth().selectableGroup().testTag("emotion_sound_source"),
-                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            PrimaryTabRow(
+                selectedTabIndex = if (online) 1 else 0,
+                modifier = Modifier.fillMaxWidth().testTag("emotion_sound_source"),
+                containerColor = Color.Transparent,
             ) {
-                ToggleButton(
-                    checked = !online, onCheckedChange = { online = false; error = null },
-                    buttonSize = ToggleButtonSize.ExtraSmall,
-                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                    modifier = Modifier.weight(1f).testTag("emotion_sound_local").semantics { role = Role.RadioButton },
-                ) { Text("Local") }
-                ToggleButton(
-                    checked = online, onCheckedChange = { online = true; error = null },
-                    buttonSize = ToggleButtonSize.ExtraSmall,
-                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                    modifier = Modifier.weight(1f).testTag("emotion_sound_online").semantics { role = Role.RadioButton },
-                ) { Text("Online") }
+                Tab(
+                    selected = !online, onClick = { online = false; error = null },
+                    text = { Text("Local") },
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("emotion_sound_local"),
+                )
+                Tab(
+                    selected = online, onClick = { online = true; error = null },
+                    text = { Text("Online") },
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("emotion_sound_online"),
+                )
             }
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())

@@ -49,8 +49,8 @@ class EmotionSoundCatalogInstrumentedTest {
             Box(Modifier.fillMaxSize())
             EmotionSoundPicker(true, true, {}, onSend = { Result.success(Unit) }, catalogService = service)
         } } }
-        compose.onNodeWithTag("emotion_sound_local").assertIsOn()
-        compose.onNodeWithTag("emotion_sound_online").assertIsOff()
+        compose.onNodeWithTag("emotion_sound_local").assertIsSelected()
+        compose.onNodeWithTag("emotion_sound_online").assertIsNotSelected()
     }
 
     private fun online() = compose.onNodeWithTag("emotion_sound_online").performClick()
@@ -73,14 +73,14 @@ class EmotionSoundCatalogInstrumentedTest {
         }
     }
 
-    @Test fun pendingLoadShowsAnIndicatorThenResultsAndConnectedButtonsKeepOneSourceSelected() {
+    @Test fun pendingLoadShowsAnIndicatorThenResultsAndTabsKeepOneSourceSelected() {
         val release = CountDownLatch(1)
         try {
             showPicker { check(release.await(15, TimeUnit.SECONDS)); catalog() }
             online()
             compose.waitUntil(5_000) { calls.get() == 1 }
-            compose.onNodeWithTag("emotion_sound_online").assertIsOn()
-            compose.onNodeWithTag("emotion_sound_local").assertIsOff()
+            compose.onNodeWithTag("emotion_sound_online").assertIsSelected()
+            compose.onNodeWithTag("emotion_sound_local").assertIsNotSelected()
             assertLoading()
             screenshot("emotion-online-loading.png")
             release.countDown()
@@ -89,9 +89,9 @@ class EmotionSoundCatalogInstrumentedTest {
             compose.onNodeWithContentDescription("Download $name").assertIsDisplayed().assertIsEnabled()
             compose.onNodeWithContentDescription("Preview $name").assertIsDisplayed().assertIsEnabled()
             compose.onNodeWithTag("emotion_sound_empty").assertDoesNotExist()
-            screenshot("emotion-online-connected.png")
-            online() // The selected radio-style button cannot deselect itself.
-            compose.onNodeWithTag("emotion_sound_online").assertIsOn()
+            screenshot("emotion-online-tabs.png")
+            online() // Selecting the active tab again keeps that view selected.
+            compose.onNodeWithTag("emotion_sound_online").assertIsSelected()
             local(); online()
             compose.onNodeWithText(name).assertIsDisplayed()
             assertEquals(1, calls.get())
@@ -151,7 +151,7 @@ class EmotionSoundCatalogInstrumentedTest {
             compose.waitUntil(5_000) { calls.get() == 1 }
             assertLoading()
             local()
-            compose.onNodeWithTag("emotion_sound_local").assertIsOn()
+            compose.onNodeWithTag("emotion_sound_local").assertIsSelected()
             compose.onNodeWithText("Hello!").assertIsDisplayed()
             compose.onNodeWithTag("emotion_sound_online_loading").assertDoesNotExist()
             online(); awaitLoad()
