@@ -138,7 +138,7 @@ class VoiceClipInstrumentedTest {
         compose.onNodeWithContentDescription("Send voice clip").performClick()
         compose.waitUntil(5_000) { sent != null }
         assertNotNull(MsnVoiceClip.parse(sent!!.bytes()))
-        assertTrue(sent!!.durationMillis in 1..15_000)
+        assertTrue(sent.durationMillis in 1..15_000)
         compose.onNodeWithText("Message editor").assertIsDisplayed()
     }
 

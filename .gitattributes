@@ -15,3 +15,5 @@ app/src/main/assets/licenses/*.txt text eol=lf -whitespace linguist-generated=tr
 app/src/main/assets/licenses/*.html text eol=lf -whitespace linguist-generated=true
 app/src/main/assets/licenses/*.zip -text
 third_party/library-audit.json linguist-generated=true
+# MSNP frame fixtures retain CRLF and the native custom-sound padding byte-for-byte.
+app/src/test/resources/emotion-sounds/wlm-*.txt -text -whitespace

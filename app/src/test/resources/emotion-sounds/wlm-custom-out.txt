@@ -1,0 +1,6 @@
+MSG 62 N 213
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-MMS-IM-Format: FN=Segoe%20UI; EF=; CO=0; CS=0; PF=22
+
+[Messenger Plus! Sound] - Data{3224D7DF910D} - CHEN                                         

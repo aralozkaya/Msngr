@@ -48,7 +48,7 @@ internal class InMemoryConversationHistoryStore : ConversationHistoryStore {
     override val messages = mutableMessages.asStateFlow()
     override val pageStates = mutablePageStates.asStateFlow()
 
-    override fun selectAccount(accountId: String) = synchronized(lock) {
+    override fun selectAccount(accountId: String): Unit = synchronized(lock) {
         val normalizedAccount = accountId.normalizedAccountId()
         if (selectedAccount == normalizedAccount) return
         selectedAccount = normalizedAccount
@@ -78,7 +78,7 @@ internal class InMemoryConversationHistoryStore : ConversationHistoryStore {
         }
     }
 
-    override fun clearContact(contactId: String) = synchronized(lock) {
+    override fun clearContact(contactId: String): Unit = synchronized(lock) {
         val account = selectedAccount ?: return
         accounts[account] = accounts[account].orEmpty() - contactId
         mutableMessages.value = mutableMessages.value - contactId
@@ -137,7 +137,7 @@ internal class FileConversationHistoryStore(
     override val pageStates: StateFlow<Map<String, ConversationHistoryPageState>> =
         mutablePageStates.asStateFlow()
 
-    override fun selectAccount(accountId: String) = synchronized(lock) {
+    override fun selectAccount(accountId: String): Unit = synchronized(lock) {
         prepareStorage()
         val normalizedAccount = accountId.normalizedAccountId()
         if (selectedAccount == normalizedAccount) return
@@ -147,14 +147,14 @@ internal class FileConversationHistoryStore(
         mutablePageStates.value = emptyMap()
     }
 
-    override fun loadLatest(contactId: String) = synchronized(lock) {
+    override fun loadLatest(contactId: String): Unit = synchronized(lock) {
         if (selectedAccount == null) return
         val conversation = loaded[contactId] ?: readLatestConversation(contactId)
         loaded[contactId] = conversation
         publish(contactId, conversation, isInitialPageLoaded = true)
     }
 
-    override fun loadOlder(contactId: String) = synchronized(lock) {
+    override fun loadOlder(contactId: String): Unit = synchronized(lock) {
         val current = loaded[contactId] ?: return
         val olderIndex = chunkIndices(contactId)
             .lastOrNull { it < current.oldestChunkIndex }
@@ -248,7 +248,7 @@ internal class FileConversationHistoryStore(
         true
     }
 
-    override fun clearContact(contactId: String) = synchronized(lock) {
+    override fun clearContact(contactId: String): Unit = synchronized(lock) {
         if (selectedAccount == null) return
         val contactDirectory = contactDirectory(contactId)
         check(!contactDirectory.exists() || contactDirectory.deleteRecursively()) {

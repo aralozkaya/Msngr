@@ -65,6 +65,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.EmojiEmotions
@@ -272,6 +273,21 @@ private fun ChatRoute(
         }
     }
 
+    val soundPlayer = rememberEmotionSoundController()
+    val plusSettings by remember(context) { MessengerPlusPrefs.state(context) }.collectAsState()
+    LaunchedEffect(contactId, lifecycleOwner, soundPlayer, plusSettings.playEmotionSounds) {
+        if (!plusSettings.playEmotionSounds) soundPlayer.stop()
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            repository.pendingEmotionSounds.collect { pending ->
+                pending[contactId]?.let { message ->
+                    repository.consumePendingEmotionSound(contactId, message.id)
+                    if (plusSettings.playEmotionSounds && System.currentTimeMillis() - message.timestampMillis in 0..60_000)
+                        message.emotionSound?.sound?.let(soundPlayer::play)
+                }
+            }
+        }
+    }
+
     var playingWink by remember(contactId) { mutableStateOf<ChatMessage?>(null) }
     LaunchedEffect(contactId, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -288,6 +304,7 @@ private fun ChatRoute(
     } }
 
     ChatScreen(
+        onSendEmotionSound = { repository.sendEmotionSound(contactId, it) },
         onSendWink = { wink, bytes -> repository.sendWink(contactId, wink, bytes) },
         otherUnreadCount = otherUnreadCount(contacts, contactId),
         nudgeCooldownMillis = nudgeCooldownMillis,
@@ -334,6 +351,7 @@ internal fun ChatScreen(
     onSendTyping: () -> Unit,
     onSendNudge: () -> Unit,
     onSendInk: (InkDrawing) -> Unit = {},
+    onSendEmotionSound: suspend (org.aralozkaya.msngr.protocol.EmotionSound) -> Result<Unit> = { Result.failure(UnsupportedOperationException("Emotion sounds are unavailable.")) },
     onSendWink: suspend (WinkReference, ByteArray) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException("Winks are unavailable.")) },
     onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
         Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
@@ -525,6 +543,8 @@ internal fun ChatScreen(
                 winksMenuEnabled = groupFeatures?.winks != false,
                 winksEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline == true &&
                     groupFeatures?.winks != false,
+                onSendEmotionSound = onSendEmotionSound,
+                emotionSoundsEnabled = isConversationAvailable && contact?.isBlocked != true,
                 onSendWink = onSendWink,
                 nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
@@ -689,10 +709,12 @@ internal fun ChatMessageList(
 private fun MessageComposer(
     enabled: Boolean = true,
     handwritingEnabled: Boolean = enabled,
+    emotionSoundsEnabled: Boolean = enabled,
     winksMenuEnabled: Boolean = true,
     winksEnabled: Boolean = enabled,
     voiceClipsVisible: Boolean = true,
     voiceClipsEnabled: Boolean = enabled,
+    onSendEmotionSound: suspend (org.aralozkaya.msngr.protocol.EmotionSound) -> Result<Unit> = { Result.failure(UnsupportedOperationException("Emotion sounds are unavailable.")) },
     onSendWink: suspend (WinkReference, ByteArray) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException("Winks are unavailable.")) },
     onSendVoiceClip: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = {
         Result.failure(UnsupportedOperationException("Voice clips are unavailable."))
@@ -714,6 +736,7 @@ private fun MessageComposer(
     val editorController = remember { MessengerPlusEditorController() }
     val emoticonSheet = rememberEmoticonSheetState()
     val colorSheet = rememberMessengerPlusColorSheetState()
+    var showEmotionSounds by remember { mutableStateOf(false) }
     var showWinks by remember { mutableStateOf(false) }
     var showTextStyle by remember { mutableStateOf(false) }
     var handwritingMode by rememberSaveable { mutableStateOf(false) }
@@ -733,6 +756,8 @@ private fun MessageComposer(
         canDelete = draft.isNotEmpty(),
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
+    EmotionSoundPicker(showEmotionSounds, enabled && emotionSoundsEnabled, { showEmotionSounds = false }, onSendEmotionSound)
+    LaunchedEffect(enabled) { if (!enabled) showEmotionSounds = false }
     WinkPicker(showWinks, winksEnabled, { showWinks = false }, onSendWink)
     LaunchedEffect(winksMenuEnabled) { if (!winksMenuEnabled) showWinks = false }
     MessengerPlusColorSheet(colorSheet)
@@ -844,6 +869,11 @@ private fun MessageComposer(
                                     enabled = enabled,
                                     handwritingEnabled = handwritingEnabled,
                                     winksEnabled = winksMenuEnabled,
+                                    soundsEnabled = emotionSoundsEnabled,
+                                    onSelectEmotionSounds = {
+                                        colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
+                                        handwritingMode = false; editorController.hideKeyboard(); showEmotionSounds = true
+                                    },
                                     onSelectWinks = {
                                         colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
                                         handwritingMode = false; editorController.hideKeyboard(); showWinks = true
@@ -929,6 +959,7 @@ private enum class ComposerEmoticonMenuOption {
     Emoticons,
     Handwriting,
     Winks,
+    EmotionSounds,
 }
 
 @Composable
@@ -936,6 +967,8 @@ private fun EmoticonAndHandwritingMenuButton(
     enabled: Boolean,
     handwritingEnabled: Boolean,
     winksEnabled: Boolean,
+    soundsEnabled: Boolean,
+    onSelectEmotionSounds: () -> Unit,
     onSelectWinks: () -> Unit,
     emoticonSheetVisible: Boolean,
     onToggleEmoticons: () -> Unit,
@@ -952,12 +985,14 @@ private fun EmoticonAndHandwritingMenuButton(
     var emoticonsItemBounds by remember { mutableStateOf<Rect?>(null) }
     var handwritingItemBounds by remember { mutableStateOf<Rect?>(null) }
     var winksItemBounds by remember { mutableStateOf<Rect?>(null) }
+    var soundsItemBounds by remember { mutableStateOf<Rect?>(null) }
     var lastDragScreenOffset by remember { mutableStateOf<Offset?>(null) }
     var hasDraggedAfterLongPress by remember { mutableStateOf(false) }
     val groupInteractionSource = remember { MutableInteractionSource() }
     val emoticonsItemInteractionSource = remember { MutableInteractionSource() }
     val handwritingItemInteractionSource = remember { MutableInteractionSource() }
     val winksItemInteractionSource = remember { MutableInteractionSource() }
+    val soundsItemInteractionSource = remember { MutableInteractionSource() }
 
     LaunchedEffect(draggedOption == ComposerEmoticonMenuOption.Emoticons) {
         if (draggedOption == ComposerEmoticonMenuOption.Emoticons) {
@@ -979,6 +1014,7 @@ private fun EmoticonAndHandwritingMenuButton(
             val emoBounds = emoticonsItemBounds
             val hwBounds = handwritingItemBounds
             val winkBounds = winksItemBounds
+            val soundBounds = soundsItemBounds
             when {
                 emoBounds != null &&
                     screenPos.y in emoBounds.top..emoBounds.bottom &&
@@ -991,6 +1027,8 @@ private fun EmoticonAndHandwritingMenuButton(
                     ComposerEmoticonMenuOption.Handwriting
                 winksEnabled && winkBounds != null && screenPos.y in winkBounds.top..winkBounds.bottom &&
                     screenPos.x in (winkBounds.left - horizontalHitPadPx)..(winkBounds.right + horizontalHitPadPx) -> ComposerEmoticonMenuOption.Winks
+                soundsEnabled && soundBounds != null && screenPos.y in soundBounds.top..soundBounds.bottom &&
+                    screenPos.x in (soundBounds.left - horizontalHitPadPx)..(soundBounds.right + horizontalHitPadPx) -> ComposerEmoticonMenuOption.EmotionSounds
                 else -> null
             }
         }
@@ -999,7 +1037,7 @@ private fun EmoticonAndHandwritingMenuButton(
     Box(
         modifier = Modifier
             .onGloballyPositioned { anchorCoordinates = it }
-            .pointerInput(enabled, handwritingEnabled, winksEnabled) {
+            .pointerInput(enabled, handwritingEnabled, winksEnabled, soundsEnabled) {
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -1077,6 +1115,7 @@ private fun EmoticonAndHandwritingMenuButton(
                                 onSelectHandwriting()
                             }
                             ComposerEmoticonMenuOption.Winks -> { menuExpanded = false; onSelectWinks() }
+                            ComposerEmoticonMenuOption.EmotionSounds -> { menuExpanded = false; onSelectEmotionSounds() }
                             null -> {
                                 // Finger released without dragging to an option: keep menu open.
                             }
@@ -1173,6 +1212,7 @@ private fun EmoticonAndHandwritingMenuButton(
                 val isEmoticonsHovered = draggedOption == ComposerEmoticonMenuOption.Emoticons
                 val isHandwritingHovered = draggedOption == ComposerEmoticonMenuOption.Handwriting
                 val isWinksHovered = draggedOption == ComposerEmoticonMenuOption.Winks
+                val isSoundsHovered = draggedOption == ComposerEmoticonMenuOption.EmotionSounds
                 DropdownMenuItem(
                     text = { Text("Emoticons") },
                     leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
@@ -1259,7 +1299,7 @@ private fun EmoticonAndHandwritingMenuButton(
                 DropdownMenuItem(
                     text = { Text("Winks") },
                     leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                    shape = MenuDefaults.trailingItemShape,
+                    shape = MenuDefaults.middleItemShape,
                     enabled = winksEnabled,
                     interactionSource = winksItemInteractionSource,
                     colors = if (isWinksHovered) {
@@ -1277,7 +1317,7 @@ private fun EmoticonAndHandwritingMenuButton(
                             } else {
                                 Color.Transparent
                             },
-                            shape = MenuDefaults.trailingItemShape,
+                            shape = MenuDefaults.middleItemShape,
                         )
                         .onGloballyPositioned { coords ->
                             if (coords.isAttached) {
@@ -1296,6 +1336,48 @@ private fun EmoticonAndHandwritingMenuButton(
                         menuExpanded = false
                         draggedOption = null
                         onSelectWinks()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Emotion sounds") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null) },
+                    shape = MenuDefaults.trailingItemShape,
+                    enabled = soundsEnabled,
+                    interactionSource = soundsItemInteractionSource,
+                    colors = if (isSoundsHovered) {
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            leadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        MenuDefaults.itemColors()
+                    },
+                    modifier = Modifier
+                        .background(
+                            color = if (isSoundsHovered) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                Color.Transparent
+                            },
+                            shape = MenuDefaults.trailingItemShape,
+                        )
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                val topLeft = coords.localToScreen(Offset.Zero)
+                                soundsItemBounds = Rect(
+                                    topLeft,
+                                    Size(coords.size.width.toFloat(), coords.size.height.toFloat()),
+                                )
+                                if (menuExpanded && hasDraggedAfterLongPress) {
+                                    draggedOption = resolveOptionAtScreenOffset(lastDragScreenOffset)
+                                }
+                            }
+                        }
+                        .testTag("emotion_sound_menu_item"),
+                    onClick = {
+                        menuExpanded = false
+                        draggedOption = null
+                        onSelectEmotionSounds()
                     },
                 )
             }
@@ -1490,6 +1572,8 @@ internal fun MessageBubble(
 ) {
     var showDeliveryError by rememberSaveable(message.id) { mutableStateOf(false) }
     var showWinkOptions by rememberSaveable(message.id) { mutableStateOf(false) }
+    var showSoundOptions by rememberSaveable(message.id) { mutableStateOf(false) }
+    val emotionSound = message.emotionSound
     val deliveryError = message.deliveryError
     val winkTransferFailed = message.wink != null && !message.isWinkPending && message.winkTransferError != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -1497,7 +1581,7 @@ internal fun MessageBubble(
     val haptic = LocalHapticFeedback.current
     val onCopy = remember(context, haptic, message.text) {
         {
-            copyChatMessage(context, message.text)
+            copyChatMessage(context, emotionSound?.displayText ?: message.text)
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
@@ -1569,12 +1653,15 @@ internal fun MessageBubble(
                     )
                 } else {
                     MsnEmoticonText(
-                        text = message.text,
+                        text = emotionSound?.displayText ?: message.text,
+                        modifier = if (emotionSound != null) Modifier.testTag("emotion_sound_message_${message.id}")
+                            .clickable(onClickLabel = "Show emotion sound options", role = androidx.compose.ui.semantics.Role.Button) { showSoundOptions = true }
+                            else Modifier,
                         nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
                             else message.nativeStyle.copy(size = textSize),
                         useOriginalEmoticons = useOriginalEmoticons,
                         renderedShortcutRanges = message.renderedEmoticonRanges,
-                        linkify = true,
+                        linkify = emotionSound == null,
                         style = if (message.isNudge) {
                             MaterialTheme.typography.titleMedium
                         } else MaterialTheme.typography.bodyLarge,
@@ -1621,6 +1708,7 @@ internal fun MessageBubble(
             }
         }
     }
+    if (showSoundOptions && emotionSound != null) EmotionSoundMessageSheet(message) { showSoundOptions = false }
     if (showWinkOptions && message.wink != null) {
         WinkMessageSheet(message, onDismiss = { showWinkOptions = false }, onRetry = onRetry)
     }

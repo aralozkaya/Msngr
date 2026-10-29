@@ -23,6 +23,7 @@ import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
 import java.io.File
 
 class MsngrApplication : Application() {
+    internal val emotionSoundStore by lazy { org.aralozkaya.msngr.data.EmotionSoundStore(File(noBackupFilesDir, "emotion_sounds")) }
     internal val winkStore by lazy {
         org.aralozkaya.msngr.data.WinkStore(File(noBackupFilesDir, "winks")) {
             val catalog = org.json.JSONArray(assets.open("winks/catalog.json").bufferedReader().use { it.readText() })

@@ -174,7 +174,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         if (muted || readyDuration == null) player?.mute(true)
         onDispose {
             if (acquired) {
-                if (android.os.Build.VERSION.SDK_INT >= 26 && request != null) audio.abandonAudioFocusRequest(request!!)
+                if (android.os.Build.VERSION.SDK_INT >= 26 && request != null) audio.abandonAudioFocusRequest(request)
                 else { @Suppress("DEPRECATION") audio.abandonAudioFocus(listener) }
             }
         }
@@ -184,7 +184,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         DisposableEffect(window) {
             val previousStream = window?.volumeControlStream
             window?.volumeControlStream = AudioManager.STREAM_MUSIC
-            onDispose { if (previousStream != null) window?.volumeControlStream = previousStream }
+            onDispose { if (previousStream != null) window.volumeControlStream = previousStream }
         }
         Box(Modifier.fillMaxSize().clickable { onDismiss() }, contentAlignment = Alignment.Center) {
             val image = remember(wink) { winkThumbnail(wink?.thumbnail)?.asImageBitmap() }
