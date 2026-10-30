@@ -42,7 +42,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -461,8 +461,8 @@ internal fun VoiceClipComposer(
                                 recording && locked -> VoiceActionIcon.Stop
                                 else -> VoiceActionIcon.Microphone
                             }, animationSpec = motion.fastEffectsSpec(), label = "voiceActionIcon") { icon ->
-                                if (icon == VoiceActionIcon.Busy) CircularProgressIndicator(Modifier.size(22.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                if (icon == VoiceActionIcon.Busy) CircularWavyProgressIndicator(Modifier.size(22.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary)
                                 else Icon(when (icon) {
                                     VoiceActionIcon.Send -> Icons.AutoMirrored.Filled.Send
                                     VoiceActionIcon.Stop -> Icons.Default.Stop

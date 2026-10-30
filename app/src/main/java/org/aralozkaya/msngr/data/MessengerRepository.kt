@@ -121,9 +121,10 @@ data class ChatMessage(
     val winkTransferError: String? = null,
     val autoPlayWink: Boolean = false,
     val autoPlayEmotionSound: Boolean = false,
+    val fileTransfer: FileTransfer? = null,
 ) {
     val emotionSound: org.aralozkaya.msngr.protocol.EmotionSoundMessage?
-        get() = if (author != MessageAuthor.System && !isInk && !isVoiceClip && wink == null) org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(text) else null
+        get() = if (author != MessageAuthor.System && !isInk && !isVoiceClip && wink == null && fileTransfer == null) org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(text) else null
     val isInk: Boolean get() = inkDrawing != null
     val isVoiceClip: Boolean get() = voiceClip != null || isVoiceClipPending || voiceClipTransferError != null
 }
@@ -155,6 +156,7 @@ private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyL
 private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList()).asStateFlow()
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
 private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow()
+private val emptyPhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap()).asStateFlow()
 private val emptyNudgeCooldowns = MutableStateFlow<Map<String, Long>>(emptyMap()).asStateFlow()
 
 interface MsnpClient {
@@ -208,6 +210,18 @@ interface MsnpClient {
         Result.failure(UnsupportedOperationException("Message retry is not supported."))
     suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> =
         Result.failure(UnsupportedOperationException("Handwriting messages are not supported."))
+    val photoShares: StateFlow<Map<String, PhotoShare>> get() = emptyPhotoShares
+    suspend fun requestPhotoOriginal(contactId: String, shareId: String, photoId: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("File transfers are unavailable."))
+    suspend fun acceptFile(contactId: String, id: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("File transfers are unavailable."))
+    suspend fun cancelFile(contactId: String, id: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("File transfers are unavailable."))
     suspend fun sendVoiceClip(contactId: String, clip: org.aralozkaya.msngr.protocol.VoiceClip): Result<Unit> =
         Result.failure(UnsupportedOperationException("Voice clips are not supported."))
     suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> =
@@ -1097,6 +1111,17 @@ class MessengerRepository(
         }
         return result
     }
+
+    val photoShares: StateFlow<Map<String, PhotoShare>> get() = client.photoShares
+    suspend fun requestPhotoOriginal(contactId: String, shareId: String, photoId: String): Result<Unit> = client.requestPhotoOriginal(contactId, shareId, photoId)
+    suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = client.sharePhotos(contactId, photos)
+    suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = client.acceptPhotos(contactId, id)
+    suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = client.stopPhotos(contactId, id)
+    suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = client.selectPhoto(contactId, id, photoId)
+
+    suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> = client.sendFile(contactId, file, name)
+    suspend fun acceptFile(contactId: String, id: String): Result<Unit> = client.acceptFile(contactId, id)
+    suspend fun cancelFile(contactId: String, id: String): Result<Unit> = client.cancelFile(contactId, id)
 
     suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> =
         client.sendWink(contactId, wink, bytes)

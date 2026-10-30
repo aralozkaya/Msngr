@@ -3,6 +3,8 @@
 
 package org.aralozkaya.msngr.pages
 
+import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
+import androidx.compose.material3.OutlinedButton
 import android.content.ClipData
 import android.content.Intent
 import android.os.Build
@@ -215,7 +217,7 @@ fun UpdateSettingsScreen(
                     if (state.downloading) {
                         LinearWavyProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth())
                         Text(stringResource(R.string.update_downloading, (state.downloadProgress * 100).toInt()))
-                        TextButton(onClick = { pendingAction = null; pendingVersion = null; manager.cancelDownload() }) {
+                        DestructiveOutlinedButton(onClick = { pendingAction = null; pendingVersion = null; manager.cancelDownload() }) {
                             Text(stringResource(android.R.string.cancel))
                         }
                     } else {
@@ -232,7 +234,7 @@ fun UpdateSettingsScreen(
                         shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("skip-update")) {
                         Text(stringResource(if (settings.skippedTag == release.version.tag) R.string.update_unskip else R.string.update_skip_version))
                     }
-                    TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri())) }) {
+                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri())) }) {
                         Text(stringResource(R.string.update_view_release))
                     }
                 }
@@ -262,7 +264,7 @@ fun UpdateSettingsScreen(
         }
         item("schedule-note") { Text(stringResource(R.string.update_schedule_note), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall) }
         item("releases-link") {
-            TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, RELEASES_PAGE.toUri())) }) {
+            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, RELEASES_PAGE.toUri())) }) {
                 Text(stringResource(R.string.update_all_releases))
             }
         }
@@ -295,18 +297,18 @@ fun UpdateSettingsScreen(
         title = { Text(stringResource(R.string.update_download_choice_title)) },
         text = { Text(stringResource(R.string.update_download_choice_description)) },
         confirmButton = {
-            Column {
-                listOf("install" to R.string.update_install, "save" to R.string.update_save_apk).forEach { (action, label) ->
-                    TextButton(onClick = {
-                        downloadDialog = false
-                        if (state.downloadedVersion == release?.version?.code) performFileAction(action)
-                        else {
-                            pendingVersion = release?.version?.code
-                            manager.download()
-                            pendingAction = action
-                        }
-                    }) { Text(stringResource(label)) }
+            val downloadAction: (String) -> Unit = { action ->
+                downloadDialog = false
+                if (state.downloadedVersion == release?.version?.code) performFileAction(action)
+                else {
+                    pendingVersion = release?.version?.code
+                    manager.download()
+                    pendingAction = action
                 }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { downloadAction("install") }) { Text(stringResource(R.string.update_install)) }
+                OutlinedButton(onClick = { downloadAction("save") }) { Text(stringResource(R.string.update_save_apk)) }
             }
         }, dismissButton = { TextButton(onClick = { downloadDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
 }

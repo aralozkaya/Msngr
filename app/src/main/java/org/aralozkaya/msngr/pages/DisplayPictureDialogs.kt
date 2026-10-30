@@ -5,6 +5,8 @@
 
 package org.aralozkaya.msngr.pages
 
+import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -12,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -43,7 +46,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -118,13 +121,12 @@ internal fun DisplayPictureOptionsDialog(
                     }
                 }
                 if (pictureUri != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onViewPicture) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onViewPicture) {
                             Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("View", Modifier.padding(start = 8.dp))
                         }
-                        TextButton(onClick = onRemovePicture,
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                        DestructiveOutlinedButton(onClick = onRemovePicture) {
                             Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Remove", Modifier.padding(start = 8.dp))
                         }
@@ -208,9 +210,9 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                     when {
                         error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(requireNotNull(error))
-                            TextButton(onClick = { retry++ }) { Text("Try again") }
+                            OutlinedButton(onClick = { retry++ }) { Text("Try again") }
                         }
-                        pictures == null -> CircularProgressIndicator()
+                        pictures == null -> CircularWavyProgressIndicator()
                         else -> LazyVerticalGrid(
                             columns = GridCells.Adaptive(88.dp),
                             contentPadding = PaddingValues(24.dp, 12.dp),
@@ -280,7 +282,7 @@ private fun DefaultPictureImage(picture: DefaultDisplayPicture, modifier: Modifi
     val image = rememberAvatarImage(picture.uri)
     Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
         image.painter?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-            ?: if (image.isLoading) CircularProgressIndicator(Modifier.size(24.dp)) else
+            ?: if (image.isLoading) CircularWavyProgressIndicator(Modifier.size(24.dp)) else
                 Icon(Icons.Default.PhotoSizeSelectActual, contentDescription = "Picture unavailable")
     }
 }

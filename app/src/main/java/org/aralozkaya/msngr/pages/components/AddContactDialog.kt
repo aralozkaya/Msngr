@@ -3,6 +3,7 @@
 
 package org.aralozkaya.msngr.pages.components
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -150,7 +151,7 @@ internal fun AddContactDialog(
                             }
                         },
                         actions = {
-                            TextButton(onClick = ::submit, enabled = submitting || (!busy && validEmail),
+                            Button(onClick = ::submit, enabled = submitting || (!busy && validEmail),
                                 modifier = Modifier.testTag("add-contact-submit")) {
                                 LoadingButtonContent(
                                     loading = submitting,

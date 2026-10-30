@@ -19,6 +19,13 @@ internal class MsnpP2pSession(
     private val onVoiceClip: (MsnDisplayPicture, ByteArray) -> Unit = { _, _ -> },
     private val localWink: (String) -> LocalDisplayPicture? = { null },
     private val onWink: (MsnDisplayPicture, ByteArray) -> Unit = { _, _ -> },
+    private val fileDirectory: (() -> java.io.File)? = null,
+    private val onFileTransfer: (FileTransfer) -> Unit = {},
+    private val onPhotoShare: (PhotoShare) -> Unit = {},
+    private val localPhoto: (String) -> LocalDisplayPicture? = { null },
+    private val publishPhoto: (LocalDisplayPicture) -> Unit = {},
+    private val localOriginal: (String) -> OriginalPhoto? = { null },
+    private val publishOriginal: (String, OriginalPhoto) -> Unit = { _, _ -> },
 ) {
     private val v2 = remoteEndpointId?.takeIf(String::isNotBlank)?.let {
         MsnpP2pV2Session(
@@ -32,6 +39,7 @@ internal class MsnpP2pSession(
             localVoiceClip = localVoiceClip,
             onVoiceClip = onVoiceClip,
             localWink = localWink, onWink = onWink,
+            fileDirectory = fileDirectory, onFileTransfer = onFileTransfer, onPhotoShare = onPhotoShare, localPhoto = localPhoto, publishPhoto = publishPhoto, localOriginal = localOriginal, publishOriginal = publishOriginal,
         )
     }
     val destination: String get() = v2?.destination ?: remoteEmail
@@ -42,6 +50,31 @@ internal class MsnpP2pSession(
     private val ids = AtomicInteger(1_000)
     private val incoming = ConcurrentHashMap<Pair<Int, Int>, IncomingP2pMessage>()
     private val pendingCalls = ConcurrentHashMap<Int, PendingDisplayPicture>()
+
+    private val photoApplicationLazy = lazy {
+        MsnpPhotoSession(localEmail, remoteEmail, fileDirectory, onPhotoShare,
+            sendControl = { sendMessage(0, P2P_NO_FLAG, 0, it) },
+            sendData = { session, bytes -> sendMessage(session.toInt(), P2P_NO_FLAG, 35, bytes) }, requestObject = { requestDisplayPicture(it) }, publishObject = publishPhoto, publishOriginal = publishOriginal)
+    }
+    private val photos get() = photoApplicationLazy.value
+    suspend fun startPhotos(items: List<PhotoToShare>): String = v2?.startPhotos(items) ?: photos.start(items)
+    fun hasPhotoShare(id: String): Boolean = v2?.hasPhotoShare(id) == true || (photoApplicationLazy.isInitialized() && photos.owns(id))
+    suspend fun acceptPhotos(id: String) { if (v2?.hasPhotoShare(id) == true) v2.acceptPhotos(id) else { check(photos.owns(id)); photos.accept() } }
+    suspend fun stopPhotos(id: String) { if (v2?.hasPhotoShare(id) == true) v2.stopPhotos(id) else if (photos.owns(id)) photos.stop() }
+    suspend fun selectPhoto(id: String, photoId: String) { if (v2?.hasPhotoShare(id) == true) v2.selectPhoto(id, photoId) else if (photos.owns(id)) photos.select(photoId) }
+
+    private val fileApplicationLazy = lazy {
+        MsnpFileSession(localEmail, remoteEmail, fileDirectory, onFileTransfer,
+            sendControl = { sendMessage(0, P2P_NO_FLAG, 0, it) }, sendFile = ::sendFileData, originalPhoto = { id ->
+                (if (photoApplicationLazy.isInitialized()) photos.localOriginal(id) else null) ?: localOriginal(id) })
+    }
+    private val files get() = fileApplicationLazy.value
+    suspend fun requestPhotoOriginal(photo: SharedPhoto): String = v2?.requestPhotoOriginal(photo) ?: files.requestOriginal(photo)
+    suspend fun offerFile(file: java.io.File, name: String): String = v2?.offerFile(file, name) ?: files.offer(file, name)
+    fun hasFileTransfer(id: String): Boolean = v2?.hasFileTransfer(id) == true || (fileApplicationLazy.isInitialized() && files.owns(id))
+    suspend fun acceptFile(id: String) { if (v2?.hasFileTransfer(id) == true) v2.acceptFile(id) else files.accept(id) }
+    suspend fun cancelFile(id: String) { if (v2?.hasFileTransfer(id) == true) v2.cancelFile(id) else files.cancel(id) }
+    fun closeFileTransfers() { if (photoApplicationLazy.isInitialized()) photos.disconnect(); v2?.closeFileTransfers(); if (fileApplicationLazy.isInitialized()) files.close() }
 
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture, retry: Boolean = false) {
         v2?.let {
@@ -92,11 +125,22 @@ internal class MsnpP2pSession(
             .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
             .forEach { incoming.remove(it.key, it.value) }
         val packet = P2pPacket.parse(packetBytes) ?: return
-        if (packet.header.flags == P2P_ACK) return
+        if (packet.header.flags == P2P_ACK) {
+            if (fileApplicationLazy.isInitialized()) files.acknowledged(packet.header.acknowledgementId.toLong() and 0xffff_ffffL)
+            return
+        }
+        if (packet.header.flags and 0x10 != 0) {
+            if (fileApplicationLazy.isInitialized() && files.owns(packet.header.sessionId.toLong() and 0xffff_ffffL)) {
+                files.receive(packet.header.sessionId.toLong() and 0xffff_ffffL,
+                    packet.header.offset, packet.header.totalSize, packet.body)
+                if (packet.header.offset + packet.body.size == packet.header.totalSize) sendAcknowledgement(packet.header)
+            }
+            return
+        }
         val key = packet.header.sessionId to packet.header.id
         val message = if (packet.header.offset == 0L) {
             if (incoming.size >= MAX_INCOMING_MESSAGES) return
-            val maxSize = if (packet.header.sessionId == 0) MAX_SLP_BYTES else pendingCalls[packet.header.sessionId]?.picture?.takeIf { it.objectType == 8 }?.size?.coerceAtMost(org.aralozkaya.msngr.protocol.MsnWink.MAX_CAB_BYTES) ?: MAX_PICTURE_BYTES
+            val maxSize = if (packet.header.sessionId == 0) MAX_SLP_BYTES else MsnpP2pUtil.objectByteLimit(pendingCalls[packet.header.sessionId]?.picture)
             if (packet.header.totalSize !in 0..maxSize.toLong()) return
             val totalSize = packet.header.totalSize.toInt()
             IncomingP2pMessage(packet.header, ByteArray(totalSize)).also { incoming[key] = it }
@@ -114,14 +158,16 @@ internal class MsnpP2pSession(
             message.header.sessionId == 0 && message.header.flags == P2P_NO_FLAG -> {
                 handleSlp(message.body)
             }
+            message.header.sessionId != 0 && photoApplicationLazy.isInitialized() && photos.owns(message.header.sessionId.toLong() and 0xffff_ffffL) -> photos.receive(message.body)
             message.header.flags and P2P_MSN_OBJECT_DATA != 0 -> {
                 // P2P sessions can migrate to a different switchboard. A newly accepted
                 // switchboard therefore may not own the original pending call. The live client
                 // validates the completed bytes against the contact's current MSNObject hash.
                 val pending = pendingCalls.remove(message.header.sessionId)
-                if (pending?.picture?.objectType in listOf(8, 11)) {
+                if (pending?.picture?.objectType in listOf(8, 11, 15)) {
                     if (pending!!.picture.matches(message.body)) {
-                        if (pending.picture.objectType == 8) onWink(pending.picture, message.body)
+                        if (pending.picture.objectType == 15) photos.receivedObject(pending.picture, message.body)
+                        else if (pending.picture.objectType == 8) onWink(pending.picture, message.body)
                         else onVoiceClip(pending.picture, message.body)
                         closeObjectSession(pending.callId, message.header.sessionId)
                     }
@@ -134,6 +180,10 @@ internal class MsnpP2pSession(
 
     private suspend fun handleSlp(bytes: ByteArray) {
         val message = SlpMessage.parse(bytes) ?: return
+        if ((photoApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
+                ?.equals(MsnpPhotoSession.GUID, true) == true) && photos.handle(message)) return
+        if ((fileApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
+                ?.uppercase() in setOf(org.aralozkaya.msngr.protocol.MsnFileContext.GUID, MsnpFileSession.ORIGINAL_GUID)) && files.handle(message)) return
         when {
             message.firstLine.startsWith("INVITE ", ignoreCase = true) -> handleInvite(message)
             message.firstLine.equals("MSNSLP/1.0 200 OK", ignoreCase = true) -> Unit
@@ -171,6 +221,15 @@ internal class MsnpP2pSession(
                     org.aralozkaya.msngr.protocol.MsnWink.parseOffer(String(it, Charsets.UTF_8).trimEnd('\u0000'))
                 }
             }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localWink(it.sha1d)) }
+
+            ?: message.body.field("Context")?.let { context ->
+                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
+                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 15)
+                }
+            }?.let { requested ->
+                MsnpP2pUtil.matchingLocalPicture(message.body,
+                    (if (photoApplicationLazy.isInitialized()) photos.localObject(requested.sha1d) else null) ?: localPhoto(requested.sha1d))
+            }
         val accepted = picture != null
         val responseContent = "SessionID: $sessionId\r\n\r\n"
         sendMessage(
@@ -201,7 +260,7 @@ internal class MsnpP2pSession(
             appId = MsnpP2pUtil.objectAppId(picture.metadata.objectType),
             body = picture.bytes,
         )
-        if (picture.metadata.objectType in listOf(8, 11)) closeObjectSession(message.callId, sessionId)
+        if (picture.metadata.objectType in listOf(8, 11, 15)) closeObjectSession(message.callId, sessionId)
     }
 
     private suspend fun closeObjectSession(callId: String, sessionId: Int) {
@@ -209,6 +268,26 @@ internal class MsnpP2pSession(
             "BYE MSNMSGR:$remoteEmail MSNSLP/1.0", remoteEmail, localEmail,
             MsnpP2pUtil.randomGuid(), callId, 0, "application/x-msnmsgr-sessionclosebody",
             "SessionID: $sessionId\r\n\r\n"))
+    }
+
+    private suspend fun sendFileData(session: Long, file: java.io.File, active: () -> Boolean, progress: (Long) -> Unit) {
+        val size = file.length()
+        val id = nextId()
+        val acknowledgement = nextId()
+        files.expectAcknowledgement(session, id.toLong() and 0xffff_ffffL)
+        var offset = 0L
+        file.inputStream().buffered().use { input ->
+            val buffer = ByteArray(MAX_CHUNK_BYTES)
+            while (offset < size) {
+                check(active()) { "File transfer was cancelled." }
+                val count = input.read(buffer, 0, minOf(buffer.size.toLong(), size - offset).toInt())
+                check(count > 0) { "The file changed during transfer." }
+                val packet = P2pPacket(P2pHeader(session.toInt(), id, offset, size, count,
+                    0x01000030, acknowledgement, 0, 0), buffer.copyOf(count), files.applicationId(session))
+                offset += count; progress(offset)
+                sendPacket(packet.encode())
+            }
+        }
     }
 
     private suspend fun sendTransportFallback(message: SlpMessage) {

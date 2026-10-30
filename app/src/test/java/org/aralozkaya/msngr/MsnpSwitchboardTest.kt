@@ -26,6 +26,80 @@ import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 
 class MsnpSwitchboardTest {
+    @Test fun nativeOfferResolvesAnOwnSessionBridgeAndSurvivesClosingItBeforeAcceptance() = runBlocking {
+        val directory = java.nio.file.Files.createTempDirectory("msngr-incoming-file").toFile()
+        val events = CopyOnWriteArrayList<SwitchboardEvent>()
+        val peers = java.util.concurrent.ConcurrentHashMap<String, MsnpP2pSession>()
+        val endpoint = "11111111-1111-1111-1111-111111111111"
+        lateinit var remote: MsnpP2pSession
+        val first = ScriptedSwitchboardTransport(signedInEmail, signedInEmail, p2pSink = { remote.handle(it) })
+        val second = ScriptedSwitchboardTransport(signedInEmail, contactEmail, p2pSink = { remote.handle(it) })
+        var receiver = first
+        val a = MsnpSwitchboardSession(signedInEmail, machineGuid, "",
+            SwitchboardInvitation("mock.example", 1864, "key", "42", signedInEmail), first,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default), events::add,
+            fileDirectory = { java.io.File(directory, "local") }, sharedP2pPeers = peers)
+        val b = MsnpSwitchboardSession(signedInEmail, machineGuid, contactEmail,
+            SwitchboardInvitation("mock.example", 1864, "key"), second,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default), events::add,
+            fileDirectory = { java.io.File(directory, "local") }, remoteEndpointId = endpoint, sharedP2pPeers = peers)
+        remote = MsnpP2pSession(contactEmail, signedInEmail, { packet ->
+            receiver.deliver(MsnpCommand("MSG", parameters = listOf("$contactEmail;{$endpoint}"), payload =
+                Msnp18Protocol.p2pPayload("$signedInEmail;{$machineGuid}", packet, "$contactEmail;{$endpoint}")))
+        }, { null }, {}, localEndpointId = endpoint, remoteEndpointId = machineGuid,
+            fileDirectory = { java.io.File(directory, "remote") })
+        try {
+            a.connect()
+            assertEquals("", a.contactEmail)
+            val bytes = ByteArray(80_123) { (it * 23).toByte() }
+            val file = java.io.File(directory, "native-source.png").apply { writeBytes(bytes) }
+            val id = remote.offerFile(file, "native-source.png")
+            withTimeout(2_000) { while (events.none { it is SwitchboardEvent.FileChanged }) kotlinx.coroutines.delay(5) }
+            assertEquals(contactEmail, a.contactEmail)
+            assertTrue(events.any { it == SwitchboardEvent.ContactResolved })
+            a.close(); receiver = second; b.connect()
+            b.acceptFile(id)
+            withTimeout(5_000) { while (events.filterIsInstance<SwitchboardEvent.FileChanged>().none {
+                it.transfer.status == org.aralozkaya.msngr.data.FileTransferStatus.Complete
+            }) kotlinx.coroutines.delay(5) }
+            val complete = events.filterIsInstance<SwitchboardEvent.FileChanged>().last().transfer
+            assertArrayEquals(bytes, java.io.File(complete.localPath!!).readBytes())
+        } finally { b.closeFileTransfers(); a.close(); b.close(); remote.closeFileTransfers(); directory.deleteRecursively() }
+    }
+    @Test fun fileAcceptanceOnAnotherSwitchboardUsesTheOriginalTransferAndStreamsWithoutBlockingAcks() = runBlocking {
+        val directory = java.nio.file.Files.createTempDirectory("msngr-migrated-file").toFile()
+        val events = CopyOnWriteArrayList<SwitchboardEvent>()
+        val remoteEvents = CopyOnWriteArrayList<org.aralozkaya.msngr.data.FileTransfer>()
+        val peers = java.util.concurrent.ConcurrentHashMap<String, MsnpP2pSession>()
+        val endpoint = "11111111-1111-1111-1111-111111111111"
+        lateinit var remote: MsnpP2pSession
+        val first = ScriptedSwitchboardTransport(signedInEmail, contactEmail, p2pSink = { remote.handle(it) })
+        val second = ScriptedSwitchboardTransport(signedInEmail, contactEmail, p2pSink = { remote.handle(it) })
+        fun board(transport: MsnpTransport) = MsnpSwitchboardSession(signedInEmail, machineGuid, contactEmail,
+            SwitchboardInvitation("mock.example", 1864, "key"), transport,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default), events::add,
+            remoteEndpointId = endpoint, fileDirectory = { java.io.File(directory, "local") }, sharedP2pPeers = peers)
+        val a = board(first)
+        val b = board(second)
+        remote = MsnpP2pSession(contactEmail, signedInEmail, { packet ->
+            second.deliver(MsnpCommand("MSG", parameters = listOf("$contactEmail;{$endpoint}"), payload =
+                Msnp18Protocol.p2pPayload("$signedInEmail;{$machineGuid}", packet, "$contactEmail;{$endpoint}")))
+        }, { null }, {}, localEndpointId = endpoint, remoteEndpointId = machineGuid,
+            fileDirectory = { java.io.File(directory, "remote") }, onFileTransfer = { remoteEvents.add(it) })
+        try {
+            a.connect(); b.connect()
+            val bytes = ByteArray(230_000) { (it * 17).toByte() }
+            val file = java.io.File(directory, "source.png").apply { writeBytes(bytes) }
+            val id = a.offerFile(file, "image.png")
+            withTimeout(2_000) { while (remoteEvents.isEmpty()) kotlinx.coroutines.delay(5) }
+            remote.acceptFile(id)
+            withTimeout(5_000) { while (events.filterIsInstance<SwitchboardEvent.FileChanged>().none {
+                it.transfer.status == org.aralozkaya.msngr.data.FileTransferStatus.Complete
+            }) kotlinx.coroutines.delay(5) }
+            assertArrayEquals(bytes, java.io.File(remoteEvents.last().localPath!!).readBytes())
+            assertTrue("Migrated data must use the second bridge", second.sent.count { it.verb == "MSG" } > 100)
+        } finally { a.closeFileTransfers(); b.closeFileTransfers(); a.close(); b.close(); remote.closeFileTransfers(); directory.deleteRecursively() }
+    }
     @Test fun otherOwnEndpointsCanFetchPicturesAndPacketsForAnotherEndpointAreIgnored() = runBlocking {
         for (conversationContact in listOf(signedInEmail, "")) {
             val remoteId = "11111111-1111-1111-1111-111111111111"

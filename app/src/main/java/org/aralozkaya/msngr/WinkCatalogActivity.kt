@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr
 
 import android.annotation.SuppressLint
@@ -72,7 +74,7 @@ class WinkCatalogActivity : MsngrActivity() {
         }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 status?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary) }
-                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (loading) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 AndroidView(factory = { context -> WebView(context).apply {
                     browser = this
                     settings.apply { javaScriptEnabled = true; allowFileAccess = false; allowContentAccess = false
@@ -123,7 +125,7 @@ class WinkCatalogActivity : MsngrActivity() {
         pending?.let { items ->
             AlertDialog(onDismissRequest = { pending = null }, title = { Text("Add winks") },
                 text = { Text(items.joinToString("\n") { it.first.name }) },
-                confirmButton = { TextButton(onClick = {
+                confirmButton = { Button(onClick = {
                     pending = null
                     lifecycleScope.launch {
                         status = withContext(Dispatchers.IO) { runCatching {

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr
 
 import androidx.compose.foundation.layout.*
@@ -77,7 +79,7 @@ internal fun RandomEmotionSoundDialog(
                 OutlinedButton(onClick = ::download, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_fetch")) {
                     Text(if (candidate == null) "Download" else "Try another")
                 }
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 candidate?.let { (sound, bytes) ->
                     Text(sound.name.messengerPlusPlainText(), style = MaterialTheme.typography.titleMedium)
                     Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
@@ -96,8 +98,8 @@ internal fun RandomEmotionSoundDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = candidate != null && !busy, onClick = {
-                val (sound, bytes) = candidate ?: return@TextButton
+            Button(enabled = candidate != null && !busy, onClick = {
+                val (sound, bytes) = candidate ?: return@Button
                 player.stop()
                 saving = true
                 error = null

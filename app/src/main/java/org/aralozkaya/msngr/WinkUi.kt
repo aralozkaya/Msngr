@@ -59,7 +59,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }, footer = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
+                FilledTonalButton(onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
             }
         }) {
         catalog.chunked(4).forEach { row ->
@@ -95,7 +95,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
     }
     LaunchedEffect(visible) { if (!visible) preview = null }
     if (visible) preview?.let { WinkOverlay(it, { preview = null }) }
@@ -159,7 +159,7 @@ internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit) {
         key(message.isWinkPending, message.winkTransferError) { WinkThumbnail(reference, Modifier.size(72.dp)) }
         Text(reference.name, style = MaterialTheme.typography.titleSmall)
         if (message.isWinkPending) {
-            LinearProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
+            LinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
             Text("Downloading wink…", style = MaterialTheme.typography.labelSmall)
         }
     }
@@ -218,7 +218,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
             }
             Text(reference.name, Modifier.padding(top = 8.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
             if (message.isWinkPending) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 Text("Downloading wink…", style = MaterialTheme.typography.bodySmall)
             } else message.winkTransferError?.let { transferError ->
                 Text(transferError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -253,7 +253,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
                 }, enabled = optionsEnabled, shapes = ListItemDefaults.segmentedShapes(1, actionCount),
                     leadingContent = { Icon(if (remove) Icons.Default.Delete else Icons.Default.Add, null,
                         tint = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) },
-                    trailingContent = { if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
+                    trailingContent = { if (busy) CircularWavyProgressIndicator(Modifier.size(20.dp)) },
                     content = { Text(if (remove) "Remove from saved winks" else "Add to saved winks",
                         color = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) })
             }

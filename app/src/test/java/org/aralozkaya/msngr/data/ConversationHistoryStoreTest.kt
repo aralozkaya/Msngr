@@ -12,6 +12,23 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 
 class ConversationHistoryStoreTest {
+    @Test fun fileHistoryRetainsCompletedFilesAndFailsInterruptedOffersOnRestart() {
+        withHistoryDirectory("msngr-history-files") { directory ->
+            val complete = message(1).copy(fileTransfer = FileTransfer("complete", "photo.png", 42, false,
+                FileTransferStatus.Complete, 42, File(directory, "received.bin").absolutePath))
+            val pending = message(2).copy(fileTransfer = FileTransfer("pending", "document.pdf", 1000, true,
+                FileTransferStatus.Transferring, 100))
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT); merge(mapOf(CONTACT to listOf(complete, pending)))
+            }
+            val restored = FileConversationHistoryStore(directory).apply { selectAccount(ACCOUNT); loadLatest(CONTACT) }
+                .messages.value.getValue(CONTACT)
+            assertEquals(complete.fileTransfer, restored.first().fileTransfer)
+            assertEquals(FileTransferStatus.Failed, restored.last().fileTransfer?.status)
+            assertEquals(100L, restored.last().fileTransfer?.transferred)
+            assertTrue(restored.last().fileTransfer?.error.orEmpty().contains("interrupted"))
+        }
+    }
     @Test fun nativeMessageStyleSurvivesRestart() {
         withHistoryDirectory("msngr-history-native-style") { directory ->
             val styled = message(1).copy(nativeStyle = org.aralozkaya.msngr.NativeTextStyle(

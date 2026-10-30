@@ -683,7 +683,7 @@ fun AboutSettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsValue("Developer", "Aral Özkaya")
                 Text("Msngr code: BSD Zero Clause (0BSD). Uses libsiren under LGPL-2.1-or-later and other open-source libraries.")
-                androidx.compose.material3.TextButton(onClick = onLicenses) { Text("Open-source licenses") }
+                androidx.compose.material3.OutlinedButton(onClick = onLicenses) { Text("Open-source licenses") }
                 Text(
                     "Thanks to the Escargot, NINA, CrossTalk, Pidgin, and retro-computing communities for keeping Messenger history alive.",
                     style = MaterialTheme.typography.bodyMedium,

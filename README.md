@@ -30,6 +30,10 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   Voice clips do not work in group chats.
 - **Draw a message.** Switch to handwriting, choose a pen size and ink color, and use the
   eraser, undo, and redo tools before sending. Compatible groups support handwriting too.
+- **Share photos and files.** Choose **Photos** or **Files** from the attachment menu in an
+  online private chat. Browse a shared slideshow, save original photos, or accept, decline,
+  save, and open file messages. Stopping photo sharing leaves the other viewer open with a
+  notice. Executable files are blocked. See [file transfers](docs/FILE_TRANSFERS.md).
 - **Send a wink.** Send and receive classic animated [winks](docs/WINKS.md) with sound in
   one-to-one chats and groups whose online members all support winks. Long-press the emoticon
   button to open the wink picker, hold a wink to

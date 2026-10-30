@@ -119,9 +119,9 @@ class Msnp18ProtocolTest {
         val command = Msnp18Protocol.changePresence(12, Presence.Online, picture)
 
         assertEquals(Msnp18Protocol.CLIENT_IDENTITY, command.parameters[1])
-        assertEquals(0x90L, (Msnp18Protocol.CLIENT_ID ushr 24) and 0xff)
+        assertEquals(0xA0L, (Msnp18Protocol.CLIENT_ID ushr 24) and 0xff)
         assertEquals(
-            (0x90L shl 24) or Msnp18Protocol.BASE_CAPABILITIES.toLong(),
+            (0xA0L shl 24) or Msnp18Protocol.BASE_CAPABILITIES.toLong(),
             Msnp18Protocol.CLIENT_ID,
         )
         assertEquals(
@@ -131,7 +131,7 @@ class Msnp18ProtocolTest {
         assertEquals(0x4802C, Msnp18Protocol.BASE_CAPABILITIES)
         assertEquals(0x8000, Msnp18Protocol.BASE_CAPABILITIES and 0x8000)
         assertEquals(0x40000, Msnp18Protocol.BASE_CAPABILITIES and 0x40000)
-        assertEquals(0x400, Msnp18Protocol.EXTENDED_CAPABILITIES)
+        assertEquals(0x21420, Msnp18Protocol.EXTENDED_CAPABILITIES)
         assertEquals(
             "Handwriting GIF and ISF capabilities must be advertised",
             0x0C,
@@ -148,8 +148,8 @@ class Msnp18ProtocolTest {
             Msnp18Protocol.BASE_CAPABILITIES and 0x100,
         )
         assertEquals(
-            "Conversation-window file transfers must not be advertised",
-            0,
+            "Conversation-window file transfers must be advertised",
+            0x20000,
             Msnp18Protocol.EXTENDED_CAPABILITIES and 0x20000,
         )
         assertEquals(picture, MsnDisplayPicture.parse(command.parameters[2]))

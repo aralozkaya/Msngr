@@ -4,6 +4,7 @@
 
 package org.aralozkaya.msngr
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -198,10 +199,11 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { showColor = true },
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { showColor = true },
                 modifier = Modifier.testTag("custom_main_color")) { Text("Custom color") }
-            if (override != null) TextButton(onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
+            if (override != null) OutlinedButton(onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
         }
     }
     if (showScenes) ScenePickerDialog(appearance.sceneId,

@@ -102,7 +102,7 @@ internal fun SessionsDialog(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                TextButton(
+                                DestructiveOutlinedButton(
                                     onClick = { logOut(sessionTarget, listOf(session)) },
                                     enabled = !busy || sessionBusy,
                                     modifier = Modifier.align(Alignment.CenterVertically)
@@ -112,9 +112,6 @@ internal fun SessionsDialog(
                                             contentDescription = if (session.isCurrent) "Log out of this device"
                                             else "Log out of ${session.deviceName}, session ${session.id.take(8)}"
                                         },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error,
-                                    ),
                                 ) {
                                     LoadingButtonContent(
                                         loading = sessionBusy,
@@ -132,13 +129,10 @@ internal fun SessionsDialog(
                     val otherBusy = busyTarget == "other"
                     val allBusy = busyTarget == "all"
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
+                        DestructiveOutlinedButton(
                             onClick = { logOut("other", others) },
                             enabled = !busy || otherBusy,
                             modifier = Modifier.fillMaxWidth().testTag("logout-other-sessions"),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error,
-                            ),
                         ) {
                             LoadingButtonContent(
                                 loading = otherBusy,
