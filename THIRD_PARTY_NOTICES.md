@@ -21,7 +21,7 @@ all legal rights or a patent clearance opinion.
 
 | Component | License and handling |
 | --- | --- |
-| 104 distinct Android library versions (99 release; 102 debug) | Apache-2.0; MaterialKolor also contains MIT-licensed wrapper code. Published licenses and embedded notices are retained. Includes AndroidX/Compose, Kotlin, coroutines, Tink, Guava compatibility classes, Gson, MaterialKolor, Markdown Renderer, JetBrains Markdown, Poko and JSpecify. Debug-only Compose tooling and its separately resolved NavigationEvent versions are covered too. |
+| 104 distinct Android library versions (101 release; 104 debug; updated October 31, 2026) | Apache-2.0; MaterialKolor also contains MIT-licensed wrapper code. Published licenses and embedded notices are retained. Includes AndroidX/Compose, Navigation 3, NavigationEvent, Kotlin, coroutines, Tink, Guava compatibility classes, Gson, MaterialKolor, Markdown Renderer, JetBrains Markdown, Poko and JSpecify. Debug-only Compose tooling is covered too. |
 | libsiren, `c7724c03d4a6daf4d6dff9e917c14ce5071dce66` | Upstream headers allow LGPL 2 or later and `COPYING` supplies LGPL 2.1. Msngr distributes under LGPL-2.1-or-later. Original authors/notices and LGPL text are retained; modified files carry dated change notices. |
 | Dorkbox CabParser, `e81fc32929ab7ce3bb995f8c7279101365137d29` | Apache-2.0. Three adapted LZX Java files retain upstream headers and now identify the package/interface changes. The license is shipped in the APK. |
 | Ruffle 0.7.1, `89a7049965f3090e706265670df309a5128233ac` | MIT OR Apache-2.0; the MIT option permits the local XML/dependency security changes. Both original licenses, the upstream web attribution collection, and exact dependency notices are retained. |

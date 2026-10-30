@@ -945,7 +945,7 @@
       "artifactSha256": "1761707c1ddee002bd97e1a0889a5016f7cd6bd8e0b6b069bcba8b2523d63723"
     },
     {
-      "name": "androidx.navigationevent:navigationevent-android:1.1.0",
+      "name": "androidx.navigation3:navigation3-runtime-android:1.3.0-alpha03",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -954,12 +954,13 @@
       ],
       "ecosystem": "Maven",
       "variants": [
+        "debug",
         "release"
       ],
-      "artifactSha256": "ea7943bc61d52b42a7a2cbcbde14c9b10e7baf9e09a8fe54d8cb17d3bb5dbfd9"
+      "artifactSha256": "b6b18fb170dc8b4e632dace0ea85c84263da85a603ee0390607d28ce85433036"
     },
     {
-      "name": "androidx.navigationevent:navigationevent-android:1.1.1",
+      "name": "androidx.navigation3:navigation3-ui-android:1.3.0-alpha03",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -968,26 +969,13 @@
       ],
       "ecosystem": "Maven",
       "variants": [
-        "debug"
-      ],
-      "artifactSha256": "4d6c49832f7d92cf6c0b8d8f12ff7fc2fc59b9d09862667b89bb867dbc19760d"
-    },
-    {
-      "name": "androidx.navigationevent:navigationevent-compose-android:1.1.0",
-      "license": "Apache-2.0",
-      "source": "https://maven.google.com/",
-      "notices": [
-        "b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e",
-        "bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec"
-      ],
-      "ecosystem": "Maven",
-      "variants": [
+        "debug",
         "release"
       ],
-      "artifactSha256": "487fd434793393f4c6d2ceac0a9f5fc6d23b682f508ff6ff18793907b5882032"
+      "artifactSha256": "6d3460410fda701de2c9963876c416249c5a11ecaaccbfcb12e650a73f336c73"
     },
     {
-      "name": "androidx.navigationevent:navigationevent-compose-android:1.1.1",
+      "name": "androidx.navigationevent:navigationevent-android:1.2.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -996,9 +984,25 @@
       ],
       "ecosystem": "Maven",
       "variants": [
-        "debug"
+        "debug",
+        "release"
       ],
-      "artifactSha256": "4c978461881d0506dd8d38deb25f84f56ea28756a14e583f2561c0ee98dff2d6"
+      "artifactSha256": "1e88819e0486ae56810ff838808d0f3191ea4480bb0c6175ff4f968684170eb1"
+    },
+    {
+      "name": "androidx.navigationevent:navigationevent-compose-android:1.2.0-rc01",
+      "license": "Apache-2.0",
+      "source": "https://maven.google.com/",
+      "notices": [
+        "b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e",
+        "bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec"
+      ],
+      "ecosystem": "Maven",
+      "variants": [
+        "debug",
+        "release"
+      ],
+      "artifactSha256": "149bbcc37df269c61cc448ea92f283af982be47f9e25ca6ed7ab3ad2166ceb77"
     },
     {
       "name": "androidx.profileinstaller:profileinstaller:1.4.0",
@@ -5615,8 +5619,8 @@
     }
   ],
   "files": {
-    "index.html": "17a0cb06759d4293ed08c59e428ae98d05c9fcd506726a29bdc01e9e6b0593a5",
+    "index.html": "6593120ef11281fcff0587b5c184391560a9aa25c8f618402f86a8a8cdcfaf2f",
     "library-sources.zip": "ac004e4b1eff760fd2ee5087b65a617f57f023353019f1a3fdc1ef6d0817915d",
-    "THIRD_PARTY_NOTICES.txt": "0a79c29a7ce9525c50c2fe53e35a673a37a8eef3408cb91a6c68cf0821d433be"
+    "THIRD_PARTY_NOTICES.txt": "e7687de2704669d019cf35da06cc31a91707cf4b67568d512b14b1ddb52dc7dc"
   }
 }
