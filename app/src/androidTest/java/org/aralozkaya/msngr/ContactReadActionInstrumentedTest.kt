@@ -1,26 +1,32 @@
 package org.aralozkaya.msngr
 
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
@@ -35,8 +41,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.ui.test.ExperimentalTestApi::class)
 class ContactReadActionInstrumentedTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
@@ -94,8 +103,14 @@ class ContactReadActionInstrumentedTest {
         compose.onNodeWithContentDescription("Mark as read").assertDoesNotExist()
         revealAction()
         compose.runOnIdle { assertTrue(unread.value); assertEquals(0, changes); assertTrue(haptics.isEmpty()) }
+        val actionBounds = compose.onNodeWithContentDescription("Mark as read").fetchSemanticsNode().boundsInRoot
+        val rowBounds = compose.onNodeWithTag("contact").fetchSemanticsNode().boundsInRoot
+        assertEquals(rowBounds.height, actionBounds.height, 1f)
+        assertEquals(with(compose.density) { IconButtonDefaults.mediumContainerSize().width.toPx() }, actionBounds.width, 1f)
+        saveSwipeScreenshot("contact-read-swipe-revealed.png")
         compose.onNodeWithContentDescription("Mark as read").performClick()
         compose.runOnIdle { assertFalse(unread.value); assertEquals(1, changes) }
+        compose.runOnIdle { assertTrue(haptics.isEmpty()) }
         compose.onNodeWithContentDescription("Mark as unread").assertDoesNotExist()
         revealAction()
         compose.onNodeWithContentDescription("Mark as unread").performClick()
@@ -151,6 +166,11 @@ class ContactReadActionInstrumentedTest {
     fun crossingThresholdHapticsOnceAndWaitsForReleaseToCommit() {
         showRow()
         holdPastThreshold()
+        val actionBounds = compose.onNodeWithContentDescription("Mark as read").fetchSemanticsNode().boundsInRoot
+        val rowBounds = compose.onNodeWithTag("contact").fetchSemanticsNode().boundsInRoot
+        assertEquals(rowBounds.height, actionBounds.height, 1f)
+        assertTrue(actionBounds.width > with(compose.density) { IconButtonDefaults.mediumContainerSize().width.toPx() })
+        saveSwipeScreenshot("contact-read-swipe-expanded.png")
         compose.runOnIdle {
             assertEquals(listOf(HapticFeedbackType.GestureThresholdActivate), haptics)
             assertEquals(0, changes)
@@ -189,5 +209,38 @@ class ContactReadActionInstrumentedTest {
         compose.runOnIdle { assertTrue(haptics.isEmpty()); assertEquals(0, changes); assertTrue(unread.value) }
         compose.onNodeWithContentDescription("Mark as read").performClick()
         compose.runOnIdle { assertEquals(1, changes) }
+    }
+
+    @Test
+    fun rtlPartialSwipeRevealsOnLeftAndTappingRowClosesWithoutOpeningChat() {
+        showRow(LayoutDirection.Rtl)
+        val distance = with(compose.density) { 72.dp.toPx() }
+        compose.onNodeWithTag("swipe_container").performTouchInput {
+            swipe(center, center + Offset(distance, 0f), durationMillis = 1000)
+        }
+        val action = compose.onNodeWithContentDescription("Mark as read").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        val wrapper = compose.onNodeWithTag("swipe_container").fetchSemanticsNode().boundsInRoot
+        assertEquals(wrapper.left, action.left, 1f)
+        assertEquals(wrapper.height, action.height, 1f)
+        compose.onNodeWithTag("contact").performClick()
+        compose.onNodeWithContentDescription("Mark as read").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, changes); assertEquals(0, opened); assertTrue(haptics.isEmpty()) }
+    }
+
+    @Test
+    fun accessibilityActionTogglesWithoutSwipeHapticsOrOpeningChat() {
+        showRow()
+        compose.onNodeWithTag("contact").performCustomAccessibilityActionWithLabel("Mark as read")
+        compose.runOnIdle { assertFalse(unread.value); assertEquals(1, changes); assertEquals(0, opened) }
+        compose.onNodeWithTag("contact").performCustomAccessibilityActionWithLabel("Mark as unread")
+        compose.runOnIdle { assertTrue(unread.value); assertEquals(2, changes); assertEquals(0, opened); assertTrue(haptics.isEmpty()) }
+    }
+
+    private fun saveSwipeScreenshot(name: String) {
+        File(compose.activity.getExternalFilesDir(null), name).outputStream().use {
+            compose.onNodeWithTag("swipe_container").captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 }

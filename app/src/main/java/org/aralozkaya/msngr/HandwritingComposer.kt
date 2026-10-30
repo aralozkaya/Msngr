@@ -10,7 +10,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,9 +41,12 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -82,7 +84,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -540,37 +541,25 @@ internal fun HandwritingComposerPanel(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowColors.forEach { option ->
                                 val isSelected = state.selectedColorRgb == option.rgb
-                                val swatchShape = if (isSelected) {
-                                    MaterialTheme.shapes.small
-                                } else {
-                                    CircleShape
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(swatchShape)
-                                        .background(option.composeColor)
-                                        .border(
-                                            width = if (isSelected) 2.5.dp else 1.dp,
-                                            color = if (isSelected) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.outline
-                                            },
-                                            shape = swatchShape,
-                                        )
-                                        .clickable(
-                                            role = Role.Button,
-                                            onClickLabel = option.name,
-                                        ) {
-                                            state.selectedColorRgb = option.rgb
-                                            state.activeTool = WlmHandwritingTool.Pen
-                                            showColorMenu = false
-                                        }
-                                        .semantics {
-                                            contentDescription = "Ink color ${option.name}"
-                                        },
-                                )
+                                Button(
+                                    onClick = {
+                                        state.selectedColorRgb = option.rgb
+                                        state.activeTool = WlmHandwritingTool.Pen
+                                        showColorMenu = false
+                                    },
+                                    shapes = ButtonDefaults.shapes(
+                                        shape = if (isSelected) ButtonDefaults.squareShape else ButtonDefaults.shape,
+                                    ),
+                                    colors = ButtonDefaults.buttonColors(containerColor = option.composeColor),
+                                    border = BorderStroke(
+                                        if (isSelected) 2.5.dp else 1.dp,
+                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    ),
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.size(30.dp).semantics {
+                                        contentDescription = "Ink color ${option.name}"
+                                    },
+                                ) {}
                             }
                         }
                     }
@@ -743,6 +732,7 @@ internal fun HandwritingComposerPanel(
                     .testTag(HANDWRITING_TOOLBAR_TAG),
                 floatingActionButton = {
                     FloatingToolbarDefaults.VibrantFloatingActionButton(
+                        shape = FloatingActionButtonDefaults.shape,
                         onClick = {
                             if (sendEnabled) {
                                 onSendInk(state.toInkDrawing())
@@ -793,6 +783,7 @@ internal fun HandwritingComposerPanel(
                                             showPenMenu = true
                                         }
                                     },
+                                    shapes = IconButtonDefaults.shapes(),
                                     enabled = enabled,
                                     colors = if (state.activeTool == WlmHandwritingTool.Pen) {
                                         selectedButtonColors
@@ -816,6 +807,7 @@ internal fun HandwritingComposerPanel(
                             Box {
                                 IconButton(
                                     onClick = { showEraserMenu = true },
+                                    shapes = IconButtonDefaults.shapes(),
                                     enabled = enabled,
                                     colors = if (state.activeTool == WlmHandwritingTool.Eraser) {
                                         selectedButtonColors

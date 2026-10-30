@@ -197,6 +197,7 @@ fun ContactsPage(
                     ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
                 ) {
                     FilledTonalButton(
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier.padding(start = ButtonGroupDefaults.HorizontalArrangement.spacing),
                         onClick = { showSortOptions = true },
                         contentPadding =

@@ -14,7 +14,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -88,18 +87,18 @@ class SettingsNavigationInstrumentedTest {
 
     @Test fun committedPredictiveBackPopsOneNestedPageAndToolbarPopsItsParent() {
         openCategory("In-app notifications")
-        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("customized_notification_settings"))
+        compose.onNodeWithTag("in_app_notification_options").performClick()
         compose.onNodeWithTag("customized_notification_settings").performClick()
         compose.onNodeWithTag("no_notification_customizations").assertIsDisplayed()
 
         startGesture(BackEventCompat.EDGE_LEFT, 0.6f)
-        compose.onNodeWithTag("customized_notification_settings").assertExists()
+        compose.onNodeWithTag("in_app_notification_options").assertExists()
         compose.onNodeWithTag("no_notification_customizations").assertExists()
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
         settle()
 
         compose.onNodeWithTag("no_notification_customizations").assertDoesNotExist()
-        compose.onNodeWithTag("customized_notification_settings").assertIsDisplayed()
+        compose.onNodeWithTag("in_app_notification_options").assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Settings").assertIsDisplayed()
         assertFalse(toolbarExitRequested)

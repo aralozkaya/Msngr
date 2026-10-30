@@ -122,7 +122,7 @@ internal fun DisplayPictureOptionsDialog(
                 }
                 if (pictureUri != null) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onViewPicture) {
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onViewPicture) {
                             Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("View", Modifier.padding(start = 8.dp))
                         }
@@ -210,7 +210,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                     when {
                         error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(requireNotNull(error))
-                            OutlinedButton(onClick = { retry++ }) { Text("Try again") }
+                            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { retry++ }) { Text("Try again") }
                         }
                         pictures == null -> CircularWavyProgressIndicator()
                         else -> LazyVerticalGrid(

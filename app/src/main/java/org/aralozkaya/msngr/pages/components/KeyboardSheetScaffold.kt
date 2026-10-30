@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 
 package org.aralozkaya.msngr.pages.components
 
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,13 +38,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberBottomSheetState
@@ -75,10 +78,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
@@ -365,16 +366,15 @@ internal fun KeyboardSheetTile(
     border: BorderStroke? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Surface(
+    Button(
         onClick = onClick,
+        shapes = ButtonDefaults.shapes(shape = ButtonDefaults.squareShape),
         modifier = modifier.size(48.dp).semantics {
             if (description != null) contentDescription = description
             if (isSelected != null) selected = isSelected
-            role = Role.Button
         },
-        shape = MaterialTheme.shapes.small,
-        color = color,
-        contentColor = contentColor,
+        colors = ButtonDefaults.buttonColors(containerColor = color, contentColor = contentColor),
+        contentPadding = PaddingValues(0.dp),
         border = border,
     ) {
         Box(contentAlignment = Alignment.Center, content = content)

@@ -125,7 +125,7 @@ class WinkCatalogActivity : MsngrActivity() {
         pending?.let { items ->
             AlertDialog(onDismissRequest = { pending = null }, title = { Text("Add winks") },
                 text = { Text(items.joinToString("\n") { it.first.name }) },
-                confirmButton = { Button(onClick = {
+                confirmButton = { Button(shapes = ButtonDefaults.shapes(), onClick = {
                     pending = null
                     lifecycleScope.launch {
                         status = withContext(Dispatchers.IO) { runCatching {

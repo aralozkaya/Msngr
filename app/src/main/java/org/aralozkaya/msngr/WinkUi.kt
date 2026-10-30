@@ -59,7 +59,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }, footer = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                FilledTonalButton(onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
+                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
             }
         }) {
         catalog.chunked(4).forEach { row ->
