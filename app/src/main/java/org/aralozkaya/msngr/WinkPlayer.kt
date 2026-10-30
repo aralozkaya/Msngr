@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr
 
 import android.annotation.SuppressLint
@@ -7,7 +9,6 @@ import android.media.AudioManager
 import android.net.Uri
 import android.webkit.*
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -196,8 +197,15 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
                 factory = { WinkWebView(it, wink!!.animation, true, { duration -> if (readyDuration == null) readyDuration = duration }, { error = "This wink could not be played."; player?.release() }).also { player = it; onPlayerCreated(it) } },
                 modifier = Modifier.fillMaxWidth().aspectRatio(wink!!.width.toFloat() / wink!!.height),
                 onRelease = { it.release() })
-            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)
-                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.extraLarge)) {
+            FilledIconButton(
+                onClick = onDismiss,
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp),
+            ) {
                 Icon(Icons.Default.Close, "Close wink")
             }
         }

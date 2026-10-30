@@ -1,5 +1,8 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr.pages
 
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -18,7 +21,7 @@ internal fun DisplayPictureResizeDialog(picture: DisplayPictureSelection, onResi
                 "Resize it to the largest size that fits, keeping its proportions" +
                 (if (picture.animation != null) ", animation, and frame timing?" else "?"))
         },
-        confirmButton = { Button(onClick = onResize) { Text("Resize and continue") } },
+        confirmButton = { Button(shapes = ButtonDefaults.shapes(), onClick = onResize) { Text("Resize and continue") } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }

@@ -22,8 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -167,7 +167,7 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
         Row(verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                IconButton(onClick = {
+                FilledIconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                     if (job?.isActive == true) { job?.cancel(); job = null }
                     else job = scope.launch {
                         error = null

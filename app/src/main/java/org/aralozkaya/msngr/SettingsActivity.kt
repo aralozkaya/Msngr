@@ -29,6 +29,7 @@ import org.aralozkaya.msngr.pages.ConnectionSettingsScreen
 import org.aralozkaya.msngr.pages.ContactInvitationSettingsScreen
 import org.aralozkaya.msngr.pages.CustomizedNotificationsScreen
 import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
+import org.aralozkaya.msngr.pages.InAppNotificationSettingsMenu
 import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
@@ -69,7 +70,7 @@ class SettingsActivity : MsngrActivity() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SettingsRoute(
+internal fun SettingsRoute(
     onBack: () -> Unit,
     onDeleteAllChatHistories: () -> Unit,
 ) {
@@ -115,6 +116,13 @@ private fun SettingsRoute(
                     selectedDestination = destination.parent
                 }
             },
+            actions = {
+                if (destination == SettingsDestination.InAppNotifications) {
+                    InAppNotificationSettingsMenu(
+                        onCustomizedNotifications = { selectedDestination = SettingsDestination.CustomizedNotifications },
+                    )
+                }
+            },
         ) { innerPadding, scrollBehavior ->
             when (destination) {
                 null -> SettingsScreen(
@@ -130,7 +138,6 @@ private fun SettingsRoute(
                 SettingsDestination.InAppNotifications -> InAppNotificationSettingsScreen(
                     innerPadding = innerPadding,
                     scrollBehavior = scrollBehavior,
-                    onCustomizedNotifications = { selectedDestination = SettingsDestination.CustomizedNotifications },
                 )
                 SettingsDestination.CustomizedNotifications -> CustomizedNotificationsScreen(innerPadding, scrollBehavior)
                 SettingsDestination.MessengerPlus -> MessengerPlusSettingsScreen(
