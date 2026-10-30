@@ -32,6 +32,8 @@ internal data class SwitchboardInvitation(
 )
 
 internal sealed interface SwitchboardEvent {
+    data class PhotosChanged(val senderEmail: String, val share: PhotoShare) : SwitchboardEvent
+    data class FileChanged(val senderEmail: String, val transfer: FileTransfer) : SwitchboardEvent
     data object ContactResolved : SwitchboardEvent
     data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
     data class Ink(val senderEmail: String, val drawing: InkDrawing) : SwitchboardEvent
@@ -62,6 +64,12 @@ internal class MsnpSwitchboardSession(
     private val localWink: (String) -> LocalDisplayPicture? = { null },
     private val cachedWink: (MsnDisplayPicture) -> ByteArray? = { null },
     private val acceptWink: () -> Boolean = { true },
+    private val fileDirectory: (() -> java.io.File)? = null,
+    private val sharedP2pPeers: ConcurrentHashMap<String, MsnpP2pSession>? = null,
+    private val localPhoto: (String, String) -> LocalDisplayPicture? = { _, _ -> null },
+    private val publishPhoto: (String, LocalDisplayPicture) -> Unit = { _, _ -> },
+    private val localOriginal: (String, String) -> OriginalPhoto? = { _, _ -> null },
+    private val publishOriginal: (String, String, OriginalPhoto) -> Unit = { _, _, _ -> },
 ) : AutoCloseable {
     // A sibling endpoint can invite us before it calls the conversation's contact.
     @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
@@ -71,22 +79,29 @@ internal class MsnpSwitchboardSession(
     private val sendMutex = Mutex()
     private val closed = AtomicBoolean(false)
     private val participants = mutableSetOf<String>()
-    private data class OutgoingPicturePacket(val destination: String, val bytes: ByteArray)
-    private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED)
+    private data class OutgoingPicturePacket(val destination: String, val bytes: ByteArray,
+        val delivered: CompletableDeferred<Unit>? = null)
+    private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED,
+        onUndeliveredElement = { it.delivered?.cancel() })
     private val otherPicturePeers = ConcurrentHashMap<String, MsnpP2pSession>()
     private val winkPeers = ConcurrentHashMap<String, MsnpP2pSession>()
     private val pendingOwnMessages = ArrayDeque<MsnpCommand>()
     private val chunkAssembler = SwitchboardChunkAssembler()
     private val pendingMessageAcks = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
-    internal val pictureSession by lazy {
+    private val pictureSessionLazy = lazy {
         check(this.contactEmail.isNotEmpty()) { "The switchboard has no conversation contact." }
-        sharedPictureSession ?: MsnpP2pSession(
+        val create = { sharedPictureSession ?: MsnpP2pSession(
             localEmail = signedInEmail,
             remoteEmail = this.contactEmail,
             sendPacket = { packet ->
-                outgoingP2pPackets.send(OutgoingPicturePacket(remoteEndpointId?.let { "${this.contactEmail};{$it}" } ?: this.contactEmail, packet))
+                queueP2pPacket(remoteEndpointId?.let { "${this.contactEmail};{$it}" } ?: this.contactEmail, packet)
             },
             localPicture = localPicture,
+            fileDirectory = fileDirectory,
+            onFileTransfer = { eventSink(SwitchboardEvent.FileChanged(this.contactEmail, it)) },
+            onPhotoShare = { eventSink(SwitchboardEvent.PhotosChanged(this.contactEmail, it)) },
+            localPhoto = { localPhoto(this.contactEmail, it) }, publishPhoto = { publishPhoto(this.contactEmail, it) },
+            localOriginal = { localOriginal(this.contactEmail, it) }, publishOriginal = { id, original -> publishOriginal(this.contactEmail, id, original) },
             onDisplayPicture = { bytes ->
                 eventSink(SwitchboardEvent.DisplayPicture(this.contactEmail, bytes))
             },
@@ -96,15 +111,20 @@ internal class MsnpSwitchboardSession(
             localWink = localWink,
             onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(this.contactEmail, metadata, bytes)) },
             onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(this.contactEmail, metadata, bytes)) },
-        )
+        ) }
+        val identity = remoteEndpointId?.let { "${this.contactEmail};{${normalizeEndpointId(it)}}" } ?: this.contactEmail
+        (sharedP2pPeers?.computeIfAbsent(identity) { create() } ?: create()).also { peer ->
+            peer.bindPacketSender { packet -> queueP2pPacket(peer.destination, packet) }
+        }
     }
+    internal val pictureSession: MsnpP2pSession get() = pictureSessionLazy.value
 
     init { sharedPictureSession?.bindPacketSender { packet ->
-        outgoingP2pPackets.send(OutgoingPicturePacket(sharedPictureSession.destination, packet))
+        queueP2pPacket(sharedPictureSession.destination, packet)
     } }
 
     internal fun resumePictureTransfers() {
-        pictureSession.bindPacketSender { packet -> outgoingP2pPackets.send(OutgoingPicturePacket(pictureSession.destination, packet)) }
+        pictureSession.bindPacketSender { packet -> queueP2pPacket(pictureSession.destination, packet) }
     }
     private var receiverJob: Job? = null
     private var p2pSenderJob: Job? = null
@@ -117,7 +137,8 @@ internal class MsnpSwitchboardSession(
         receiverJob = scope.launch {
             try {
                 while (isActive && !closed.get()) handle(transport.receive())
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                runCatching { if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i("MsnpP2p", "Switchboard receive ended: ${error.javaClass.simpleName}") }
                 // A closed switchboard is normal after the remote participant leaves.
             } finally {
                 close()
@@ -125,8 +146,12 @@ internal class MsnpSwitchboardSession(
         }
         p2pSenderJob = scope.launch {
             try {
-                for (packet in outgoingP2pPackets) sendP2pPacket(packet)
-            } catch (_: Exception) {
+                for (packet in outgoingP2pPackets) {
+                    try { sendP2pPacket(packet); packet.delivered?.complete(Unit) }
+                    catch (error: Exception) { packet.delivered?.completeExceptionally(error); throw error }
+                }
+            } catch (error: Exception) {
+                runCatching { if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i("MsnpP2p", "Switchboard send ended: ${error.javaClass.simpleName}") }
                 close()
             }
         }
@@ -155,6 +180,33 @@ internal class MsnpSwitchboardSession(
         }
     }
 
+    suspend fun requestPhotoOriginal(shareId: String, photo: SharedPhoto): String = requireNotNull(photoPeer(shareId)).requestPhotoOriginal(photo)
+    suspend fun startPhotos(items: List<PhotoToShare>, shareId: String? = null): String =
+        (shareId?.let { requireNotNull(photoPeer(it)) } ?: pictureSession).startPhotos(items)
+    fun hasPhotoShare(id: String): Boolean = applicationPeers().any { it.hasPhotoShare(id) }
+    suspend fun acceptPhotos(id: String) { requireNotNull(photoPeer(id)).acceptPhotos(id) }
+    suspend fun stopPhotos(id: String) { photoPeer(id)?.stopPhotos(id) }
+    suspend fun selectPhoto(id: String, photoId: String) { photoPeer(id)?.selectPhoto(id, photoId) }
+    private fun photoPeer(id: String): MsnpP2pSession? =
+        applicationPeers().firstOrNull { it.hasPhotoShare(id) }?.also(::bindApplicationPeer)
+
+    suspend fun offerFile(file: java.io.File, name: String): String = pictureSession.offerFile(file, name)
+    fun hasFileTransfer(id: String): Boolean = applicationPeers().any { it.hasFileTransfer(id) }
+    suspend fun acceptFile(id: String) { requireNotNull(filePeer(id)) { "This file offer has ended." }.acceptFile(id) }
+    suspend fun cancelFile(id: String) { filePeer(id)?.cancelFile(id) }
+    private fun filePeer(id: String): MsnpP2pSession? =
+        applicationPeers().firstOrNull { it.hasFileTransfer(id) }?.also(::bindApplicationPeer)
+    private fun applicationPeers(): List<MsnpP2pSession> = initializedPicturePeers() +
+        sharedP2pPeers?.values.orEmpty().filter { it.destination.substringBefore(';').equals(contactEmail, true) }
+    private fun bindApplicationPeer(peer: MsnpP2pSession) {
+        peer.bindPacketSender { queueP2pPacket(peer.destination, it) }
+    }
+    fun closeFileTransfers() {
+        initializedPicturePeers().distinct().forEach { it.closeFileTransfers() }
+    }
+    private fun initializedPicturePeers(): List<MsnpP2pSession> =
+        (if (pictureSessionLazy.isInitialized()) listOf(pictureSession) else emptyList()) + otherPicturePeers.values
+
     suspend fun sendWink(metadata: MsnDisplayPicture) {
         for (payload in org.aralozkaya.msngr.protocol.MsnWink.payloads(metadata)) sendPayload(payload, "A")
     }
@@ -171,9 +223,6 @@ internal class MsnpSwitchboardSession(
     suspend fun sendVoiceClip(metadata: MsnDisplayPicture) {
         sendPayload(Msnp18Protocol.voiceClipPayload(metadata), acknowledgement = "A")
     }
-    private fun unusedSendInkMarker() {
-    }
-
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture) {
         pictureSession.requestDisplayPicture(picture)
     }
@@ -184,7 +233,7 @@ internal class MsnpSwitchboardSession(
         receiverJob = null
         p2pSenderJob?.cancel()
         p2pSenderJob = null
-        outgoingP2pPackets.close()
+        outgoingP2pPackets.cancel()
         pendingMessageAcks.values.forEach { it.cancel() }
         pendingMessageAcks.clear()
         transport.close()
@@ -297,6 +346,7 @@ internal class MsnpSwitchboardSession(
         if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
         val reassembledPayload = chunkAssembler.feed(rawSender, command.payload ?: return) ?: return
         val message = parseSwitchboardMime(reassembledPayload)
+        if (contactEmail.isEmpty() && !mine) addParticipant(sender)
         if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
         if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
         // Keep sibling picture controls routable without treating them as conversation history.
@@ -352,13 +402,18 @@ internal class MsnpSwitchboardSession(
     private fun p2pPeer(sender: String, sourceEndpoint: String?): MsnpP2pSession? {
         if (sender == contactEmail.normalizedSwitchboardIdentity() &&
             (sourceEndpoint == null || sourceEndpoint == normalizeEndpointId(pictureSession.destination.substringAfter(';', ""))))
-            return pictureSession
+            return pictureSession.also { peer -> peer.bindPacketSender { queueP2pPacket(peer.destination, it) } }
         val identity = sourceEndpoint?.let { "$sender;{$it}" } ?: sender
         if (!otherPicturePeers.containsKey(identity) && otherPicturePeers.size >= 16) return null
         return otherPicturePeers.computeIfAbsent(identity) {
-            MsnpP2pSession(signedInEmail, sender,
-                sendPacket = { outgoingP2pPackets.send(OutgoingPicturePacket(identity, it)) },
+            val create = { MsnpP2pSession(signedInEmail, sender,
+                sendPacket = { queueP2pPacket(identity, it) },
                 localPicture = localPicture,
+                fileDirectory = if (sender == contactEmail) fileDirectory else null,
+                onFileTransfer = { eventSink(SwitchboardEvent.FileChanged(sender, it)) },
+                onPhotoShare = { eventSink(SwitchboardEvent.PhotosChanged(sender, it)) },
+                localPhoto = { localPhoto(sender, it) }, publishPhoto = { publishPhoto(sender, it) },
+                localOriginal = { localOriginal(sender, it) }, publishOriginal = { id, original -> publishOriginal(sender, id, original) },
                 onDisplayPicture = { eventSink(SwitchboardEvent.DisplayPicture(sender, it)) },
                 localEndpointId = machineGuid, remoteEndpointId = sourceEndpoint,
                 localVoiceClip = { hash ->
@@ -366,8 +421,9 @@ internal class MsnpSwitchboardSession(
                 },
                 localWink = { hash -> if (sender == contactEmail || sender.equals(signedInEmail, true)) localWink(hash) else null },
                 onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(sender, metadata, bytes)) },
-                onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) })
-        }
+                onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) }) }
+            sharedP2pPeers?.computeIfAbsent(identity) { create() } ?: create()
+        }.also { peer -> peer.bindPacketSender { queueP2pPacket(identity, it) } }
     }
 
     private suspend fun addParticipant(rawIdentity: String) {
@@ -403,6 +459,18 @@ internal class MsnpSwitchboardSession(
         } finally {
             pendingMessageAcks.remove(transactionId, acknowledgement)
         }
+    }
+
+    private suspend fun queueP2pPacket(destination: String, bytes: ByteArray) {
+        val v2 = P2pV2Packet.parse(bytes)
+        val isFileData = if (v2 != null) v2.sessionId != 0L && v2.tfCombination and 6 == 6
+            else bytes.size >= 48 && java.nio.ByteBuffer.wrap(bytes, 28, 4)
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN).int and 0x10 != 0
+        // File producers wait for delivery one chunk at a time. Control replies from the
+        // receiver must always enqueue immediately so it can keep reading server ACKs.
+        val delivered = if (isFileData) CompletableDeferred<Unit>() else null
+        outgoingP2pPackets.send(OutgoingPicturePacket(destination, bytes, delivered))
+        delivered?.await()
     }
 
     private fun switchboardIdentity(): String =

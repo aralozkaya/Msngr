@@ -62,7 +62,9 @@ class MsngrApplication : Application() {
                 } else {
                     LiveMsnp18Client(
                         winkStore = winkStore,
+                        fileTransferDirectory = File(noBackupFilesDir, "file_transfers"),
                         endpointName = { deviceEndpointName(this) },
+                        endpointId = { deviceEndpointId(this) },
                         contactDisplayPictureCache = FileContactDisplayPictureCache(
                             File(filesDir, "contact_display_pictures"),
                         ),

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr
 
 import android.media.AudioAttributes
@@ -19,7 +21,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -215,7 +217,7 @@ internal fun VoiceClipMessage(message: ChatMessage) {
                 message.voiceClip != null -> VoiceClipPlayer(message.voiceClip)
                 message.isVoiceClipPending -> Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator(Modifier.size(20.dp))
+                    CircularWavyProgressIndicator(Modifier.size(20.dp))
                     Text("Downloading voice clip…", style = MaterialTheme.typography.bodySmall)
                 }
                 else -> Text(message.voiceClipTransferError ?: "Voice clip unavailable", style = MaterialTheme.typography.bodySmall)

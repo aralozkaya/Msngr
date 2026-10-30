@@ -165,7 +165,7 @@ internal fun EmotionSoundDropdown(
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     Box {
-        TextButton(
+        OutlinedButton(
             onClick = { expanded = true },
             enabled = enabled,
             modifier = Modifier.testTag(tag).semantics { contentDescription = label },
@@ -262,17 +262,18 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             }
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
-            if (actionBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (actionBusy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
             (error ?: player.error ?: status)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 EmotionSoundDropdown(category, emotionSoundCategories, "Sound category", "emotion_sound_category",
                     onSelected = { category = it }, enabled = !busy)
-                if (hash != null) TextButton(enabled = !busy, onClick = { action {
+                if (hash != null) Button(enabled = !busy, onClick = { action {
                     val (sound, _) = player.load(EmotionSound(hash, "Emotion sound"), save = true)
                     status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
                 } }) { Icon(Icons.Default.Download, null); Text("Download") }
-                else TextButton(enabled = !busy, onClick = {
+                else FilledTonalButton(enabled = !busy, onClick = {
                     player.stop(); searchController.clearFocusAndHideKeyboard(); randomDialog = true
                 }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
             }
@@ -288,7 +289,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             }
             online && catalogError != null -> {
                 Text(catalogError!!, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { catalogError = null; catalogAttempt++ }, modifier = Modifier.testTag("emotion_sound_online_retry")) { Text("Retry") }
+                OutlinedButton(onClick = { catalogError = null; catalogAttempt++ }, modifier = Modifier.testTag("emotion_sound_online_retry")) { Text("Retry") }
             }
             results.isEmpty() -> Text(if (online) "No matching sounds. Enter a sound ID to download, or try Random." else "No matching sounds.",
                 modifier = Modifier.testTag("emotion_sound_empty"))
@@ -373,7 +374,7 @@ internal fun EmotionSoundMessageSheet(message: org.aralozkaya.msngr.data.ChatMes
                 shapes = ListItemDefaults.segmentedShapes(1, 2),
                 leadingContent = { Icon(if (saved) Icons.Default.Delete else Icons.Default.Add, null) },
                 content = { Text(if (saved) "Remove from saved sounds" else "Add to saved sounds") })
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
             (error ?: player.error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }

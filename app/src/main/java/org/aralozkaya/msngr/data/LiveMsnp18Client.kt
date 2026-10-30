@@ -122,6 +122,7 @@ internal class LiveMsnp18Client(
         photoResourceId: String,
     ) -> Unit = MsnpStorageService::removeDisplayPicture,
     private val winkStore: WinkStore? = null,
+    private val fileTransferDirectory: java.io.File? = null,
     private val contactDisplayPictureCache: ContactDisplayPictureCache =
         EmptyContactDisplayPictureCache,
     private val contactTilePollIntervalMillis: Long = CONTACT_TILE_POLL_INTERVAL_MILLIS,
@@ -130,6 +131,7 @@ internal class LiveMsnp18Client(
     private val offlineMessageService: OfflineMessageService = MsnpOfflineMessages,
     private val offlineRetryDelayMillis: Long = 30_000L,
     private val endpointName: () -> String = { deviceEndpointName() },
+    private val endpointId: () -> String = { UUID.randomUUID().toString() },
     private val addAddressBookContact: suspend (String, String, String, String, String) -> String =
         MsnpAddressBookService::addContact,
     private val removeAddressBookContact: suspend (String, String, String) -> Unit =
@@ -181,6 +183,26 @@ internal class LiveMsnp18Client(
     private val switchboards = ConcurrentHashMap<String, MsnpSwitchboardSession>()
     private val activeSwitchboards = ConcurrentHashMap.newKeySet<MsnpSwitchboardSession>()
     private val pictureSessions = ConcurrentHashMap<String, MsnpP2pSession>()
+    private val applicationP2pPeers = ConcurrentHashMap<String, MsnpP2pSession>()
+    private data class SharedPhotoObject(val recipients: Set<String>, val data: LocalDisplayPicture, val created: Long = System.nanoTime())
+    private val sharedPhotoObjects = ConcurrentHashMap<String, SharedPhotoObject>()
+    private fun localPhotoObject(peer: String, hash: String): LocalDisplayPicture? = sharedPhotoObjects[hash]?.takeIf {
+        (peer.lowercase() in it.recipients || peer.equals(signedInEmail, true)) && System.nanoTime() - it.created < 600_000_000_000L
+    }?.data
+    private data class SharedOriginal(val recipients: Set<String>, val original: OriginalPhoto)
+    private val sharedOriginals = ConcurrentHashMap<String, SharedOriginal>()
+    private fun localOriginalPhoto(peer: String, id: String): OriginalPhoto? = sharedOriginals[id.uppercase()]?.takeIf {
+        peer.lowercase() in it.recipients || peer.equals(signedInEmail, true)
+    }?.original
+    private fun publishOriginalPhoto(peer: String, id: String, original: OriginalPhoto) {
+        sharedOriginals[id.uppercase()] = SharedOriginal(setOf(peer.lowercase()), original)
+    }
+    private fun publishPhotoObject(peer: String, data: LocalDisplayPicture) {
+        sharedPhotoObjects.entries.removeIf { System.nanoTime() - it.value.created > 600_000_000_000L }
+        sharedPhotoObjects.compute(data.metadata.sha1d) { _, previous ->
+            SharedPhotoObject(previous?.recipients.orEmpty() + peer.lowercase(), data)
+        }
+    }
     private data class SharedVoice(val data: LocalDisplayPicture, val createdAt: Long)
     private val sharedVoiceClips = ConcurrentHashMap<String, SharedVoice>()
     private data class SharedWink(val data: LocalDisplayPicture, val createdAt: Long, val recipients: Set<String>)
@@ -286,7 +308,7 @@ internal class LiveMsnp18Client(
             challenge.policy,
             challenge.nonce,
         )
-        val endpointGuid = UUID.randomUUID().toString()
+        val endpointGuid = UUID.fromString(endpointId()).toString()
         val transactionId = nextTransactionId()
         send(
             MsnpCommand(
@@ -394,6 +416,7 @@ internal class LiveMsnp18Client(
         val pendingIds = addressBook.contactRequests.map(ContactRequest::id).toSet()
         publishInitialContactList(addressBook.contacts.filterNot { it.isGroup || it.id in pendingIds })
         send(Msnp18Protocol.endpointCapabilities(nextTransactionId()))
+        send(Msnp18Protocol.endpointMachineGuid(nextTransactionId(), machineGuid))
         send(
             Msnp18Protocol.privateEndpointData(
                 nextTransactionId(),
@@ -895,6 +918,62 @@ internal class LiveMsnp18Client(
             updateWink(message.contactId, message.id, null)
         }
     }
+
+    private val mutablePhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap())
+    override val photoShares = mutablePhotoShares.asStateFlow()
+    override suspend fun requestPhotoOriginal(contactId: String, shareId: String, photoId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val share = requireNotNull(mutablePhotoShares.value[contactId])
+            require(share.id == shareId)
+            val photo = requireNotNull(share.photos.firstOrNull { it.id.equals(photoId, true) })
+            if (photo.originalPath == null && !photo.originalPending) photoSession(contactId, shareId).requestPhotoOriginal(shareId, photo)
+            Unit
+        }
+    }
+    override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val email = contactEmail(contactId)
+            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) { "This contact is unavailable for photo sharing." }
+            val active = mutablePhotoShares.value[email.lowercase()]?.takeIf { it.status == PhotoShareStatus.Active }
+            if (active != null) photoSession(email, active.id).startPhotos(photos, active.id)
+            else switchboardFor(email).startPhotos(photos)
+            Unit
+        }
+    }
+    private suspend fun photoSession(contactId: String, id: String): MsnpSwitchboardSession =
+        switchboardFor(contactId).also { check(it.hasPhotoShare(id)) { "This photo share has ended." } }
+    override suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).acceptPhotos(id) } }
+    override suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).stopPhotos(id) } }
+    override suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).selectPhoto(id, photoId) } }
+
+    private fun transferArea(): java.io.File {
+        check(signedInStorageAccount.isNotBlank()) { "Sign in before sharing files." }
+        val key = java.security.MessageDigest.getInstance("SHA-256").digest(signedInStorageAccount.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return java.io.File(requireNotNull(fileTransferDirectory), key)
+    }
+
+    override suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val email = contactEmail(contactId)
+            check(!isGroup(email)) { "File transfers are only available in one-to-one chats." }
+            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            check(contact != null && !contact.isBlocked && contact.presence != Presence.Offline) { "This contact is unavailable for file transfers." }
+            check(signedInEmail.isNotBlank()) { "Sign in before sharing files." }
+            switchboardFor(email).offerFile(file, name)
+            Unit
+        }
+    }
+
+    override suspend fun acceptFile(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { fileSession(contactId, id).acceptFile(id) }
+    }
+    override suspend fun cancelFile(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { fileSession(contactId, id).cancelFile(id); Unit }
+    }
+    private suspend fun fileSession(contactId: String, id: String): MsnpSwitchboardSession =
+        switchboardFor(contactId).also { check(it.hasFileTransfer(id)) { "This file offer has ended." } }
 
     override suspend fun sendVoiceClip(contactId: String, clip: VoiceClip): Result<Unit> {
         val email = contactEmail(contactId)
@@ -2606,6 +2685,12 @@ internal class LiveMsnp18Client(
                 scope = scope,
                 eventSink = { event -> handleSwitchboardEvent(session, event) },
                 localPicture = ::localDisplayPictureSnapshot,
+                fileDirectory = fileTransferDirectory?.let { { transferArea() } },
+                sharedP2pPeers = applicationP2pPeers,
+                localPhoto = ::localPhotoObject,
+                publishPhoto = ::publishPhotoObject,
+                localOriginal = ::localOriginalPhoto,
+                publishOriginal = ::publishOriginalPhoto,
                 localVoiceClip = { hash -> localVoiceClipSnapshot(session.contactEmail, hash) },
                 localWink = { hash -> localWinkSnapshot(session.contactEmail, hash) },
                 cachedWink = { metadata -> winkStore?.bytes(signedInStorageAccount, metadata) },
@@ -2731,6 +2816,10 @@ internal class LiveMsnp18Client(
             scope = scope,
             eventSink = { event -> handleSwitchboardEvent(session, event) },
             localPicture = ::localDisplayPictureSnapshot,
+            fileDirectory = fileTransferDirectory?.let { { transferArea() } },
+            sharedP2pPeers = applicationP2pPeers,
+            localPhoto = ::localPhotoObject, publishPhoto = ::publishPhotoObject,
+            localOriginal = ::localOriginalPhoto, publishOriginal = ::publishOriginalPhoto,
             localVoiceClip = { hash -> localVoiceClipSnapshot(session.contactEmail, hash) },
             localWink = { hash -> localWinkSnapshot(session.contactEmail, hash) },
             cachedWink = { metadata -> winkStore?.bytes(signedInStorageAccount, metadata) },
@@ -2744,7 +2833,8 @@ internal class LiveMsnp18Client(
             // Native WLM can move an existing P2P bridge to a second switchboard. Keep
             // the old receiver alive for its remaining packets and retain sequence state.
             .onSuccess { if (session.contactEmail.isNotEmpty()) registerIncomingSwitchboard(session) }
-            .onFailure {
+            .onFailure { error ->
+                pictureTrace("SWITCHBOARD incoming-failed ${error.javaClass.simpleName}")
                 session.close()
                 if (switchboards[id] === previousSession) previousSession?.resumePictureTransfers()
             }
@@ -2785,7 +2875,11 @@ internal class LiveMsnp18Client(
             }
             return
         }
-        val contactId = session.contactEmail
+        val contactId = when (event) {
+            is SwitchboardEvent.FileChanged -> event.senderEmail.lowercase()
+            is SwitchboardEvent.PhotosChanged -> event.senderEmail.lowercase()
+            else -> session.contactEmail
+        }
         if (contactId.isEmpty()) {
             if (event == SwitchboardEvent.Closed) activeSwitchboards.remove(session)
             return
@@ -2798,7 +2892,8 @@ internal class LiveMsnp18Client(
         }
         if (event is SwitchboardEvent.Text || event is SwitchboardEvent.Ink ||
             event is SwitchboardEvent.WinkOffered || event is SwitchboardEvent.VoiceClipOffered ||
-            event is SwitchboardEvent.Nudge
+            event is SwitchboardEvent.Nudge || event is SwitchboardEvent.FileChanged ||
+            event is SwitchboardEvent.PhotosChanged
         ) ensureSwitchboardContact(contactId)
         when (event) {
             SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
@@ -2818,6 +2913,64 @@ internal class LiveMsnp18Client(
             }
             is SwitchboardEvent.WinkReceived -> {
                 completeWinkTransfer(event.senderEmail, event.metadata, event.bytes)
+            }
+            is SwitchboardEvent.PhotosChanged -> {
+                if (!event.senderEmail.equals(contactId, true)) return
+                var previous: PhotoShare? = null
+                var merged = event.share
+                mutablePhotoShares.update { all ->
+                    val oldShare = all[contactId]
+                    previous = oldShare
+                    merged = if (oldShare?.id == event.share.id) event.share.copy(photos = event.share.photos.map { photo ->
+                        oldShare.photos.firstOrNull { it.id == photo.id }?.let { old -> photo.copy(
+                            originalPath = old.originalPath ?: photo.originalPath, originalPending = old.originalPending,
+                            originalError = old.originalError, originalSentToPeer = old.originalSentToPeer || photo.originalSentToPeer)
+                        } ?: photo
+                    }) else event.share
+                    all + (contactId to merged)
+                }
+                if (previous?.id != event.share.id) {
+                    val message = ChatMessage(messageIds.incrementAndGet(), contactId, MessageAuthor.System,
+                        if (event.share.outgoing) "Photo sharing invitation sent." else "Photo sharing invitation received.", System.currentTimeMillis())
+                    appendMessage(message)
+                    if (!event.share.outgoing) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id)) }
+                } else if (previous?.status != merged.status && merged.status in listOf(PhotoShareStatus.Stopped, PhotoShareStatus.Declined, PhotoShareStatus.Failed)) {
+                    val text = when (merged.status) {
+                        PhotoShareStatus.Stopped -> if (merged.remoteStopped) "The other person stopped sharing photos." else "You stopped sharing photos."
+                        PhotoShareStatus.Declined -> "Photo sharing invitation declined."
+                        else -> merged.error ?: "Photo sharing failed."
+                    }
+                    val message = ChatMessage(messageIds.incrementAndGet(), contactId, MessageAuthor.System, text, System.currentTimeMillis())
+                    appendMessage(message)
+                    if (merged.remoteStopped) {
+                        incrementUnread(contactId)
+                        mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                    }
+                }
+            }
+            is SwitchboardEvent.FileChanged -> {
+                if (!event.senderEmail.equals(contactId, true)) return
+                if (event.transfer.photoId != null) {
+                    val transfer = event.transfer
+                    mutablePhotoShares.update { all -> all[contactId]?.let { share -> all + (contactId to share.copy(photos = share.photos.map { photo ->
+                        if (!photo.id.equals(transfer.photoId, true)) photo else photo.copy(
+                            originalPath = if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete) transfer.localPath else photo.originalPath,
+                            originalPending = !transfer.outgoing && transfer.active,
+                            originalError = transfer.error,
+                            originalSentToPeer = photo.originalSentToPeer || (transfer.outgoing && transfer.status == FileTransferStatus.Complete))
+                    })) } ?: all }
+                    return
+                }
+                val existing = mutableMessages.value[contactId].orEmpty().firstOrNull { it.fileTransfer?.id == event.transfer.id }
+                if (existing == null) {
+                    val message = ChatMessage(messageIds.incrementAndGet(), contactId,
+                        if (event.transfer.outgoing) MessageAuthor.Me else MessageAuthor.Contact,
+                        "File: ${event.transfer.name}", System.currentTimeMillis(), fileTransfer = event.transfer)
+                    appendMessage(message)
+                    if (!event.transfer.outgoing) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id)) }
+                } else mutableMessages.update { all -> all + (contactId to all[contactId].orEmpty().map {
+                    if (it.id == existing.id) it.copy(fileTransfer = event.transfer) else it
+                }) }
             }
             is SwitchboardEvent.VoiceClipOffered -> {
                 if (isGroup(contactId)) return
@@ -3048,6 +3201,11 @@ internal class LiveMsnp18Client(
     }
 
     private fun closeSwitchboards(contactId: String) {
+        activeSwitchboards.filter { it.contactEmail.equals(contactId, true) }.forEach { it.closeFileTransfers() }
+        pictureSessions.remove(contactId)?.closeFileTransfers()
+        applicationP2pPeers.entries.filter { it.key.substringBefore(';').equals(contactId, true) }.forEach {
+            if (applicationP2pPeers.remove(it.key, it.value)) it.value.closeFileTransfers()
+        }
         switchboards.remove(contactId)?.close()
         activeSwitchboards.filter { it.contactEmail.equals(contactId, ignoreCase = true) }
             .forEach(MsnpSwitchboardSession::close)
@@ -3146,9 +3304,15 @@ internal class LiveMsnp18Client(
         initialContactPictureRefreshSignal = null
         pendingNotificationTransactions.values.forEach { it.cancel() }
         pendingNotificationTransactions.clear()
-        activeSwitchboards.toList().forEach(MsnpSwitchboardSession::close)
+        activeSwitchboards.toList().forEach { it.closeFileTransfers(); it.close() }
         activeSwitchboards.clear()
+        pictureSessions.values.forEach { it.closeFileTransfers() }
         pictureSessions.clear()
+        applicationP2pPeers.values.forEach { it.closeFileTransfers() }
+        applicationP2pPeers.clear()
+        sharedPhotoObjects.clear()
+        sharedOriginals.clear()
+        mutablePhotoShares.value = emptyMap()
         sharedWinks.clear()
         pendingWinks.clear()
         sharedVoiceClips.clear()

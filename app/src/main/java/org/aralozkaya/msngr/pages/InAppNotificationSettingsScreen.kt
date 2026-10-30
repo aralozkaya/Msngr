@@ -2,6 +2,8 @@
 
 package org.aralozkaya.msngr.pages
 
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,7 +62,7 @@ internal fun InAppNotificationSettingsScreen(
         notificationOptions(settings.defaults, settings.defaults.enabled, InAppNotificationType.entries,
             onChange = { options -> InAppNotificationPrefs.update(context) { it.copy(defaults = options) } })
         item(key = "customized-notifications") {
-            TextButton(
+            FilledTonalButton(
                 onClick = onCustomizedNotifications,
                 modifier = Modifier.fillMaxWidth().testTag("customized_notification_settings").padding(16.dp),
             ) { Text("Customized notifications") }
@@ -156,7 +158,7 @@ internal fun ConversationNotificationSettingsScreen(
             InAppNotificationPrefs.customizeBackground(context, contactId, displayName, isGroup) { it.copy(backgroundSilent = silent) }
         }
         if (custom != null) item {
-            TextButton(onClick = { InAppNotificationPrefs.reset(context, contactId) },
+            OutlinedButton(onClick = { InAppNotificationPrefs.reset(context, contactId) },
                 modifier = Modifier.testTag("reset_conversation_notifications")) { Text("Reset to general settings") }
         }
     }

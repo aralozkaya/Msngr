@@ -1,10 +1,12 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package org.aralozkaya.msngr.pages.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,10 +47,9 @@ internal fun LoadingButtonContent(
                 contentDescription = label
                 liveRegion = LiveRegionMode.Polite
             }
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 modifier = progressModifier.size(20.dp),
                 color = LocalContentColor.current,
-                strokeWidth = 2.dp,
             )
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, content = content)

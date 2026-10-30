@@ -3,6 +3,7 @@
 
 package org.aralozkaya.msngr.pages.components
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -227,7 +229,7 @@ internal fun GroupEditorDialog(
         }
     }
     val submitButton: @Composable () -> Unit = {
-        TextButton(onClick = ::submit,
+        Button(onClick = ::submit,
             enabled = submitting || (!busy && if (invitationAction) selected.isNotEmpty() || email.isNotBlank() else name.isNotBlank()),
             modifier = Modifier.testTag("group-editor-submit")) {
             LoadingButtonContent(
@@ -330,9 +332,9 @@ private fun GroupContactPickerDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .selectable(
-                                    selected = checked,
-                                    onClick = { onSelectionChange(contact.email, !checked) },
+                                .toggleable(
+                                    value = checked,
+                                    onValueChange = { onSelectionChange(contact.email, it) },
                                     role = Role.Checkbox
                                 )
                                 .height(56.dp)
@@ -357,7 +359,7 @@ private fun GroupContactPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss,
+            Button(onClick = onDismiss,
                 modifier = Modifier.testTag("group-contact-picker-done")) { Text("Done") }
         },
     )

@@ -97,6 +97,12 @@ object Msnp18Protocol {
         "<EndpointData><Capabilities>$ENDPOINT_CAPABILITIES</Capabilities></EndpointData>",
     )
 
+    /** Refresh routing without changing the account's roaming personal message. */
+    fun endpointMachineGuid(transactionId: Int, machineGuid: String): MsnpCommand = uux(
+        transactionId,
+        "<Data><MachineGuid>${machineGuid.escapeXml()}</MachineGuid></Data>",
+    )
+
     fun privateEndpointData(
         transactionId: Int,
         presence: Presence,
@@ -428,14 +434,14 @@ object Msnp18Protocol {
         )
     }
 
-    // MSNC9, chunking, handwriting, voice clips (0x40000), and winks (0x8000).
-    // The extended mask advertises only nudges (0x400). In particular, it leaves out
-    // activities and games (0x100), and file transfer (0x20000).
-    const val CLIENT_ID = 2_416_214_060L
+    // MSNC10, chunking, handwriting, voice clips, and winks.
+    // Endpoint capabilities include P2Pv2 (0x20), nudges (0x400), Photos (0x1000),
+    // and conversation-window file transfers (0x20000).
+    const val CLIENT_ID = 2_684_649_516L
     const val BASE_CAPABILITIES = 294_956
-    const val EXTENDED_CAPABILITIES = 1_024
-    const val CLIENT_IDENTITY = "2416214060:1024"
-    const val ENDPOINT_CAPABILITIES = "294956:1024"
+    const val EXTENDED_CAPABILITIES = 136_224
+    const val CLIENT_IDENTITY = "2684649516:136224"
+    const val ENDPOINT_CAPABILITIES = "294956:136224"
 
     fun voiceClipPayload(clip: MsnDisplayPicture): ByteArray {
         require(clip.objectType == MsnVoiceClip.OBJECT_TYPE)
@@ -552,6 +558,7 @@ class MsnpFrameDecoder {
  * traffic never uses those services as a tunnel and explicitly bypasses configured socket proxies.
  */
 class Msnp18SocketTransport : MsnpTransport {
+    private val traceId = nextTraceId.incrementAndGet()
     private var socket: Socket? = null
     private var input: BufferedInputStream? = null
     private var output: BufferedOutputStream? = null
@@ -605,9 +612,10 @@ class Msnp18SocketTransport : MsnpTransport {
     }
 
     override fun close() {
+        // Unblock a concurrent receive before closing its buffered stream.
+        runCatching { socket?.close() }
         runCatching { input?.close() }
         runCatching { output?.close() }
-        runCatching { socket?.close() }
         input = null
         output = null
         socket = null
@@ -616,6 +624,8 @@ class Msnp18SocketTransport : MsnpTransport {
     }
 
     private fun trace(message: String) {
-        if (BuildConfig.DEBUG) Log.i("MsnpWire", message)
+        if (BuildConfig.DEBUG) Log.i("MsnpWire", "$traceId $message")
     }
+
+    private companion object { val nextTraceId = java.util.concurrent.atomic.AtomicInteger() }
 }

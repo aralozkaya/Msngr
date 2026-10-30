@@ -182,7 +182,7 @@ internal fun NativeTextStyleSheet(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                TextButton(
+                OutlinedButton(
                     onClick = {
                         sizeInput = NativeTextStyle.DEFAULT_SIZE.toString()
                         updateSize(NativeTextStyle())

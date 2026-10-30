@@ -521,6 +521,19 @@ private fun DataInputStream.readChatMessage(contactId: String, version: Int = 1)
                 org.aralozkaya.msngr.protocol.MsnWink.parseOffer(readSizedString()) ?: error("Invalid saved wink."), readSizedString())
         } else null,
         winkTransferError = if (version >= 7 && readBoolean()) readSizedString() else null,
+        fileTransfer = if (version >= 8 && readBoolean()) {
+            val id = readSizedString()
+            val name = readSizedString()
+            val size = readLong()
+            require(org.aralozkaya.msngr.protocol.MsnFileContext.validName(name) && size in 0..org.aralozkaya.msngr.protocol.MsnFileContext.MAX_FILE_BYTES)
+            val outgoing = readBoolean()
+            val status = FileTransferStatus.valueOf(readSizedString())
+            val count = readLong()
+            require(count in 0..size)
+            FileTransfer(id, name, size, outgoing, status, count,
+                if (readBoolean()) readSizedString() else null,
+                if (readBoolean()) readSizedString() else null).interrupted()
+        } else null,
     )
 }
 
@@ -572,6 +585,13 @@ private fun DataOutputStream.writeChatMessage(message: ChatMessage) {
     val winkError = if (message.isWinkPending) "Wink download was interrupted." else message.winkTransferError
     writeBoolean(winkError != null)
     winkError?.let(::writeSizedString)
+    writeBoolean(message.fileTransfer != null)
+    message.fileTransfer?.interrupted()?.let { transfer ->
+        writeSizedString(transfer.id); writeSizedString(transfer.name); writeLong(transfer.size)
+        writeBoolean(transfer.outgoing); writeSizedString(transfer.status.name); writeLong(transfer.transferred)
+        writeBoolean(transfer.localPath != null); transfer.localPath?.let(::writeSizedString)
+        writeBoolean(transfer.error != null); transfer.error?.let(::writeSizedString)
+    }
 }
 
 private fun writeHistoryChunk(file: File, contactId: String, messages: List<ChatMessage>) =
@@ -634,7 +654,7 @@ private val CHAT_MESSAGE_COMPARATOR = compareBy(ChatMessage::timestampMillis, Ch
 private val CHUNK_FILE_REGEX = Regex("chunk-(\\d{8})\\.bin")
 private const val DEFAULT_PAGE_SIZE = 200
 private const val CHUNK_MAGIC = 0x4D534743
-private const val CHUNK_VERSION = 7
+private const val CHUNK_VERSION = 8
 private const val LEGACY_FILE_MAGIC = 0x4D534748
 private const val LEGACY_FILE_VERSION = 1
 private const val MAX_ENTRY_COUNT = 1_000_000

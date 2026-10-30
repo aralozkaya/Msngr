@@ -3,6 +3,7 @@
 
 package org.aralozkaya.msngr.pages
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,7 +121,7 @@ internal fun RequestsPage(
                         else -> Text(stringResource(R.string.requests_empty),
                             textAlign = TextAlign.Center, modifier = Modifier.testTag("requests-empty"))
                     }
-                    if (refreshError != null) TextButton(onRefresh, enabled = !refreshing,
+                    if (refreshError != null) OutlinedButton(onRefresh, enabled = !refreshing,
                         shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(R.string.requests_refresh))
                     }
@@ -132,7 +133,7 @@ internal fun RequestsPage(
                 if (refreshError != null) item(key = "refresh-error") {
                     Text(refreshError, color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    TextButton(onRefresh, enabled = !refreshing) {
+                    OutlinedButton(onRefresh, enabled = !refreshing) {
                         Text(stringResource(R.string.requests_refresh))
                     }
                 }

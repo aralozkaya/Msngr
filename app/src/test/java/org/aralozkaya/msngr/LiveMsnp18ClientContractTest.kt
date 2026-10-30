@@ -1804,9 +1804,15 @@ class LiveMsnp18ClientContractTest {
         assertEquals(Presence.Busy, profile.presence)
         assertEquals(listOf(contact), client.contacts.value)
         assertEquals(
-            listOf("VER", "CVR", "USR", "USR", "ADL", "UUX", "UUX", "CHG"),
-            notification.sent.take(8).map(MsnpCommand::verb),
+            listOf("VER", "CVR", "USR", "USR", "ADL", "UUX", "UUX", "UUX", "CHG"),
+            notification.sent.take(9).map(MsnpCommand::verb),
         )
+        val signedInEndpoint = notification.sent.single { it.verb == "USR" && it.parameters.firstOrNull() == "SSO" && it.parameters.getOrNull(1) == "S" }.parameters.last()
+        assertTrue(notification.sent.filter { it.verb == "UUX" }.any {
+            it.payload?.toString(Charsets.UTF_8)?.contains("<MachineGuid>$signedInEndpoint</MachineGuid>") == true
+        })
+        val initialIdentity = notification.sent.first { it.verb == "UUX" && it.payload?.toString(Charsets.UTF_8)?.contains("<MachineGuid>") == true }
+        assertFalse("Publishing routing identity must not overwrite a personal message", initialIdentity.payload!!.toString(Charsets.UTF_8).contains("<PSM"))
         assertEquals(
             Presence.Busy.msnpCode,
             notification.sent.single { it.verb == "CHG" }.parameters.first(),
@@ -1861,7 +1867,7 @@ class LiveMsnp18ClientContractTest {
         client.changePersonalMessage(MockServerData.ACCOUNT_STATUS_MESSAGE)
         val personalMessage = notification.sent
             .filter { it.verb == "UUX" }
-            .single { it.payload?.toString(Charsets.UTF_8).orEmpty().contains("<Data>") }
+            .last { it.payload?.toString(Charsets.UTF_8).orEmpty().contains("<Data>") }
             .payload
             ?.toString(Charsets.UTF_8)
             .orEmpty()

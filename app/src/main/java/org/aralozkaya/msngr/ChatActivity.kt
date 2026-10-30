@@ -165,7 +165,6 @@ import org.aralozkaya.msngr.pages.components.KeyboardSheetTile
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTileGrid
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.pages.components.PresenceDot
-import org.aralozkaya.msngr.pages.components.isKeyboardRising
 import org.aralozkaya.msngr.pages.components.keyboardSheetWindowInsets
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.WinkReference
@@ -288,6 +287,7 @@ private fun ChatRoute(
         }
     }
 
+    val photoShares by repository.photoShares.collectAsState()
     var playingWink by remember(contactId) { mutableStateOf<ChatMessage?>(null) }
     LaunchedEffect(contactId, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -304,6 +304,7 @@ private fun ChatRoute(
     } }
 
     ChatScreen(
+        photoShare = photoShares[contactId],
         onSendEmotionSound = { repository.sendEmotionSound(contactId, it) },
         onSendWink = { wink, bytes -> repository.sendWink(contactId, wink, bytes) },
         otherUnreadCount = otherUnreadCount(contacts, contactId),
@@ -365,6 +366,7 @@ internal fun ChatScreen(
     nudgeCooldownMillis: Long = 0L,
     ownPresence: Presence = Presence.Online,
     ownEmail: String = "",
+    photoShare: org.aralozkaya.msngr.data.PhotoShare? = null,
 ) {
     val groupFeatures = contact?.takeIf { it.isGroup }?.groupFeatures(ownEmail)
     val nudgeShakeState = rememberNudgeShakeState()
@@ -477,6 +479,7 @@ internal fun ChatScreen(
                                 }
                             }
                         },
+                        actions = { SharingMenu(contact?.id.orEmpty(), enabled = isConversationAvailable && contact != null && !contact.isGroup && contact.presence.isOnline && ownPresence.isOnline) },
                         title = {
                             Row(
                                 modifier = Modifier
@@ -528,6 +531,9 @@ internal fun ChatScreen(
                 }
                 if (SessionPrefs.isMockServerActive()) MockServerBanner()
             }
+        },
+        floatingActionButton = {
+            if (photoShare != null && contact != null) PhotoSharingHost(contact.id, photoShare)
         },
         bottomBar = {
             MessageComposer(
@@ -706,7 +712,7 @@ internal fun ChatMessageList(
 }
 
 @Composable
-private fun MessageComposer(
+internal fun MessageComposer(
     enabled: Boolean = true,
     handwritingEnabled: Boolean = enabled,
     emotionSoundsEnabled: Boolean = enabled,
@@ -772,14 +778,8 @@ private fun MessageComposer(
     val bottomInsets = WindowInsets.safeDrawing
         .only(WindowInsetsSides.Bottom)
         .union(keyboardSheetWindowInsets())
-    val slotBackgroundColor = if (isKeyboardRising()) {
-        composerBackgroundColor
-    } else {
-        Color.Transparent
-    }
-
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().background(composerBackgroundColor).testTag("chat_composer"),
     ) {
         if (enabled && nudgeCooldownMillis > 0L) {
             Text(
@@ -949,7 +949,6 @@ private fun MessageComposer(
         Spacer(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(slotBackgroundColor)
                 .windowInsetsBottomHeight(bottomInsets),
         )
     }
@@ -1642,7 +1641,9 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                if (message.wink != null) {
+                if (message.fileTransfer != null) {
+                    FileTransferMessage(message)
+                } else if (message.wink != null) {
                     WinkMessage(message, onShowOptions = { showWinkOptions = true })
                 } else if (message.isVoiceClip) {
                     VoiceClipMessage(message)

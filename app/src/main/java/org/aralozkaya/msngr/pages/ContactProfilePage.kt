@@ -2,6 +2,8 @@
 
 package org.aralozkaya.msngr.pages
 
+import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -176,40 +178,30 @@ fun ContactProfilePage(
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(
+                    DestructiveOutlinedButton(
                         onClick = { showBlockConfirmation = true },
                         enabled = !contact.isBlocked,
-                        shapes = ButtonDefaults.shapes(),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
                     ) {
                         Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                         Text(if (contact.isBlocked) "Blocked" else "Block")
                     }
-                    OutlinedButton(
+                    DestructiveOutlinedButton(
                         onClick = {
                             eraseError = null
                             showEraseConfirmation = true
                         },
-                        shapes = ButtonDefaults.shapes(),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
                     ) {
                         Icon(Icons.Outlined.DeleteSweep, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                         Text("Erase history")
                     }
                     if (onDeleteContact != null && contact.isForwardListContact && !contact.isGroup) {
-                        OutlinedButton(
+                        DestructiveOutlinedButton(
                             onClick = { deleteTarget = contact },
-                            shapes = ButtonDefaults.shapes(),
                             contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) {
                             Icon(Icons.Outlined.PersonRemove, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
