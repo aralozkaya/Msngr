@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -276,31 +277,34 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
         if (!ongoing) closed = true
     }
     val stop: () -> Unit = { scope.launch { error = (onStop?.invoke() ?: context.sharingRepository().stopPhotos(contactId, share.id)).exceptionOrNull()?.message } }
-    if (!visible) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-            tooltip = { PlainTooltip { Text("View photos") } },
-            state = rememberTooltipState(),
-        ) {
-            FloatingActionButton(
-                onClick = { visible = true },
-                modifier = Modifier.testTag("reopen_photo_share").semantics {
+    // Keep the FAB composed behind the sheet so Material can animate both directions.
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text("View photos") } },
+        state = rememberTooltipState(),
+    ) {
+        FloatingActionButton(
+            onClick = { visible = true },
+            modifier = Modifier.animateFloatingActionButton(
+                visible = !visible,
+                alignment = Alignment.BottomEnd,
+            ).then(if (visible) Modifier.clearAndSetSemantics {} else
+                Modifier.testTag("reopen_photo_share").semantics {
                     stateDescription = when (share.status) {
                         PhotoShareStatus.Invited -> "Photo sharing invitation"
                         PhotoShareStatus.Active -> "Sharing ${share.photos.size} photos"
                         else -> "Photo sharing ended"
                     }
-                },
-            ) {
-                BadgedBox(badge = {
-                    if (share.photos.isNotEmpty()) Badge { Text(share.photos.size.toString()) }
-                }) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = "View photos")
-                }
+                }),
+        ) {
+            BadgedBox(badge = {
+                if (share.photos.isNotEmpty()) Badge { Text(share.photos.size.toString()) }
+            }) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = "View photos")
             }
         }
-        return
     }
+    if (!visible) return
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 28.dp).testTag("photo_share"),
