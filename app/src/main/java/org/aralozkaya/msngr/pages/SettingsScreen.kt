@@ -60,6 +60,7 @@ import org.aralozkaya.msngr.MessengerPlusPrefs
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.ThemeMode
+import org.aralozkaya.msngr.WinkCatalogActivity
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
@@ -652,8 +653,24 @@ fun ConnectionInformationScreen(
         settingsDetailsSection("Account and service", accountDetails, first = true)
         settingsSectionSpacer()
         settingsDetailsSection("Connected services", serviceEndpoints)
+        settingsSectionSpacer()
+        settingsDetailsSection(
+            "Messenger Plus!",
+            messengerPlusConnectionDetails(
+                winkCatalogUrl = WinkCatalogActivity.CATALOG_URL,
+                emotionSoundUrl = snapshot.resolvedServers.emotionSoundServer,
+            ),
+        )
     }
 }
+
+internal fun messengerPlusConnectionDetails(
+    winkCatalogUrl: String?,
+    emotionSoundUrl: String?,
+): List<Pair<String, String>> = listOf(
+    "Winks" to winkCatalogUrl,
+    "Emotion sounds" to emotionSoundUrl,
+).map { (label, url) -> label to (url?.takeIf { it.isNotBlank() } ?: "Not configured") }
 
 @Composable
 fun AboutSettingsScreen(
