@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -183,6 +184,7 @@ internal fun NativeTextStyleSheet(
                     )
                 }
                 OutlinedButton(
+                    shapes = ButtonDefaults.shapes(),
                     onClick = {
                         sizeInput = NativeTextStyle.DEFAULT_SIZE.toString()
                         updateSize(NativeTextStyle())
@@ -265,6 +267,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
         Text("Font Style", modifier = Modifier.weight(1f))
         Box {
             OutlinedButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = { expanded = true },
                 modifier = Modifier.testTag("native_font_style_dropdown"),
             ) {

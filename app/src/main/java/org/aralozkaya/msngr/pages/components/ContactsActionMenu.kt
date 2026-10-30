@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.ToggleFloatingActionButtonDefaults
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -71,6 +72,7 @@ fun ContactsActionMenu(
                 ToggleFloatingActionButton(
                     checked = expanded,
                     onCheckedChange = { expanded = it },
+                    containerCornerRadius = ToggleFloatingActionButtonDefaults.containerCornerRadius(),
                     modifier = Modifier.semantics {
                         contentDescription = toggleLabel
                         stateDescription = menuState

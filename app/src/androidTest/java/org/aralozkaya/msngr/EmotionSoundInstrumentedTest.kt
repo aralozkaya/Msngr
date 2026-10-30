@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.action.ViewActions
@@ -59,6 +60,9 @@ class EmotionSoundInstrumentedTest {
         compose.onNodeWithContentDescription("Show emoticons").performTouchInput { longClick() }
         compose.onNodeWithTag("emotion_sound_menu_item").assertIsEnabled().performClick()
         compose.onNodeWithTag("emotion_sound_picker").assertIsDisplayed()
+        val picker = compose.onNodeWithTag("emotion_sound_picker").fetchSemanticsNode().boundsInRoot
+        val random = compose.onNodeWithTag("emotion_sound_random").fetchSemanticsNode().boundsInRoot
+        assertEquals(picker.right - with(compose.density) { 16.dp.toPx() }, random.right, 1f)
         screenshot("emotion-sound-picker.png")
         compose.onNodeWithTag("emotion_sound_category").performClick()
         compose.onNodeWithTag("emotion_sound_category_menu").assertIsDisplayed()

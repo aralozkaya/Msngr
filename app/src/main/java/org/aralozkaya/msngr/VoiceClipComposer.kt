@@ -25,6 +25,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +45,10 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,6 +69,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -72,12 +77,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -108,6 +109,7 @@ internal fun VoiceClipComposer(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val actionInteractions = remember { MutableInteractionSource() }
     var recorder by remember { mutableStateOf<VoiceRecorder?>(null) }
     var recordingJob by remember { mutableStateOf<Job?>(null) }
     var recording by remember { mutableStateOf(false) }
@@ -133,18 +135,11 @@ internal fun VoiceClipComposer(
         motion.fastEffectsSpec(), label = "voiceEditorAlpha")
     val microphoneScale by animateFloatAsState(if (recording) 1.08f else 1f,
         motion.fastSpatialSpec(), label = "voiceMicrophoneScale")
-    val microphoneElevation by animateDpAsState(if (recording) 4.dp else 0.dp,
-        motion.fastSpatialSpec(), label = "voiceMicrophoneElevation")
     val lockScale by animateFloatAsState(when {
         lockHovered -> 1.16f
         locked -> 1.06f
         else -> 1f
     }, motion.fastSpatialSpec(), label = "voiceLockScale")
-    val lockElevation by animateDpAsState(when {
-        lockHovered -> 12.dp
-        locked -> 8.dp
-        else -> 6.dp
-    }, motion.fastSpatialSpec(), label = "voiceLockElevation")
     val lockColor by animateColorAsState(when {
         locked -> MaterialTheme.colorScheme.primary
         lockHovered -> MaterialTheme.colorScheme.primaryContainer
@@ -320,17 +315,18 @@ internal fun VoiceClipComposer(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(
+                    FilledIconButton(
                         onClick = {
                             locked = !locked
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             if (!locked && !holding) stop()
                         },
-                        shape = CircleShape,
+                        shapes = IconButtonDefaults.shapes(),
                         enabled = recording,
-                        color = lockColor,
-                        contentColor = lockContentColor,
-                        shadowElevation = lockElevation.coerceAtLeast(0.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = lockColor,
+                            contentColor = lockContentColor,
+                        ),
                         modifier = Modifier.size(48.dp).onGloballyPositioned { lockCoordinates = it }
                             .semantics {
                                 contentDescription = if (locked) "Unlock recording" else "Lock recording"
@@ -415,29 +411,37 @@ internal fun VoiceClipComposer(
                 // This node never leaves the tree during capture or review.
                 if (voiceButtonVisible || active) {
                     val actionable = enabled && !processing && !sending
-                    Surface(
-                        shape = CircleShape,
-                        color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        shadowElevation = microphoneElevation.coerceAtLeast(0.dp),
+                    FilledIconButton(
+                        onClick = { primaryAction() },
+                        enabled = actionable,
+                        interactionSource = actionInteractions,
+                        shapes = IconButtonDefaults.shapes(
+                            shape = IconButtonDefaults.mediumRoundShape,
+                            pressedShape = IconButtonDefaults.mediumPressedShape,
+                        ),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                            disabledContentColor = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                         modifier = Modifier.size(56.dp).onGloballyPositioned { anchor = it }
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = actionDescription
-                                if (!actionable) disabled()
-                                onClick { if (actionable) primaryAction(); actionable }
-                            }
+                            .semantics { contentDescription = actionDescription }
                             .pointerInput(enabled) {
                                 if (!enabled) return@pointerInput
                                 awaitEachGesture {
-                                    val down = awaitFirstDown()
+                                    // Capture before the native click handler: holding and dragging
+                                    // record audio, while the button still owns keyboard/a11y clicks.
+                                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
                                     down.consume()
                                     val acceptsPress = canPress
+                                    val press = if (acceptsPress) PressInteraction.Press(down.position) else null
+                                    press?.let(actionInteractions::tryEmit)
                                     val tracksRecording = acceptsPress && beginPress()
                                     var released = false
                                     try {
                                         while (true) {
-                                            val event = awaitPointerEvent()
+                                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                             change.consume()
                                             if (tracksRecording && change.pressed) {
@@ -447,6 +451,9 @@ internal fun VoiceClipComposer(
                                             if (!change.pressed) { released = true; break }
                                         }
                                     } finally {
+                                        if (press != null) actionInteractions.tryEmit(
+                                            if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press),
+                                        )
                                         if (tracksRecording) releasePress()
                                         else if (released && acceptsPress && canPress) primaryAction()
                                     }

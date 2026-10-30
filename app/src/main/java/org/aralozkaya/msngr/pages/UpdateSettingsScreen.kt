@@ -234,7 +234,7 @@ fun UpdateSettingsScreen(
                         shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("skip-update")) {
                         Text(stringResource(if (settings.skippedTag == release.version.tag) R.string.update_unskip else R.string.update_skip_version))
                     }
-                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri())) }) {
+                    OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri())) }) {
                         Text(stringResource(R.string.update_view_release))
                     }
                 }
@@ -264,7 +264,7 @@ fun UpdateSettingsScreen(
         }
         item("schedule-note") { Text(stringResource(R.string.update_schedule_note), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall) }
         item("releases-link") {
-            OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, RELEASES_PAGE.toUri())) }) {
+            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, RELEASES_PAGE.toUri())) }) {
                 Text(stringResource(R.string.update_all_releases))
             }
         }
@@ -307,8 +307,8 @@ fun UpdateSettingsScreen(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { downloadAction("install") }) { Text(stringResource(R.string.update_install)) }
-                OutlinedButton(onClick = { downloadAction("save") }) { Text(stringResource(R.string.update_save_apk)) }
+                Button(shapes = ButtonDefaults.shapes(), onClick = { downloadAction("install") }) { Text(stringResource(R.string.update_install)) }
+                OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { downloadAction("save") }) { Text(stringResource(R.string.update_save_apk)) }
             }
         }, dismissButton = { TextButton(onClick = { downloadDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
 }

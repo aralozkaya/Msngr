@@ -192,6 +192,7 @@ internal fun StatusShortcutWindow(
                 )
                 Box {
                     OutlinedButton(
+                        shapes = ButtonDefaults.shapes(),
                         onClick = { presenceMenuOpen = true },
                         enabled = !applying,
                         modifier = Modifier.fillMaxWidth().testTag("shortcut_status_dropdown"),

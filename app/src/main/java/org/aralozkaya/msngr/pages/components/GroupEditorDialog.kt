@@ -3,6 +3,7 @@
 
 package org.aralozkaya.msngr.pages.components
 
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -229,7 +230,7 @@ internal fun GroupEditorDialog(
         }
     }
     val submitButton: @Composable () -> Unit = {
-        Button(onClick = ::submit,
+        TextButton(onClick = ::submit,
             enabled = submitting || (!busy && if (invitationAction) selected.isNotEmpty() || email.isNotBlank() else name.isNotBlank()),
             modifier = Modifier.testTag("group-editor-submit")) {
             LoadingButtonContent(
@@ -359,7 +360,7 @@ private fun GroupContactPickerDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss,
+            Button(shapes = ButtonDefaults.shapes(), onClick = onDismiss,
                 modifier = Modifier.testTag("group-contact-picker-done")) { Text("Done") }
         },
     )

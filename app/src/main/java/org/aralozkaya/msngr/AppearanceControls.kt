@@ -201,9 +201,9 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
             itemVerticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { showColor = true },
+            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { showColor = true },
                 modifier = Modifier.testTag("custom_main_color")) { Text("Custom color") }
-            if (override != null) OutlinedButton(onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
+            if (override != null) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
         }
     }
     if (showScenes) ScenePickerDialog(appearance.sceneId,
