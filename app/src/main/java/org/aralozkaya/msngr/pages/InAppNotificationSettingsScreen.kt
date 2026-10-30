@@ -2,8 +2,6 @@
 
 package org.aralozkaya.msngr.pages
 
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,20 +12,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -44,13 +50,13 @@ import org.aralozkaya.msngr.notifications.InAppNotificationOptions
 import org.aralozkaya.msngr.notifications.InAppNotificationPrefs
 import org.aralozkaya.msngr.notifications.InAppNotificationType
 import org.aralozkaya.msngr.notifications.notificationKey
+import org.aralozkaya.msngr.pages.components.NotificationCustomizationRow
 import org.aralozkaya.msngr.pages.components.PageContentList
 
 @Composable
 internal fun InAppNotificationSettingsScreen(
     innerPadding: PaddingValues,
     scrollBehavior: TopAppBarScrollBehavior,
-    onCustomizedNotifications: () -> Unit,
 ) {
     val context = LocalContext.current
     val settings by remember(context) { InAppNotificationPrefs.state(context) }.collectAsState()
@@ -61,11 +67,26 @@ internal fun InAppNotificationSettingsScreen(
         }
         notificationOptions(settings.defaults, settings.defaults.enabled, InAppNotificationType.entries,
             onChange = { options -> InAppNotificationPrefs.update(context) { it.copy(defaults = options) } })
-        item(key = "customized-notifications") {
-            FilledTonalButton(
-                onClick = onCustomizedNotifications,
-                modifier = Modifier.fillMaxWidth().testTag("customized_notification_settings").padding(16.dp),
-            ) { Text("Customized notifications") }
+    }
+}
+
+@Composable
+internal fun InAppNotificationSettingsMenu(onCustomizedNotifications: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.testTag("in_app_notification_options")) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Notification options")
+        }
+        DropdownMenuPopup(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
+                DropdownMenuItem(
+                    text = { Text("Customized notifications") },
+                    leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    shape = MenuDefaults.standaloneItemShape,
+                    modifier = Modifier.testTag("customized_notification_settings"),
+                    onClick = { expanded = false; onCustomizedNotifications() },
+                )
+            }
         }
     }
 }
@@ -94,20 +115,18 @@ internal fun CustomizedNotificationsScreen(innerPadding: PaddingValues, scrollBe
         items(customizations, key = { it.contactId }) { custom ->
             val name = contacts.firstOrNull { it.id.notificationKey() == custom.contactId }?.displayName
                 ?.messengerPlusPlainText() ?: custom.displayName
-            SegmentedListItem(
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
+            NotificationCustomizationRow(
+                name = name,
+                summary = (if (custom.isGroup) "Group" else "Contact") + " · " +
+                    if (!custom.options.enabled && !custom.backgroundEnabled) "Muted" else "Custom alerts",
+                contactId = custom.contactId,
                 onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
                     context, custom.contactId, name, custom.isGroup)) },
-                modifier = Modifier.fillMaxWidth().testTag("notification_custom_${custom.contactId}"),
-                supportingContent = { Text((if (custom.isGroup) "Group" else "Contact") + " · " +
-                    if (!custom.options.enabled && !custom.backgroundEnabled) "Muted" else "Custom alerts") },
-                trailingContent = {
-                    IconButton(onClick = { InAppNotificationPrefs.reset(context, custom.contactId) },
-                        modifier = Modifier.testTag("delete_notification_custom_${custom.contactId}")) {
-                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "Reset notifications for $name")
-                    }
-                },
-                content = { Text(name) },
+                onReset = { InAppNotificationPrefs.reset(context, custom.contactId) },
+                modifier = Modifier.animateItem(
+                    placementSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                ),
             )
         }
     }
@@ -158,7 +177,7 @@ internal fun ConversationNotificationSettingsScreen(
             InAppNotificationPrefs.customizeBackground(context, contactId, displayName, isGroup) { it.copy(backgroundSilent = silent) }
         }
         if (custom != null) item {
-            OutlinedButton(onClick = { InAppNotificationPrefs.reset(context, contactId) },
+            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { InAppNotificationPrefs.reset(context, contactId) },
                 modifier = Modifier.testTag("reset_conversation_notifications")) { Text("Reset to general settings") }
         }
     }

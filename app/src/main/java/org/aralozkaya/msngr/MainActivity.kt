@@ -380,7 +380,7 @@ private fun MsngrApp(
                             ) {
                                 DropdownMenuItem(
                                     text = {
-                                        Text(if (sessions.size > 1) "Log outâ€¦" else "Log out",
+                                        Text(if (sessions.size > 1) "Log out\u2026" else "Log out",
                                             color = MaterialTheme.colorScheme.error)
                                     },
                                     supportingText = if (sessions.size > 1) {

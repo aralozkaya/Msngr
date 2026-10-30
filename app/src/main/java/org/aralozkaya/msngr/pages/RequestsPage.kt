@@ -133,7 +133,7 @@ internal fun RequestsPage(
                 if (refreshError != null) item(key = "refresh-error") {
                     Text(refreshError, color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    OutlinedButton(onRefresh, enabled = !refreshing) {
+                    OutlinedButton(onRefresh, shapes = ButtonDefaults.shapes(), enabled = !refreshing) {
                         Text(stringResource(R.string.requests_refresh))
                     }
                 }

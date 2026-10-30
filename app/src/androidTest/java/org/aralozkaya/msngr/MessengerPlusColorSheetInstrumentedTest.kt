@@ -237,6 +237,13 @@ class MessengerPlusColorSheetInstrumentedTest {
     @Test
     fun profileFieldsTrailingEmoticonButtonsOpenThePanelAndInsertEmoticons() {
         showProfilePage()
+        fun placeCaretAtEnd(description: String) {
+            onView(withContentDescription(description)).check { view, noViewException ->
+                if (noViewException != null) throw noViewException
+                (view as EditText).setSelection(view.length())
+            }
+        }
+        placeCaretAtEnd("Display name")
         val smile = MSN_EMOTICON_SHORTCUTS.first { it.name == "Smile" }
         compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Show emoticons"))[0]
             .performClick()
@@ -251,6 +258,7 @@ class MessengerPlusColorSheetInstrumentedTest {
         }
 
         // Display name's button is now "Show keyboard", so the remaining one is Personal message's.
+        placeCaretAtEnd("Personal message")
         compose.onNodeWithContentDescription("Show emoticons").performClick()
         compose.onNodeWithContentDescription("Smile").performClick()
         compose.waitForIdle()

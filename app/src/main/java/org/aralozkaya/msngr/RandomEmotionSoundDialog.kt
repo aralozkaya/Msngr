@@ -76,7 +76,7 @@ internal fun RandomEmotionSoundDialog(
                             player.stop(); language = it; candidate = null; error = null
                         })
                 }
-                OutlinedButton(onClick = ::download, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_fetch")) {
+                OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = ::download, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_fetch")) {
                     Text(if (candidate == null) "Download" else "Try another")
                 }
                 if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
@@ -85,6 +85,7 @@ internal fun RandomEmotionSoundDialog(
                     Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
                     val active = player.activeId == sound.id
                     OutlinedButton(
+                        shapes = ButtonDefaults.shapes(),
                         onClick = { if (active) player.stop() else player.play(sound, previewBytes = bytes) },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_preview"),
@@ -98,7 +99,7 @@ internal fun RandomEmotionSoundDialog(
             }
         },
         confirmButton = {
-            Button(enabled = candidate != null && !busy, onClick = {
+            Button(shapes = ButtonDefaults.shapes(), enabled = candidate != null && !busy, onClick = {
                 val (sound, bytes) = candidate ?: return@Button
                 player.stop()
                 saving = true

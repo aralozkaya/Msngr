@@ -174,18 +174,18 @@ internal fun FileTransferMessage(message: ChatMessage,
         else if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) Button(enabled = !busy, onClick = {
+            if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = {
                 scope.launch { accept() }
             }) { Text("Accept") }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered)
-                OutlinedButton(enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
+                OutlinedButton(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
             if (transfer.active) DestructiveOutlinedButton(enabled = !busy, onClick = {
                 scope.launch { error = (onCancel?.invoke() ?: context.sharingRepository().cancelFile(message.contactId, transfer.id)).exceptionOrNull()?.message }
             }) { Text(if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) "Decline" else "Cancel") }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete && transfer.localPath != null)
-                Button(enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
+                Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete && transfer.localPath != null)
-                OutlinedButton(enabled = !busy, onClick = {
+                OutlinedButton(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = {
                     try {
                         val uri = FileSharingProvider.uri(context, File(transfer.localPath), transfer.name)
                         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW)
@@ -285,6 +285,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
     ) {
         FloatingActionButton(
             onClick = { visible = true },
+            shape = FloatingActionButtonDefaults.shape,
             modifier = Modifier.animateFloatingActionButton(
                 visible = !visible,
                 alignment = Alignment.BottomEnd,
@@ -314,7 +315,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 PhotoShareStatus.Invited -> {
                     Text(if (share.outgoing) "Waiting for the other person to accept…" else "You are invited to share photos.")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (!share.outgoing) Button(onClick = { scope.launch {
+                        if (!share.outgoing) Button(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                             error = (onAccept?.invoke() ?: context.sharingRepository().acceptPhotos(contactId, share.id)).exceptionOrNull()?.message
                         } }) { Text("Accept") }
                         DestructiveOutlinedButton(onClick = stop) { Text(if (share.outgoing) "Cancel" else "Decline") }
@@ -387,11 +388,11 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 }
                 Text(selected.name, style = MaterialTheme.typography.bodyMedium)
                 Text("${index + 1} / ${share.photos.size}", style = MaterialTheme.typography.labelMedium)
-                if (selected.previewError != null && share.status == PhotoShareStatus.Active) OutlinedButton(onClick = { scope.launch {
+                if (selected.previewError != null && share.status == PhotoShareStatus.Active) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                     error = (onSelect?.invoke(selected.id) ?: context.sharingRepository().selectPhoto(contactId, share.id, selected.id)).exceptionOrNull()?.message
                 } }) { Text("Retry photo") }
                 if (selected.originalPending) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
-                if (selected.localPath != null) FilledTonalButton(onClick = {
+                if (selected.localPath != null) FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {
                     savePhotoId = selected.id; savedPhotoId = null
                     savePhoto.launch(selected.name)
                 }, enabled = !selected.originalPending) { Text(if (selected.originalPending) "Saving…" else if (savedPhotoId == selected.id) "Saved" else "Save photo") }
@@ -399,7 +400,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             }
             if (preparing) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(arrayOf("image/*")) }) {
+                Button(shapes = ButtonDefaults.shapes(), enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(arrayOf("image/*")) }) {
                     Text(if (preparing) "Preparing…" else "Add photos")
                 }
                 DestructiveOutlinedButton(onClick = stop) { Text("Stop sharing") }
