@@ -824,7 +824,7 @@ private fun CustomServerDialog(
                     draft = draft.copy(socialServerEnabled = it)
                 }, { draft = draft.copy(socialServer = it) })
                 OptionalServerField(
-                    "Activities",
+                    "Games & activities",
                     draft.activitiesServerEnabled,
                     draft.activitiesServer,
                     { draft = draft.copy(activitiesServerEnabled = it) },

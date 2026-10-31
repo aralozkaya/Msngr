@@ -288,6 +288,7 @@ private fun ChatRoute(
     }
 
     val photoShares by repository.photoShares.collectAsState()
+    val gameSessions by repository.gameSessions.collectAsState()
     var playingWink by remember(contactId) { mutableStateOf<ChatMessage?>(null) }
     LaunchedEffect(contactId, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -305,6 +306,8 @@ private fun ChatRoute(
 
     ChatScreen(
         photoShare = photoShares[contactId],
+        gameSession = gameSessions[contactId.lowercase(java.util.Locale.ROOT)] ?: gameSessions[contactId],
+        ownName = profile.username.ifBlank { profile.email },
         onSendEmotionSound = { repository.sendEmotionSound(contactId, it) },
         onSendWink = { wink, bytes -> repository.sendWink(contactId, wink, bytes) },
         otherUnreadCount = otherUnreadCount(contacts, contactId),
@@ -366,7 +369,9 @@ internal fun ChatScreen(
     nudgeCooldownMillis: Long = 0L,
     ownPresence: Presence = Presence.Online,
     ownEmail: String = "",
+    ownName: String = "",
     photoShare: org.aralozkaya.msngr.data.PhotoShare? = null,
+    gameSession: org.aralozkaya.msngr.data.GameSession? = null,
 ) {
     val groupFeatures = contact?.takeIf { it.isGroup }?.groupFeatures(ownEmail)
     val nudgeShakeState = rememberNudgeShakeState()
@@ -533,7 +538,24 @@ internal fun ChatScreen(
             }
         },
         floatingActionButton = {
-            if (photoShare != null && contact != null) PhotoSharingHost(contact.id, photoShare)
+            if (contact != null && (photoShare != null || gameSession != null)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    if (photoShare != null) PhotoSharingHost(contact.id, photoShare)
+                    if (gameSession != null) {
+                        GameHost(
+                            contactId = contact.id,
+                            session = gameSession,
+                            localDisplayName = ownName.ifBlank { ownEmail },
+                            localEmail = ownEmail,
+                            peerDisplayName = contact.displayName.ifBlank { contact.email },
+                            peerEmail = contact.email,
+                        )
+                    }
+                }
+            }
         },
         bottomBar = {
             MessageComposer(

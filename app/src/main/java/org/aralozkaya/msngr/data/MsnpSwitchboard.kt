@@ -33,6 +33,7 @@ internal data class SwitchboardInvitation(
 
 internal sealed interface SwitchboardEvent {
     data class PhotosChanged(val senderEmail: String, val share: PhotoShare) : SwitchboardEvent
+    data class GameChanged(val senderEmail: String, val session: GameSession) : SwitchboardEvent
     data class FileChanged(val senderEmail: String, val transfer: FileTransfer) : SwitchboardEvent
     data object ContactResolved : SwitchboardEvent
     data class Text(val senderEmail: String, val text: String, val style: NativeTextStyle = NativeTextStyle()) : SwitchboardEvent
@@ -100,6 +101,7 @@ internal class MsnpSwitchboardSession(
             fileDirectory = fileDirectory,
             onFileTransfer = { eventSink(SwitchboardEvent.FileChanged(this.contactEmail, it)) },
             onPhotoShare = { eventSink(SwitchboardEvent.PhotosChanged(this.contactEmail, it)) },
+            onGameSession = { eventSink(SwitchboardEvent.GameChanged(this.contactEmail, it)) },
             localPhoto = { localPhoto(this.contactEmail, it) }, publishPhoto = { publishPhoto(this.contactEmail, it) },
             localOriginal = { localOriginal(this.contactEmail, it) }, publishOriginal = { id, original -> publishOriginal(this.contactEmail, id, original) },
             onDisplayPicture = { bytes ->
@@ -189,6 +191,15 @@ internal class MsnpSwitchboardSession(
     suspend fun selectPhoto(id: String, photoId: String) { photoPeer(id)?.selectPhoto(id, photoId) }
     private fun photoPeer(id: String): MsnpP2pSession? =
         applicationPeers().firstOrNull { it.hasPhotoShare(id) }?.also(::bindApplicationPeer)
+
+    suspend fun startGame(entry: GameCatalogEntry): String = pictureSession.startGame(entry)
+    fun hasGameSession(id: String): Boolean = applicationPeers().any { it.hasGameSession(id) }
+    suspend fun acceptGame(id: String) { requireNotNull(gamePeer(id)) { "This game invitation has ended." }.acceptGame(id) }
+    suspend fun stopGame(id: String) { gamePeer(id)?.stopGame(id) }
+    suspend fun initializeGameChannel(id: String) { gamePeer(id)?.initializeGameChannel(id) }
+    suspend fun sendGameData(id: String, payload: String) { gamePeer(id)?.sendGameData(id, payload) }
+    private fun gamePeer(id: String): MsnpP2pSession? =
+        applicationPeers().firstOrNull { it.hasGameSession(id) }?.also(::bindApplicationPeer)
 
     suspend fun offerFile(file: java.io.File, name: String): String = pictureSession.offerFile(file, name)
     fun hasFileTransfer(id: String): Boolean = applicationPeers().any { it.hasFileTransfer(id) }
@@ -412,6 +423,7 @@ internal class MsnpSwitchboardSession(
                 fileDirectory = if (sender == contactEmail) fileDirectory else null,
                 onFileTransfer = { eventSink(SwitchboardEvent.FileChanged(sender, it)) },
                 onPhotoShare = { eventSink(SwitchboardEvent.PhotosChanged(sender, it)) },
+                onGameSession = { eventSink(SwitchboardEvent.GameChanged(sender, it)) },
                 localPhoto = { localPhoto(sender, it) }, publishPhoto = { publishPhoto(sender, it) },
                 localOriginal = { localOriginal(sender, it) }, publishOriginal = { id, original -> publishOriginal(sender, id, original) },
                 onDisplayPicture = { eventSink(SwitchboardEvent.DisplayPicture(sender, it)) },

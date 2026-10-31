@@ -21,6 +21,8 @@ class ServerConfigTest {
             storageServer = "storage.example",
             socialServerEnabled = false,
             socialServer = "social.example",
+            activitiesServerEnabled = false,
+            activitiesServer = "apps.example",
         ).toResolved()
 
         assertEquals("main.example", resolved.authServer)
@@ -28,6 +30,7 @@ class ServerConfigTest {
         assertEquals("main.example", resolved.adsServer)
         assertEquals("main.example", resolved.storageServer)
         assertEquals("main.example", resolved.socialServer)
+        assertEquals("main.example", resolved.activitiesServer)
         assertEquals(1864, resolved.switchboardPort)
     }
 
@@ -45,6 +48,19 @@ class ServerConfigTest {
         assertEquals("ctsvcs.advertising.ugnet.gay", resolved.adsServer)
         assertEquals("cts.storage.ugnet.gay", resolved.storageServer)
         assertEquals("social.ugnet.gay", resolved.socialServer)
+        assertEquals("mactivities.msgrsvcs.ctsrv.gay", resolved.activitiesServer)
+    }
+
+    @Test
+    fun escargotPresetResolvesItsActivitiesServer() {
+        val resolved = ServerPresets.resolveForProvider(
+            provider = ProviderOptions.ESCARGOT,
+            customServers = ServerOverrides(),
+        )
+
+        assertEquals("ds.escargot.nina.chat", resolved.mainServer)
+        assertEquals("mconf.escargot.nina.chat", resolved.configServer)
+        assertEquals("apps.escargot.nina.chat", resolved.activitiesServer)
     }
 
     @Test

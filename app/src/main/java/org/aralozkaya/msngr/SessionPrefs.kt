@@ -170,6 +170,8 @@ object ServerPresets {
     private val escargot = ServerOverrides(
         mainServer = "ds.escargot.nina.chat",
         configServer = "mconf.escargot.nina.chat",
+        activitiesServerEnabled = true,
+        activitiesServer = "apps.escargot.nina.chat",
         emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
     )
 
