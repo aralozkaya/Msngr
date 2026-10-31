@@ -1858,14 +1858,16 @@ internal class LiveMsnp18Client(
 
     private fun startReceiver() {
         receiverJob?.cancel()
+        val sessionEndpoint = machineGuid
         receiverJob = scope.launch {
-            while (isActive && signedInEmail.isNotEmpty()) {
+            while (isActive && signedInEmail.isNotEmpty() && machineGuid == sessionEndpoint) {
                 val command = try {
                     transport.receive()
                 } catch (error: Exception) {
-                    if (isActive) reportConnectionLoss(error, force = true)
+                    if (isActive && machineGuid == sessionEndpoint) reportConnectionLoss(error, force = true)
                     break
                 }
+                if (!isActive || machineGuid != sessionEndpoint) break
                 val waiter = command.transactionId
                     ?.let(pendingNotificationTransactions::remove)
                 if (waiter != null) {
@@ -1874,12 +1876,14 @@ internal class LiveMsnp18Client(
                 }
                 handleIncoming(command)
             }
-            pendingNotificationTransactions.values.forEach {
-                it.completeExceptionally(
-                    IllegalStateException("The notification server disconnected."),
-                )
+            if (isActive && machineGuid == sessionEndpoint) {
+                pendingNotificationTransactions.values.forEach {
+                    it.completeExceptionally(
+                        IllegalStateException("The notification server disconnected."),
+                    )
+                }
+                pendingNotificationTransactions.clear()
             }
-            pendingNotificationTransactions.clear()
         }
     }
 
