@@ -17,6 +17,7 @@ data class SharedPhoto(
     val originalSentToPeer: Boolean = false,
     val previewError: String? = null,
     val sortIndex: Int? = null,
+    val outgoing: Boolean = false,
 )
 data class PhotoShare(
     val id: String,

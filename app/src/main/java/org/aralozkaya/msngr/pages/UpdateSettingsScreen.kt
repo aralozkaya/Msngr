@@ -67,6 +67,7 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.pages.components.ReleaseNotes
 import org.aralozkaya.msngr.updates.APK_MIME_TYPE
 import org.aralozkaya.msngr.updates.RELEASES_PAGE
@@ -242,20 +243,23 @@ fun UpdateSettingsScreen(
         }
         item("preferences") {
             Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                SegmentedListItem(checked = settings.enabled,
-                    onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
-                    shapes = ListItemDefaults.segmentedShapes(0, 3),
-                    trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
-                    supportingContent = { Text(stringResource(R.string.update_automatic_description)) },
-                    modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
-                SegmentedListItem(onClick = { intervalDialog = true }, enabled = state.supported && settings.enabled,
-                    shapes = ListItemDefaults.segmentedShapes(1, 3),
-                    supportingContent = { Text(stringResource(settings.interval.labelResource())) },
-                    modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
+                ExpandableSettingsGroup(expanded = state.supported && settings.enabled, master = { shapes ->
+                    SegmentedListItem(checked = settings.enabled,
+                        onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
+                        shapes = shapes,
+                        trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
+                        supportingContent = { Text(stringResource(R.string.update_automatic_description)) },
+                        modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
+                }) { shapes, colors ->
+                    SegmentedListItem(onClick = { intervalDialog = true },
+                        shapes = shapes, colors = colors,
+                        supportingContent = { Text(stringResource(settings.interval.labelResource())) },
+                        modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
+                }
                 SegmentedListItem(checked = settings.includePrereleases,
                     onCheckedChange = { manager.configure(settings.copy(includePrereleases = it)); manager.checkManually() },
                     enabled = state.supported && !state.checking && !state.downloading,
-                    shapes = ListItemDefaults.segmentedShapes(2, 3),
+                    shapes = ListItemDefaults.segmentedShapes(0, 1),
                     trailingContent = { Switch(checked = settings.includePrereleases, onCheckedChange = null,
                         enabled = state.supported && !state.checking && !state.downloading) },
                     supportingContent = { Text(stringResource(R.string.update_prerelease_description)) },

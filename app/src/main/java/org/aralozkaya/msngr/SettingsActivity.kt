@@ -165,6 +165,7 @@ internal fun SettingsRoute(
                             innerPadding = innerPadding,
                             scrollBehavior = scrollBehavior,
                         )
+                        SettingsDestination.Transfers -> org.aralozkaya.msngr.pages.TransferSettingsScreen(innerPadding, scrollBehavior)
                         SettingsDestination.Connection -> ConnectionSettingsScreen(
                             innerPadding = innerPadding,
                             scrollBehavior = scrollBehavior,

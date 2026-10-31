@@ -920,14 +920,25 @@ internal class LiveMsnp18Client(
     }
 
     private val mutablePhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap())
+    private val photoOriginalRequestMutex = Mutex()
     override val photoShares = mutablePhotoShares.asStateFlow()
     override suspend fun requestPhotoOriginal(contactId: String, shareId: String, photoId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val share = requireNotNull(mutablePhotoShares.value[contactId])
-            require(share.id == shareId)
-            val photo = requireNotNull(share.photos.firstOrNull { it.id.equals(photoId, true) })
-            if (photo.originalPath == null && !photo.originalPending) photoSession(contactId, shareId).requestPhotoOriginal(shareId, photo)
-            Unit
+        photoOriginalRequestMutex.withLock {
+            runCatching {
+                val share = requireNotNull(mutablePhotoShares.value[contactId])
+                require(share.id == shareId)
+                val photo = requireNotNull(share.photos.firstOrNull { it.id.equals(photoId, true) })
+                if (photo.originalPath == null && !photo.originalPending) photoSession(contactId, shareId).requestPhotoOriginal(shareId, photo)
+                Unit
+            }.onFailure { error ->
+                mutablePhotoShares.update { all ->
+                    val share = all[contactId]?.takeIf { it.id == shareId } ?: return@update all
+                    all + (contactId to share.copy(photos = share.photos.map { photo ->
+                        if (photo.id.equals(photoId, true)) photo.copy(originalPending = false,
+                            originalError = error.message ?: "The original photo could not be requested.") else photo
+                    }))
+                }
+            }
         }
     }
     override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = withContext(Dispatchers.IO) {

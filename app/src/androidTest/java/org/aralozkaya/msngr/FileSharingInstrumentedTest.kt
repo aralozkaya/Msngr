@@ -51,6 +51,45 @@ import org.junit.Test
 class FileSharingInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
+    @Test fun savePhotoRetriesAnOriginalRequestAndWritesToGalleryWithoutADestinationPicker() {
+        val fixtures = carouselFixtures()
+        val source = fixtures.first()
+        val context = compose.activity
+        val account = SessionPrefs.preferenceAccount(context)
+        val id = java.util.UUID.randomUUID().toString()
+        val metadata = MsnDisplayPicture.create("peer@example.test", source.readBytes(), 15)
+        val photo = SharedPhoto(id, "msngr-save-test.png", "hash", metadata, metadata, localPath = source.absolutePath)
+        val share = mutableStateOf(PhotoShare(id, false, PhotoShareStatus.Active, listOf(photo)))
+        var requests = 0
+        val key = "photo:$id:$id"
+        var uri: Uri? = null
+        try {
+            compose.setContent { MsngrTheme { PhotoSharingHost("peer", share.value, onRequestOriginal = {
+                requests++
+                if (requests == 1) {
+                    share.value = share.value.copy(photos = listOf(photo.copy(originalError = "Try again")))
+                    Result.failure(IllegalStateException("Try again"))
+                } else {
+                    kotlinx.coroutines.delay(150)
+                    share.value = share.value.copy(photos = listOf(photo.copy(originalPath = source.absolutePath)))
+                    Result.success(Unit)
+                }
+            }) } }
+            compose.onNodeWithText("Save photo").performScrollTo().performClick()
+            compose.waitUntil(5_000) { requests == 1 }
+            compose.onNodeWithText("Save photo").performClick()
+            compose.waitUntil(10_000) { context.receivedTransferStorage.state(account, key).uri != null }
+            uri = Uri.parse(context.receivedTransferStorage.state(account, key).uri)
+            compose.onNodeWithText("Saved").assertIsDisplayed()
+            assertArrayEquals(source.readBytes(), context.contentResolver.openInputStream(uri)!!.use { it.readBytes() })
+            assertEquals(2, requests)
+        } finally {
+            uri?.let { context.contentResolver.delete(it, null, null) }
+            AccountPreferences.forAccount(context, "msngr_transfer_saves", account).edit().remove("uri:$key").remove("error:$key").commit()
+            fixtures.forEach { it.delete() }
+        }
+    }
+
     @Test fun minimizedPhotosFloatAboveTheComposerWithoutMovingTheHeader() {
         val share = mutableStateOf<PhotoShare?>(null)
         val sent = mutableListOf<String>()

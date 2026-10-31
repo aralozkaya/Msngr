@@ -23,6 +23,14 @@ import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
 import java.io.File
 
 class MsngrApplication : Application() {
+    internal val receivedTransferStorage by lazy { ReceivedTransferStorage(this) }
+    private val transferAutomation by lazy {
+        TransferAutomation(
+            settings = { account -> TransferPrefs.read(this, account) },
+            saveFile = { account, transfer -> receivedTransferStorage.saveFile(account, transfer) },
+            savePhoto = { account, share, photo -> receivedTransferStorage.savePhoto(account, share, photo) },
+        )
+    }
     internal val emotionSoundStore by lazy { org.aralozkaya.msngr.data.EmotionSoundStore(File(noBackupFilesDir, "emotion_sounds")) }
     internal val winkStore by lazy {
         org.aralozkaya.msngr.data.WinkStore(File(noBackupFilesDir, "winks")) {
@@ -72,6 +80,7 @@ class MsngrApplication : Application() {
                 }
             },
             onRepositoryCreated = { repository ->
+                transferAutomation.attach(repository)
                 realtimeNotificationBridge.attach(repository)
                 displayPictureSync.attach(repository)
                 displayPictureSync.setForeground(visibilityTracker.isForeground)
