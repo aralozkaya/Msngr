@@ -9,8 +9,13 @@ Member names use the shared emoticon renderer and retain Messenger Plus formatti
 Tap a member row to open their private chat or their picture to open the contact profile. Members
 show their access level (Owner, Administrator, or User) separately from presence. The signed-in
 account is marked with a You badge beside its name; its row has no chat action and its picture
-opens Edit profile. Missing access levels show Unknown. Members
-outside the contact list can still be viewed and messaged; opening their details does not add them
+opens Edit profile. Missing access levels show Unknown. People
+with an unanswered invitation appear at the bottom of the list, sorted by name, with a Pending
+badge. Search includes them, and the header shows joined and pending counts separately.
+Pending invitees do not count toward group availability, conversation member counts, roles,
+or handwriting/wink recipients. Accepted invitations become regular members on roster refresh;
+declined or deleted invitations disappear.
+Members outside the contact list can still be viewed and messaged; opening their details does not add them
 to the contact list. Missing pictures use the standard initials avatar.
 Group IDs, rather than display names, identify conversations, so two groups named Test retain
 independent messages and histories.
@@ -54,7 +59,9 @@ The implementation was checked against Windows Live Messenger 2009 traffic and t
 [Escargot's group documentation](https://escargot.chat/groups/) describes its circle support.
 
 1. SOAP `ABFindContactsPaged` discovers accepted `CircleInverseInfo` records. A separate request
-   with the circle's `ABId` loads its accepted members. Pending/deleted records are excluded.
+   with the circle's `ABId` loads its members. `Live`/`RelationshipState=3` records are joined
+   members; `LivePending`/`RelationshipState=2` records are unanswered invitations. Deleted,
+   rejected, empty, and departed records are excluded.
    Member `RelationshipRole` values are retained: 1 is Owner, 2 is Administrator, and 3 is User,
    matching the server's [role definitions](https://gitlab.com/escargot-chat/server/-/blob/master/core/models.py)
    and [circle member response](https://gitlab.com/escargot-chat/server/-/blob/master/front/msn/tmpl/abservice/ABFindContactsPagedResponse.xml).

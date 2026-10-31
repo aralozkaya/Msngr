@@ -32,6 +32,15 @@ class GroupFeaturesTest {
         assertEquals(GroupFeatures(), group(peer).copy(isBlocked = true).groupFeatures(me))
     }
 
+    @Test fun pendingInvitationsNeverAffectGroupAvailabilityOrRecipientCapabilities() {
+        val pending = GroupMember("pending@example.com", presence = Presence.Online, isPending = true)
+        assertEquals(Presence.Offline, group(pending).withGroupPresence(me).presence)
+        assertEquals(GroupFeatures(), group(pending).groupFeatures(me))
+        assertEquals(GroupFeatures(GroupInkFormat.Isf, true), group(peer, pending).groupFeatures(me))
+        assertEquals(GroupMemberRole.Unknown,
+            group(pending.copy(email = me, role = GroupMemberRole.Owner)).ownGroupRole(me))
+    }
+
     @Test fun clientIdsKeepUnsignedBitsAndNeverReadTheExtendedMaskAsFeatureSupport() {
         assertEquals(2_416_214_060L, parseClientCapabilities("2416214060:1024"))
         assertEquals(0L, parseClientCapabilities("0:32780"))

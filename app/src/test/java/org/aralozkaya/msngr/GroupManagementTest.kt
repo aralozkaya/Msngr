@@ -184,7 +184,10 @@ class GroupManagementTest {
             client.signIn(request()).getOrThrow()
             val groupId = client.createGroup("Local group")
             client.inviteGroupMembers(groupId, listOf(peer))
-            assertEquals(listOf(owner), client.contacts.value.first { it.id == groupId }.members.map(GroupMember::email))
+            val group = client.contacts.value.first { it.id == groupId }
+            assertEquals(listOf(owner), group.joinedMembers.map(GroupMember::email))
+            assertEquals(listOf(peer), group.members.filter { it.isPending }.map(GroupMember::email))
+            assertTrue(runCatching { validateGroupInvitees(listOf(peer.uppercase()), owner, group.members) }.isFailure)
             assertTrue(runCatching { client.leaveGroup(groupId) }.isFailure)
         } finally { client.close() }
     }

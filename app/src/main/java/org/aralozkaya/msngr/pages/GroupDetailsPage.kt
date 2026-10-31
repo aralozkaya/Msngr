@@ -47,11 +47,14 @@ fun GroupDetailsPage(
 ) {
     val searchFieldState = rememberSaveable(group?.id, saver = TextFieldState.Saver) { TextFieldState() }
     val search = searchFieldState.text.toString().withExpandedMsnMenuTokens().trim()
-    val memberRoles = group?.members.orEmpty().associate { it.email.lowercase() to it.role }
+    val membership = group?.members.orEmpty().associateBy { it.email.lowercase() }
+    val pendingCount = members.count { membership[it.email.lowercase()]?.isPending == true }
+    val memberCount = members.size - pendingCount
     val visible = members.filter {
         it.displayName.messengerPlusPlainText().contains(search, ignoreCase = true) ||
             it.email.contains(search, ignoreCase = true)
-    }.sortedWith(compareBy<Contact> { it.presence.priority }
+    }.sortedWith(compareBy<Contact> { membership[it.email.lowercase()]?.isPending == true }
+        .thenBy { if (membership[it.email.lowercase()]?.isPending == true) 0 else it.presence.priority }
         .thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName.messengerPlusPlainText() })
 
     Column(
@@ -73,7 +76,10 @@ fun GroupDetailsPage(
                 Modifier.fillMaxWidth()
             ) {
                 MessengerPlusText(text = group.displayName, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${members.size} ${if (members.size == 1) "member" else "members"}", style = MaterialTheme.typography.bodyMedium)
+                Text(buildString {
+                    append("$memberCount ${if (memberCount == 1) "member" else "members"}")
+                    if (pendingCount > 0) append(" · $pendingCount pending")
+                }, style = MaterialTheme.typography.bodyMedium)
             }
             CompactSearchField(
                 state = searchFieldState,
@@ -90,6 +96,8 @@ fun GroupDetailsPage(
         ) {
             itemsIndexed(visible, key = { _, member -> member.id }) { index, member ->
                 val isOwnContact = member.email.equals(ownEmail, ignoreCase = true)
+                val groupMember = membership[member.email.lowercase()]
+                val isPending = groupMember?.isPending == true
                 LaunchedEffect(member.id, isOwnContact) {
                     if (!isOwnContact) onRefreshPicture(member)
                 }
@@ -98,7 +106,8 @@ fun GroupDetailsPage(
                     count = visible.size,
                     contact = member,
                     supportingText = member.email,
-                    accessLevel = (memberRoles[member.email.lowercase()] ?: GroupMemberRole.Unknown).label,
+                    accessLevel = if (isPending) null else (groupMember?.role ?: GroupMemberRole.Unknown).label,
+                    isPendingMember = isPending,
                     onClick = if (isOwnContact) null else { { onOpenChat(member) } },
                     onOpenProfile = { if (isOwnContact) onEditProfile() else onOpenProfile(member) },
                     profileActionLabel = if (isOwnContact) "Edit profile" else null,

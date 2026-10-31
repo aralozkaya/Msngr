@@ -200,6 +200,46 @@ class GroupDetailsInstrumentedTest {
         compose.onNodeWithContentDescription("Back").assertIsDisplayed()
     }
 
+    @Test fun pendingInvitationsStayBelowJoinedMembersAndSupportSearchAndAcceptance() {
+        val aaron = Contact("aaron@example.com", "Aaron", "aaron@example.com", Presence.Online)
+        val zoe = Contact("zoe@example.com", "Zoe", "zoe@example.com", Presence.Offline)
+        val currentGroup = mutableStateOf(group.copy(members = listOf(
+            GroupMember(alice.email, role = GroupMemberRole.Owner),
+            GroupMember(bob.email, role = GroupMemberRole.User),
+            GroupMember(aaron.email, role = GroupMemberRole.User, isPending = true),
+            GroupMember(zoe.email, role = GroupMemberRole.User, isPending = true),
+        )))
+        compose.setContent {
+            MsngrTheme { GroupDetailsTestPage(currentGroup.value, listOf(zoe, aaron, bob, alice)) }
+        }
+        compose.onNodeWithText("2 members · 2 pending").assertIsDisplayed()
+        compose.onAllNodesWithText("Pending").assertCountEquals(2)
+        compose.onNodeWithTag("contact-row-${aaron.id}", useUnmergedTree = true)
+            .assert(hasAnyDescendant(hasText("Pending")))
+        fun rowTop(contact: Contact) = compose.onNodeWithTag("contact-row-${contact.id}", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.top
+        assertTrue(rowTop(alice) < rowTop(bob))
+        assertTrue(rowTop(bob) < rowTop(aaron))
+        assertTrue(rowTop(aaron) < rowTop(zoe))
+
+        compose.onNodeWithContentDescription("Search members").performTextReplacement("AARON@EXAMPLE")
+        compose.onNodeWithText(aaron.email).assertIsDisplayed()
+        compose.onNodeWithText("Pending").assertIsDisplayed()
+        compose.onNodeWithText(bob.email).assertDoesNotExist()
+        compose.onNodeWithText("2 members · 2 pending").assertIsDisplayed()
+        compose.runOnIdle {
+            currentGroup.value = currentGroup.value.copy(members = currentGroup.value.members.map {
+                if (it.email == aaron.email) it.copy(isPending = false) else it
+            })
+        }
+        compose.onNodeWithText("3 members · 1 pending").assertIsDisplayed()
+        compose.onNodeWithText("Pending").assertDoesNotExist()
+        compose.onNodeWithText("User").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        assertTrue(rowTop(aaron) < rowTop(bob))
+        assertTrue(rowTop(bob) < rowTop(zoe))
+    }
+
     @Composable
     private fun GroupDetailsTestPage(
         group: Contact?,

@@ -18,7 +18,7 @@ data class GroupInvitationInbox(
 )
 
 internal fun Contact.ownGroupRole(ownEmail: String): GroupMemberRole =
-    members.firstOrNull { it.email.equals(ownEmail, true) }?.role ?: GroupMemberRole.Unknown
+    joinedMembers.firstOrNull { it.email.equals(ownEmail, true) }?.role ?: GroupMemberRole.Unknown
 
 internal fun Contact.canInviteGroupMembers(ownEmail: String): Boolean =
     isGroup && ownGroupRole(ownEmail) in setOf(GroupMemberRole.Owner, GroupMemberRole.Administrator)
@@ -34,6 +34,7 @@ internal fun validateGroupName(raw: String): String = raw.trim().also {
 
 internal fun validateGroupInvitees(raw: List<String>, ownEmail: String, members: List<GroupMember> = emptyList()): List<String> {
     val addresses = raw.map { validateContactAddress(it, ownEmail, emptyList()) }.distinct()
+    require(addresses.none { email -> members.any { it.email.equals(email, true) && it.isPending } }) { "This person already has a pending group invitation." }
     require(addresses.none { email -> members.any { it.email.equals(email, true) } }) { "This person is already a group member." }
     require(addresses.size + members.size.coerceAtLeast(1) <= 20) { "A group can have up to 20 members." }
     return addresses

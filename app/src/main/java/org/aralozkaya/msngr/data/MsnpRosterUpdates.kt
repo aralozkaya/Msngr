@@ -20,9 +20,9 @@ internal fun mergeAddressBookUpdate(
                 member.copy(
                     displayName = member.displayName.takeUnless { it.equals(member.email, true) }
                         ?: old?.displayName ?: member.displayName,
-                    presence = old?.presence ?: member.presence,
+                    presence = if (member.isPending) member.presence else old?.takeUnless { it.isPending }?.presence ?: member.presence,
                     avatarUri = old?.avatarUri ?: member.avatarUri,
-                    clientCapabilities = old?.clientCapabilities ?: member.clientCapabilities,
+                    clientCapabilities = if (member.isPending) 0L else old?.takeUnless { it.isPending }?.clientCapabilities ?: member.clientCapabilities,
                 )
             }
         }

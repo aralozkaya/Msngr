@@ -69,6 +69,25 @@ class MsnpRosterUpdatesTest {
         assertEquals(listOf(peer.copy(nickname = "Updated", isBlocked = false)), refreshed)
     }
 
+    @Test fun refreshTracksPendingAcceptanceAndRemovalAndKeepsInvitationsOnLookupFailure() {
+        val pending = GroupMember("pending@example.com", "Pending person", avatarUri = "data:picture", isPending = true)
+        val group = Contact("group@live.com", "Test", "group@live.com", Presence.Offline,
+            isGroup = true, members = listOf(pending))
+        val accepted = group.copy(members = listOf(GroupMember(pending.email, role = GroupMemberRole.User)))
+        val refreshed = mergeAddressBookUpdate(listOf(group), AddressBookSnapshot(listOf(accepted)), "me@example.com").single()
+        assertEquals(pending.copy(isPending = false, role = GroupMemberRole.User), refreshed.members.single())
+        assertEquals(1, refreshed.joinedMembers.size)
+        val empty = AddressBookSnapshot(listOf(group.copy(members = emptyList())))
+        assertTrue(mergeAddressBookUpdate(listOf(group), empty, "me@example.com").single().members.isEmpty())
+        assertEquals(listOf(pending), mergeAddressBookUpdate(listOf(group),
+            empty.copy(failedMemberLookups = setOf(group.id)), "me@example.com").single().members)
+
+        val staleOnline = group.copy(members = listOf(pending.copy(isPending = false, presence = Presence.Online, clientCapabilities = 0x800c)))
+        val reinvited = mergeAddressBookUpdate(listOf(staleOnline), AddressBookSnapshot(listOf(group)), "me@example.com").single()
+        assertEquals(Presence.Offline, reinvited.presence)
+        assertEquals(listOf(pending), reinvited.members)
+    }
+
     @Test fun addressBookNotificationIsFramedWithoutATransactionAndIgnoresOtherServices() {
         val body = "<NOTIFICATION siteid=\"45705\"><MSG><BODY>Changed</BODY></MSG></NOTIFICATION>".toByteArray()
         val wire = "NOT ${body.size}\r\n".toByteArray() + body + "QNG 40\r\n".toByteArray()

@@ -60,6 +60,10 @@ data class Contact(
     val isGroup: Boolean = false,
     val members: List<GroupMember> = emptyList(),
 ) {
+    /** Accepted members only; pending invitations do not participate in the conversation. */
+    val joinedMembers: List<GroupMember>
+        get() = members.filterNot(GroupMember::isPending)
+
     val isUnread: Boolean
         get() = isMarkedUnread || unreadCount > 0
 
@@ -77,10 +81,12 @@ data class GroupMember(
     val storageId: String? = null,
     val role: GroupMemberRole = GroupMemberRole.Unknown,
     val clientCapabilities: Long = 0L,
+    /** The group invitation has been sent and is still awaiting a response. */
+    val isPending: Boolean = false,
 )
 
 internal fun Contact.withGroupPresence(ownEmail: String): Contact = if (!isGroup) this else copy(
-    presence = if (!isBlocked && members.any { !it.email.equals(ownEmail, true) && it.presence.isOnline })
+    presence = if (!isBlocked && joinedMembers.any { !it.email.equals(ownEmail, true) && it.presence.isOnline })
         Presence.Online else Presence.Offline,
 )
 
@@ -380,10 +386,15 @@ class MockMsnp18Client(
         val generation = sessionGeneration
         val group = mutableContacts.value.firstOrNull { it.id == groupId && it.isGroup } ?: error("This group is no longer available.")
         require(group.canInviteGroupMembers(signedInEmail)) { "Only owners and administrators can invite group members." }
-        validateGroupInvitees(emails, signedInEmail, group.members)
+        val invitees = validateGroupInvitees(emails, signedInEmail, group.members)
         // Invitation delivery is simulated locally; pending invitees are not accepted members.
         if (addContactDelayMillis > 0) delay(addContactDelayMillis)
         check(generation == sessionGeneration && signedInEmail.isNotBlank()) { "This session ended while inviting group members." }
+        mutableContacts.update { contacts -> contacts.map { contact ->
+            if (contact.id != groupId) contact else contact.copy(members = contact.members + invitees.map {
+                GroupMember(it, role = GroupMemberRole.User, isPending = true)
+            })
+        } }
         Unit
     }
 
@@ -504,8 +515,8 @@ class MockMsnp18Client(
             delay(1_000)
             mutableTyping.update { it + (contactId to false) }
             val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
-            val groupSender = group?.members?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
-                ?: group?.members?.firstOrNull()
+            val groupSender = group?.joinedMembers?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
+                ?: group?.joinedMembers?.firstOrNull()
             val incoming = ChatMessage(
                 id = ids.incrementAndGet(),
                 contactId = contactId,
@@ -587,8 +598,8 @@ class MockMsnp18Client(
                 ),
             )
             val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
-            val groupSender = group?.members?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
-                ?: group?.members?.firstOrNull()
+            val groupSender = group?.joinedMembers?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
+                ?: group?.joinedMembers?.firstOrNull()
             val incoming = ChatMessage(
                 id = ids.incrementAndGet(),
                 contactId = contactId,

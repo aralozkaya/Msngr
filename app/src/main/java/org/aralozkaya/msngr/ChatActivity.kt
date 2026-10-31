@@ -516,7 +516,7 @@ internal fun ChatScreen(
                                             text = if (isTyping) {
                                                 "typing…"
                                             } else if (contact?.isGroup == true) {
-                                                "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}"
+                                                "${contact.joinedMembers.size} ${if (contact.joinedMembers.size == 1) "member" else "members"}"
                                             } else {
                                                 contact?.presence?.label ?: "Offline"
                                             },
