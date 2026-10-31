@@ -130,7 +130,7 @@ class SettingsNavigationInstrumentedTest {
 
     @Test fun everyCategorySupportsSystemBackAndRootLeavesSystemBackUnclaimed() {
         for (title in listOf("Appearance", "Emoticons & Winks", "Messenger Plus!", "Contact Invitations",
-            "In-app notifications", "Connection", "About", "App updates")) {
+            "File & photo transfers", "In-app notifications", "Connection", "About", "App updates")) {
             openCategory(title)
             compose.onNodeWithText("Settings").assertDoesNotExist()
             compose.runOnIdle { assertTrue(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()) }

@@ -13,7 +13,8 @@ version tag, publication date, and release notes. Updates work only in installed
 - A new activity session triggers a startup check. Navigation, configuration changes,
   connection restoration, and background service/worker startup do not trigger startup checks.
 - Turn off **Check automatically** to cancel automatic checking. **Check for updates**
-  continues to work manually.
+  continues to work manually. The checking frequency selector expands below the switch
+  while automatic checking is enabled; collapsing it preserves the selected frequency.
 - Stable releases are the default. **Include prereleases** also offers alpha, beta, and rc
   releases. Versions follow the release-tag/versionCode contract in `app/build.gradle.kts`;
   republishing an old version does not make it an upgrade.

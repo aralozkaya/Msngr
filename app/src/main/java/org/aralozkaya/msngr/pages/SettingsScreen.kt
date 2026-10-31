@@ -66,6 +66,7 @@ import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
 import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.updates.updateManager
 
 enum class SettingsDestination(
@@ -76,6 +77,7 @@ enum class SettingsDestination(
     Emoticons("Emoticons & Winks"),
     MessengerPlus("Messenger Plus!"),
     ContactInvitations("Contact Invitations"),
+    Transfers("File & photo transfers"),
     InAppNotifications("In-app notifications"),
     CustomizedNotifications("Customized notifications"),
     Connection("Connection"),
@@ -112,6 +114,12 @@ internal enum class SettingsCategory(
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.ContactInvitations,
         testTag = "contact_invitation_settings",
+    ),
+    Transfers(
+        title = "File & photo transfers",
+        presentation = SettingsCategoryPresentation.Destination,
+        destination = SettingsDestination.Transfers,
+        testTag = "transfer_settings",
     ),
     Connection(
         title = "Connection",
@@ -168,6 +176,7 @@ private val primarySettingsCategories = listOf(
     SettingsCategory.Emoticons,
     SettingsCategory.MessengerPlus,
     SettingsCategory.ContactInvitations,
+    SettingsCategory.Transfers,
     SettingsCategory.InAppNotifications,
     SettingsCategory.Connection,
     SettingsCategory.Updates,
@@ -397,37 +406,37 @@ fun ContactInvitationSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
         item(key = "use-decline-defaults") {
-            SegmentedListItem(
-                checked = settings.useDeclineDefaults,
-                onCheckedChange = { ContactInvitationPrefs.setUseDeclineDefaults(context, it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
-                modifier = Modifier.settingsRow().testTag("use_contact_invitation_decline_defaults"),
-                trailingContent = {
-                    Switch(checked = settings.useDeclineDefaults, onCheckedChange = null)
-                },
-                supportingContent = {
-                    Text("Decline uses the actions below without asking. Turn this off to choose each time.")
-                },
-                content = { Text("Use default decline actions") },
-            )
-        }
-        item(key = "block-declined-invitations") {
-            SegmentedListItem(
-                checked = settings.blockDeclinedInvitations,
-                onCheckedChange = { ContactInvitationPrefs.setBlockDeclinedInvitations(context, it) },
-                enabled = settings.useDeclineDefaults,
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
-                modifier = Modifier.settingsRow().testTag("block_declined_contact_invitations"),
-                trailingContent = {
-                    Checkbox(
-                        checked = settings.blockDeclinedInvitations,
-                        onCheckedChange = null,
-                        enabled = settings.useDeclineDefaults,
-                    )
-                },
-                supportingContent = { Text("Also block future invitations from anyone you decline.") },
-                content = { Text(stringResource(R.string.contact_request_block)) },
-            )
+            ExpandableSettingsGroup(expanded = settings.useDeclineDefaults, master = { shapes ->
+                SegmentedListItem(
+                    checked = settings.useDeclineDefaults,
+                    onCheckedChange = { ContactInvitationPrefs.setUseDeclineDefaults(context, it) },
+                    shapes = shapes,
+                    modifier = Modifier.settingsRow().testTag("use_contact_invitation_decline_defaults"),
+                    trailingContent = {
+                        Switch(checked = settings.useDeclineDefaults, onCheckedChange = null)
+                    },
+                    supportingContent = {
+                        Text("Decline uses the actions below without asking. Turn this off to choose each time.")
+                    },
+                    content = { Text("Use default decline actions") },
+                )
+            }) { shapes, colors ->
+                SegmentedListItem(
+                    checked = settings.blockDeclinedInvitations,
+                    onCheckedChange = { ContactInvitationPrefs.setBlockDeclinedInvitations(context, it) },
+                    shapes = shapes,
+                    colors = colors,
+                    modifier = Modifier.settingsRow().testTag("block_declined_contact_invitations"),
+                    trailingContent = {
+                        Checkbox(
+                            checked = settings.blockDeclinedInvitations,
+                            onCheckedChange = null,
+                        )
+                    },
+                    supportingContent = { Text("Also block future invitations from anyone you decline.") },
+                    content = { Text(stringResource(R.string.contact_request_block)) },
+                )
+            }
         }
     }
 }
@@ -446,43 +455,43 @@ fun MessengerPlusSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
         item(key = "rendering") {
-            SegmentedListItem(
-                checked = settings.enabled,
-                onCheckedChange = { MessengerPlusPrefs.setEnabled(context, it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 3),
-                modifier = Modifier.settingsRow().testTag("messenger_plus_enabled"),
-                trailingContent = {
-                    Switch(checked = settings.enabled, onCheckedChange = null)
-                },
-                supportingContent = { Text(MESSENGER_PLUS_DISCLAIMER) },
-                content = { Text("Enable Messenger Plus! rendering") },
-            )
-        }
-        item(key = "hide-control-characters") {
-            SegmentedListItem(
-                checked = settings.shouldHideControlCharacters,
-                onCheckedChange = { MessengerPlusPrefs.setHideControlCharacters(context, it) },
-                enabled = !settings.enabled,
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 3),
-                modifier = Modifier.settingsRow().testTag("messenger_plus_hide_control_characters"),
-                trailingContent = {
-                    Switch(
-                        checked = settings.shouldHideControlCharacters,
-                        onCheckedChange = null,
-                        enabled = !settings.enabled,
-                    )
-                },
-                supportingContent = {
-                    Text("Hide formatting codes when rendering is off. Always on while rendering is enabled.")
-                },
-                content = { Text("Hide control characters") },
-            )
+            ExpandableSettingsGroup(expanded = !settings.enabled, highlighted = false, master = { shapes ->
+                SegmentedListItem(
+                    checked = settings.enabled,
+                    onCheckedChange = { MessengerPlusPrefs.setEnabled(context, it) },
+                    shapes = shapes,
+                    modifier = Modifier.settingsRow().testTag("messenger_plus_enabled"),
+                    trailingContent = {
+                        Switch(checked = settings.enabled, onCheckedChange = null)
+                    },
+                    supportingContent = { Text(MESSENGER_PLUS_DISCLAIMER) },
+                    content = { Text("Enable Messenger Plus! rendering") },
+                )
+            }) { shapes, colors ->
+                SegmentedListItem(
+                    checked = settings.shouldHideControlCharacters,
+                    onCheckedChange = { MessengerPlusPrefs.setHideControlCharacters(context, it) },
+                    shapes = shapes,
+                    colors = colors,
+                    modifier = Modifier.settingsRow().testTag("messenger_plus_hide_control_characters"),
+                    trailingContent = {
+                        Checkbox(
+                            checked = settings.shouldHideControlCharacters,
+                            onCheckedChange = null,
+                        )
+                    },
+                    supportingContent = {
+                        Text("Hide formatting codes when rendering is off. Always on while rendering is enabled.")
+                    },
+                    content = { Text("Hide control characters") },
+                )
+            }
         }
         item(key = "emotion-sounds-autoplay") {
             SegmentedListItem(
                 checked = settings.playEmotionSounds,
                 onCheckedChange = { MessengerPlusPrefs.setPlayEmotionSounds(context, it) },
-                shapes = ListItemDefaults.segmentedShapes(index = 2, count = 3),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
                 modifier = Modifier.settingsRow().testTag("emotion_sound_autoplay"),
                 trailingContent = { Switch(checked = settings.playEmotionSounds, onCheckedChange = null) },
                 supportingContent = { Text("Play new emotion sounds while their conversation is open.") },
@@ -799,7 +808,7 @@ private fun DeleteHistoryDialog(
     )
 }
 
-private fun LazyListScope.settingsSectionHeader(title: String, first: Boolean = false) {
+internal fun LazyListScope.settingsSectionHeader(title: String, first: Boolean = false) {
     item(key = "header-$title") {
         Text(
             text = title,
@@ -817,7 +826,7 @@ private fun LazyListScope.settingsSectionHeader(title: String, first: Boolean = 
     }
 }
 
-private fun LazyListScope.settingsSectionSpacer() {
+internal fun LazyListScope.settingsSectionSpacer() {
     item { Spacer(Modifier.height(10.dp)) }
 }
 

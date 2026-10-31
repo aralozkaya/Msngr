@@ -11,6 +11,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -79,6 +82,21 @@ class UpdateScreenInstrumentedTest {
         compose.runOnIdle { assertEquals("v2.0.0", manager.state.value.preferences.skippedTag) }
         compose.onNodeWithTag("skip-update").performClick()
         compose.runOnIdle { assertEquals(null, manager.state.value.preferences.skippedTag) }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("automatic-updates"))
+        compose.onNodeWithTag("automatic-updates").assertIsOff()
+        compose.onNodeWithTag("update-interval").assertDoesNotExist()
+        compose.onNodeWithTag("automatic-updates").performClick().assertIsOn()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("update-interval"))
+        compose.onNodeWithTag("update-interval").assertIsEnabled().performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        File(target.getExternalFilesDir(null), "update-settings-expanded.png").outputStream().use {
+            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("automatic-updates"))
+        compose.onNodeWithTag("automatic-updates").performClick().assertIsOff()
+        compose.onNodeWithTag("update-interval").assertDoesNotExist()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("include-prereleases"))
+        compose.onNodeWithTag("include-prereleases").assertIsEnabled()
         context.getSharedPreferences("msngr_updates", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
