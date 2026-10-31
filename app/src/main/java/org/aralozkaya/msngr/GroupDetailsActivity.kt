@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.data.resolveContact
 import org.aralozkaya.msngr.pages.GroupDetailsPage
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
+import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
 import org.aralozkaya.msngr.pages.components.LeaveGroupDialog
@@ -41,6 +42,7 @@ class GroupDetailsActivity : MsngrActivity() {
             val members = group?.members.orEmpty().mapNotNull { contacts.resolveContact(it.email, profile) }
             var showInvite by rememberSaveable { mutableStateOf(false) }
             var showLeave by rememberSaveable { mutableStateOf(false) }
+            var addContactEmail by rememberSaveable { mutableStateOf<String?>(null) }
             val snackbarHostState = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
@@ -83,6 +85,26 @@ class GroupDetailsActivity : MsngrActivity() {
                         ownEmail = profile.email,
                         onEditProfile = { startActivity(ProfileActivity.createIntent(this)) },
                         onRefreshPicture = { repository.refreshContactPicture(it.id) },
+                        onAddContact = { addContactEmail = it.email },
+                    )
+                }
+                addContactEmail?.let { email ->
+                    AddContactDialog(
+                        ownEmail = profile.email,
+                        contacts = contacts,
+                        initialEmail = email,
+                        isMock = SessionPrefs.isMockServerActive(),
+                        onAddContact = repository::addContact,
+                        onAdded = {
+                            addContactEmail = null
+                            scope.launch {
+                                snackbarHostState.showActionSnackbar(getString(
+                                    if (SessionPrefs.isMockServerActive()) R.string.contact_add_mock_success
+                                    else R.string.contact_add_success,
+                                ))
+                            }
+                        },
+                        onDismiss = { addContactEmail = null },
                     )
                 }
                 if (showInvite && group != null) GroupEditorDialog(profile.email, contacts, group,
