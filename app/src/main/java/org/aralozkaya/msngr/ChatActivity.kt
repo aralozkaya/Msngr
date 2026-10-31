@@ -1568,6 +1568,8 @@ internal fun MessageBubble(
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     textSize: Int = NativeTextStyle.DEFAULT_SIZE,
+    containerInteractionEnabled: Boolean =
+        message.wink == null && !message.isVoiceClip && !message.isInk && message.fileTransfer == null,
 ) {
     var showDeliveryError by rememberSaveable(message.id) { mutableStateOf(false) }
     var showWinkOptions by rememberSaveable(message.id) { mutableStateOf(false) }
@@ -1575,15 +1577,25 @@ internal fun MessageBubble(
     val emotionSound = message.emotionSound
     val deliveryError = message.deliveryError
     val winkTransferFailed = message.wink != null && !message.isWinkPending && message.winkTransferError != null
-    val interactionSource = remember { MutableInteractionSource() }
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    val onCopy = remember(context, haptic, message.text) {
-        {
-            copyChatMessage(context, emotionSound?.displayText ?: message.text)
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    val containerInteractionModifier = if (containerInteractionEnabled) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val context = LocalContext.current
+        val haptic = LocalHapticFeedback.current
+        val copyText = emotionSound?.displayText ?: message.text
+        val onCopy = remember(context, haptic, copyText) {
+            {
+                copyChatMessage(context, copyText)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
         }
-    }
+        Modifier
+            .indication(interactionSource, ripple())
+            .copyMessageOnLongPress(
+                label = stringResource(R.string.chat_copy_message),
+                interactionSource = interactionSource,
+                onCopy = onCopy,
+            )
+    } else Modifier
     val alignment = when (message.author) {
         MessageAuthor.Me -> Alignment.CenterEnd
         MessageAuthor.Contact -> Alignment.CenterStart
@@ -1624,13 +1636,7 @@ internal fun MessageBubble(
             color = containerColor,
         ) {
             Column(
-                modifier = Modifier
-                    .indication(interactionSource, ripple())
-                    .copyMessageOnLongPress(
-                        label = stringResource(R.string.chat_copy_message),
-                        interactionSource = interactionSource,
-                        onCopy = onCopy,
-                    )
+                modifier = containerInteractionModifier
                     .padding(horizontal = 14.dp, vertical = 9.dp),
             ) {
                 if (showSenderName && message.author == MessageAuthor.Contact && !joinsPrevious) {
@@ -1644,7 +1650,7 @@ internal fun MessageBubble(
                 if (message.fileTransfer != null) {
                     FileTransferMessage(message)
                 } else if (message.wink != null) {
-                    WinkMessage(message, onShowOptions = { showWinkOptions = true })
+                    WinkMessage(message, onShowOptions = { showWinkOptions = true }, onRetry = onRetry)
                 } else if (message.isVoiceClip) {
                     VoiceClipMessage(message)
                 } else if (message.inkDrawing != null) {
