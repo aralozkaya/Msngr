@@ -777,6 +777,7 @@ class MessengerRepository(
     val drafts: StateFlow<Map<String, String>> = draftStore.drafts
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
+    internal val liveTransferMessages get() = client.messages
     val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
     private val mutablePendingEmotionSounds = MutableStateFlow<Map<String, ChatMessage>>(emptyMap())
     private val queuedEmotionSoundIds = java.util.concurrent.ConcurrentHashMap<String, Long>()

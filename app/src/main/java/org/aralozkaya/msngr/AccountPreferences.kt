@@ -22,6 +22,8 @@ internal object AccountPreferences {
         "msngr_winks",
         "msngr_messenger_plus",
         "msngr_contact_invitations",
+        "msngr_transfers",
+        "msngr_transfer_saves",
         "msngr_in_app_notifications",
         "background_delivery",
     )
@@ -65,6 +67,7 @@ internal object AccountPreferences {
         WinkPrefs.reload(context)
         MessengerPlusPrefs.reload(context)
         ContactInvitationPrefs.reload(context)
+        TransferPrefs.reload(context)
         org.aralozkaya.msngr.notifications.InAppNotificationPrefs.reload(context)
     }
 }

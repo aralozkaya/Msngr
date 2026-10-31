@@ -157,7 +157,7 @@ internal class MsnpPhotoSession(
         publishObject(requireNotNull(localObjects[thumb.sha1d])); publishObject(requireNotNull(localObjects[preview.sha1d]))
         val item = SharedPhoto(MsnpP2pUtil.randomGuid(), photo.name, photo.hash, thumb, preview,
             saveObject(preview, previewBytes), originalPath = photo.originalPath,
-            sortIndex = if (current.outgoing) ++nextPhotoIndex else null)
+            sortIndex = if (current.outgoing) ++nextPhotoIndex else null, outgoing = true)
         photo.originalPath?.let { path ->
             val original = OriginalPhoto(photo.name, path, photo.hash)
             originals[item.id.uppercase()] = original; publishOriginal(item.id, original)

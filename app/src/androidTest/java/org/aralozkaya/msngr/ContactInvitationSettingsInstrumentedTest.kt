@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.captureToImage
@@ -85,7 +84,9 @@ class ContactInvitationSettingsInstrumentedTest {
                             { destination.value = null }) { padding, scroll ->
                             if (destination.value == SettingsDestination.ContactInvitations) {
                                 ContactInvitationSettingsScreen(padding, scroll)
-                            } else SettingsScreen(padding, scroll, { destination.value = it }, {})
+                            } else CompositionLocalProvider(LocalContext provides compose.activity) {
+                                SettingsScreen(padding, scroll, { destination.value = it }, {})
+                            }
                         }
                     }
                 }
@@ -98,7 +99,7 @@ class ContactInvitationSettingsInstrumentedTest {
         openPage()
         compose.onNodeWithText("Contact Invitations").assertIsDisplayed()
         compose.onNodeWithTag("use_contact_invitation_decline_defaults").assertIsOff()
-        compose.onNodeWithTag("block_declined_contact_invitations").assertIsDisplayed().assertIsOff().assertIsNotEnabled()
+        compose.onNodeWithTag("block_declined_contact_invitations").assertDoesNotExist()
         compose.onNodeWithTag("use_contact_invitation_decline_defaults").performClick().assertIsOn()
         compose.onNodeWithTag("block_declined_contact_invitations").assertIsOff().assertIsEnabled().performClick().assertIsOn()
         compose.runOnIdle {
@@ -114,7 +115,7 @@ class ContactInvitationSettingsInstrumentedTest {
                 compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         compose.onNodeWithTag("use_contact_invitation_decline_defaults").performClick().assertIsOff()
-        compose.onNodeWithTag("block_declined_contact_invitations").assertIsDisplayed().assertIsOn().assertIsNotEnabled()
+        compose.onNodeWithTag("block_declined_contact_invitations").assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(ContactInvitationSettings(false, true), ContactInvitationPrefs.state(context).value)
         }
@@ -122,7 +123,7 @@ class ContactInvitationSettingsInstrumentedTest {
         compose.onNodeWithTag("block_declined_contact_invitations").assertIsOn().assertIsEnabled()
     }
 
-    @Test fun disabledOptionStaysVisibleAndIgnoresClicksWithoutChangingItsSavedValue() {
+    @Test fun collapsedOptionRetainsItsSavedValueAndReappearsAsAnEditableCheckbox() {
         ContactInvitationPrefs.saveDeclineDefaults(context, block = true)
         compose.setContent {
             CompositionLocalProvider(LocalContext provides context) {
@@ -137,14 +138,14 @@ class ContactInvitationSettingsInstrumentedTest {
         val toggle = compose.onNodeWithTag("use_contact_invitation_decline_defaults")
         option.assertIsDisplayed().assertIsOn().assertIsEnabled()
         toggle.performClick().assertIsOff()
-        option.assertIsDisplayed().assertIsOn().assertIsNotEnabled().performClick().assertIsOn()
+        option.assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(ContactInvitationSettings(false, true), ContactInvitationPrefs.state(context).value)
         }
         toggle.performClick().assertIsOn()
         option.assertIsEnabled().performClick().assertIsOff()
         toggle.performClick().assertIsOff()
-        option.assertIsDisplayed().assertIsOff().assertIsNotEnabled().performClick().assertIsOff()
+        option.assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(ContactInvitationSettings(false, false), ContactInvitationPrefs.state(context).value)
         }

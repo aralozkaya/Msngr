@@ -1,19 +1,22 @@
 package org.aralozkaya.msngr
 
+import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
@@ -23,6 +26,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 
 class ConversationHistorySettingsInstrumentedTest {
     @get:Rule
@@ -87,15 +91,18 @@ class ConversationHistorySettingsInstrumentedTest {
             compose.onNodeWithText(MESSENGER_PLUS_DISCLAIMER).assertExists()
 
             val hideToggle = compose.onNodeWithTag("messenger_plus_hide_control_characters")
-            hideToggle.assertIsOn().assertIsNotEnabled()
+            hideToggle.assertDoesNotExist()
             toggle.performClick().assertIsOff()
+            File(context.getExternalFilesDir(null), "messenger-plus-settings-expanded.png").outputStream().use {
+                compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
             hideToggle.assertIsOn().assertIsEnabled().performClick().assertIsOff()
             compose.runOnIdle {
                 assertFalse(MessengerPlusPrefs.state(context).value.hideControlCharacters)
                 assertFalse(preferences.getBoolean(hideKey, true))
             }
             toggle.performClick().assertIsOn()
-            hideToggle.assertIsOn().assertIsNotEnabled()
+            hideToggle.assertDoesNotExist()
             compose.runOnIdle { MessengerPlusPrefs.setHideControlCharacters(context, true) }
             toggle.performClick().assertIsOff()
             hideToggle.assertIsOff().assertIsEnabled()

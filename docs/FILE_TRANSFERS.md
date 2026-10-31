@@ -2,6 +2,10 @@
 
 The attachment menu in an online private chat offers **Photos** and **Files**.
 Groups and offline transfers are unavailable.
+Photos (including Add photos in an active share) uses Android's native photo
+picker with image-only selection and a 32-photo limit. Files keeps the document
+picker. The photo picker backport is requested on devices with Google Play
+services; AndroidX falls back to the document picker on unsupported devices.
 
 **Files** sends a normal conversation message. An incoming offer has **Accept**,
 **Save as**, and **Decline**; an active transfer has **Cancel**. Completed incoming
@@ -19,6 +23,8 @@ fall back to the icon.
 **Photos** invites the other person to a shared slideshow. Either participant can
 add photos and select the current image. The viewer uses a swipeable Material carousel and Save photo;
 saving requests the unchanged original rather than exporting the JPEG preview.
+Save photo writes to the configured photo folder without a per-photo destination
+prompt. The default is **DCIM/Msngr**, visible in the device's gallery.
 Original downloads are checked against the advertised SHA-1. Previews respect EXIF
 orientation. A share contains up to 32 photos, with previews bounded to 4 MiB each
 and outgoing preview data to 32 MiB per session. Download requests are queued;
@@ -29,6 +35,48 @@ share running so the conversation and attachment menu remain usable. A floating
 Photos button above the composer reopens it; only Stop sharing, Cancel, or Decline
 ends the session locally. Closing an ended share removes its floating button.
 Slideshow state is retained during the signed-in session, rather than in history.
+
+## Transfer settings and storage
+
+**Settings > File & photo transfers** has independent switches for automatically
+accepting incoming file offers / photo invitations and automatically saving
+completed received files. Both are off by default. **Include shared photos** is
+an additional checkbox, off by default, that expands below file autosave when it
+is on. Its saved choice is retained while file autosave is off. **Save locations**
+groups the file and photo destinations.
+Including shared photos downloads and saves received originals, including photos added to a
+share that you started; it does not duplicate your own photos. Original requests
+are queued one at a time. Automation runs in the live session even when the chat
+or photo viewer is closed; restored history is not exported again.
+
+The default file destination is **Downloads** and the default photo destination
+is **DCIM/Msngr**. The folder rows have trailing folder and photo icons; either
+row opens Android's native directory access picker (`ACTION_OPEN_DOCUMENT_TREE`).
+Msngr retains each write grant for future transfers and relaunches. Long-press either
+folder row and choose **Restore default location** in its Material 3 Expressive menu
+to reset that destination. Both default paths are labeled **(default)**. File and
+photo folders are independent, and both choices are scoped to the signed-in account.
+If a grant is revoked or a folder becomes unavailable, the transfer remains
+in private storage and the chat shows the save error. Files can still use Save as;
+photos can retry after choosing an available photo folder.
+Successful automatic exports are remembered to avoid duplicate copies.
+
+On Android 10 and newer, Msngr creates its own entries in `MediaStore.Downloads`
+and `MediaStore.Images`, using `RELATIVE_PATH` for Downloads and DCIM/Msngr and
+`IS_PENDING` until copying succeeds. This needs no storage permission or folder
+approval. Failed or cancelled writes remove the incomplete public copy. Android
+9 and earlier require the legacy write permission for these public defaults;
+the app requests it only when enabling default autosave or saving a photo. A
+custom folder uses its directory grant instead. On Android 11 and newer,
+the system forbids selecting the storage root or Downloads root through the
+directory picker; permitted subfolders can still be selected. Saving app-owned
+Downloads entries through MediaStore does not need that directory grant.
+
+Android SDK references:
+
+- [Photo picker and the AndroidX contracts](https://developer.android.com/training/data-storage/shared/photo-picker)
+- [App-owned media, Downloads, and MediaStore permissions](https://developer.android.com/training/data-storage/shared/media)
+- [Directory selection, persistent grants, and restricted roots](https://developer.android.com/training/data-storage/shared/documents-files)
 
 ## Native evidence and sources
 
