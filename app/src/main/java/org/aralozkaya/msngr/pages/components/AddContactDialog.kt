@@ -69,8 +69,9 @@ internal fun AddContactDialog(
     onDismiss: () -> Unit,
     isMock: Boolean = false,
     sourceBounds: Rect? = null,
+    initialEmail: String = "",
 ) {
-    var email by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable(initialEmail) { mutableStateOf(initialEmail) }
     var message by rememberSaveable { mutableStateOf("") }
     var submitting by remember { mutableStateOf(false) }
     var closingAction by remember { mutableStateOf<(() -> Unit)?>(null) }

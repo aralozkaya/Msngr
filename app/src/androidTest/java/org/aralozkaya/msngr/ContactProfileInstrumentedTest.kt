@@ -7,10 +7,17 @@ import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -57,6 +64,47 @@ class ContactProfileInstrumentedTest {
         compose.onNodeWithText("friend@example.com").performScrollTo().assertExists()
         compose.onNodeWithText("Back soon").performScrollTo().assertExists()
         compose.onNodeWithContentDescription("View display picture").assertIsNotEnabled()
+    }
+
+    @Test
+    fun nonContactProfileOffersStandardColoredAdditionAndUpdatesAfterSaving() {
+        val current = mutableStateOf(contact.copy(isForwardListContact = false))
+        val targets = mutableListOf<Contact>()
+        var contentColor = Color.Unspecified
+        var errorColor = Color.Unspecified
+        compose.setContent {
+            MsngrTheme {
+                contentColor = ButtonDefaults.outlinedButtonColors().contentColor
+                errorColor = MaterialTheme.colorScheme.error
+                ContactProfilePage(
+                    contact = current.value,
+                    innerPadding = PaddingValues(),
+                    scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
+                    onBlockContact = {},
+                    onEraseHistory = {},
+                    onDeleteContact = { _, _ -> error("Must not delete") },
+                    onAddContact = { targets += it },
+                )
+            }
+        }
+        compose.onNodeWithText("Delete contact").assertDoesNotExist()
+        val button = compose.onNodeWithText("Add a contact").performScrollTo().assertIsDisplayed()
+        val image = button.captureToImage().asAndroidBitmap()
+        val pixels = IntArray(image.width * image.height)
+        image.getPixels(pixels, 0, image.width, 0, 0, image.width, image.height)
+        assertTrue("Add contact uses the standard outlined button color", pixels.any { it == contentColor.toArgb() })
+        assertFalse("Add contact must not use error colors", pixels.any { it == errorColor.toArgb() })
+        image.recycle()
+        button.performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(current.value), targets)
+            current.value = contact
+        }
+        compose.onNodeWithText("Add a contact").assertDoesNotExist()
+        compose.onNodeWithText("Delete contact").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { current.value = contact.copy(isGroup = true, isForwardListContact = false) }
+        compose.onNodeWithText("Add a contact").assertDoesNotExist()
+        compose.onNodeWithText("Delete contact").assertDoesNotExist()
     }
 
     @Test
