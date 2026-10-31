@@ -245,6 +245,7 @@ interface MsnpClient {
         throw UnsupportedOperationException("Deleting contacts is not supported by this client.")
     }
     suspend fun refreshContactRequests() = Unit
+    suspend fun refreshBlockedContacts() = Unit
     suspend fun respondToContactRequest(requestId: String, accept: Boolean, block: Boolean = false) {
         throw UnsupportedOperationException("Contact requests are not supported by this client.")
     }
@@ -656,6 +657,7 @@ class MockMsnp18Client(
     }
 
     override suspend fun blockContact(contactId: String) {
+        mutableTyping.update { it - contactId }
         mutableContacts.update { contacts ->
             contacts.map { contact ->
                 if (contact.id == contactId) {
@@ -675,7 +677,7 @@ class MockMsnp18Client(
     override suspend fun unblockContact(contactId: String) {
         mutableContacts.update { contacts ->
             contacts.map { contact ->
-                if (contact.id == contactId) contact.copy(isBlocked = false) else contact
+                if (contact.id == contactId) contact.copy(isBlocked = false).withGroupPresence(signedInEmail) else contact
             }
         }
     }
@@ -1229,6 +1231,18 @@ class MessengerRepository(
     }
 
     suspend fun createGroup(name: String): Result<String> = groupOperation { client.createGroup(name) }
+    suspend fun setGroupBlocked(groupId: String, blocked: Boolean): Result<Unit> = groupOperation {
+        val group = client.contacts.value.firstOrNull { it.id == groupId && it.isGroup }
+            ?: error("This group is no longer available.")
+        if (blocked) client.blockContact(group.id) else client.unblockContact(group.id)
+        if (blocked) {
+            clearPendingNudgeShake(groupId)
+            mutablePendingWinks.update { it - groupId }
+            mutablePendingEmotionSounds.update { it - groupId }
+            queuedEmotionSoundIds.remove(groupId)
+            onConversationRead(groupId)
+        }
+    }
     suspend fun inviteGroupMembers(groupId: String, emails: List<String>, message: String = ""): Result<Unit> = groupOperation { client.inviteGroupMembers(groupId, emails, message) }
     suspend fun leaveGroup(groupId: String): Result<Unit> = groupOperation {
         client.leaveGroup(groupId)
@@ -1267,6 +1281,15 @@ class MessengerRepository(
         try {
             check(lastSignInRequest != null) { "Sign in to load contact requests." }
             client.refreshContactRequests()
+            Result.success(Unit)
+        } catch (error: CancellationException) { throw error }
+        catch (error: Exception) { Result.failure(error) }
+    }
+
+    suspend fun refreshBlockedContacts(): Result<Unit> = connectionMutex.withLock {
+        try {
+            check(lastSignInRequest != null && mutableSignOutReason.value == null) { "Sign in to load blocked contacts." }
+            client.refreshBlockedContacts()
             Result.success(Unit)
         } catch (error: CancellationException) { throw error }
         catch (error: Exception) { Result.failure(error) }

@@ -19,6 +19,7 @@ import org.aralozkaya.msngr.pages.GroupDetailsPage
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
+import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
 import org.aralozkaya.msngr.pages.components.LeaveGroupDialog
 import org.aralozkaya.msngr.pages.components.SecondaryPageScaffold
@@ -42,6 +43,7 @@ class GroupDetailsActivity : MsngrActivity() {
             val members = group?.members.orEmpty().mapNotNull { contacts.resolveContact(it.email, profile) }
             var showInvite by rememberSaveable { mutableStateOf(false) }
             var showLeave by rememberSaveable { mutableStateOf(false) }
+            var blockingTarget by rememberSaveable { mutableStateOf<Boolean?>(null) }
             var addContactEmail by rememberSaveable { mutableStateOf<String?>(null) }
             val snackbarHostState = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
@@ -61,6 +63,7 @@ class GroupDetailsActivity : MsngrActivity() {
                             ownEmail = profile.email,
                             onInviteMembers = { showInvite = true },
                             onLeaveGroup = { showLeave = true },
+                            onChangeBlocking = { group?.let { blockingTarget = !it.isBlocked } },
                             onOpenNotifications = {
                                 group?.let { target ->
                                     startActivity(ConversationNotificationSettingsActivity.createIntent(
@@ -106,6 +109,11 @@ class GroupDetailsActivity : MsngrActivity() {
                         },
                         onDismiss = { addContactEmail = null },
                     )
+                }
+                blockingTarget?.let { blocked ->
+                    if (group != null) GroupBlockingDialog(group, blocked,
+                        onSetBlocked = { repository.setGroupBlocked(group.id, blocked) },
+                        onChanged = { blockingTarget = null }, onDismiss = { blockingTarget = null })
                 }
                 if (showInvite && group != null) GroupEditorDialog(profile.email, contacts, group,
                     onCreate = repository::createGroup, onInvite = repository::inviteGroupMembers,

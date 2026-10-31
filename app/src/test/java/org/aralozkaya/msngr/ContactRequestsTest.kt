@@ -152,6 +152,51 @@ class ContactRequestsTest {
         } finally { h.close() }
     }
 
+    @Test fun blockedRefreshReadsServerBlocksAndUnblocksWithoutWritingMemberships() = runBlocking {
+        val h = Harness()
+        try {
+            h.pending = emptyList()
+            h.saved = Contact(peer, "Saved name", peer, Presence.Offline, avatarUri = "data:picture")
+            h.signIn()
+            val outsider = Contact("outside@example.test", "Outside", "outside@example.test", Presence.Offline,
+                isBlocked = true, isForwardListContact = false)
+            h.blocked = listOf(h.saved!!.copy(isBlocked = true, isForwardListContact = false), outsider)
+            val writesBefore = h.transport.sent.size
+            h.client.refreshBlockedContacts()
+            assertEquals(setOf(peer, outsider.id), h.client.contacts.value.filter(Contact::isBlocked).map(Contact::id).toSet())
+            assertTrue(h.client.contacts.value.single { it.id == peer }.isForwardListContact)
+            assertEquals("data:picture", h.client.contacts.value.single { it.id == peer }.avatarUri)
+            h.blocked = emptyList()
+            h.client.refreshBlockedContacts()
+            assertEquals(listOf(peer), h.client.contacts.value.map(Contact::id))
+            assertFalse(h.client.contacts.value.single().isBlocked)
+            assertTrue(h.calls.isEmpty())
+            assertTrue(h.transport.sent.drop(writesBefore).none { it.verb in setOf("ADL", "RML") })
+        } finally { h.close() }
+    }
+
+    @Test fun blockedRefreshFailureAndAnEndedSessionCannotReplaceTheDisplayedList() = runBlocking {
+        val h = Harness()
+        try {
+            h.signIn()
+            h.blocked = listOf(Contact(peer, "Blocked", peer, Presence.Offline,
+                isBlocked = true, isForwardListContact = false))
+            h.client.refreshBlockedContacts()
+            val before = h.client.contacts.value
+            h.failLookup = true
+            assertTrue(runCatching { h.client.refreshBlockedContacts() }.isFailure)
+            assertEquals(before, h.client.contacts.value)
+            h.failLookup = false
+            h.lookupGate = CompletableDeferred()
+            val operation = async(start = CoroutineStart.UNDISPATCHED) { runCatching { h.client.refreshBlockedContacts() } }
+            h.client.close()
+            h.lookupGate!!.complete(Unit)
+            assertTrue(operation.await().isFailure)
+            assertTrue(h.client.contacts.value.isEmpty())
+            assertTrue(h.calls.isEmpty())
+        } finally { h.close() }
+    }
+
     @Test fun withdrawnRequestIsRemovedLocallyWithoutAnyMutation() = runBlocking {
         val h = Harness()
         try {
@@ -226,6 +271,7 @@ class ContactRequestsTest {
         val transport = RequestTransport(peer)
         val calls = CopyOnWriteArrayList<String>()
         var pending = listOf(request)
+        var blocked = emptyList<Contact>()
         var saved: Contact? = null
         var failLookup = false
         var failSave = false
@@ -238,7 +284,7 @@ class ContactRequestsTest {
             fetchMessengerMemberships = { _, _, email ->
                 assertEquals(owner, email); lookupGate?.await()
                 if (failLookup) error("lookup failed")
-                MessengerMemberships(emptyList(), pending)
+                MessengerMemberships(blocked, pending)
             },
             acceptAddressBookContact = { _, _, email, _ ->
                 assertEquals(peer, email); calls += "add"

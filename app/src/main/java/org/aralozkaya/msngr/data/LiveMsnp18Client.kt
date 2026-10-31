@@ -1441,6 +1441,25 @@ internal class LiveMsnp18Client(
         mutableContactRequests.value = memberships.requests
     }
 
+    override suspend fun refreshBlockedContacts() = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in to load blocked contacts." }
+        val memberships = fetchMessengerMemberships(addressBookServer, addressBookTicket, owner)
+        check(machineGuid == endpoint && signedInEmail == owner) { "This session ended while loading blocked contacts." }
+        mutableContacts.update { contacts ->
+            mergeBlockedContactUpdate(contacts, memberships.blockedContacts).map { it.withGroupPresence(owner) }
+        }
+        mutableContactRequests.value = memberships.requests
+        mutableContacts.value.filter(Contact::isBlocked).forEach { contact ->
+            closeSwitchboards(contact.id)
+            typingJobs.remove(contact.id)?.cancel()
+            contactDisplayPictureJobs.remove(contact.id)?.cancel()
+        }
+        val blockedIds = memberships.blockedContacts.map(Contact::id).toSet()
+        mutableTyping.update { it - blockedIds }
+    }
+
     override suspend fun respondToContactRequest(requestId: String, accept: Boolean, block: Boolean): Unit = rosterMutationMutex.withLock {
         val owner = signedInEmail
         val endpoint = machineGuid
@@ -1525,12 +1544,25 @@ internal class LiveMsnp18Client(
         if (current.isBlocked == blocked) return
 
         if (current.isGroup) {
+            check(circleAuthenticated) { "Sign in before changing group blocking." }
             val response = requestNotification(
-                MsnpCircles.subscribe(nextTransactionId(), listOf(current.copy(isBlocked = blocked)), initial = false),
+                MsnpCircles.changeBlocking(nextTransactionId(), current, blocked),
             )
             check(machineGuid == endpoint && signedInEmail == owner) { "This session ended while changing the contact." }
             if (response.verb != "ADL" || response.parameters.firstOrNull() != "OK") throw response.toProtocolError()
-            updateContact(email) { it?.copy(isBlocked = blocked) }
+            if (blocked) {
+                typingJobs.remove(id)?.cancel()
+                mutableTyping.update { it - id }
+                circleSegments.discardGroup(id)
+            }
+            updateContact(email) { group -> group?.copy(
+                isBlocked = blocked,
+                unreadCount = if (blocked) 0 else group.unreadCount,
+                isMarkedUnread = !blocked && group.isMarkedUnread,
+            ) }
+            mutableContacts.value.firstOrNull { it.id == id }?.let {
+                subscribedContacts = subscribedContacts + (id to it)
+            }
             return
         }
 

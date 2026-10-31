@@ -36,6 +36,18 @@ internal object MsnpCircles {
         }.toByteArray(Charsets.UTF_8),
     )
 
+    /** Circle blocking changes type 9 membership; ordinary Passport RML/ADL packets do not apply. */
+    fun changeBlocking(transactionId: Int, group: Contact, blocked: Boolean): MsnpCommand {
+        require(group.isGroup) { "A circle is required to change group blocking." }
+        // Including Forward in a block attempts to join the already subscribed circle first.
+        // Some servers acknowledge that duplicate join without applying the subsequent block.
+        val lists = if (blocked) Msnp18Protocol.BLOCK_LIST else
+            Msnp18Protocol.FORWARD_LIST or Msnp18Protocol.ALLOW_LIST
+        val body = "<ml><d n=\"${group.email.substringAfter('@').circleXml()}\">" +
+            "<c n=\"${group.email.substringBefore('@').circleXml()}\" t=\"9\" l=\"$lists\" /></d></ml>"
+        return payloadCommand("ADL", transactionId, body.toByteArray(Charsets.UTF_8))
+    }
+
     fun message(
         transactionId: Int, groupEmail: String, senderEmail: String, endpointId: String,
         text: String = "", type: String = "Text",
@@ -271,6 +283,11 @@ internal class CircleSegmentAssembler {
         }
 
         return envelope
+    }
+
+    @Synchronized
+    fun discardGroup(groupId: String) {
+        pendingByStream.keys.removeAll { it.groupId == groupId }
     }
 
     @Synchronized
