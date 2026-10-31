@@ -22,7 +22,11 @@ independent messages and histories.
 
 Supported behavior includes UTF-8 text, sender names, typing indicators, nudges, member presence,
 saved history, unread counts, group message notifications, and inline replies. The client also
-preserves group blocking from the address book and supports the repository's block/unblock calls.
+preserves group blocking from the address book. Long-press a group in the contact list or open
+**Group details → Group options → Block group**. This confirms the action, waits for the server,
+and keeps a failed operation retryable. Owners, administrators, and members can block a group
+without leaving it. Unblock it from **Blocked contacts** or the Group details menu. Blocking clears
+active typing and unread indicators while preserving group membership and saved history.
 Creating groups, sending and accepting/declining invitations, and leaving as a non-owner are
 supported; see [GROUP_CREATION.md](GROUP_CREATION.md). Removing other members is not exposed.
 Protocol notifications refresh the contact and group lists when another session changes them,
@@ -69,6 +73,12 @@ The implementation was checked against Windows Live Messenger 2009 traffic and t
    `USR <transaction> SHA A <ticket>`. Authentication precedes circle subscriptions.
 3. A separate `ADL` subscribes circle identities using network type `t="9"`, with list value `3`
    for allowed groups or `5` for blocked groups. Ordinary contacts continue to use type `1`.
+   Explicit blocking uses an incremental type `9` `ADL` with only Block (`l="4"`), without
+   initial `l="1"` or Forward membership. Including Forward (`l="5"`) attempts a duplicate
+   join and can be acknowledged without applying the block. Unblocking uses `l="3"` to restore
+   Forward + Allow and rejoin the circle. Neither action sends Passport contact `RML`/`ADL` packets. Escargot
+   stores the circle's blocking membership; `FindMembership` returns it as a `CircleMember` with
+   `CircleId`, so login and the Blocked contacts refresh restore the same group block.
 4. Circle traffic uses `SDG` on the notification connection. Its three header blocks contain
    routing, reliability, and message metadata. A typical destination is
    `To: 9:<circle-id>@live.com;path=IM`; the sender is `From: 1:<member-email>;epid={<endpoint>}`.

@@ -7,6 +7,7 @@ import org.aralozkaya.msngr.data.GroupMemberRole
 import org.aralozkaya.msngr.data.isAddressBookNotification
 import org.aralozkaya.msngr.data.mergeAddressBookUpdate
 import org.aralozkaya.msngr.data.mergeBlockedMemberships
+import org.aralozkaya.msngr.data.mergeBlockedContactUpdate
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
 import org.junit.Assert.assertEquals
@@ -16,6 +17,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MsnpRosterUpdatesTest {
+    @Test fun membershipRefreshPreservesNamesAndForwardMembershipAndDoesNotResurrectLeftGroups() {
+        val peer = Contact("peer@example.com", "Local name", "peer@example.com", Presence.Busy,
+            statusMessage = "Status", avatarUri = "data:picture", unreadCount = 4, isMarkedUnread = true)
+        val group = Contact("group@live.com", "Group", "group@live.com", Presence.Online, isGroup = true)
+        val stale = group.copy(id = "left@live.com", email = "left@live.com", isBlocked = true)
+        val blocked = listOf(peer.copy(nickname = "Server name", isBlocked = true, isForwardListContact = false),
+            group.copy(isBlocked = true), stale)
+        val refreshed = mergeBlockedContactUpdate(listOf(peer, group), blocked)
+        assertEquals(listOf(peer.copy(isBlocked = true, presence = Presence.Offline, unreadCount = 0, isMarkedUnread = false),
+            group.copy(isBlocked = true, presence = Presence.Offline)), refreshed)
+        assertEquals(listOf(peer, group), mergeBlockedContactUpdate(listOf(peer.copy(isBlocked = true),
+            group.copy(isBlocked = true)), emptyList()))
+    }
+
     @Test fun refreshKeepsLivePresenceAndUnreadStateButRemovesDepartedMembers() {
         val me = GroupMember("me@example.com", "Me", Presence.Online)
         val peer = GroupMember("peer@example.com", "Peer :-)", Presence.Away, avatarUri = "data:photo")

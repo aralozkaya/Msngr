@@ -87,6 +87,7 @@ import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.ContactsActionMenu
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
+import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.pages.components.SessionsDialog
 import org.aralozkaya.msngr.pages.components.showActionSnackbar
@@ -262,6 +263,7 @@ private fun MsngrApp(
     var showCreateGroup by rememberSaveable { mutableStateOf(false) }
     var createGroupBounds by remember { mutableStateOf<Rect?>(null) }
     var deleteTarget by remember { mutableStateOf<Contact?>(null) }
+    var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
     val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val groupInteractionSource = remember { MutableInteractionSource() }
@@ -439,12 +441,18 @@ private fun MsngrApp(
             },
             onEditProfile = onOpenProfile,
             onOpenChat = { onOpenChat(it.id) },
-            onBlockContact = { repository.blockContact(it.id) },
+            onBlockContact = { if (it.isGroup) blockGroupTarget = it else repository.blockContact(it.id) },
             onDeleteContact = { deleteTarget = it },
             onReadStateChange = { contact, unread ->
                 if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
             },
         )
+    }
+
+    blockGroupTarget?.let { group ->
+        GroupBlockingDialog(group, blocked = true,
+            onSetBlocked = { repository.setGroupBlocked(group.id, true) },
+            onChanged = { blockGroupTarget = null }, onDismiss = { blockGroupTarget = null })
     }
 
     if (showCreateGroup) {

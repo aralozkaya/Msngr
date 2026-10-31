@@ -1,5 +1,25 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.enums.Presence
+
+/** A successful full membership lookup replaces block flags, including blocks outside the forward list. */
+internal fun mergeBlockedContactUpdate(current: List<Contact>, blocked: List<Contact>): List<Contact> {
+    val blockedIds = blocked.map(Contact::id).toSet()
+    val retained = current.filterNot {
+        it.isBlocked && !it.isForwardListContact && !it.isGroup && it.id !in blockedIds
+    }.map { contact ->
+        val isBlocked = contact.id in blockedIds
+        contact.copy(
+            isBlocked = isBlocked,
+            presence = if (isBlocked) Presence.Offline else contact.presence,
+            unreadCount = if (isBlocked) 0 else contact.unreadCount,
+            isMarkedUnread = !isBlocked && contact.isMarkedUnread,
+        )
+    }
+    // Reuse the login merge's guard against resurrecting circles that have been left.
+    return mergeBlockedMemberships(AddressBookSnapshot(retained), blocked).contacts
+}
+
 /** Membership comes from SOAP; live presence, pictures and unread state stay on the active roster. */
 internal fun mergeAddressBookUpdate(
     current: List<Contact>,
