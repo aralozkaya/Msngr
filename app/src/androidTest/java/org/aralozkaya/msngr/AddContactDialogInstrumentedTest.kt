@@ -128,9 +128,9 @@ class AddContactDialogInstrumentedTest {
                 assertEquals("Contact hello & ğüşi", message)
                 calls++
                 if (calls == 1) response.await() else Result.success(Unit)
-            }, { added = true }, { dismissed = true }) }
+            }, { added = true }, { dismissed = true }, initialEmail = peer) }
         }
-        compose.onNodeWithTag("add-contact-email").performTextInput(peer)
+        compose.onNodeWithTag("add-contact-email").assertTextContains(peer)
         compose.onNodeWithTag("add-contact-message").performTextInput("Contact hello & ğüşi")
         val modalBefore = compose.onNodeWithTag("add-contact-modal").fetchSemanticsNode().boundsInRoot
         val actionBefore = compose.onNodeWithTag("add-contact-submit").fetchSemanticsNode().boundsInRoot
