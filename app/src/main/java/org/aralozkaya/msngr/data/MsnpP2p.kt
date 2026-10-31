@@ -26,6 +26,7 @@ internal class MsnpP2pSession(
     private val publishPhoto: (LocalDisplayPicture) -> Unit = {},
     private val localOriginal: (String) -> OriginalPhoto? = { null },
     private val publishOriginal: (String, OriginalPhoto) -> Unit = { _, _ -> },
+    private val onGameSession: (GameSession) -> Unit = {},
 ) {
     private val v2 = remoteEndpointId?.takeIf(String::isNotBlank)?.let {
         MsnpP2pV2Session(
@@ -40,6 +41,7 @@ internal class MsnpP2pSession(
             onVoiceClip = onVoiceClip,
             localWink = localWink, onWink = onWink,
             fileDirectory = fileDirectory, onFileTransfer = onFileTransfer, onPhotoShare = onPhotoShare, localPhoto = localPhoto, publishPhoto = publishPhoto, localOriginal = localOriginal, publishOriginal = publishOriginal,
+            onGameSession = onGameSession,
         )
     }
     val destination: String get() = v2?.destination ?: remoteEmail
@@ -63,6 +65,23 @@ internal class MsnpP2pSession(
     suspend fun stopPhotos(id: String) { if (v2?.hasPhotoShare(id) == true) v2.stopPhotos(id) else if (photos.owns(id)) photos.stop() }
     suspend fun selectPhoto(id: String, photoId: String) { if (v2?.hasPhotoShare(id) == true) v2.selectPhoto(id, photoId) else if (photos.owns(id)) photos.select(photoId) }
 
+    private val gameApplicationLazy = lazy {
+        MsnpGameSession(
+            source = localEmail,
+            destination = remoteEmail,
+            publish = onGameSession,
+            sendControl = { sendMessage(0, P2P_NO_FLAG, 0, it) },
+            sendData = { session, appId, bytes -> sendMessage(session.toInt(), P2P_NO_FLAG, appId, bytes) },
+        )
+    }
+    private val games get() = gameApplicationLazy.value
+    suspend fun startGame(entry: GameCatalogEntry): String = v2?.startGame(entry) ?: games.start(entry)
+    fun hasGameSession(id: String): Boolean = v2?.hasGameSession(id) == true || (gameApplicationLazy.isInitialized() && games.owns(id))
+    suspend fun acceptGame(id: String) { if (v2?.hasGameSession(id) == true) v2.acceptGame(id) else { check(games.owns(id)); games.accept() } }
+    suspend fun stopGame(id: String) { if (v2?.hasGameSession(id) == true) v2.stopGame(id) else if (games.owns(id)) games.stop() }
+    suspend fun initializeGameChannel(id: String) { if (v2?.hasGameSession(id) == true) v2.initializeGameChannel(id) else if (games.owns(id)) games.initializeChannel() }
+    suspend fun sendGameData(id: String, payload: String) { if (v2?.hasGameSession(id) == true) v2.sendGameData(id, payload) else if (games.owns(id)) games.sendGameData(payload) }
+
     private val fileApplicationLazy = lazy {
         MsnpFileSession(localEmail, remoteEmail, fileDirectory, onFileTransfer,
             sendControl = { sendMessage(0, P2P_NO_FLAG, 0, it) }, sendFile = ::sendFileData, originalPhoto = { id ->
@@ -74,7 +93,7 @@ internal class MsnpP2pSession(
     fun hasFileTransfer(id: String): Boolean = v2?.hasFileTransfer(id) == true || (fileApplicationLazy.isInitialized() && files.owns(id))
     suspend fun acceptFile(id: String) { if (v2?.hasFileTransfer(id) == true) v2.acceptFile(id) else files.accept(id) }
     suspend fun cancelFile(id: String) { if (v2?.hasFileTransfer(id) == true) v2.cancelFile(id) else files.cancel(id) }
-    fun closeFileTransfers() { if (photoApplicationLazy.isInitialized()) photos.disconnect(); v2?.closeFileTransfers(); if (fileApplicationLazy.isInitialized()) files.close() }
+    fun closeFileTransfers() { if (photoApplicationLazy.isInitialized()) photos.disconnect(); if (gameApplicationLazy.isInitialized()) games.disconnect(); v2?.closeFileTransfers(); if (fileApplicationLazy.isInitialized()) files.close() }
 
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture, retry: Boolean = false) {
         v2?.let {
@@ -159,6 +178,7 @@ internal class MsnpP2pSession(
                 handleSlp(message.body)
             }
             message.header.sessionId != 0 && photoApplicationLazy.isInitialized() && photos.owns(message.header.sessionId.toLong() and 0xffff_ffffL) -> photos.receive(message.body)
+            message.header.sessionId != 0 && gameApplicationLazy.isInitialized() && games.owns(message.header.sessionId.toLong() and 0xffff_ffffL) -> games.receive(message.body)
             message.header.flags and P2P_MSN_OBJECT_DATA != 0 -> {
                 // P2P sessions can migrate to a different switchboard. A newly accepted
                 // switchboard therefore may not own the original pending call. The live client
@@ -182,6 +202,8 @@ internal class MsnpP2pSession(
         val message = SlpMessage.parse(bytes) ?: return
         if ((photoApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
                 ?.equals(MsnpPhotoSession.GUID, true) == true) && photos.handle(message)) return
+        if ((gameApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
+                ?.equals(org.aralozkaya.msngr.protocol.MsnGameProtocol.EUF_GUID, true) == true) && games.handle(message)) return
         if ((fileApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
                 ?.uppercase() in setOf(org.aralozkaya.msngr.protocol.MsnFileContext.GUID, MsnpFileSession.ORIGINAL_GUID)) && files.handle(message)) return
         when {

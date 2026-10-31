@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
@@ -59,6 +60,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
+    var gamesOpen by rememberSaveable(contactId) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -101,14 +103,27 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                 DropdownMenuItem(
                     text = { Text("Files") },
                     leadingIcon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
-                    shape = MenuDefaults.trailingItemShape,
+                    shape = MenuDefaults.middleItemShape,
                     modifier = Modifier.testTag("sharing_menu_files"),
                     onClick = { expanded = false; files.launch(arrayOf("*/*")) },
+                )
+                DropdownMenuItem(
+                    text = { Text("Games & activities") },
+                    leadingIcon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
+                    shape = MenuDefaults.trailingItemShape,
+                    modifier = Modifier.testTag("sharing_menu_games"),
+                    onClick = { expanded = false; gamesOpen = true },
                 )
             }
         }
     }
     LaunchedEffect(enabled, busy) { if (!enabled || busy) expanded = false }
+    if (gamesOpen && enabled) {
+        GameCatalogSheet(
+            contactId = contactId,
+            onDismiss = { gamesOpen = false },
+        )
+    }
     error?.let { message -> AlertDialog(onDismissRequest = { error = null }, title = { Text("Could not share") },
         text = { Text(message) }, confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } }) }
 }

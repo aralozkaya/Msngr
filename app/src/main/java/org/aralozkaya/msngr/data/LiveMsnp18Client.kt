@@ -339,6 +339,7 @@ internal class LiveMsnp18Client(
             presence = request.initialPresence))
         currentPresence = request.initialPresence
         storageServer = request.serverConfig.storageServer
+        MsnpGameCatalogService.currentActivitiesServer = request.serverConfig.activitiesServer
         storageTicket = token.storageTicket
         offlineServer = request.serverConfig.mainServer
         offlineTicket = token.offlineTicket
@@ -957,6 +958,34 @@ internal class LiveMsnp18Client(
     override suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).acceptPhotos(id) } }
     override suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).stopPhotos(id) } }
     override suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = withContext(Dispatchers.IO) { runCatching { photoSession(contactId, id).selectPhoto(id, photoId) } }
+
+    private val mutableGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap())
+    override val gameSessions = mutableGameSessions.asStateFlow()
+    private suspend fun gameSession(contactId: String, id: String): MsnpSwitchboardSession =
+        switchboardFor(contactId).also { check(it.hasGameSession(id)) { "This game session has ended." } }
+    override suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val email = contactEmail(contactId)
+            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) {
+                "This contact is unavailable for games and activities."
+            }
+            switchboardFor(email).startGame(entry)
+            Unit
+        }
+    }
+    override suspend fun acceptGame(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { gameSession(contactId, id).acceptGame(id) }
+    }
+    override suspend fun stopGame(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { gameSession(contactId, id).stopGame(id) }
+    }
+    override suspend fun initializeGameChannel(contactId: String, id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { gameSession(contactId, id).initializeGameChannel(id) }
+    }
+    override suspend fun sendGameData(contactId: String, id: String, payload: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { gameSession(contactId, id).sendGameData(id, payload) }
+    }
 
     private fun transferArea(): java.io.File {
         check(signedInStorageAccount.isNotBlank()) { "Sign in before sharing files." }
@@ -1829,14 +1858,16 @@ internal class LiveMsnp18Client(
 
     private fun startReceiver() {
         receiverJob?.cancel()
+        val sessionEndpoint = machineGuid
         receiverJob = scope.launch {
-            while (isActive && signedInEmail.isNotEmpty()) {
+            while (isActive && signedInEmail.isNotEmpty() && machineGuid == sessionEndpoint) {
                 val command = try {
                     transport.receive()
                 } catch (error: Exception) {
-                    if (isActive) reportConnectionLoss(error, force = true)
+                    if (isActive && machineGuid == sessionEndpoint) reportConnectionLoss(error, force = true)
                     break
                 }
+                if (!isActive || machineGuid != sessionEndpoint) break
                 val waiter = command.transactionId
                     ?.let(pendingNotificationTransactions::remove)
                 if (waiter != null) {
@@ -1845,12 +1876,14 @@ internal class LiveMsnp18Client(
                 }
                 handleIncoming(command)
             }
-            pendingNotificationTransactions.values.forEach {
-                it.completeExceptionally(
-                    IllegalStateException("The notification server disconnected."),
-                )
+            if (isActive && machineGuid == sessionEndpoint) {
+                pendingNotificationTransactions.values.forEach {
+                    it.completeExceptionally(
+                        IllegalStateException("The notification server disconnected."),
+                    )
+                }
+                pendingNotificationTransactions.clear()
             }
-            pendingNotificationTransactions.clear()
         }
     }
 
@@ -2922,6 +2955,7 @@ internal class LiveMsnp18Client(
         val contactId = when (event) {
             is SwitchboardEvent.FileChanged -> event.senderEmail.lowercase()
             is SwitchboardEvent.PhotosChanged -> event.senderEmail.lowercase()
+            is SwitchboardEvent.GameChanged -> event.senderEmail.lowercase()
             else -> session.contactEmail
         }
         if (contactId.isEmpty()) {
@@ -2937,7 +2971,7 @@ internal class LiveMsnp18Client(
         if (event is SwitchboardEvent.Text || event is SwitchboardEvent.Ink ||
             event is SwitchboardEvent.WinkOffered || event is SwitchboardEvent.VoiceClipOffered ||
             event is SwitchboardEvent.Nudge || event is SwitchboardEvent.FileChanged ||
-            event is SwitchboardEvent.PhotosChanged
+            event is SwitchboardEvent.PhotosChanged || event is SwitchboardEvent.GameChanged
         ) ensureSwitchboardContact(contactId)
         when (event) {
             SwitchboardEvent.ContactResolved -> registerIncomingSwitchboard(session)
@@ -2987,6 +3021,59 @@ internal class LiveMsnp18Client(
                     val message = ChatMessage(messageIds.incrementAndGet(), contactId, MessageAuthor.System, text, System.currentTimeMillis())
                     appendMessage(message)
                     if (merged.remoteStopped) {
+                        incrementUnread(contactId)
+                        mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                    }
+                }
+            }
+            is SwitchboardEvent.GameChanged -> {
+                if (!event.senderEmail.equals(contactId, true)) return
+                var previous: GameSession? = null
+                mutableGameSessions.update { all ->
+                    previous = all[contactId]
+                    all + (contactId to event.session)
+                }
+                if (previous?.id != event.session.id) {
+                    val message = ChatMessage(
+                        id = messageIds.incrementAndGet(),
+                        contactId = contactId,
+                        author = MessageAuthor.System,
+                        text = if (event.session.outgoing) {
+                            "Game invitation sent: ${event.session.appName}."
+                        } else {
+                            "Game invitation received: ${event.session.appName}."
+                        },
+                        timestampMillis = System.currentTimeMillis(),
+                    )
+                    appendMessage(message)
+                    if (!event.session.outgoing) {
+                        incrementUnread(contactId)
+                        mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                    }
+                } else if (previous.status != event.session.status && event.session.status in listOf(
+                        GameSessionStatus.Stopped,
+                        GameSessionStatus.Declined,
+                        GameSessionStatus.Failed,
+                    )
+                ) {
+                    val text = when (event.session.status) {
+                        GameSessionStatus.Stopped -> if (event.session.remoteStopped) {
+                            "The other person closed ${event.session.appName}."
+                        } else {
+                            "You closed ${event.session.appName}."
+                        }
+                        GameSessionStatus.Declined -> "${event.session.appName} invitation declined."
+                        else -> event.session.error ?: "${event.session.appName} failed."
+                    }
+                    val message = ChatMessage(
+                        id = messageIds.incrementAndGet(),
+                        contactId = contactId,
+                        author = MessageAuthor.System,
+                        text = text,
+                        timestampMillis = System.currentTimeMillis(),
+                    )
+                    appendMessage(message)
+                    if (event.session.remoteStopped) {
                         incrementUnread(contactId)
                         mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
                     }
@@ -3357,6 +3444,7 @@ internal class LiveMsnp18Client(
         sharedPhotoObjects.clear()
         sharedOriginals.clear()
         mutablePhotoShares.value = emptyMap()
+        mutableGameSessions.value = emptyMap()
         sharedWinks.clear()
         pendingWinks.clear()
         sharedVoiceClips.clear()

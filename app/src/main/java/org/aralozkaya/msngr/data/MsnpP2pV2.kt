@@ -28,6 +28,7 @@ internal class MsnpP2pV2Session(
     private val publishPhoto: (LocalDisplayPicture) -> Unit = {},
     private val localOriginal: (String) -> OriginalPhoto? = { null },
     private val publishOriginal: (String, OriginalPhoto) -> Unit = { _, _ -> },
+    private val onGameSession: (GameSession) -> Unit = {},
 ) {
     val destination = "$remoteEmail;${remoteEndpointId.asP2pGuid()}"
     private val source = "$localEmail;${localEndpointId.asP2pGuid()}"
@@ -50,6 +51,23 @@ internal class MsnpP2pV2Session(
     suspend fun stopPhotos(id: String) { if (photos.owns(id)) photos.stop() }
     suspend fun selectPhoto(id: String, photoId: String) { if (photos.owns(id)) photos.select(photoId) }
 
+    private val gameApplicationLazy = lazy {
+        MsnpGameSession(
+            source = source,
+            destination = destination,
+            publish = onGameSession,
+            sendControl = { sendApplicationControl(it) },
+            sendData = { session, _, bytes -> sendMessage(session, TF_FIRST, OP_NONE, 0, body = bytes) },
+        )
+    }
+    private val games get() = gameApplicationLazy.value
+    suspend fun startGame(entry: GameCatalogEntry): String = games.start(entry)
+    fun hasGameSession(id: String): Boolean = gameApplicationLazy.isInitialized() && games.owns(id)
+    suspend fun acceptGame(id: String) { check(games.owns(id)); games.accept() }
+    suspend fun stopGame(id: String) { if (games.owns(id)) games.stop() }
+    suspend fun initializeGameChannel(id: String) { if (games.owns(id)) games.initializeChannel() }
+    suspend fun sendGameData(id: String, payload: String) { if (games.owns(id)) games.sendGameData(payload) }
+
     private val fileApplicationLazy = lazy {
         MsnpFileSession(source, destination, fileDirectory, onFileTransfer,
             sendControl = { sendApplicationControl(it) }, sendFile = ::sendFileData, originalPhoto = { id ->
@@ -61,7 +79,7 @@ internal class MsnpP2pV2Session(
     fun hasFileTransfer(id: String): Boolean = fileApplicationLazy.isInitialized() && files.owns(id)
     suspend fun acceptFile(id: String) { files.accept(id) }
     suspend fun cancelFile(id: String) { files.cancel(id) }
-    fun closeFileTransfers() { if (photoApplicationLazy.isInitialized()) photos.disconnect(); if (fileApplicationLazy.isInitialized()) files.close() }
+    fun closeFileTransfers() { if (photoApplicationLazy.isInitialized()) photos.disconnect(); if (gameApplicationLazy.isInitialized()) games.disconnect(); if (fileApplicationLazy.isInitialized()) files.close() }
 
     suspend fun requestDisplayPicture(picture: MsnDisplayPicture, retry: Boolean = false) {
         val now = System.nanoTime()
@@ -129,6 +147,7 @@ internal class MsnpP2pV2Session(
         when {
             packet.sessionId == 0L && baseTf == TF_NONE -> handleSlp(message.body)
             packet.sessionId != 0L && photoApplicationLazy.isInitialized() && photos.owns(packet.sessionId) -> photos.receive(message.body)
+            packet.sessionId != 0L && gameApplicationLazy.isInitialized() && games.owns(packet.sessionId) -> games.receive(message.body)
             baseTf and TF_MSN_OBJECT != 0 -> {
                 val pending = pendingCalls.remove(packet.sessionId)
                 if (pending?.picture?.objectType in listOf(8, 11, 15)) {
@@ -151,6 +170,8 @@ internal class MsnpP2pV2Session(
             "V2 SLP app=${message.body.field("AppID")?.toIntOrNull()} session=${message.body.field("SessionID")?.toLongOrNull()} type=${when(message.contentType) { MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE -> "session"; MsnpP2pUtil.TRANSPORT_REQUEST_CONTENT_TYPE -> "transport-request"; MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE -> "transport-response"; else -> "other" }} response=${message.firstLine.startsWith("MSNSLP/1.0 200")}") }
         if ((photoApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
                 ?.equals(MsnpPhotoSession.GUID, true) == true) && photos.handle(message)) return
+        if ((gameApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
+                ?.equals(org.aralozkaya.msngr.protocol.MsnGameProtocol.EUF_GUID, true) == true) && games.handle(message)) return
         if ((fileApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
                 ?.uppercase() in setOf(org.aralozkaya.msngr.protocol.MsnFileContext.GUID, MsnpFileSession.ORIGINAL_GUID)) && files.handle(message)) return
         when {

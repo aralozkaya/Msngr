@@ -650,7 +650,7 @@ fun ConnectionInformationScreen(
         "Authentication" to snapshot.resolvedServers.authServer,
         "Address book" to snapshot.resolvedServers.addressBookServer,
         "Storage" to snapshot.resolvedServers.storageServer,
-        "Activities" to snapshot.resolvedServers.activitiesServer,
+        "Games & activities" to snapshot.resolvedServers.activitiesServer,
         "Mail" to snapshot.resolvedServers.mailServer,
     )
 

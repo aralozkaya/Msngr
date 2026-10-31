@@ -34,6 +34,11 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   online private chat. Browse a shared slideshow, save original photos, or accept, decline,
   save, and open file messages. Stopping photo sharing leaves the other viewer open with a
   notice. Executable files are blocked. See [file transfers](docs/FILE_TRANSFERS.md).
+- **Play games and share activities *(experimental)*.** Choose **Games & activities** from the
+  attachment menu in an online private chat to browse the service's catalog, invite a contact,
+  and play classic Windows Live Messenger games and shared activities in-app. Minimize an active
+  session into a floating button anytime to keep chatting while the game stays live. See
+  [Games & Activities protocol](WLM_GAMES_PROTOCOL.md).
 - **Send a wink.** Send and receive classic animated [winks](docs/WINKS.md) with sound in
   one-to-one chats and groups whose online members all support winks. Long-press the emoticon
   button to open the wink picker, hold a wink to
@@ -614,6 +619,7 @@ The endpoint presets and protocol behavior were checked against:
 | [Contact requests](docs/CONTACT_REQUESTS.md) · [Request messages](docs/REQUEST_MESSAGES.md) | Accept/decline flows, invitation text, and service limitations. |
 | [Background notifications](docs/PUSH_NOTIFICATIONS.md) · [Active sessions](docs/MULTI_PRESENCE.md) | Android delivery, reconnects, device names, and remote logout. |
 | [Picture synchronization](docs/PROFILE_PICTURE_SYNC.md) | Roaming identity, same-account picture transfers, removals, and desktop interoperability. |
+| [Games & Activities (experimental)](WLM_GAMES_PROTOCOL.md) | App Directory catalog discovery, MSNSLP P4 invitations, `window.external` bridge, and binary `CP4Channel` framing. |
 
 ## License
 

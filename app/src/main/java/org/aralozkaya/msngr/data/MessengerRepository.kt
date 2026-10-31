@@ -163,6 +163,7 @@ private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyL
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
 private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow()
 private val emptyPhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap()).asStateFlow()
+private val emptyGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap()).asStateFlow()
 private val emptyNudgeCooldowns = MutableStateFlow<Map<String, Long>>(emptyMap()).asStateFlow()
 
 interface MsnpClient {
@@ -222,6 +223,12 @@ interface MsnpClient {
     suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
     suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
     suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = Result.failure(UnsupportedOperationException("Photo sharing is unavailable."))
+    val gameSessions: StateFlow<Map<String, GameSession>> get() = emptyGameSessions
+    suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = Result.failure(UnsupportedOperationException("Games and activities are unavailable."))
+    suspend fun acceptGame(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Games and activities are unavailable."))
+    suspend fun stopGame(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Games and activities are unavailable."))
+    suspend fun initializeGameChannel(contactId: String, id: String): Result<Unit> = Result.failure(UnsupportedOperationException("Games and activities are unavailable."))
+    suspend fun sendGameData(contactId: String, id: String, payload: String): Result<Unit> = Result.failure(UnsupportedOperationException("Games and activities are unavailable."))
     suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("File transfers are unavailable."))
     suspend fun acceptFile(contactId: String, id: String): Result<Unit> =
@@ -324,6 +331,8 @@ class MockMsnp18Client(
     override val typing = mutableTyping.asStateFlow()
     override val events = mutableEvents.asSharedFlow()
     override val sessions = mutableSessions.asStateFlow()
+    private val mutableGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap())
+    override val gameSessions = mutableGameSessions.asStateFlow()
 
     override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> {
         if (signInDelayMillis > 0) delay(signInDelayMillis)
@@ -706,6 +715,108 @@ class MockMsnp18Client(
         mutableContacts.update { contacts -> contacts.map { it.copy(unreadCount = 0, isMarkedUnread = false) } }
     }
 
+    override suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = runCatching {
+        val key = contactId.lowercase()
+        val contact = mutableContacts.value.firstOrNull { it.id.equals(key, true) || it.email.equals(key, true) }
+        check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) {
+            "This contact is unavailable for games and activities."
+        }
+        val sessionId = MsnpP2pUtil.randomGuid()
+        val initial = GameSession(
+            id = sessionId,
+            appId = entry.appId,
+            appName = entry.name,
+            entry = entry,
+            outgoing = true,
+            status = GameSessionStatus.Invited,
+        )
+        mutableGameSessions.update { it + (contact.id to initial) }
+        appendMessage(
+            ChatMessage(
+                id = ids.incrementAndGet(),
+                contactId = contact.id,
+                author = MessageAuthor.System,
+                text = "Game invitation sent: ${entry.name}.",
+                timestampMillis = System.currentTimeMillis(),
+            ),
+        )
+        scope.launch {
+            delay(650)
+            mutableGameSessions.update { current ->
+                val active = current[contact.id]?.takeIf { it.id == sessionId && it.status == GameSessionStatus.Invited }
+                    ?: return@update current
+                current + (contact.id to active.copy(status = GameSessionStatus.Active, remoteAppLoaded = true))
+            }
+        }
+    }
+
+    override suspend fun acceptGame(contactId: String, id: String): Result<Unit> = runCatching {
+        val key = contactId.lowercase()
+        mutableGameSessions.update { current ->
+            val session = current[key]?.takeIf { it.id == id } ?: return@update current
+            current + (key to session.copy(status = GameSessionStatus.Active, remoteAppLoaded = true))
+        }
+    }
+
+    override suspend fun stopGame(contactId: String, id: String): Result<Unit> = runCatching {
+        val key = contactId.lowercase()
+        var closedSession: GameSession? = null
+        mutableGameSessions.update { current ->
+            val session = current[key]?.takeIf { it.id == id } ?: return@update current
+            val nextStatus = if (!session.outgoing && session.status == GameSessionStatus.Invited) {
+                GameSessionStatus.Declined
+            } else {
+                GameSessionStatus.Stopped
+            }
+            val updated = session.copy(status = nextStatus)
+            closedSession = updated
+            current + (key to updated)
+        }
+        closedSession?.let { session ->
+            appendMessage(
+                ChatMessage(
+                    id = ids.incrementAndGet(),
+                    contactId = key,
+                    author = MessageAuthor.System,
+                    text = if (session.status == GameSessionStatus.Declined) {
+                        "${session.appName} invitation declined."
+                    } else {
+                        "You closed ${session.appName}."
+                    },
+                    timestampMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    override suspend fun initializeGameChannel(contactId: String, id: String): Result<Unit> = runCatching {
+        val key = contactId.lowercase()
+        mutableGameSessions.update { current ->
+            val session = current[key]?.takeIf { it.id == id } ?: return@update current
+            current + (key to session.copy(localChannelInitialized = true, remoteAppLoaded = true))
+        }
+    }
+
+    override suspend fun sendGameData(contactId: String, id: String, payload: String): Result<Unit> = runCatching {
+        val key = contactId.lowercase()
+        val session = mutableGameSessions.value[key]?.takeIf { it.id == id && it.status == GameSessionStatus.Active }
+            ?: return@runCatching
+        if (session.appId == 101000 && payload.length == 1 && payload[0] in '0'..'8') {
+            scope.launch {
+                delay(450)
+                mutableGameSessions.update { current ->
+                    val latest = current[key]?.takeIf { it.id == id && it.status == GameSessionStatus.Active }
+                        ?: return@update current
+                    val taken = latest.receivedPackets.mapNotNull { it.payload.toIntOrNull() }.toSet() +
+                        setOfNotNull(payload.toIntOrNull())
+                    val replyCell = (0..8).firstOrNull { it !in taken } ?: return@update current
+                    val packet = GameDataPacket(sequence = ids.incrementAndGet(), payload = replyCell.toString())
+                    current + (key to latest.copy(receivedPackets = latest.receivedPackets + packet))
+                }
+            }
+        }
+    }
+
     override fun close() {
         mutableContactRequests.value = emptyList()
         mutableGroupInvitations.value = emptyList()
@@ -717,6 +828,7 @@ class MockMsnp18Client(
         mutableContacts.value = emptyList()
         mutableMessages.value = emptyMap()
         mutableTyping.value = emptyMap()
+        mutableGameSessions.value = emptyMap()
     }
 
     private fun appendMessage(message: ChatMessage) {
@@ -1132,6 +1244,13 @@ class MessengerRepository(
     suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = client.acceptPhotos(contactId, id)
     suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = client.stopPhotos(contactId, id)
     suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = client.selectPhoto(contactId, id, photoId)
+
+    val gameSessions: StateFlow<Map<String, GameSession>> get() = client.gameSessions
+    suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = client.startGame(contactId, entry)
+    suspend fun acceptGame(contactId: String, id: String): Result<Unit> = client.acceptGame(contactId, id)
+    suspend fun stopGame(contactId: String, id: String): Result<Unit> = client.stopGame(contactId, id)
+    suspend fun initializeGameChannel(contactId: String, id: String): Result<Unit> = client.initializeGameChannel(contactId, id)
+    suspend fun sendGameData(contactId: String, id: String, payload: String): Result<Unit> = client.sendGameData(contactId, id, payload)
 
     suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> = client.sendFile(contactId, file, name)
     suspend fun acceptFile(contactId: String, id: String): Result<Unit> = client.acceptFile(contactId, id)
