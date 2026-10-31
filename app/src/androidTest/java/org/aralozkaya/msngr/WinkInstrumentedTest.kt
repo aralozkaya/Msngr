@@ -311,6 +311,41 @@ class WinkInstrumentedTest {
         compose.onNodeWithText("Remove from saved winks").assertDoesNotExist()
     }
 
+    @Test fun failedWinkRetriesDirectlyFromTheBubbleAndTracksDownloadState() {
+        installedFixture()
+        val reference = org.aralozkaya.msngr.protocol.WinkReference(
+            org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("peer@example.test", byteArrayOf(1), 8), "Failed Wink")
+        var message by mutableStateOf(org.aralozkaya.msngr.data.ChatMessage(1, "peer",
+            org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference,
+            winkTransferError = "Wink download timed out."))
+        var retries = 0
+        compose.setContent { MaterialTheme { Surface {
+            MessageBubble(message, useOriginalEmoticons = true, onRetry = {
+                retries++
+                message = message.copy(isWinkPending = true, winkTransferError = null)
+            })
+        } } }
+        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(1, retries) }
+        compose.onNodeWithTag("wink_message_sheet").assertDoesNotExist()
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Downloading wink…").assertIsDisplayed()
+
+        compose.runOnIdle { message = message.copy(isWinkPending = false, winkTransferError = "Try again.") }
+        compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(2, retries) }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.runOnIdle { message = message.copy(isWinkPending = false) }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Downloading wink…").assertDoesNotExist()
+
+        compose.runOnIdle { message = message.copy(author = org.aralozkaya.msngr.data.MessageAuthor.Me,
+            winkTransferError = "Wink download timed out.") }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+    }
+
+    private fun retryInSheet() = compose.onNode(hasText("Retry") and hasAnyAncestor(hasTestTag("wink_message_sheet")))
+
     @Test fun failedWinkIconOpensTheSheetAndRetriesWithOtherActionsDisabled() {
         SessionPrefs.completeLogin(context, "wink-retry-${System.nanoTime()}@example.test", "mock-password", false,
             ProviderOptions.ESCARGOT, ServerOverrides(), true)
@@ -325,7 +360,7 @@ class WinkInstrumentedTest {
                 message = message.copy(isWinkPending = true, winkTransferError = null)
             })
         } } }
-        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Retry").assertIsDisplayed()
         compose.onNodeWithText("Wink download timed out.").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed().performClick()
         compose.onNodeWithTag("wink_message_sheet").assertIsDisplayed()
@@ -333,7 +368,7 @@ class WinkInstrumentedTest {
         compose.onNodeWithText("Play").assertIsDisplayed().assertIsNotEnabled()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Add to saved winks").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Add to saved winks").assertIsNotEnabled()
-        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled().performClick()
+        retryInSheet().assertIsDisplayed().assertIsEnabled().performClick()
         compose.onNodeWithText("Retry").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wink download failed").assertDoesNotExist()
         compose.onNodeWithTag("wink_message_sheet").assertIsDisplayed()
@@ -360,23 +395,23 @@ class WinkInstrumentedTest {
         compose.setContent { MaterialTheme { Surface {
             MessageBubble(message, useOriginalEmoticons = true, onRetry = {})
         } } }
-        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Retry").assertIsDisplayed()
         compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed().performClick()
         compose.onNodeWithText("Play").assertIsNotEnabled()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Remove from saved winks").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Remove from saved winks").assertIsNotEnabled().performTouchInput { click() }
-        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled()
+        retryInSheet().assertIsDisplayed().assertIsEnabled()
         assertTrue(context.winkStore().isSaved(account, reference.metadata))
         compose.onNodeWithContentDescription("Close wink").assertDoesNotExist()
         androidx.test.espresso.Espresso.pressBack()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("wink_message_sheet").fetchSemanticsNodes().isEmpty() }
 
         compose.runOnIdle { message = message.copy(wink = bundled) }
-        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Retry").assertIsDisplayed()
         compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed()
         compose.onNodeWithTag("wink_message_1").performClick()
         compose.onNodeWithText("Play").assertIsNotEnabled().performTouchInput { click() }
-        compose.onNodeWithText("Retry").assertIsDisplayed().assertIsEnabled()
+        retryInSheet().assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("Add to saved winks").assertDoesNotExist()
         compose.onNodeWithText("Remove from saved winks").assertDoesNotExist()
         compose.onNodeWithContentDescription("Close wink").assertDoesNotExist()

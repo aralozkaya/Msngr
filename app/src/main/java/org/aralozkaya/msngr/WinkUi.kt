@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -30,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.data.ChatMessage
+import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.protocol.*
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 
@@ -149,7 +151,7 @@ internal fun WinkThumbnail(reference: WinkReference, modifier: Modifier = Modifi
 }
 
 @Composable
-internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit) {
+internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit, onRetry: () -> Unit) {
     val reference = message.wink ?: return
     Column(
         modifier = Modifier.testTag("wink_message_${message.id}")
@@ -161,6 +163,10 @@ internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit) {
         if (message.isWinkPending) {
             LinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
             Text("Downloading wink…", style = MaterialTheme.typography.labelSmall)
+        } else if (message.winkTransferError != null && message.author == MessageAuthor.Contact) {
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.chat_message_retry))
+            }
         }
     }
 }
@@ -199,7 +205,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
     val optionsEnabled = !busy && !message.isWinkPending && message.winkTransferError == null
     val canChangeSaved = libraryState == WinkLibraryState.Saved || libraryState == WinkLibraryState.Unsaved
     val canRetry = !message.isWinkPending && message.winkTransferError != null &&
-        message.author == org.aralozkaya.msngr.data.MessageAuthor.Contact
+        message.author == MessageAuthor.Contact
     val actionCount = 1 + (if (canChangeSaved) 1 else 0) + (if (canRetry) 1 else 0)
     ModalBottomSheet(
         onDismissRequest = onDismiss,

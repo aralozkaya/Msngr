@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -11,11 +12,14 @@ import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -24,13 +28,23 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.aralozkaya.msngr.data.ChatMessage
+import org.aralozkaya.msngr.data.FileTransfer
 import org.aralozkaya.msngr.data.MessageAuthor
+import org.aralozkaya.msngr.protocol.InkDrawing
+import org.aralozkaya.msngr.protocol.InkPoint
+import org.aralozkaya.msngr.protocol.InkStroke
+import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnVoiceClip
+import org.aralozkaya.msngr.protocol.WinkReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.text.DateFormat
+import java.util.Date
 
 @RunWith(AndroidJUnit4::class)
 class ChatMessageInteractionsInstrumentedTest {
@@ -147,6 +161,74 @@ class ChatMessageInteractionsInstrumentedTest {
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         compose.runOnIdle { assertEquals("Copy this message", clipboardText()) }
+    }
+
+    @Test
+    fun specializedBubblesDoNotCopyAndKeepTheirChildActions() {
+        val base = ChatMessage(1, "contact", MessageAuthor.Contact, "Message text", 0L)
+        val clip = InstrumentationRegistry.getInstrumentation().context.assets
+            .open("voice-clips/native-siren.wav").use { MsnVoiceClip.parse(it.readBytes())!! }
+        val wink = WinkReference(MsnDisplayPicture.create("peer@example.test", byteArrayOf(1), 8), "Wink")
+        val fixtures = listOf(
+            base.copy(wink = wink),
+            base.copy(voiceClip = clip),
+            base.copy(isVoiceClipPending = true),
+            base.copy(voiceClipTransferError = "Download failed"),
+            base.copy(inkDrawing = InkDrawing(listOf(InkStroke(listOf(InkPoint(0f, 0f), InkPoint(50f, 50f)))))),
+            base.copy(fileTransfer = FileTransfer("file", "notes.txt", 100, false)),
+            base.copy(fileTransfer = FileTransfer("photo", "photo.png", 100, false)),
+        )
+        val message = mutableStateOf(base)
+        compose.setContent { MaterialTheme { MessageBubble(message.value, useOriginalEmoticons = true) } }
+        val timestamp = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(0L))
+        compose.runOnIdle {
+            compose.activity.getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("Test", "Keep this clipboard text"))
+        }
+        var id = 2L
+        for (author in listOf(MessageAuthor.Contact, MessageAuthor.Me)) {
+            for (fixture in fixtures) {
+                compose.runOnIdle {
+                    message.value = fixture.copy(id = id++, author = author,
+                        fileTransfer = fixture.fileTransfer?.copy(outgoing = author == MessageAuthor.Me))
+                }
+                compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick), useUnmergedTree = true)
+                    .assertCountEquals(0)
+                compose.onNodeWithText(timestamp, useUnmergedTree = true).performTouchInput { longClick() }
+                compose.runOnIdle { assertEquals("Keep this clipboard text", clipboardText()) }
+                when {
+                    fixture.wink != null -> compose.onNodeWithTag("wink_message_${message.value.id}").assertHasClickAction()
+                    fixture.voiceClip != null -> compose.onNodeWithContentDescription("Play voice clip").assertHasClickAction()
+                    fixture.fileTransfer != null -> compose.onNodeWithText(
+                        if (author == MessageAuthor.Me) "Cancel" else "Accept",
+                    ).assertHasClickAction()
+                }
+            }
+        }
+        compose.runOnIdle { message.value = base }
+        compose.onNodeWithText(timestamp, useUnmergedTree = true).performTouchInput { longClick() }
+        compose.runOnIdle { assertEquals(base.text, clipboardText()) }
+    }
+
+    @Test
+    fun disablingContainerInteractionPreservesLinksAndStatusButtons() {
+        val url = "https://example.com"
+        val text = "Read $url now"
+        compose.setContent { MaterialTheme { CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+            MessageBubble(ChatMessage(1, "contact", MessageAuthor.Me, text, 0L, deliveryError = "Send failed"),
+                useOriginalEmoticons = true, containerInteractionEnabled = false)
+        } } }
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick), useUnmergedTree = true)
+            .assertCountEquals(0)
+        val node = compose.onNodeWithText(text, useUnmergedTree = true)
+        val results = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val linkPosition = results.single().getBoundingBox(text.indexOf(url) + 2).center
+        node.performTouchInput { click(linkPosition) }
+        compose.runOnIdle { assertEquals(listOf(url), openedUrls) }
+        compose.onNodeWithContentDescription("Message not sent").performClick()
+        compose.onNodeWithText("Send failed").assertIsDisplayed()
+        compose.onNodeWithText("Retry").assertHasClickAction()
     }
 
     private fun showMessages(messages: List<Pair<MessageAuthor, String>>) {
