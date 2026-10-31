@@ -132,6 +132,34 @@ class MsnpCirclesTest {
             GroupMemberRole.Unknown, GroupMemberRole.Unknown), members.map { it.role })
     }
 
+    @Test fun memberAddressBookIncludesPendingInvitationsButExcludesDeclinedDeletedAndDepartedMembers() {
+        fun member(email: String, type: String, state: String, deleted: Boolean = false) = """
+            <Contact><contactId>00000000-0000-0000-0000-123456789abc</contactId><contactInfo>
+              <contactType>$type</contactType><passportName>$email</passportName><displayName>Test person</displayName>
+              <NetworkInfoList>
+                <NetworkInfo><RelationshipType>1</RelationshipType><RelationshipState>3</RelationshipState></NetworkInfo>
+                <NetworkInfo><RelationshipType>5</RelationshipType><RelationshipState>$state</RelationshipState>
+                  <RelationshipRole>3</RelationshipRole></NetworkInfo>
+              </NetworkInfoList></contactInfo><fDeleted>$deleted</fDeleted></Contact>
+        """
+        val members = parseCircleMembers("""<Contacts xmlns="http://www.msn.com/webservices/AddressBook">
+            ${member("Joined@example.com", "Live", "3")}
+            ${member("Pending@example.com", "LivePending", "2")}
+            ${member("declined@example.com", "LivePending", "4")}
+            ${member("deleted@example.com", "LivePending", "2", deleted = true)}
+            ${member("left@example.com", "Live", "2")}
+            ${member("empty@example.com", "LivePending", "0")}
+            ${member("missing@example.com", "LivePending", "")}
+            ${member("unknown@example.com", "LivePending", "99")}
+            ${member("circle@example.com", "Me", "3")}
+            </Contacts>""")
+        assertEquals(listOf("joined@example.com", "pending@example.com"), members.map { it.email })
+        assertEquals(listOf(false, true), members.map { it.isPending })
+        assertEquals("Test person", members.last().displayName)
+        assertEquals(GroupMemberRole.User, members.last().role)
+        assertEquals("00000000-0000-0000-0000-123456789abc", members.last().storageId)
+    }
+
     @Test fun capturedWlm2009GroupInkSdgPacketDecodesAndRoundTrips() {
         val capturedPayload = (
             "Routing: 1.0\r\n" +

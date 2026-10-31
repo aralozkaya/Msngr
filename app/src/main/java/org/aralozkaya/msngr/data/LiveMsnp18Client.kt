@@ -872,7 +872,7 @@ internal class LiveMsnp18Client(
             val email = contactEmail(contactId)
             checkGroupAvailable(email)
             val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
-            if (group != null) check(group.members.any {
+            if (group != null) check(group.joinedMembers.any {
                 it.email.equals(metadata.creator, true) && it.presence.isOnline
             }) {
                 "The wink sender is no longer online in this group."
@@ -1022,7 +1022,7 @@ internal class LiveMsnp18Client(
                 val now = System.nanoTime()
                 sharedWinks.entries.removeIf { now - it.value.createdAt > 600_000_000_000L }
                 while (sharedWinks.size >= 16) sharedWinks.entries.minByOrNull { it.value.createdAt }?.let { sharedWinks.remove(it.key, it.value) }
-                val recipients = group?.members?.filter {
+                val recipients = group?.joinedMembers?.filter {
                     it.presence.isOnline && !it.email.equals(signedInEmail, true)
                 }?.map { it.email.lowercase() }?.toSet() ?: setOf(email.lowercase())
                 sharedWinks["${email.lowercase()}\n${metadata.sha1d}"] = SharedWink(LocalDisplayPicture(metadata, bytes), now, recipients)
@@ -1840,7 +1840,7 @@ internal class LiveMsnp18Client(
                             val supplemental = pendingRosterGroups.values.toList().mapNotNull { group ->
                                 val members = fetchAddressBookGroupMembers(host, ticket, group.email.substringBefore('@'))
                                 checkGroupSession(email, endpoint)
-                                if (members.none { it.email.equals(email, true) }) {
+                                if (members.none { !it.isPending && it.email.equals(email, true) }) {
                                     pendingRosterGroups.remove(group.id)
                                     null
                                 } else group.copy(members = members)
@@ -2022,7 +2022,7 @@ internal class LiveMsnp18Client(
             val offer = parseSwitchboardMime(
                 "Content-Type: ${Msnp18Protocol.NUDGE_CONTENT_TYPE}\r\n\r\n".toByteArray() + envelope.body,
             ) as? SwitchboardMimeMessage.WinkOffer ?: return
-            if (!offer.metadata.creator.equals(sender, true) || group.members.none { it.email.equals(sender, true) }) return
+            if (!offer.metadata.creator.equals(sender, true) || group.joinedMembers.none { it.email.equals(sender, true) }) return
             val senderEndpoint = normalizeEndpointId(envelope.routing["from"].orEmpty().substringAfter(";epid=", ""))
             if (mine && senderEndpoint == normalizeEndpointId(machineGuid)) return
             receiveCircleWink(group, sender, offer.metadata)
@@ -2164,7 +2164,7 @@ internal class LiveMsnp18Client(
                     (known.keys + online).map { email ->
                         val member = known[email] ?: GroupMember(email,
                             mutableContacts.value.firstOrNull { it.email.equals(email, true) }?.displayName ?: email)
-                        member.copy(presence = if (email in online) {
+                        member.copy(isPending = member.isPending && email !in online, presence = if (email in online) {
                             if (member.presence.isOnline) member.presence else Presence.Online
                         } else Presence.Offline,
                             clientCapabilities = if (email in online && member.presence.isOnline) member.clientCapabilities else 0L)
@@ -2199,6 +2199,7 @@ internal class LiveMsnp18Client(
             val index = indexOfFirst { it.email == email }
             val previous = getOrNull(index) ?: GroupMember(email)
             val member = previous.copy(
+                isPending = previous.isPending && status?.isOnline != true,
                 displayName = name ?: previous.displayName,
                 presence = status ?: previous.presence,
                 clientCapabilities = when {

@@ -202,6 +202,7 @@ fun ContactRow(
     accessLevel: String? = null,
     profileActionLabel: String? = null,
     isOwnContact: Boolean = false,
+    isPendingMember: Boolean = false,
 ) {
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
@@ -224,6 +225,7 @@ fun ContactRow(
                         name = contact.displayName.messengerPlusPlainText(),
                         avatarUri = contact.avatarUri,
                         presence = contact.presence,
+                        showPresenceIndicator = !isPendingMember,
                         modifier = if (onOpenProfile != null) {
                             Modifier
                                 .clickable(
@@ -266,6 +268,12 @@ fun ContactRow(
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                                 ) { Text("You") }
                             }
+                            if (isPendingMember) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                ) { Text("Pending") }
+                            }
                         }
                         if (hasDraft) {
                             Row(
@@ -287,7 +295,7 @@ fun ContactRow(
                             }
                         } else {
                             MsnEmoticonText(
-                                text = supportingText ?: if (contact.isGroup) "${contact.members.size} ${if (contact.members.size > 1) "members" else "member"}" else contact.statusMessage.ifBlank { contact.email },
+                                text = supportingText ?: if (contact.isGroup) "${contact.joinedMembers.size} ${if (contact.joinedMembers.size == 1) "member" else "members"}" else contact.statusMessage.ifBlank { contact.email },
                                 useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -307,7 +315,7 @@ fun ContactRow(
                             accessLevel?.let {
                                 Text(it, style = MaterialTheme.typography.labelMedium)
                             }
-                            Text(
+                            if (!isPendingMember) Text(
                                 text = if (contact.isGroup) "Group" else contact.presence.label,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

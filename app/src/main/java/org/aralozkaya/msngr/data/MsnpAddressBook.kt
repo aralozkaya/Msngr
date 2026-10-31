@@ -542,16 +542,20 @@ internal fun parseCircleMembers(xml: String): List<GroupMember> {
     val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream())
     return document.getElementsByTagNameNS("*", "Contact").asElementSequence()
         .filterNot { it.descendantText("fDeleted").equals("true", true) }
-        .filter { it.descendantText("contactType") == "Live" }
+        .filter { it.descendantText("contactType") in setOf("Live", "LivePending") }
         .mapNotNull { contact ->
             val relationship = contact.getElementsByTagNameNS("*", "NetworkInfo").asElementSequence()
                 .firstOrNull { it.descendantText("RelationshipType") == "5" } ?: contact
-            if (relationship.descendantText("RelationshipState") != "3") return@mapNotNull null
+            val state = relationship.descendantText("RelationshipState")
+            // Live/state 2 can also be a departed member; invitations are LivePending/state 2.
+            val isPending = contact.descendantText("contactType") == "LivePending" && state == "2"
+            if (!(contact.descendantText("contactType") == "Live" && state == "3") && !isPending) return@mapNotNull null
             val email = contact.descendantText("passportName").lowercase()
             if (email.isBlank()) null else GroupMember(
                 email, contact.descendantText("displayName").ifBlank { email },
                 storageId = contact.descendantText("contactId").takeIf(CONTACT_STORAGE_ID::matches),
                 role = GroupMemberRole.fromRelationshipRole(relationship.descendantText("RelationshipRole")),
+                isPending = isPending,
             )
         }.distinctBy(GroupMember::email).toList()
 }

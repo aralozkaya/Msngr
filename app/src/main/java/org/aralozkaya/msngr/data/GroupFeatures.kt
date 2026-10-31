@@ -18,7 +18,7 @@ internal data class GroupFeatures(
 /** Members come from the accepted membership/connected circle roster, not the contact list. */
 internal fun Contact.groupFeatures(ownEmail: String): GroupFeatures {
     if (!isGroup || isBlocked || !presence.isOnline) return GroupFeatures()
-    val recipients = members.filter { it.presence.isOnline && !it.email.equals(ownEmail, true) }
+    val recipients = joinedMembers.filter { it.presence.isOnline && !it.email.equals(ownEmail, true) }
     if (recipients.isEmpty()) return GroupFeatures()
     fun allSupport(mask: Long) = recipients.all { it.clientCapabilities and mask != 0L }
     return GroupFeatures(
