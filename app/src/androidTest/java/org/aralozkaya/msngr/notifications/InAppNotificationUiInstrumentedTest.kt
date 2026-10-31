@@ -177,6 +177,7 @@ class InAppNotificationUiInstrumentedTest {
             compose.onNodeWithTag("no_notification_customizations").assertExists()
             compose.onNodeWithTag("in_app_notification_options").assertDoesNotExist()
             compose.onNodeWithContentDescription("Back").performClick()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("in_app_enabled"))
             compose.onNodeWithTag("in_app_enabled").assertExists()
             compose.onNodeWithTag("customized_notification_settings").assertDoesNotExist()
             compose.onNodeWithTag("in_app_notification_options").performClick()
