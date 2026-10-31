@@ -44,6 +44,7 @@ fun GroupDetailsPage(
     ownEmail: String,
     onEditProfile: () -> Unit,
     onRefreshPicture: suspend (Contact) -> Unit = {},
+    onAddContact: (Contact) -> Unit = {},
 ) {
     val searchFieldState = rememberSaveable(group?.id, saver = TextFieldState.Saver) { TextFieldState() }
     val search = searchFieldState.text.toString().withExpandedMsnMenuTokens().trim()
@@ -108,7 +109,9 @@ fun GroupDetailsPage(
                     supportingText = member.email,
                     accessLevel = if (isPending) null else (groupMember?.role ?: GroupMemberRole.Unknown).label,
                     isPendingMember = isPending,
-                    onClick = if (isOwnContact) null else { { onOpenChat(member) } },
+                    onClick = if (isOwnContact) null else { {
+                        if (member.isForwardListContact) onOpenChat(member) else onAddContact(member)
+                    } },
                     onOpenProfile = { if (isOwnContact) onEditProfile() else onOpenProfile(member) },
                     profileActionLabel = if (isOwnContact) "Edit profile" else null,
                     isOwnContact = isOwnContact,

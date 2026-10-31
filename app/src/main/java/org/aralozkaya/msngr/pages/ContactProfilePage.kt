@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.PersonRemove
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,6 +79,7 @@ fun ContactProfilePage(
     onEraseHistory: suspend (Contact) -> Unit,
     onDeleteContact: (suspend (Contact, Boolean) -> Result<Unit>)? = null,
     onContactDeleted: () -> Unit = {},
+    onAddContact: ((Contact) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
@@ -206,6 +208,16 @@ fun ContactProfilePage(
                             Icon(Icons.Outlined.PersonRemove, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                             Text(stringResource(R.string.contact_delete_action))
+                        }
+                    } else if (onAddContact != null && !contact.isForwardListContact && !contact.isGroup) {
+                        OutlinedButton(
+                            onClick = { onAddContact(contact) },
+                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text(stringResource(R.string.contacts_action_add_contact))
                         }
                     }
                 }
