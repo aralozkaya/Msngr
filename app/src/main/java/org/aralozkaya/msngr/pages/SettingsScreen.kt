@@ -70,19 +70,19 @@ import org.aralozkaya.msngr.updates.updateManager
 
 enum class SettingsDestination(
     val title: String,
-    val parent: SettingsDestination? = null,
 ) {
+    Root("Settings"),
     Appearance("Appearance"),
     Emoticons("Emoticons & Winks"),
     MessengerPlus("Messenger Plus!"),
     ContactInvitations("Contact Invitations"),
     InAppNotifications("In-app notifications"),
-    CustomizedNotifications("Customized notifications", parent = InAppNotifications),
+    CustomizedNotifications("Customized notifications"),
     Connection("Connection"),
-    ConnectionInformation("Connection information", parent = Connection),
+    ConnectionInformation("Connection information"),
     Updates("App updates"),
     About("About"),
-    Licenses("Open-source licenses", parent = About),
+    Licenses("Open-source licenses"),
 }
 
 internal enum class SettingsCategory(
