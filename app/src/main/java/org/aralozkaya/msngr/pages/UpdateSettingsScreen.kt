@@ -3,6 +3,7 @@
 
 package org.aralozkaya.msngr.pages
 
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
 import androidx.compose.material3.OutlinedButton
 import android.content.ClipData
@@ -31,7 +32,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -216,7 +216,7 @@ fun UpdateSettingsScreen(
                     Text(stringResource(R.string.update_changelog), style = MaterialTheme.typography.titleMedium)
                     ReleaseNotes(release.notes, Modifier.fillMaxWidth().testTag("release-notes"))
                     if (state.downloading) {
-                        LinearWavyProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth())
+                        MsngrLinearWavyProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth())
                         Text(stringResource(R.string.update_downloading, (state.downloadProgress * 100).toInt()))
                         DestructiveOutlinedButton(onClick = { pendingAction = null; pendingVersion = null; manager.cancelDownload() }) {
                             Text(stringResource(android.R.string.cancel))

@@ -235,7 +235,7 @@ internal fun GroupEditorDialog(
             modifier = Modifier.testTag("group-editor-submit")) {
             LoadingButtonContent(
                 loading = submitting,
-                label = if (createdId == null) "Creating group…" else "Sending invitations…",
+                label = if (createdId == null) "Creating group\u2026" else "Sending invitations\u2026",
                 indicatorModifier = Modifier.testTag("group-editor-loading"),
             ) {
                 Text(if (invitationAction) "Send" else "Create")
