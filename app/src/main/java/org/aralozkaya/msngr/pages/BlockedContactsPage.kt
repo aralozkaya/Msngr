@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -25,6 +24,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -59,7 +59,7 @@ fun BlockedContactsPage(
         ) {
             if (refreshing) {
                 val description = stringResource(R.string.blocked_contacts_refreshing)
-                LoadingIndicator(Modifier.testTag("blocked-contacts-refresh-indicator")
+                MsngrLoadingIndicator(Modifier.testTag("blocked-contacts-refresh-indicator")
                     .semantics { contentDescription = description })
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally,

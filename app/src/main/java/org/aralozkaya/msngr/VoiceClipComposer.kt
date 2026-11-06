@@ -44,7 +44,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +90,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.protocol.MsnVoiceClip
 import org.aralozkaya.msngr.protocol.VoiceClip
 import java.util.Locale
@@ -468,7 +468,7 @@ internal fun VoiceClipComposer(
                                 recording && locked -> VoiceActionIcon.Stop
                                 else -> VoiceActionIcon.Microphone
                             }, animationSpec = motion.fastEffectsSpec(), label = "voiceActionIcon") { icon ->
-                                if (icon == VoiceActionIcon.Busy) CircularWavyProgressIndicator(Modifier.size(22.dp),
+                                if (icon == VoiceActionIcon.Busy) MsngrCircularWavyProgressIndicator(Modifier.size(22.dp),
                                     color = MaterialTheme.colorScheme.onPrimary)
                                 else Icon(when (icon) {
                                     VoiceActionIcon.Send -> Icons.AutoMirrored.Filled.Send
