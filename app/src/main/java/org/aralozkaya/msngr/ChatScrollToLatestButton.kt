@@ -16,9 +16,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -90,13 +91,14 @@ internal fun ChatScrollToLatestButton(
             scaleOut(motion.fastSpatialSpec(), targetScale = 0.6f) +
             slideOutVertically(motion.fastSpatialSpec()) { it / 2 },
     ) {
-        SmallFloatingActionButton(
+        FilledIconButton(
             onClick = { scope.launch { listState.animateScrollToLatest() } },
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            ),
             modifier = Modifier.testTag(CHAT_SCROLL_TO_LATEST_TAG),
-            // Outgoing bubbles use primaryContainer and incoming ones surfaceContainerHigh, so the
-            // button takes the solid primary pair to stand apart from both.
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
             Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Scroll to latest message")
         }
