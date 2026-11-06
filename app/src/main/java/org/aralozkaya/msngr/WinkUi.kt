@@ -30,6 +30,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.protocol.*
@@ -97,7 +99,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                 repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+        if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
     }
     LaunchedEffect(visible) { if (!visible) preview = null }
     if (visible) preview?.let { WinkOverlay(it, { preview = null }) }
@@ -161,7 +163,7 @@ internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit, onRetr
         key(message.isWinkPending, message.winkTransferError) { WinkThumbnail(reference, Modifier.size(72.dp)) }
         Text(reference.name, style = MaterialTheme.typography.titleSmall)
         if (message.isWinkPending) {
-            LinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
+            MsngrLinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
             Text("Downloading wink…", style = MaterialTheme.typography.labelSmall)
         } else if (message.winkTransferError != null && message.author == MessageAuthor.Contact) {
             TextButton(onClick = onRetry) {
@@ -224,7 +226,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
             }
             Text(reference.name, Modifier.padding(top = 8.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
             if (message.isWinkPending) {
-                LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 Text("Downloading wink…", style = MaterialTheme.typography.bodySmall)
             } else message.winkTransferError?.let { transferError ->
                 Text(transferError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -259,7 +261,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
                 }, enabled = optionsEnabled, shapes = ListItemDefaults.segmentedShapes(1, actionCount),
                     leadingContent = { Icon(if (remove) Icons.Default.Delete else Icons.Default.Add, null,
                         tint = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) },
-                    trailingContent = { if (busy) CircularWavyProgressIndicator(Modifier.size(20.dp)) },
+                    trailingContent = { if (busy) MsngrCircularWavyProgressIndicator(Modifier.size(20.dp)) },
                     content = { Text(if (remove) "Remove from saved winks" else "Add to saved winks",
                         color = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) })
             }

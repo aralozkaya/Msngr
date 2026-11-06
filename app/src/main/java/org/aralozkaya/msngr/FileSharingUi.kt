@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnFileContext
@@ -87,7 +89,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
         }
     }
     Box {
-        if (busy) CircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
+        if (busy) MsngrCircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
         else IconButton(onClick = { expanded = true }, enabled = enabled) {
             Icon(Icons.Default.AttachFile, contentDescription = "Share photos or files")
         }
@@ -189,9 +191,9 @@ internal fun FileTransferMessage(message: ChatMessage,
             FileTransferStatus.Cancelled -> "File transfer cancelled"
             FileTransferStatus.Failed -> transfer.error ?: "File transfer failed"
         }, style = MaterialTheme.typography.bodySmall)
-        if (transfer.status == FileTransferStatus.Transferring) LinearWavyProgressIndicator(
+        if (transfer.status == FileTransferStatus.Transferring) MsngrLinearWavyProgressIndicator(
             progress = { if (transfer.size == 0L) 0f else (transfer.transferred.toDouble() / transfer.size).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-        else if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+        else if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -411,7 +413,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                                 when {
                                     photo.previewError != null -> Text(photo.previewError, color = MaterialTheme.colorScheme.error)
                                     photo.localPath != null -> Text("Preview unavailable.")
-                                    else -> { LinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo…") }
+                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo…") }
                                 }
                             }
                         }
@@ -422,7 +424,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 if (selected.previewError != null && share.status == PhotoShareStatus.Active) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                     error = (onSelect?.invoke(selected.id) ?: context.sharingRepository().selectPhoto(contactId, share.id, selected.id)).exceptionOrNull()?.message
                 } }) { Text("Retry photo") }
-                if (selected.originalPending) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                if (selected.originalPending) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 if (selected.localPath != null) FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {
                     savePhotoId = selected.id; savedPhotoId = null
                     if (TransferPrefs.read(context).photoTree != null || hasDefaultTransferStorageAccess(context)) requestSave()
@@ -433,7 +435,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 selected.originalError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
-            if (preparing) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            if (preparing) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(shapes = ButtonDefaults.shapes(), enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                     Text(if (preparing) "Preparing…" else "Add photos")

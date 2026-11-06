@@ -5,6 +5,7 @@
 
 package org.aralozkaya.msngr.pages
 
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.animation.core.animateDpAsState
@@ -46,7 +47,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -212,7 +212,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                             Text(requireNotNull(error))
                             OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { retry++ }) { Text("Try again") }
                         }
-                        pictures == null -> CircularWavyProgressIndicator()
+                        pictures == null -> MsngrCircularWavyProgressIndicator()
                         else -> LazyVerticalGrid(
                             columns = GridCells.Adaptive(88.dp),
                             contentPadding = PaddingValues(24.dp, 12.dp),
@@ -282,7 +282,7 @@ private fun DefaultPictureImage(picture: DefaultDisplayPicture, modifier: Modifi
     val image = rememberAvatarImage(picture.uri)
     Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
         image.painter?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-            ?: if (image.isLoading) CircularWavyProgressIndicator(Modifier.size(24.dp)) else
+            ?: if (image.isLoading) MsngrCircularWavyProgressIndicator(Modifier.size(24.dp)) else
                 Icon(Icons.Default.PhotoSizeSelectActual, contentDescription = "Picture unavailable")
     }
 }

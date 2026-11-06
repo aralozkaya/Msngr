@@ -52,6 +52,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
 import org.json.JSONObject
@@ -275,7 +277,7 @@ internal fun GameCatalogSheet(
                                     }
                                 }
                                 if (isStarting) {
-                                    CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                                    MsngrCircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
                                 }
                             }
                         }
@@ -1277,7 +1279,7 @@ internal fun GameHost(
                                     }
                                 }
                             } else {
-                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                MsngrLinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                             }
                         }
                     }

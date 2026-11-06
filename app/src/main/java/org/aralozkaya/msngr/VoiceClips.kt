@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -51,6 +50,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.protocol.MsnVoiceClip
 import org.aralozkaya.msngr.protocol.VoiceClip
@@ -217,7 +217,7 @@ internal fun VoiceClipMessage(message: ChatMessage) {
                 message.voiceClip != null -> VoiceClipPlayer(message.voiceClip)
                 message.isVoiceClipPending -> Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularWavyProgressIndicator(Modifier.size(20.dp))
+                    MsngrCircularWavyProgressIndicator(Modifier.size(20.dp))
                     Text("Downloading voice clip…", style = MaterialTheme.typography.bodySmall)
                 }
                 else -> Text(message.voiceClipTransferError ?: "Voice clip unavailable", style = MaterialTheme.typography.bodySmall)

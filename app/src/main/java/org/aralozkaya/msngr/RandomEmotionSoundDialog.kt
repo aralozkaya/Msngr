@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.EmotionSoundService
 import org.aralozkaya.msngr.protocol.EmotionSound
 
@@ -79,7 +80,7 @@ internal fun RandomEmotionSoundDialog(
                 OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = ::download, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_fetch")) {
                     Text(if (candidate == null) "Download" else "Try another")
                 }
-                if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 candidate?.let { (sound, bytes) ->
                     Text(sound.name.messengerPlusPlainText(), style = MaterialTheme.typography.titleMedium)
                     Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
