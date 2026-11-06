@@ -100,7 +100,7 @@ internal fun DisplayPictureConflictDialog(
                 }
                 if (state.busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MsngrCircularWavyProgressIndicator(Modifier.size(20.dp))
-                    Text("Updating display picture…", style = MaterialTheme.typography.bodySmall)
+                    Text("Updating display picture\u2026", style = MaterialTheme.typography.bodySmall)
                 }
                 state.error?.let { message -> Text(message, color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("picture-sync-error")) }

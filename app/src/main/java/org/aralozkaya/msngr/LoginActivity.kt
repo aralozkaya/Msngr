@@ -223,7 +223,7 @@ private fun LoginRoute(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 MsngrCircularWavyProgressIndicator()
-                Text("Opening secure storage…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Opening secure storage\u2026", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         return

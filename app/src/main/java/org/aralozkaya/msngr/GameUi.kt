@@ -22,6 +22,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
@@ -38,6 +41,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -49,7 +55,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
@@ -130,8 +140,13 @@ internal fun GameEntryIcon(
     }
 }
 
+/**
+ * A full-screen dialog listing the games and activities a contact can be invited to. Its top bar
+ * only has a navigation icon: there is deliberately no action button. Back closes it with a
+ * predictive back animation, unless a game invitation is being sent.
+ */
 @Composable
-internal fun GameCatalogSheet(
+internal fun GameCatalogDialog(
     contactId: String,
     onDismiss: () -> Unit,
     onStartGame: (suspend (GameCatalogEntry) -> Result<Unit>)? = null,
@@ -145,140 +160,203 @@ internal fun GameCatalogSheet(
     var catalog by remember { mutableStateOf(MsnpGameCatalogService.defaultCatalog()) }
     var startingAppId by remember { mutableStateOf<Int?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    val backProgress = remember { Animatable(0f) }
 
     LaunchedEffect(activitiesServer) {
         catalog = MsnpGameCatalogService.fetchCatalog(activitiesServer = activitiesServer)
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = { if (startingAppId == null) onDismiss() },
-        sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
         ),
     ) {
-        Column(
+        // Registered after the dialog's own callback, so it takes precedence. While an invitation
+        // is being sent the dialog's callback stays enabled and swallows Back.
+        PredictiveBackHandler(enabled = startingAppId == null) { events ->
+            try {
+                events.collect { backProgress.snapTo(it.progress) }
+                currentOnDismiss()
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) { backProgress.animateTo(0f) }
+                throw cancelled
+            }
+        }
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 28.dp)
-                .testTag("game_catalog_sheet"),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .fillMaxSize()
+                .graphicsLayer {
+                    val progress = backProgress.value
+                    val scale = 1f - 0.1f * progress
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - 0.2f * progress
+                    shape = RoundedCornerShape((28 * progress).dp)
+                    clip = progress > 0f
+                },
+            color = MaterialTheme.colorScheme.surface,
         ) {
-            Text(
-                text = "Games & activities",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Text(
-                text = "Invite your contact to play a game or share an activity right inside the chat.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+            Scaffold(
+                modifier = Modifier.fillMaxSize().testTag("game_catalog_dialog"),
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        title = { Text("Games & activities", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onDismiss,
+                                enabled = startingAppId == null,
+                                modifier = Modifier.testTag("game_catalog_close"),
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    )
+                },
+            ) { padding ->
+                GameCatalogContent(
+                    catalog = catalog,
+                    startingAppId = startingAppId,
+                    error = error,
+                    onStart = { entry ->
+                        scope.launch {
+                            startingAppId = entry.appId
+                            error = null
+                            try {
+                                val result = onStartGame?.invoke(entry)
+                                    ?: context.gameRepository().startGame(contactId, entry)
+                                error = result.exceptionOrNull()?.message
+                                if (result.isSuccess) {
+                                    onDismiss()
+                                }
+                            } finally {
+                                startingAppId = null
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(padding),
                 )
             }
+        }
+    }
+}
 
-            val entriesByCategory = remember(catalog) {
-                catalog.visibleEntries.groupBy { it.categoryId }
-            }
-            for (category in catalog.categories) {
-                val categoryEntries = entriesByCategory[category.categoryId].orEmpty()
-                if (categoryEntries.isEmpty()) continue
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+@Composable
+private fun GameCatalogContent(
+    catalog: GameCatalog,
+    startingAppId: Int?,
+    error: String?,
+    onStart: (GameCatalogEntry) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 28.dp)
+            .testTag("game_catalog_sheet"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = "Invite your contact to play a game or share an activity right inside the chat.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        val entriesByCategory = remember(catalog) {
+            catalog.visibleEntries.groupBy { it.categoryId }
+        }
+        for (category in catalog.categories) {
+            val categoryEntries = entriesByCategory[category.categoryId].orEmpty()
+            if (categoryEntries.isEmpty()) continue
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (category.description.isNotBlank()) {
                     Text(
-                        text = category.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        text = category.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (category.description.isNotBlank()) {
-                        Text(
-                            text = category.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    for (entry in categoryEntries) {
-                        val isStarting = startingAppId == entry.appId
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                }
+                for (entry in categoryEntries) {
+                    val isStarting = startingAppId == entry.appId
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable(enabled = startingAppId == null) { onStart(entry) }
+                            .testTag("game_catalog_entry_${entry.appId}"),
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .clickable(enabled = startingAppId == null) {
-                                    scope.launch {
-                                        startingAppId = entry.appId
-                                        error = null
-                                        try {
-                                            val result = onStartGame?.invoke(entry)
-                                                ?: context.gameRepository().startGame(contactId, entry)
-                                            error = result.exceptionOrNull()?.message
-                                            if (result.isSuccess) {
-                                                onDismiss()
-                                            }
-                                        } finally {
-                                            startingAppId = null
-                                        }
-                                    }
-                                }
-                                .testTag("game_catalog_entry_${entry.appId}"),
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                            GameEntryIcon(entry = entry)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                GameEntryIcon(entry = entry)
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    Text(
+                                        text = entry.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Surface(
+                                        shape = MaterialTheme.shapes.extraSmall,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
                                     ) {
                                         Text(
-                                            text = entry.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Surface(
-                                            shape = MaterialTheme.shapes.extraSmall,
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                        ) {
-                                            Text(
-                                                text = when {
-                                                    entry.appType == 1 -> "Activity"
-                                                    entry.minUsers == 1 && entry.maxUsers == 1 -> "1 Player"
-                                                    entry.minUsers == 1 -> "1–${entry.maxUsers} Players"
-                                                    else -> "${entry.maxUsers} Players"
-                                                },
-                                                style = MaterialTheme.typography.labelSmall,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            )
-                                        }
-                                    }
-                                    if (entry.description.isNotBlank()) {
-                                        Text(
-                                            text = entry.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
+                                            text = when {
+                                                entry.appType == 1 -> "Activity"
+                                                entry.minUsers == 1 && entry.maxUsers == 1 -> "1 Player"
+                                                entry.minUsers == 1 -> "1–${entry.maxUsers} Players"
+                                                else -> "${entry.maxUsers} Players"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         )
                                     }
                                 }
-                                if (isStarting) {
-                                    MsngrCircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                                if (entry.description.isNotBlank()) {
+                                    Text(
+                                        text = entry.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
+                            }
+                            if (isStarting) {
+                                MsngrCircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -1174,14 +1252,14 @@ internal fun GameHost(
                     Text(
                         text = when (session.status) {
                             GameSessionStatus.Invited -> if (session.outgoing) {
-                                "Waiting for $peerDisplayName to accept…"
+                                "Waiting for $peerDisplayName to accept\u2026"
                             } else {
                                 "$peerDisplayName invited you"
                             }
                             GameSessionStatus.Active -> if (session.remoteAppLoaded) {
                                 "With $peerDisplayName"
                             } else {
-                                "Loading $peerDisplayName's game…"
+                                "Loading $peerDisplayName's game\u2026"
                             }
                             GameSessionStatus.Declined -> "Invitation declined"
                             GameSessionStatus.Stopped -> if (session.remoteStopped) {

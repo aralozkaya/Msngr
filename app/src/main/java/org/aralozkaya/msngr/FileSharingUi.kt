@@ -121,7 +121,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
     }
     LaunchedEffect(enabled, busy) { if (!enabled || busy) expanded = false }
     if (gamesOpen && enabled) {
-        GameCatalogSheet(
+        GameCatalogDialog(
             contactId = contactId,
             onDismiss = { gamesOpen = false },
         )
@@ -343,7 +343,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             Text("Photos", style = MaterialTheme.typography.headlineSmall)
             when (share.status) {
                 PhotoShareStatus.Invited -> {
-                    Text(if (share.outgoing) "Waiting for the other person to accept…" else "You are invited to share photos.")
+                    Text(if (share.outgoing) "Waiting for the other person to accept\u2026" else "You are invited to share photos.")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!share.outgoing) Button(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                             error = (onAccept?.invoke() ?: context.sharingRepository().acceptPhotos(contactId, share.id)).exceptionOrNull()?.message
@@ -413,7 +413,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                                 when {
                                     photo.previewError != null -> Text(photo.previewError, color = MaterialTheme.colorScheme.error)
                                     photo.localPath != null -> Text("Preview unavailable.")
-                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo…") }
+                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo\u2026") }
                                 }
                             }
                         }
@@ -430,7 +430,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                     if (TransferPrefs.read(context).photoTree != null || hasDefaultTransferStorageAccess(context)) requestSave()
                     else savePermission.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }, enabled = !selected.originalPending && !saveRequested) {
-                    Text(if (selected.originalPending || saveRequested) "Saving…" else if (savedPhotoId == selected.id || saveState.uri != null) "Saved" else "Save photo")
+                    Text(if (selected.originalPending || saveRequested) "Saving\u2026" else if (savedPhotoId == selected.id || saveState.uri != null) "Saved" else "Save photo")
                 }
                 selected.originalError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -438,7 +438,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             if (preparing) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(shapes = ButtonDefaults.shapes(), enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text(if (preparing) "Preparing…" else "Add photos")
+                    Text(if (preparing) "Preparing\u2026" else "Add photos")
                 }
                 DestructiveOutlinedButton(onClick = stop) { Text("Stop sharing") }
             }

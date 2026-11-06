@@ -395,7 +395,7 @@ internal fun VoiceClipComposer(
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Text(String.format(Locale.ROOT, "%.1f / 15 s", elapsed / 1_000f),
                                                 style = MaterialTheme.typography.labelLarge)
-                                            Crossfade(if (processing) "Preparing…" else if (locked) "Locked" else "Release to review",
+                                            Crossfade(if (processing) "Preparing\u2026" else if (locked) "Locked" else "Release to review",
                                                 animationSpec = motion.fastEffectsSpec(), label = "voiceRecordingStatus") { status ->
                                                 Text(status, style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant)

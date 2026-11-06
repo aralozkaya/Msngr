@@ -164,7 +164,7 @@ internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit, onRetr
         Text(reference.name, style = MaterialTheme.typography.titleSmall)
         if (message.isWinkPending) {
             MsngrLinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
-            Text("Downloading wink…", style = MaterialTheme.typography.labelSmall)
+            Text("Downloading wink\u2026", style = MaterialTheme.typography.labelSmall)
         } else if (message.winkTransferError != null && message.author == MessageAuthor.Contact) {
             TextButton(onClick = onRetry) {
                 Text(stringResource(R.string.chat_message_retry))
@@ -227,7 +227,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
             Text(reference.name, Modifier.padding(top = 8.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
             if (message.isWinkPending) {
                 MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
-                Text("Downloading wink…", style = MaterialTheme.typography.bodySmall)
+                Text("Downloading wink\u2026", style = MaterialTheme.typography.bodySmall)
             } else message.winkTransferError?.let { transferError ->
                 Text(transferError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }

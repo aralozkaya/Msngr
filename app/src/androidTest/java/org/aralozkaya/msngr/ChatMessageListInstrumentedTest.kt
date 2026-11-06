@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
@@ -97,6 +98,81 @@ class ChatMessageListInstrumentedTest {
         compose.onNodeWithText(compose.activity.getString(R.string.empty_conversation_warning)).assertIsDisplayed()
     }
 
+    @Test
+    fun scrollToLatestButtonShowsWhileScrollingThenGlidesToNewestMessage() {
+        val history = (0L..999L).map { index ->
+            if (index >= 990L) {
+                message(index).copy(text = "Message $index\nLine 2\nLine 3\nLine 4")
+            } else {
+                message(index)
+            }
+        }
+        lateinit var state: LazyListState
+        lateinit var scope: CoroutineScope
+        compose.setContent {
+            MaterialTheme {
+                state = rememberLazyListState()
+                scope = rememberCoroutineScope()
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = history,
+                        listState = state,
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(bottom = 64.dp),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Message 999", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+
+        compose.runOnIdle { scope.launch { state.scrollToItem(400) } }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        // Scrolling away shows the button, and it lingers briefly once the list stops.
+        compose.runOnIdle { scope.launch { state.scrollBy(10f) } }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(CHAT_SCROLL_TO_LATEST_LINGER_MILLIS / 2)
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(CHAT_SCROLL_TO_LATEST_LINGER_MILLIS)
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+        compose.runOnIdle { assertTrue(state.firstVisibleItemIndex > 300) }
+
+        compose.runOnIdle { scope.launch { state.scrollBy(-10f) } }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).performClick()
+        compose.mainClock.advanceTimeBy(100)
+        compose.runOnIdle {
+            // Still gliding: neither at the start position nor already at the newest message.
+            assertTrue(state.firstVisibleItemIndex in 1 until 400)
+        }
+        // Step frame by frame: once the newest message is in view the glide must keep shrinking
+        // the remaining distance in small steps and land exactly, without a final correction.
+        var previousOffset = Int.MAX_VALUE
+        var lastStep = 0
+        var frames = 0
+        while (frames++ < 600) {
+            compose.mainClock.advanceTimeByFrame()
+            val (index, offset) = compose.runOnIdle { state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset }
+            if (index == 0) {
+                assertTrue("Offset grew from $previousOffset to $offset", offset <= previousOffset)
+                if (previousOffset != Int.MAX_VALUE) lastStep = previousOffset - offset
+                previousOffset = offset
+                if (offset == 0) break
+            }
+        }
+        assertEquals(0, compose.runOnIdle { state.firstVisibleItemScrollOffset })
+        val viewportHeight = compose.runOnIdle { state.layoutInfo.viewportSize.height }
+        assertTrue("Final step jumped by $lastStep px", lastStep in 0..viewportHeight / 8)
+        compose.mainClock.autoAdvance = true
+        compose.waitUntil(5_000) { state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0 }
+        compose.onNodeWithText("Message 999", substring = true).assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+    }
     private fun assertHistoryStartsAtBottom(delayed: Boolean) {
         val history = (0L..999L).map { message(it) }
         val messages = mutableStateOf(if (delayed) emptyList() else history)

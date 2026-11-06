@@ -162,9 +162,9 @@ private fun ReconnectScreen(
             )
             Text(
                 text = if (attempt == 1) {
-                    "The Messenger connection was interrupted. Signing you back in…"
+                    "The Messenger connection was interrupted. Signing you back in\u2026"
                 } else {
-                    "The service is not responding yet. Retrying automatically…"
+                    "The service is not responding yet. Retrying automatically\u2026"
                 },
                 modifier = Modifier
                     .padding(top = 12.dp)
