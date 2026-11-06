@@ -86,6 +86,14 @@ object MsnGameProtocol {
         byteArrayOf(HEADER_INTERNAL, 0x00, 0x01, 0x00)
 
     /**
+     * Native P4's BYE context: little-endian HRESULT 0x81000374. CP4Channel's
+     * OnChannelEvent (0x005d8fc1) fires OnRemoteAppClosed only for this reason;
+     * a context-free disconnect merely changes the channel connection type.
+     */
+    fun encodeRemoteAppClosedContext(): ByteArray =
+        ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(0x81000374.toInt()).array()
+
+    /**
      * Encodes an application payload with the 4-byte P4 header (`80 00 00 00`) followed by
      * ATL `CComVariant::WriteToStream` (`0x00588636`) / `CComBSTR::WriteToStream` (`0x00587d1c`).
      */
