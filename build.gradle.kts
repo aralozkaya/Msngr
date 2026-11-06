@@ -4,7 +4,7 @@ buildscript {
     // Keep build tooling in the same vulnerability gate as app dependencies.
     configurations.named("classpath") {
         resolutionStrategy.force(
-            "com.google.guava:guava:33.7.2-jre",
+            "com.google.guava:guava:33.8.0-jre",
             "org.apache.commons:commons-lang3:3.21.0",
             "org.bitbucket.b_c:jose4j:0.9.7",
             "org.bouncycastle:bcpkix-jdk18on:1.86",
