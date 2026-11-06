@@ -519,7 +519,7 @@ internal fun ChatScreen(
                                         )
                                         SceneText(
                                             text = if (isTyping) {
-                                                "typing…"
+                                                "typing\u2026"
                                             } else if (contact?.isGroup == true) {
                                                 "${contact.joinedMembers.size} ${if (contact.joinedMembers.size == 1) "member" else "members"}"
                                             } else {
@@ -730,6 +730,15 @@ internal fun ChatMessageList(
             }
         }
         ChatStickyDay(timeline, listState, dayLabels, stickyDayAlpha)
+        ChatScrollToLatestButton(
+            listState = listState,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = innerPadding.calculateEndPadding(layoutDirection) + 16.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 12.dp,
+                ),
+        )
     }
 }
 
@@ -805,7 +814,7 @@ internal fun MessageComposer(
     ) {
         if (enabled && nudgeCooldownMillis > 0L) {
             Text(
-                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge…" else
+                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge\u2026" else
                     "You can send another nudge in ${(nudgeCooldownMillis + 999) / 1_000} seconds.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

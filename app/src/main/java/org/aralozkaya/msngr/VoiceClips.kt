@@ -218,7 +218,7 @@ internal fun VoiceClipMessage(message: ChatMessage) {
                 message.isVoiceClipPending -> Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularWavyProgressIndicator(Modifier.size(20.dp))
-                    Text("Downloading voice clip…", style = MaterialTheme.typography.bodySmall)
+                    Text("Downloading voice clip\u2026", style = MaterialTheme.typography.bodySmall)
                 }
                 else -> Text(message.voiceClipTransferError ?: "Voice clip unavailable", style = MaterialTheme.typography.bodySmall)
             }
