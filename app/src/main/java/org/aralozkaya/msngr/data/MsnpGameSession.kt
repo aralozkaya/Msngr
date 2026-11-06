@@ -320,7 +320,8 @@ internal class MsnpGameSession(
                     callId = current.id,
                     cseq = 0,
                     contentType = "application/x-msnmsgr-sessionclosebody",
-                    content = "SessionID: $session\r\n\r\n",
+                    content = "SessionID: $session\r\n" +
+                        "Context: ${MsnBase64.encode(MsnGameProtocol.encodeRemoteAppClosedContext())}\r\n\r\n",
                 ),
             )
         }

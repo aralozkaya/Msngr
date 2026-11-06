@@ -366,7 +366,7 @@ private fun GameCatalogContent(
     }
 }
 
-private class GameWebViewController(
+internal class GameWebViewController(
     context: Context,
     val sessionId: String,
     val entry: GameCatalogEntry,
@@ -534,24 +534,26 @@ private class GameWebViewController(
     }
 
     private inner class BridgeInterface {
+        // These JavaScript API names also name controller callbacks; qualify the
+        // receiver so the posted work does not recursively call the bridge.
         @JavascriptInterface
         fun onInitialize() {
-            mainHandler.post { onInitialize() }
+            mainHandler.post { this@GameWebViewController.onInitialize() }
         }
 
         @JavascriptInterface
         fun onSendData(payload: String) {
-            mainHandler.post { onSendData(payload) }
+            mainHandler.post { this@GameWebViewController.onSendData(payload) }
         }
 
         @JavascriptInterface
         fun onSendImAsUser(message: String) {
-            mainHandler.post { onSendImAsUser(message) }
+            mainHandler.post { this@GameWebViewController.onSendImAsUser(message) }
         }
 
         @JavascriptInterface
         fun onCloseApp() {
-            mainHandler.post { onCloseApp() }
+            mainHandler.post { this@GameWebViewController.onCloseApp() }
         }
 
         @JavascriptInterface
@@ -1287,20 +1289,16 @@ internal fun GameHost(
                     Spacer(Modifier.width(4.dp))
                     Text("Minimize")
                 }
-                if (ongoing) {
+                if (ongoing && !hasPendingInvite) {
                     DestructiveOutlinedButton(
                         onClick = stop,
                         modifier = Modifier.testTag("stop_game_session"),
                     ) {
                         Text(
-                            when {
-                                session.status == GameSessionStatus.Invited && session.outgoing -> "Cancel"
-                                session.status == GameSessionStatus.Invited -> "Decline"
-                                else -> "End"
-                            },
+                            if (session.status == GameSessionStatus.Invited) "Cancel" else "End",
                         )
                     }
-                } else {
+                } else if (!ongoing) {
                     OutlinedButton(
                         shapes = ButtonDefaults.shapes(),
                         onClick = { visible = false; closed = true },
@@ -1352,7 +1350,10 @@ internal fun GameHost(
                                     ) {
                                         Text("Accept & play")
                                     }
-                                    DestructiveOutlinedButton(onClick = stop) {
+                                    DestructiveOutlinedButton(
+                                        onClick = stop,
+                                        modifier = Modifier.testTag("stop_game_session"),
+                                    ) {
                                         Text("Decline")
                                     }
                                 }

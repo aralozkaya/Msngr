@@ -4,6 +4,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.*
+import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
 import org.aralozkaya.msngr.protocol.MsnGameProtocol
 import org.aralozkaya.msngr.protocol.P4Packet
@@ -153,6 +154,57 @@ class GameProtocolTest {
             "https://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/reversi.htm",
             crossTalkCatalog.entries.single().url,
         )
+    }
+
+    @Test
+    fun closingGameIncludesNativeP4CloseReasonForEitherPlayer() = runBlocking {
+        val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        for (hostCloses in listOf(true, false)) {
+            val sent = CopyOnWriteArrayList<SlpMessage>()
+            lateinit var host: MsnpGameSession
+            lateinit var guest: MsnpGameSession
+            host = MsnpGameSession(
+                source = "alice@example.test",
+                destination = "bob@example.test",
+                publish = {},
+                sendControl = { bytes ->
+                    val message = requireNotNull(SlpMessage.parse(bytes))
+                    sent.add(message)
+                    guest.handle(message)
+                },
+                sendData = { _, _, _ -> },
+            )
+            guest = MsnpGameSession(
+                source = "bob@example.test",
+                destination = "alice@example.test",
+                publish = {},
+                sendControl = { bytes ->
+                    val message = requireNotNull(SlpMessage.parse(bytes))
+                    sent.add(message)
+                    host.handle(message)
+                },
+                sendData = { _, _, _ -> },
+                resolveCatalogEntry = { _, _ -> entry },
+            )
+            try {
+                host.start(entry)
+                guest.accept()
+                (if (hostCloses) host else guest).stop()
+                val invitation = sent.first()
+                val close = sent.last()
+                assertTrue(close.firstLine.startsWith("BYE "))
+                assertEquals(invitation.callId, close.callId)
+                assertEquals(invitation.body.field("SessionID"), close.body.field("SessionID"))
+                assertEquals("application/x-msnmsgr-sessionclosebody", close.contentType)
+                assertArrayEquals(
+                    byteArrayOf(0x74, 0x03, 0x00, 0x81.toByte()),
+                    MsnBase64.decode(requireNotNull(close.body.field("Context"))),
+                )
+            } finally {
+                host.disconnect()
+                guest.disconnect()
+            }
+        }
     }
 
     @Test
