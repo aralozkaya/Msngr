@@ -32,7 +32,7 @@ class MessengerConnectionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        promoteToForeground("Preparing the Messenger connection…")
+        promoteToForeground("Preparing the Messenger connection\u2026")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -55,7 +55,7 @@ class MessengerConnectionService : Service() {
                 connectedRepository.connectionIssue,
             ) { profile, issue ->
                 when {
-                    issue != null -> "Reconnecting automatically…"
+                    issue != null -> "Reconnecting automatically\u2026"
                     profile.email.isNotBlank() -> "Connected as ${profile.email}"
                     else -> "Connected to Messenger"
                 }
