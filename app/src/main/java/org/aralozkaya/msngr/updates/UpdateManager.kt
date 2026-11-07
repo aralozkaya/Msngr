@@ -216,6 +216,7 @@ class UpdateManager internal constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         try {
             notifications.notify(NOTIFICATION_ID, NotificationCompat.Builder(context, NotificationChannels.APP_UPDATES)
+                .setSilent(org.aralozkaya.msngr.notifications.MsngrNotificationManager.shouldSilenceNonChatNotification(context))
                 .setSmallIcon(R.drawable.ic_notification_msngr)
                 .setContentTitle(context.getString(R.string.update_notification_title, release.version.tag))
                 .setContentText(context.getString(R.string.update_notification_text))
