@@ -131,6 +131,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -163,6 +164,7 @@ import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTile
 import org.aralozkaya.msngr.pages.components.KeyboardSheetTileGrid
+import org.aralozkaya.msngr.pages.components.LocalKeyboardSheetHost
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.pages.components.PresenceDot
 import org.aralozkaya.msngr.pages.components.keyboardSheetWindowInsets
@@ -773,17 +775,35 @@ internal fun MessageComposer(
     val editorController = remember { MessengerPlusEditorController() }
     val emoticonSheet = rememberEmoticonSheetState()
     val colorSheet = rememberMessengerPlusColorSheetState()
+    val keyboardSheetHost = LocalKeyboardSheetHost.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var showEmotionSounds by remember { mutableStateOf(false) }
     var showWinks by remember { mutableStateOf(false) }
     var showTextStyle by remember { mutableStateOf(false) }
     var handwritingMode by rememberSaveable { mutableStateOf(false) }
     val handwritingState = rememberHandwritingCanvasState()
+    fun dismissComposerSheets(dismissKeyboardSheetHost: Boolean = false) {
+        colorSheet.dismiss()
+        emoticonSheet.dismiss()
+        showEmotionSounds = false
+        showWinks = false
+        showTextStyle = false
+        if (dismissKeyboardSheetHost) keyboardSheetHost?.dismiss()
+    }
     LaunchedEffect(enabled, handwritingEnabled, messengerPlusEnabled) {
         if (!enabled || !messengerPlusEnabled) colorSheet.dismiss()
         if (!handwritingEnabled) handwritingMode = false
         if (!enabled) {
-            showTextStyle = false
-            emoticonSheet.dismiss()
+            dismissComposerSheets(dismissKeyboardSheetHost = true)
+            editorController.hideKeyboard()
+        }
+    }
+    LaunchedEffect(handwritingMode) {
+        if (handwritingMode) {
+            dismissComposerSheets(dismissKeyboardSheetHost = true)
+            focusManager.clearFocus()
+            keyboardController?.hide()
             editorController.hideKeyboard()
         }
     }
@@ -794,9 +814,9 @@ internal fun MessageComposer(
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
     EmotionSoundPicker(showEmotionSounds, enabled && emotionSoundsEnabled, { showEmotionSounds = false }, onSendEmotionSound)
-    LaunchedEffect(enabled) { if (!enabled) showEmotionSounds = false }
+    LaunchedEffect(enabled, emotionSoundsEnabled) { if (!enabled || !emotionSoundsEnabled) showEmotionSounds = false }
     WinkPicker(showWinks, winksEnabled, { showWinks = false }, onSendWink)
-    LaunchedEffect(winksMenuEnabled) { if (!winksMenuEnabled) showWinks = false }
+    LaunchedEffect(enabled, winksMenuEnabled) { if (!enabled || !winksMenuEnabled) showWinks = false }
     MessengerPlusColorSheet(colorSheet)
     if (showTextStyle) NativeTextStyleSheet(
         style = nativeStyle,
@@ -872,9 +892,7 @@ internal fun MessageComposer(
                     voiceButtonVisible = voiceClipsVisible && !draft.hasMessengerPlusVisibleContent(),
                     onSend = onSendVoiceClip,
                     onRecordingStarted = {
-                        colorSheet.dismiss()
-                        emoticonSheet.dismiss()
-                        showTextStyle = false
+                        dismissComposerSheets(dismissKeyboardSheetHost = true)
                     },
                     onRecordingFinished = { editorController.hideKeyboard() },
                     textComposer = {
@@ -902,20 +920,24 @@ internal fun MessageComposer(
                                     winksEnabled = winksMenuEnabled,
                                     soundsEnabled = emotionSoundsEnabled,
                                     onSelectEmotionSounds = {
-                                        colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
-                                        handwritingMode = false; editorController.hideKeyboard(); showEmotionSounds = true
+                                        dismissComposerSheets()
+                                        handwritingMode = false
+                                        editorController.hideKeyboard()
+                                        showEmotionSounds = true
                                     },
                                     onSelectWinks = {
-                                        colorSheet.dismiss(); emoticonSheet.dismiss(); showTextStyle = false
-                                        handwritingMode = false; editorController.hideKeyboard(); showWinks = true
+                                        dismissComposerSheets()
+                                        handwritingMode = false
+                                        editorController.hideKeyboard()
+                                        showWinks = true
                                     },
                                     emoticonSheetVisible = emoticonSheet.visible,
                                     onToggleEmoticons = { emoticonSheet.toggle(editorController) },
                                     onSelectEmoticons = { emoticonSheet.open(editorController) },
                                     onSelectHandwriting = {
-                                        colorSheet.dismiss()
-                                        emoticonSheet.dismiss()
-                                        showTextStyle = false
+                                        dismissComposerSheets(dismissKeyboardSheetHost = true)
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
                                         editorController.hideKeyboard()
                                         handwritingMode = true
                                     },
@@ -934,8 +956,7 @@ internal fun MessageComposer(
                                 MsnEmoticonEditor(
                                     nativeStyle = nativeStyle,
                                     onTextStyle = {
-                                        colorSheet.dismiss()
-                                        emoticonSheet.dismiss()
+                                        dismissComposerSheets(dismissKeyboardSheetHost = true)
                                         editorController.hideKeyboard()
                                         showTextStyle = true
                                     },
