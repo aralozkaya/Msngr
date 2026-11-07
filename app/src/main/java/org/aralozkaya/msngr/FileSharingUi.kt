@@ -19,10 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
@@ -91,10 +91,20 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
     Box {
         if (busy) MsngrCircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
         else IconButton(onClick = { expanded = true }, enabled = enabled) {
-            Icon(Icons.Default.AttachFile, contentDescription = "Share photos or files")
+            Icon(
+                Icons.Rounded.DashboardCustomize,
+                contentDescription = "Share or start an activity",
+            )
         }
-        DropdownMenuPopup(expanded = expanded && enabled && !busy, onDismissRequest = { expanded = false }) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1), modifier = Modifier.testTag("sharing_menu")) {
+        DropdownMenuPopup(
+            expanded = expanded && enabled && !busy,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.testTag("sharing_menu"),
+        ) {
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 2),
+                modifier = Modifier.testTag("sharing_menu_transfers"),
+            ) {
                 DropdownMenuItem(
                     text = { Text("Photos") },
                     leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
@@ -109,6 +119,12 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                     modifier = Modifier.testTag("sharing_menu_files"),
                     onClick = { expanded = false; files.launch(arrayOf("*/*")) },
                 )
+            }
+            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(1, 2),
+                modifier = Modifier.testTag("sharing_menu_activities"),
+            ) {
                 DropdownMenuItem(
                     text = { Text("Games & activities") },
                     leadingIcon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
