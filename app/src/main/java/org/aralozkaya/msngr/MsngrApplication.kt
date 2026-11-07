@@ -162,6 +162,9 @@ class AppContainer(
         }
     }
 
+    internal val currentRepository: MessengerRepository?
+        @Synchronized get() = repository
+
     val messengerRepository: MessengerRepository
         @Synchronized get() = checkNotNull(repository) {
             "The MSNP backend must be selected by a successful login first."

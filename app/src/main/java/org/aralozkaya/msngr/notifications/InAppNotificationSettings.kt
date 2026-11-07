@@ -29,9 +29,15 @@ internal data class ConversationNotificationOverride(
     val backgroundSilent: Boolean = false,
 )
 
+internal data class PushNotificationOptions(
+    val silenceWhenNotOnline: Boolean = true,
+    val includeChatsWhenNotOnline: Boolean = false,
+)
+
 internal data class InAppNotificationSettings(
     val defaults: InAppNotificationOptions = InAppNotificationOptions(),
     val conversations: Map<String, ConversationNotificationOverride> = emptyMap(),
+    val push: PushNotificationOptions = PushNotificationOptions(),
 ) {
     fun options(contactId: String?) = conversations[contactId?.notificationKey()]?.options ?: defaults
 
@@ -46,6 +52,11 @@ internal data class InAppNotificationSettings(
 
     fun showsBanner(type: InAppNotificationType, contactId: String? = null): Boolean =
         allows(type, contactId) && options(contactId).banners
+
+    fun silencesPush(presence: org.aralozkaya.msngr.enums.Presence, isChat: Boolean): Boolean {
+        if (presence == org.aralozkaya.msngr.enums.Presence.Online || !push.silenceWhenNotOnline) return false
+        return !isChat || push.includeChatsWhenNotOnline
+    }
 }
 
 internal fun String.notificationKey() = trim().lowercase(java.util.Locale.ROOT)
