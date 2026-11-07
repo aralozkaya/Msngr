@@ -62,4 +62,35 @@ class InAppNotificationSettingsTest {
             contact("blocked", 4).copy(isBlocked = true), contact("marked", 0).copy(isMarkedUnread = true))
         assertEquals(6, otherUnreadCount(contacts, "CURRENT"))
     }
+
+    @Test fun pushNotificationsSilenceNonChatWhenNotOnlineAndKeepChatsAlertingByDefault() {
+        val defaultSettings = InAppNotificationSettings()
+        assertTrue(defaultSettings.push.silenceWhenNotOnline)
+        assertFalse(defaultSettings.push.includeChatsWhenNotOnline)
+
+        assertFalse(defaultSettings.silencesPush(Presence.Online, isChat = false))
+        assertFalse(defaultSettings.silencesPush(Presence.Online, isChat = true))
+        for (nonAvailable in listOf(Presence.Busy, Presence.Away, Presence.Offline)) {
+            assertTrue(defaultSettings.silencesPush(nonAvailable, isChat = false))
+            assertFalse(defaultSettings.silencesPush(nonAvailable, isChat = true))
+        }
+
+        val withChatsSilenced = defaultSettings.copy(
+            push = PushNotificationOptions(silenceWhenNotOnline = true, includeChatsWhenNotOnline = true),
+        )
+        assertFalse(withChatsSilenced.silencesPush(Presence.Online, isChat = false))
+        assertFalse(withChatsSilenced.silencesPush(Presence.Online, isChat = true))
+        for (nonAvailable in listOf(Presence.Busy, Presence.Away, Presence.Offline)) {
+            assertTrue(withChatsSilenced.silencesPush(nonAvailable, isChat = false))
+            assertTrue(withChatsSilenced.silencesPush(nonAvailable, isChat = true))
+        }
+
+        val disabled = defaultSettings.copy(
+            push = PushNotificationOptions(silenceWhenNotOnline = false, includeChatsWhenNotOnline = true),
+        )
+        Presence.entries.forEach { presence ->
+            assertFalse(disabled.silencesPush(presence, isChat = false))
+            assertFalse(disabled.silencesPush(presence, isChat = true))
+        }
+    }
 }

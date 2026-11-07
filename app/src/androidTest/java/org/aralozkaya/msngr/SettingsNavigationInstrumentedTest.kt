@@ -86,7 +86,8 @@ class SettingsNavigationInstrumentedTest {
     }
 
     @Test fun committedPredictiveBackPopsOneNestedPageAndToolbarPopsItsParent() {
-        openCategory("In-app notifications")
+        openCategory("Notifications")
+        compose.onNodeWithTag("in_app_notification_settings").performClick()
         compose.onNodeWithTag("in_app_notification_options").performClick()
         compose.onNodeWithTag("customized_notification_settings").performClick()
         compose.onNodeWithTag("no_notification_customizations").assertIsDisplayed()
@@ -98,7 +99,9 @@ class SettingsNavigationInstrumentedTest {
         settle()
 
         compose.onNodeWithTag("no_notification_customizations").assertDoesNotExist()
-        compose.onNodeWithTag("in_app_notification_options").assertIsDisplayed()
+        compose.onNodeWithTag("in_app_enabled").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithTag("silence_push_when_not_online").assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Settings").assertIsDisplayed()
         assertFalse(toolbarExitRequested)
@@ -130,7 +133,7 @@ class SettingsNavigationInstrumentedTest {
 
     @Test fun everyCategorySupportsSystemBackAndRootLeavesSystemBackUnclaimed() {
         for (title in listOf("Appearance", "Emoticons & Winks", "Messenger Plus!", "Contact Invitations",
-            "File & photo transfers", "In-app notifications", "Connection", "About", "App updates")) {
+            "File & photo transfers", "Notifications", "Connection", "About", "App updates")) {
             openCategory(title)
             compose.onNodeWithText("Settings").assertDoesNotExist()
             compose.runOnIdle { assertTrue(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()) }
