@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.view.ActionMode
+import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
@@ -10,6 +12,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,6 +23,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMember
@@ -92,7 +98,7 @@ class HandwritingComposerInstrumentedTest {
 
         // Helper to click a toolbar item whether it fits directly in the toolbar or overflowed into the menu
         fun clickToolbarItem(tag: String) {
-            val directNodes = compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes()
+            val directNodes = compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes()
             if (directNodes.isEmpty()) {
                 compose.onNodeWithTag(HANDWRITING_OVERFLOW_BUTTON_TAG).assertIsDisplayed().performClick()
             }
@@ -306,6 +312,82 @@ class HandwritingComposerInstrumentedTest {
         compose.onNodeWithText("Small grid").assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(WlmGridStyle.SmallGrid, state.gridStyle)
+        }
+    }
+
+    @Test
+    fun openingHandwritingClosesEmoticonWinkEmotionSoundAndFormattingSheets() {
+        val context = compose.activity.applicationContext
+        MessengerPlusPrefs.setEnabled(context, true)
+        val draft = mutableStateOf("one two three")
+
+        compose.setContent {
+            MsngrTheme {
+                ChatScreen(
+                    draft = draft.value,
+                    onDraftChange = { draft.value = it },
+                    contact = Contact("peer", "Peer", "peer@example.com", Presence.Online),
+                    messages = emptyList(),
+                    isHistoryLoaded = true,
+                    canLoadOlderMessages = false,
+                    isTyping = false,
+                    onBack = {},
+                    onSendMessage = { _, _ -> },
+                    onRetryMessage = {},
+                    onSendTyping = {},
+                    onSendNudge = {},
+                    onLoadOlderMessages = {},
+                )
+            }
+        }
+
+        fun hasSheet(tag: String): Boolean =
+            compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
+
+        fun assertOpeningHandwritingClosesSheet(sheetTag: String, openSheet: () -> Unit) {
+            openSheet()
+            compose.waitUntil(5_000) { hasSheet(sheetTag) }
+            compose.waitForIdle()
+            val sheetTop = compose.onNodeWithTag(sheetTag).getBoundsInRoot().top
+
+            compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
+            compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).assertIsDisplayed().performClick()
+
+            compose.waitUntil(5_000) { !hasSheet(sheetTag) }
+            compose.waitForIdle()
+            compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).assertIsDisplayed()
+            val handwritingBottom = compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).getBoundsInRoot().bottom
+            assertTrue(
+                "Expected handwriting panel bottom ($handwritingBottom) to settle below closed sheet top ($sheetTop)",
+                handwritingBottom > sheetTop,
+            )
+
+            compose.onNodeWithTag(HANDWRITING_TYPE_BUTTON_TAG).performClick()
+            compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).assertIsDisplayed()
+        }
+
+        assertOpeningHandwritingClosesSheet(EMOTICON_PICKER_TAG) {
+            compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performClick()
+        }
+        assertOpeningHandwritingClosesSheet("wink_picker") {
+            compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
+            compose.onNodeWithTag("wink_menu_item").assertIsDisplayed().performClick()
+        }
+        assertOpeningHandwritingClosesSheet("emotion_sound_picker") {
+            compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
+            compose.onNodeWithTag("emotion_sound_menu_item").assertIsDisplayed().performClick()
+        }
+        assertOpeningHandwritingClosesSheet(MESSENGER_PLUS_COLOR_SHEET_TAG) {
+            onView(withContentDescription("Message input")).check { view, noViewException ->
+                if (noViewException != null) throw noViewException
+                val editor = view as EditText
+                editor.setSelection(4, 7)
+                val callback = checkNotNull(editor.customSelectionActionModeCallback)
+                val mode = checkNotNull(editor.startActionMode(callback, ActionMode.TYPE_FLOATING))
+                callback.onPrepareActionMode(mode, mode.menu)
+                val colors = checkNotNull(mode.menu.findItem(R.id.format_plus))
+                assertTrue(callback.onActionItemClicked(mode, colors))
+            }
         }
     }
 }
