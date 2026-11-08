@@ -562,6 +562,183 @@ class NotificationConfigurationInstrumentedTest {
         )
     }
 
+    @Test
+    fun nonChatPushNotificationsAreSilentUnlessOnlineAndChatInclusionIsOptional() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val target = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                target.packageName,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+        val context = object : android.content.ContextWrapper(target) {
+            override fun getSharedPreferences(name: String, mode: Int) =
+                super.getSharedPreferences("presence_push_silence_test_$name", mode)
+        }
+        NotificationChannels.createAll(context)
+        val systemManager = context.getSystemService(NotificationManager::class.java)
+        var ownPresence = org.aralozkaya.msngr.enums.Presence.Online
+        val renderer = MsngrNotificationManager(context) { false }.apply {
+            bindPresence { ownPresence }
+        }
+        val contactChatId = "contact-chat@example.test"
+        val groupChatId = "group-chat@live.com"
+        val nudgeContactId = "nudge-peer@example.test"
+        val signedInContactId = "signed-in-peer@example.test"
+        val contactMessageNotificationId = MsngrNotificationManager.notificationId(
+            NotificationEventType.Message,
+            contactChatId,
+        )
+        val groupMessageNotificationId = MsngrNotificationManager.notificationId(
+            NotificationEventType.Message,
+            groupChatId,
+        )
+        val nudgeNotificationId = MsngrNotificationManager.notificationId(
+            NotificationEventType.Nudge,
+            nudgeContactId,
+        )
+        val signedInNotificationId = MsngrNotificationManager.notificationId(
+            NotificationEventType.ContactSignedIn,
+            signedInContactId,
+        )
+        val nonChatIds = listOf(
+            nudgeNotificationId,
+            signedInNotificationId,
+            MsngrNotificationManager.OFFLINE_MESSAGES_NOTIFICATION_ID,
+            MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID,
+            MsngrNotificationManager.GROUP_INVITATIONS_NOTIFICATION_ID,
+        )
+        val chatIds = listOf(contactMessageNotificationId, groupMessageNotificationId)
+        val allIds = chatIds + nonChatIds
+
+        suspend fun postAll(round: Int) {
+            systemManager.cancelAll()
+            for (attempt in 0 until 20) {
+                if (systemManager.activeNotifications.isEmpty()) break
+                SystemClock.sleep(50)
+            }
+            renderer.show(
+                NotificationEvent(
+                    type = NotificationEventType.Message,
+                    contactId = contactChatId,
+                    contactName = "Contact peer",
+                    messageText = "Hello $round",
+                ),
+            )
+            renderer.show(
+                NotificationEvent(
+                    type = NotificationEventType.Message,
+                    contactId = groupChatId,
+                    contactName = "Group room",
+                    messageText = "Group hello $round",
+                    isGroup = true,
+                    senderName = "Alice",
+                    senderEmail = "alice@example.test",
+                ),
+            )
+            renderer.show(
+                NotificationEvent(
+                    type = NotificationEventType.Nudge,
+                    contactId = nudgeContactId,
+                    contactName = "Nudge peer",
+                ),
+            )
+            renderer.show(
+                NotificationEvent(
+                    type = NotificationEventType.ContactSignedIn,
+                    contactId = signedInContactId,
+                    contactName = "Signed in peer",
+                ),
+            )
+            renderer.showOfflineMessagesReceived()
+            renderer.syncContactRequests(
+                org.aralozkaya.msngr.data.ContactRequestInbox(
+                    "account-$round",
+                    listOf(org.aralozkaya.msngr.data.ContactRequest("req-$round@example.test", "Pending/$round")),
+                ),
+            )
+            renderer.syncGroupInvitations(
+                org.aralozkaya.msngr.data.GroupInvitationInbox(
+                    "account-$round",
+                    listOf(org.aralozkaya.msngr.data.GroupInvitation("group-$round@live.com", "Invite $round")),
+                ),
+            )
+        }
+
+        InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
+        try {
+            var round = 0
+            ownPresence = org.aralozkaya.msngr.enums.Presence.Online
+            postAll(++round)
+            allIds.forEach { id ->
+                val posted = awaitNotification(id) { true }
+                assertEquals(
+                    "Expected alerting notification for $id while Online",
+                    android.app.Notification.GROUP_ALERT_ALL,
+                    posted.groupAlertBehavior,
+                )
+            }
+
+            for (nonAvailable in listOf(
+                org.aralozkaya.msngr.enums.Presence.Busy,
+                org.aralozkaya.msngr.enums.Presence.Away,
+                org.aralozkaya.msngr.enums.Presence.Offline,
+            )) {
+                ownPresence = nonAvailable
+                postAll(++round)
+                nonChatIds.forEach { id ->
+                    val posted = awaitNotification(id) { true }
+                    assertEquals(
+                        "Expected silent non-chat notification for $id while $nonAvailable",
+                        android.app.Notification.GROUP_ALERT_SUMMARY,
+                        posted.groupAlertBehavior,
+                    )
+                }
+                chatIds.forEach { id ->
+                    val posted = awaitNotification(id) { true }
+                    assertEquals(
+                        "Expected alerting chat notification for $id while $nonAvailable by default",
+                        android.app.Notification.GROUP_ALERT_ALL,
+                        posted.groupAlertBehavior,
+                    )
+                }
+            }
+
+            InAppNotificationPrefs.setIncludeChatsWhenNotOnline(context, true)
+            ownPresence = org.aralozkaya.msngr.enums.Presence.Busy
+            postAll(++round)
+            allIds.forEach { id ->
+                val posted = awaitNotification(id) { true }
+                assertEquals(
+                    "Expected silent notification for $id when chat silencing is included",
+                    android.app.Notification.GROUP_ALERT_SUMMARY,
+                    posted.groupAlertBehavior,
+                )
+            }
+
+            ownPresence = org.aralozkaya.msngr.enums.Presence.Online
+            postAll(++round)
+            allIds.forEach { id ->
+                val posted = awaitNotification(id) { true }
+                assertEquals(
+                    "Expected alerting notification for $id when back Online",
+                    android.app.Notification.GROUP_ALERT_ALL,
+                    posted.groupAlertBehavior,
+                )
+            }
+        } finally {
+            systemManager.cancelAll()
+            ShortcutManagerCompat.removeDynamicShortcuts(
+                target,
+                listOf(contactChatId, groupChatId, nudgeContactId, signedInContactId)
+                    .map(MsngrNotificationManager::conversationShortcutId),
+            )
+            InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
+            InAppNotificationPrefs.reload(target)
+        }
+    }
+
     private fun event(
         type: NotificationEventType,
         eventId: String,

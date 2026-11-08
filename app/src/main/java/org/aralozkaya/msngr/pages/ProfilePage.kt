@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.ContactPictureViewer
 import org.aralozkaya.msngr.DisplayPictureSelection
 import org.aralozkaya.msngr.EmoticonPanel
@@ -280,7 +280,7 @@ fun ProfilePage(
                                 shape = MaterialTheme.shapes.ownDisplayPicture,
                             )
                             if (processingDisplayPicture) {
-                                CircularWavyProgressIndicator(
+                                MsngrCircularWavyProgressIndicator(
                                     modifier = Modifier.align(Alignment.Center).testTag("picture-processing"),
                                 )
                             }

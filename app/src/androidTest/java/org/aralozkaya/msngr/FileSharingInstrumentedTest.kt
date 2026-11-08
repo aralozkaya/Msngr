@@ -242,10 +242,19 @@ class FileSharingInstrumentedTest {
             compose.onNodeWithText("Send message").performClick()
             compose.runOnIdle { assertEquals(listOf("Still chatting"), sent); assertEquals(0, stopCalls) }
             Espresso.closeSoftKeyboard()
-            compose.onNodeWithContentDescription("Share photos or files").performClick()
+            compose.onNodeWithContentDescription("Share or start an activity").performClick()
             compose.onNodeWithTag("sharing_menu").assertIsDisplayed()
+            compose.onNodeWithTag("sharing_menu_transfers").assertIsDisplayed()
             compose.onNodeWithTag("sharing_menu_photos").assertIsDisplayed()
             compose.onNodeWithTag("sharing_menu_files").assertIsDisplayed()
+            compose.onNodeWithTag("sharing_menu_activities").assertIsDisplayed()
+            compose.onNodeWithTag("sharing_menu_games").assertIsDisplayed()
+            val transfersBounds = compose.onNodeWithTag("sharing_menu_transfers").fetchSemanticsNode().boundsInRoot
+            val activitiesBounds = compose.onNodeWithTag("sharing_menu_activities").fetchSemanticsNode().boundsInRoot
+            assertTrue(
+                "Expected file transfer menu group above games & activities group, got $transfersBounds vs $activitiesBounds",
+                transfersBounds.bottom < activitiesBounds.top,
+            )
             capture("sharing-menu-active-session.png")
             Espresso.pressBack()
             compose.runOnIdle { share.value = share.value.copy(photos = photos, selectedId = photos.last().id) }
@@ -456,6 +465,60 @@ class FileSharingInstrumentedTest {
                 .appendPath("..").appendPath("..").appendPath("cache").appendPath(outside.name).build()
             assertTrue(runCatching { context.contentResolver.openInputStream(escaped)!!.close() }.isFailure)
         } finally { file.delete(); outside.delete() }
+    }
+
+    @Test fun chatTopBarMenuSeparatesFileTransfersAndGamesAndActivities() {
+        compose.setContent {
+            MsngrTheme {
+                var draft by remember { mutableStateOf("") }
+                ChatScreen(
+                    draft = draft,
+                    onDraftChange = { draft = it },
+                    contact = Contact("peer", "Alex", "alex@example.test", Presence.Online),
+                    messages = listOf(
+                        ChatMessage(
+                            id = 1,
+                            contactId = "peer",
+                            author = MessageAuthor.Contact,
+                            text = "Want to play a game or send that photo?",
+                            timestampMillis = System.currentTimeMillis(),
+                        ),
+                    ),
+                    isHistoryLoaded = true,
+                    canLoadOlderMessages = false,
+                    isTyping = false,
+                    onBack = {},
+                    onSendMessage = { _, _ -> },
+                    onRetryMessage = {},
+                    onSendTyping = {},
+                    onSendNudge = {},
+                    onLoadOlderMessages = {},
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Share or start an activity").assertIsDisplayed()
+        capture("chat-topbar-actions-icon.png")
+
+        compose.onNodeWithContentDescription("Share or start an activity").performClick()
+        compose.onNodeWithTag("sharing_menu").assertIsDisplayed()
+        compose.onNodeWithTag("sharing_menu_transfers").assertIsDisplayed()
+        compose.onNodeWithTag("sharing_menu_photos").assertIsDisplayed()
+        compose.onNodeWithTag("sharing_menu_files").assertIsDisplayed()
+        compose.onNodeWithTag("sharing_menu_activities").assertIsDisplayed()
+        compose.onNodeWithTag("sharing_menu_games").assertIsDisplayed()
+
+        val transfersBounds = compose.onNodeWithTag("sharing_menu_transfers").fetchSemanticsNode().boundsInRoot
+        val activitiesBounds = compose.onNodeWithTag("sharing_menu_activities").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected file transfer group above games & activities group with spacing, got $transfersBounds vs $activitiesBounds",
+            transfersBounds.bottom < activitiesBounds.top,
+        )
+        capture("chat-topbar-actions-popup.png")
+
+        compose.onNodeWithTag("sharing_menu_games").performClick()
+        compose.onNodeWithTag("game_catalog_dialog").assertIsDisplayed()
+        compose.onNodeWithTag("game_catalog_close").performClick()
+        compose.onNodeWithTag("game_catalog_dialog").assertDoesNotExist()
     }
 
     private fun capture(name: String) {

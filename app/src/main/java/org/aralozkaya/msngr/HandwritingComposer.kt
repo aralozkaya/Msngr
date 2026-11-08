@@ -685,7 +685,7 @@ internal fun HandwritingComposerPanel(
 
                 if (!state.hasStrokes && activeStrokePoints.isEmpty()) {
                     Text(
-                        text = "Draw handwriting message hereâ€¦",
+                        text = "Draw handwriting message here\u2026",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier
                             .align(Alignment.TopStart)

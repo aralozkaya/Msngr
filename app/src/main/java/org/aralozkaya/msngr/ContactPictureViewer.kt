@@ -17,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +44,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 
@@ -104,7 +104,7 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
-                        image.isLoading -> CircularWavyProgressIndicator()
+                        image.isLoading -> MsngrCircularWavyProgressIndicator()
                         else -> Text("This display picture could not be loaded.")
                     }
                 }

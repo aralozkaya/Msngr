@@ -14,14 +14,20 @@ import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +36,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.*
@@ -38,6 +45,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -49,9 +59,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
 import org.json.JSONObject
@@ -59,6 +75,8 @@ import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.roundToInt
 
 private fun Context.gameRepository() =
     (applicationContext as MsngrApplication).container.messengerRepository
@@ -128,8 +146,13 @@ internal fun GameEntryIcon(
     }
 }
 
+/**
+ * A full-screen dialog listing the games and activities a contact can be invited to. Its top bar
+ * only has a navigation icon: there is deliberately no action button. Back closes it with a
+ * predictive back animation, unless a game invitation is being sent.
+ */
 @Composable
-internal fun GameCatalogSheet(
+internal fun GameCatalogDialog(
     contactId: String,
     onDismiss: () -> Unit,
     onStartGame: (suspend (GameCatalogEntry) -> Result<Unit>)? = null,
@@ -143,140 +166,203 @@ internal fun GameCatalogSheet(
     var catalog by remember { mutableStateOf(MsnpGameCatalogService.defaultCatalog()) }
     var startingAppId by remember { mutableStateOf<Int?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    val backProgress = remember { Animatable(0f) }
 
     LaunchedEffect(activitiesServer) {
         catalog = MsnpGameCatalogService.fetchCatalog(activitiesServer = activitiesServer)
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = { if (startingAppId == null) onDismiss() },
-        sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
         ),
     ) {
-        Column(
+        // Registered after the dialog's own callback, so it takes precedence. While an invitation
+        // is being sent the dialog's callback stays enabled and swallows Back.
+        PredictiveBackHandler(enabled = startingAppId == null) { events ->
+            try {
+                events.collect { backProgress.snapTo(it.progress) }
+                currentOnDismiss()
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) { backProgress.animateTo(0f) }
+                throw cancelled
+            }
+        }
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 28.dp)
-                .testTag("game_catalog_sheet"),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .fillMaxSize()
+                .graphicsLayer {
+                    val progress = backProgress.value
+                    val scale = 1f - 0.1f * progress
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - 0.2f * progress
+                    shape = RoundedCornerShape((28 * progress).dp)
+                    clip = progress > 0f
+                },
+            color = MaterialTheme.colorScheme.surface,
         ) {
-            Text(
-                text = "Games & activities",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Text(
-                text = "Invite your contact to play a game or share an activity right inside the chat.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+            Scaffold(
+                modifier = Modifier.fillMaxSize().testTag("game_catalog_dialog"),
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        title = { Text("Games & activities", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onDismiss,
+                                enabled = startingAppId == null,
+                                modifier = Modifier.testTag("game_catalog_close"),
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    )
+                },
+            ) { padding ->
+                GameCatalogContent(
+                    catalog = catalog,
+                    startingAppId = startingAppId,
+                    error = error,
+                    onStart = { entry ->
+                        scope.launch {
+                            startingAppId = entry.appId
+                            error = null
+                            try {
+                                val result = onStartGame?.invoke(entry)
+                                    ?: context.gameRepository().startGame(contactId, entry)
+                                error = result.exceptionOrNull()?.message
+                                if (result.isSuccess) {
+                                    onDismiss()
+                                }
+                            } finally {
+                                startingAppId = null
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(padding),
                 )
             }
+        }
+    }
+}
 
-            val entriesByCategory = remember(catalog) {
-                catalog.visibleEntries.groupBy { it.categoryId }
-            }
-            for (category in catalog.categories) {
-                val categoryEntries = entriesByCategory[category.categoryId].orEmpty()
-                if (categoryEntries.isEmpty()) continue
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+@Composable
+private fun GameCatalogContent(
+    catalog: GameCatalog,
+    startingAppId: Int?,
+    error: String?,
+    onStart: (GameCatalogEntry) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 28.dp)
+            .testTag("game_catalog_sheet"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = "Invite your contact to play a game or share an activity right inside the chat.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        val entriesByCategory = remember(catalog) {
+            catalog.visibleEntries.groupBy { it.categoryId }
+        }
+        for (category in catalog.categories) {
+            val categoryEntries = entriesByCategory[category.categoryId].orEmpty()
+            if (categoryEntries.isEmpty()) continue
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (category.description.isNotBlank()) {
                     Text(
-                        text = category.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        text = category.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (category.description.isNotBlank()) {
-                        Text(
-                            text = category.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    for (entry in categoryEntries) {
-                        val isStarting = startingAppId == entry.appId
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                }
+                for (entry in categoryEntries) {
+                    val isStarting = startingAppId == entry.appId
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable(enabled = startingAppId == null) { onStart(entry) }
+                            .testTag("game_catalog_entry_${entry.appId}"),
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .clickable(enabled = startingAppId == null) {
-                                    scope.launch {
-                                        startingAppId = entry.appId
-                                        error = null
-                                        try {
-                                            val result = onStartGame?.invoke(entry)
-                                                ?: context.gameRepository().startGame(contactId, entry)
-                                            error = result.exceptionOrNull()?.message
-                                            if (result.isSuccess) {
-                                                onDismiss()
-                                            }
-                                        } finally {
-                                            startingAppId = null
-                                        }
-                                    }
-                                }
-                                .testTag("game_catalog_entry_${entry.appId}"),
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                            GameEntryIcon(entry = entry)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                GameEntryIcon(entry = entry)
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    Text(
+                                        text = entry.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Surface(
+                                        shape = MaterialTheme.shapes.extraSmall,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
                                     ) {
                                         Text(
-                                            text = entry.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Surface(
-                                            shape = MaterialTheme.shapes.extraSmall,
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                        ) {
-                                            Text(
-                                                text = when {
-                                                    entry.appType == 1 -> "Activity"
-                                                    entry.minUsers == 1 && entry.maxUsers == 1 -> "1 Player"
-                                                    entry.minUsers == 1 -> "1–${entry.maxUsers} Players"
-                                                    else -> "${entry.maxUsers} Players"
-                                                },
-                                                style = MaterialTheme.typography.labelSmall,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            )
-                                        }
-                                    }
-                                    if (entry.description.isNotBlank()) {
-                                        Text(
-                                            text = entry.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
+                                            text = when {
+                                                entry.appType == 1 -> "Activity"
+                                                entry.minUsers == 1 && entry.maxUsers == 1 -> "1 Player"
+                                                entry.minUsers == 1 -> "1–${entry.maxUsers} Players"
+                                                else -> "${entry.maxUsers} Players"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         )
                                     }
                                 }
-                                if (isStarting) {
-                                    CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                                if (entry.description.isNotBlank()) {
+                                    Text(
+                                        text = entry.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
+                            }
+                            if (isStarting) {
+                                MsngrCircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -286,7 +372,167 @@ internal fun GameCatalogSheet(
     }
 }
 
-private class GameWebViewController(
+internal const val DEFAULT_NATIVE_GAME_PANE_WIDTH = 500
+internal const val DEFAULT_NATIVE_GAME_PANE_HEIGHT = 500
+internal const val WHITEBOARD_NATIVE_PANE_HEIGHT = 568
+internal const val WORDLE_NATIVE_PANE_HEIGHT = 560
+
+internal fun nativeGamePaneDimensions(entry: GameCatalogEntry): Pair<Int, Int> {
+    val width = entry.width.takeIf { it > 0 }?.coerceAtLeast(DEFAULT_NATIVE_GAME_PANE_WIDTH)
+        ?: DEFAULT_NATIVE_GAME_PANE_WIDTH
+    val minHeight = when (entry.appId) {
+        100000 -> WHITEBOARD_NATIVE_PANE_HEIGHT
+        103000 -> WORDLE_NATIVE_PANE_HEIGHT
+        else -> DEFAULT_NATIVE_GAME_PANE_HEIGHT
+    }
+    val height = entry.height.takeIf { it > 0 }?.coerceAtLeast(minHeight) ?: minHeight
+    return width to height
+}
+
+private const val P4_BASE_CSS = """
+html {
+    background-color: #ffffff;
+    height: 100%;
+}
+body[scroll="no"] {
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+}
+#divCanvas {
+    touch-action: none;
+}
+td > img:only-child {
+    vertical-align: top;
+}
+#myBoard:not(.board), #remoteBoard:not(.board) {
+    width: 210px;
+    height: 210px;
+}
+#myBoard:not(.board) tr, #remoteBoard:not(.board) tr {
+    height: 21px;
+}
+#myBoard:not(.board) td, #remoteBoard:not(.board) td {
+    width: 21px;
+    height: 21px;
+    padding: 0;
+    line-height: 0;
+    background-repeat: no-repeat;
+}
+#myBoard.board, #remoteBoard.board {
+    width: 160px;
+    height: 320px;
+}
+#myBoard.board tr, #remoteBoard.board tr {
+    height: 16px;
+}
+#myBoard.board td, #remoteBoard.board td {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    line-height: 0;
+}
+#divLines {
+    pointer-events: none;
+    width: 450px;
+    height: 450px;
+    overflow: hidden;
+}
+#brushText {
+    margin: 0;
+    top: 58px !important;
+    right: 39px !important;
+    font-size: 11px !important;
+}
+"""
+
+/**
+ * Hosts the game [WebView] at its exact native Windows Live Messenger logical pane dimensions
+ * (e.g. 500x500 CSS pixels) and uniformly scales the rendered surface to fit the container.
+ * Android's [ViewGroup] touch dispatch automatically maps container touches through the child's
+ * inverse scale matrix, preserving 1:1 mouse/touch coordinates inside the game document.
+ */
+internal class NativeGamePaneContainer(context: Context) : FrameLayout(context) {
+    var paneWidthPx: Int = 0
+    var paneHeightPx: Int = 0
+
+    init {
+        setBackgroundColor(AndroidColor.WHITE)
+        clipChildren = true
+        clipToPadding = true
+    }
+
+    fun updatePaneSize(widthPx: Int, heightPx: Int) {
+        if (paneWidthPx != widthPx || paneHeightPx != heightPx) {
+            paneWidthPx = widthPx
+            paneHeightPx = heightPx
+            requestLayout()
+        }
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val containerW = MeasureSpec.getSize(widthMeasureSpec)
+        val containerH = MeasureSpec.getSize(heightMeasureSpec)
+        setMeasuredDimension(containerW, containerH)
+        val targetW = if (paneWidthPx > 0) paneWidthPx else containerW
+        val targetH = if (paneHeightPx > 0) paneHeightPx else containerH
+        val childWSpec = MeasureSpec.makeMeasureSpec(targetW, MeasureSpec.EXACTLY)
+        val childHSpec = MeasureSpec.makeMeasureSpec(targetH, MeasureSpec.EXACTLY)
+        for (index in 0 until childCount) {
+            getChildAt(index).measure(childWSpec, childHSpec)
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        val containerW = right - left
+        val containerH = bottom - top
+        val targetW = if (paneWidthPx > 0) paneWidthPx else containerW
+        val targetH = if (paneHeightPx > 0) paneHeightPx else containerH
+        val sx = if (targetW > 0 && containerW > 0) containerW.toFloat() / targetW.toFloat() else 1f
+        val sy = if (targetH > 0 && containerH > 0) containerH.toFloat() / targetH.toFloat() else 1f
+        for (index in 0 until childCount) {
+            val child = getChildAt(index)
+            child.pivotX = 0f
+            child.pivotY = 0f
+            child.scaleX = sx
+            child.scaleY = sy
+            child.layout(0, 0, targetW, targetH)
+        }
+    }
+}
+
+internal sealed class GameJsDialogKind {
+    data object Alert : GameJsDialogKind()
+    data object Confirm : GameJsDialogKind()
+    data class Prompt(val defaultValue: String) : GameJsDialogKind()
+}
+
+internal class GameJsDialogRequest(
+    val id: Long,
+    val kind: GameJsDialogKind,
+    val message: String,
+    private val onConfirm: (String?) -> Unit,
+    private val onCancel: () -> Unit,
+) {
+    private val settled = AtomicBoolean(false)
+
+    val isSettled: Boolean
+        get() = settled.get()
+
+    fun confirm(promptValue: String? = null) {
+        if (settled.compareAndSet(false, true)) {
+            onConfirm(promptValue)
+        }
+    }
+
+    fun cancel() {
+        if (settled.compareAndSet(false, true)) {
+            onCancel()
+        }
+    }
+}
+
+internal class GameWebViewController(
     context: Context,
     val sessionId: String,
     val entry: GameCatalogEntry,
@@ -302,11 +548,78 @@ private class GameWebViewController(
     private val onOpenHelpUrl: (String) -> Unit,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    val paneDimensions: Pair<Int, Int> = nativeGamePaneDimensions(entry)
+    val paneWidth: Int get() = paneDimensions.first
+    val paneHeight: Int get() = paneDimensions.second
     var pageFinished by mutableStateOf(false)
+        private set
+    private var nextJsDialogId: Long = 1L
+    private val jsDialogQueue = ArrayDeque<GameJsDialogRequest>()
+    var activeJsDialog by mutableStateOf<GameJsDialogRequest?>(null)
         private set
     var lastDeliveredSequence: Long = 0L
     var remoteLoadedDispatched: Boolean = false
     var remoteClosedDispatched: Boolean = false
+
+    internal fun enqueueJsDialog(
+        kind: GameJsDialogKind,
+        message: String,
+        onConfirm: (String?) -> Unit,
+        onCancel: () -> Unit,
+    ) {
+        val id = nextJsDialogId++
+        fun advance() {
+            if (activeJsDialog?.id == id) {
+                activeJsDialog = jsDialogQueue.removeFirstOrNull()
+            } else {
+                jsDialogQueue.removeAll { it.id == id }
+            }
+        }
+        val request = GameJsDialogRequest(
+            id = id,
+            kind = kind,
+            message = message,
+            onConfirm = { value ->
+                try {
+                    onConfirm(value)
+                } finally {
+                    advance()
+                }
+            },
+            onCancel = {
+                try {
+                    onCancel()
+                } finally {
+                    advance()
+                }
+            },
+        )
+        if (activeJsDialog == null) {
+            activeJsDialog = request
+        } else {
+            jsDialogQueue.addLast(request)
+        }
+    }
+
+    fun dismissInteractiveJsDialogs() {
+        val remaining = jsDialogQueue.filter { it.kind is GameJsDialogKind.Alert }
+        val toCancel = jsDialogQueue.filter { it.kind !is GameJsDialogKind.Alert }
+        jsDialogQueue.clear()
+        jsDialogQueue.addAll(remaining)
+        toCancel.forEach { it.cancel() }
+        val current = activeJsDialog
+        if (current != null && current.kind !is GameJsDialogKind.Alert) {
+            current.cancel()
+        }
+    }
+
+    fun dismissAllJsDialogs() {
+        val pending = jsDialogQueue.toList()
+        jsDialogQueue.clear()
+        pending.forEach { it.cancel() }
+        activeJsDialog?.cancel()
+        activeJsDialog = null
+    }
 
     private val bridgeScript: String = buildP4PolyfillScript(
         isInviter = isInviter,
@@ -314,16 +627,16 @@ private class GameWebViewController(
         localEmail = localEmail,
         peerName = peerName,
         peerEmail = peerEmail,
-        targetWidth = entry.width.coerceAtLeast(320),
+        targetWidth = paneWidth,
     )
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     val webView: WebView = WebView(context.applicationContext).apply {
-        layoutParams = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-        )
-        setBackgroundColor(AndroidColor.TRANSPARENT)
+        val density = resources.displayMetrics.density.coerceAtLeast(1f)
+        val initialWidthPx = (paneWidth * density).roundToInt()
+        val initialHeightPx = (paneHeight * density).roundToInt()
+        layoutParams = FrameLayout.LayoutParams(initialWidthPx, initialHeightPx)
+        setBackgroundColor(AndroidColor.WHITE)
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -337,6 +650,11 @@ private class GameWebViewController(
             mediaPlaybackRequiresUserGesture = false
             userAgentString = "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0; MSNMSGR 14.0.8117.0416)"
         }
+        measure(
+            View.MeasureSpec.makeMeasureSpec(initialWidthPx, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(initialHeightPx, View.MeasureSpec.EXACTLY),
+        )
+        layout(0, 0, initialWidthPx, initialHeightPx)
         setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN,
@@ -396,6 +714,66 @@ private class GameWebViewController(
                 pageFinished = true
             }
         }
+        webChromeClient = object : WebChromeClient() {
+            override fun onJsAlert(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: JsResult?,
+            ): Boolean {
+                if (result == null) return false
+                enqueueJsDialog(
+                    kind = GameJsDialogKind.Alert,
+                    message = message.orEmpty(),
+                    onConfirm = { result.confirm() },
+                    onCancel = { result.cancel() },
+                )
+                return true
+            }
+
+            override fun onJsConfirm(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: JsResult?,
+            ): Boolean {
+                if (result == null) return false
+                enqueueJsDialog(
+                    kind = GameJsDialogKind.Confirm,
+                    message = message.orEmpty(),
+                    onConfirm = { result.confirm() },
+                    onCancel = { result.cancel() },
+                )
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                defaultValue: String?,
+                result: JsPromptResult?,
+            ): Boolean {
+                if (result == null) return false
+                enqueueJsDialog(
+                    kind = GameJsDialogKind.Prompt(defaultValue.orEmpty()),
+                    message = message.orEmpty(),
+                    onConfirm = { value -> result.confirm(value.orEmpty()) },
+                    onCancel = { result.cancel() },
+                )
+                return true
+            }
+
+            override fun onJsBeforeUnload(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: JsResult?,
+            ): Boolean {
+                result?.confirm()
+                return true
+            }
+        }
         loadUrl(MsnpGameCatalogService.upgradeKnownHttpsUrl(entry.url))
     }
 
@@ -440,8 +818,7 @@ private class GameWebViewController(
                 Object.defineProperty(ev, 'keyCode', { get: function() { return $keyCode; } });
                 Object.defineProperty(ev, 'which', { get: function() { return $keyCode; } });
                 window.event = ev;
-                document.dispatchEvent(ev);
-                if (document.body) document.body.dispatchEvent(ev);
+                (document.body || document).dispatchEvent(ev);
             })();
             """.trimIndent(),
             null,
@@ -449,29 +826,32 @@ private class GameWebViewController(
     }
 
     fun destroy() {
+        dismissAllJsDialogs()
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
     }
 
     private inner class BridgeInterface {
+        // These JavaScript API names also name controller callbacks; qualify the
+        // receiver so the posted work does not recursively call the bridge.
         @JavascriptInterface
         fun onInitialize() {
-            mainHandler.post { onInitialize() }
+            mainHandler.post { this@GameWebViewController.onInitialize() }
         }
 
         @JavascriptInterface
         fun onSendData(payload: String) {
-            mainHandler.post { onSendData(payload) }
+            mainHandler.post { this@GameWebViewController.onSendData(payload) }
         }
 
         @JavascriptInterface
         fun onSendImAsUser(message: String) {
-            mainHandler.post { onSendImAsUser(message) }
+            mainHandler.post { this@GameWebViewController.onSendImAsUser(message) }
         }
 
         @JavascriptInterface
         fun onCloseApp() {
-            mainHandler.post { onCloseApp() }
+            mainHandler.post { this@GameWebViewController.onCloseApp() }
         }
 
         @JavascriptInterface
@@ -481,6 +861,69 @@ private class GameWebViewController(
             }
         }
     }
+}
+
+private val scriptBlockRegex = Regex("""<script\b[^>]*>[\s\S]*?</script>""", RegexOption.IGNORE_CASE)
+private val htmlStartTagRegex = Regex("""<[A-Za-z][A-Za-z0-9:-]*\b[^>]*>""")
+private val styleAttrRegex = Regex("""\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')""", RegexOption.IGNORE_CASE)
+private val ieCenterExpressionRegex = Regex(
+    """left\s*:\s*expression\([^)]*\)\s*;\s*top\s*:\s*expression\([^)]*\)""",
+    RegexOption.IGNORE_CASE,
+)
+
+/**
+ * Normalizes legacy IE7 HTML/CSS constructs used by Escargot and Mess.be games so they render
+ * identically in Chromium:
+ * - Merges duplicate `style="..."` attributes on a single HTML start tag (used on `<body>` by
+ *   `battleships.htm`, `yahtzee.htm`, and `backgammon.htm`, where Chromium otherwise drops the
+ *   second `style="background-color:#516CA1"` attribute).
+ * - Replaces legacy IE CSS `expression(...)` centering on `#pnlGameover` / `#pnlPromote` with
+ *   standard CSS percentage/transform centering.
+ */
+internal fun normalizeLegacyGameHtml(html: String): String {
+    val result = StringBuilder(html.length + 64)
+    var cursor = 0
+    for (scriptMatch in scriptBlockRegex.findAll(html)) {
+        if (scriptMatch.range.first > cursor) {
+            result.append(normalizeNonScriptHtmlChunk(html.substring(cursor, scriptMatch.range.first)))
+        }
+        result.append(scriptMatch.value)
+        cursor = scriptMatch.range.last + 1
+    }
+    if (cursor < html.length) {
+        result.append(normalizeNonScriptHtmlChunk(html.substring(cursor)))
+    }
+    return result.toString()
+}
+
+private fun normalizeNonScriptHtmlChunk(chunk: String): String {
+    val mergedTags = htmlStartTagRegex.replace(chunk) { tagMatch ->
+        val tag = tagMatch.value
+        val styleMatches = styleAttrRegex.findAll(tag).toList()
+        if (styleMatches.size < 2) {
+            tag
+        } else {
+            val combinedStyle = styleMatches
+                .map { (it.groups[1]?.value ?: it.groups[2]?.value).orEmpty().trim().trimEnd(';') }
+                .filter { it.isNotEmpty() }
+                .joinToString(";")
+            val sb = StringBuilder(tag.length)
+            var lastIndex = 0
+            styleMatches.forEachIndexed { index, match ->
+                sb.append(tag, lastIndex, match.range.first)
+                if (index == 0) {
+                    sb.append("style=\"").append(combinedStyle).append('"')
+                }
+                lastIndex = match.range.last + 1
+            }
+            sb.append(tag, lastIndex, tag.length)
+            sb.toString()
+        }
+    }
+    return ieCenterExpressionRegex.replace(
+        mergedTags,
+        "left:50%;top:50%;transform:translate(-50%,-100%)",
+    )
 }
 
 private fun fetchAndInjectHtml(url: String, script: String): WebResourceResponse {
@@ -493,8 +936,8 @@ private fun fetchAndInjectHtml(url: String, script: String): WebResourceResponse
     }
     try {
         val bytes = connection.inputStream.use { it.readBytes() }
-        val html = String(bytes, StandardCharsets.UTF_8)
-        val injection = "<script>$script</script>"
+        val html = normalizeLegacyGameHtml(String(bytes, StandardCharsets.UTF_8))
+        val injection = "<style id=\"__p4_base_style\">$P4_BASE_CSS</style><script>$script</script>"
         val headRegex = Regex("<head[^>]*>", RegexOption.IGNORE_CASE)
         val match = headRegex.find(html)
         val modified = if (match != null) {
@@ -553,11 +996,30 @@ internal fun buildP4PolyfillScript(
     val safePeerName = JSONObject.quote(peerName.ifBlank { peerEmail.substringBefore('@') })
     val safePeerEmail = JSONObject.quote(peerEmail)
     val inviterLiteral = if (isInviter) "true" else "false"
+    val baseCssLiteral = JSONObject.quote(P4_BASE_CSS)
 
     return """
 (function() {
     if (window.__p4PolyfillInstalled) return;
     window.__p4PolyfillInstalled = true;
+    window.__p4TargetWidth = $targetWidth;
+    if (typeof window.Line === 'undefined') {
+        window.Line = '';
+    }
+
+    var ensureBaseStyle = function() {
+        try {
+            if (document.getElementById('__p4_base_style')) return;
+            var root = document.head || document.documentElement;
+            if (!root) return;
+            var styleEl = document.createElement('style');
+            styleEl.id = '__p4_base_style';
+            styleEl.textContent = $baseCssLiteral;
+            root.insertBefore(styleEl, root.firstChild);
+        } catch (e) {}
+    };
+    ensureBaseStyle();
+    window.addEventListener('DOMContentLoaded', ensureBaseStyle);
 
     try {
         if (!navigator.browserLanguage) {
@@ -572,6 +1034,17 @@ internal fun buildP4PolyfillScript(
         if (typeof HTMLTableElement !== 'undefined' && !('cells' in HTMLTableElement.prototype)) {
             Object.defineProperty(HTMLTableElement.prototype, 'cells', {
                 get: function() { return this.querySelectorAll('td, th'); },
+                configurable: true
+            });
+        }
+        if (typeof HTMLTableRowElement !== 'undefined' && !('height' in HTMLTableRowElement.prototype)) {
+            Object.defineProperty(HTMLTableRowElement.prototype, 'height', {
+                get: function() { return this.getAttribute('height') || ''; },
+                set: function(val) {
+                    var s = String(val);
+                    this.setAttribute('height', s);
+                    this.style.height = /^\d+$/.test(s) ? (s + 'px') : s;
+                },
                 configurable: true
             });
         }
@@ -695,6 +1168,7 @@ internal fun buildP4PolyfillScript(
             var stroke = el.__p4StrokeColor || el.getAttribute('strokecolor') || '#000000';
             var weight = el.__p4StrokeWeight || el.getAttribute('strokeweight') || '3px';
             var sw = parseFloat(String(weight)) || 3;
+            el.style.pointerEvents = 'none';
             var svg = el.querySelector('svg.__p4VmlSvg');
             if (!svg) {
                 svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -719,7 +1193,7 @@ internal fun buildP4PolyfillScript(
             if (p) {
                 p.setAttribute('d', d);
                 p.setAttribute('stroke', stroke);
-                p.setAttribute('stroke-width', String(sw * 2));
+                p.setAttribute('stroke-width', String(sw));
             }
         };
         Object.defineProperty(HTMLElement.prototype, 'path', {
@@ -884,31 +1358,13 @@ internal fun buildP4PolyfillScript(
         }
     };
 
-    var applyResponsiveScale = function() {
-        if (!document.body) return;
-        var vw = window.innerWidth || document.documentElement.clientWidth || $targetWidth;
-        var targetW = $targetWidth;
-        if (vw > 0 && targetW > 0 && vw < targetW) {
-            var scale = vw / targetW;
-            document.documentElement.style.overflowX = 'hidden';
-            document.body.style.transformOrigin = 'top left';
-            document.body.style.transform = 'scale(' + scale.toFixed(4) + ')';
-            document.body.style.width = targetW + 'px';
-        } else {
-            document.body.style.transform = '';
-            document.body.style.width = '';
-        }
-    };
-    window.addEventListener('DOMContentLoaded', applyResponsiveScale);
-    window.addEventListener('load', applyResponsiveScale);
-    window.addEventListener('resize', applyResponsiveScale);
-
-    var touchToMouse = function(type, touchEvent) {
+    var touchToMouse = function(type, touchEvent, buttonOverride) {
         var t = (touchEvent.touches && touchEvent.touches[0]) ||
                 (touchEvent.changedTouches && touchEvent.changedTouches[0]);
         if (!t) return;
         var target = document.elementFromPoint(t.clientX, t.clientY) || touchEvent.target;
         if (!target) return;
+        var btn = (typeof buttonOverride === 'number') ? buttonOverride : (type === 'mouseup' ? 0 : 1);
         var mouseEv = new MouseEvent(type, {
             bubbles: true,
             cancelable: true,
@@ -918,10 +1374,10 @@ internal fun buildP4PolyfillScript(
             screenX: t.screenX,
             screenY: t.screenY,
             button: 0,
-            buttons: type === 'mouseup' ? 0 : 1
+            buttons: btn
         });
         try {
-            Object.defineProperty(mouseEv, 'button', { get: function() { return type === 'mouseup' ? 0 : 1; } });
+            Object.defineProperty(mouseEv, 'button', { get: function() { return btn; } });
             Object.defineProperty(mouseEv, 'offsetX', {
                 get: function() {
                     var r = target.getBoundingClientRect();
@@ -942,17 +1398,23 @@ internal fun buildP4PolyfillScript(
     };
     document.addEventListener('touchstart', function(e) {
         if (document.getElementById('divCanvas') || document.getElementById('red1')) {
-            touchToMouse('mousedown', e);
+            touchToMouse('mousedown', e, 1);
+            if (document.getElementById('divCanvas')) {
+                touchToMouse('mousemove', e, 1);
+            }
         }
     }, { passive: true });
     document.addEventListener('touchmove', function(e) {
         if (document.getElementById('divCanvas') || document.getElementById('red1')) {
-            touchToMouse('mousemove', e);
+            touchToMouse('mousemove', e, 1);
         }
     }, { passive: true });
     document.addEventListener('touchend', function(e) {
         if (document.getElementById('divCanvas') || document.getElementById('red1')) {
-            touchToMouse('mouseup', e);
+            if (document.getElementById('divCanvas')) {
+                touchToMouse('mousemove', e, 0);
+            }
+            touchToMouse('mouseup', e, 0);
         }
     }, { passive: true });
 })();
@@ -1074,6 +1536,21 @@ internal fun GameHost(
         }
     }
 
+    LaunchedEffect(session.status) {
+        if (session.status != GameSessionStatus.Active) {
+            controller.dismissInteractiveJsDialogs()
+        }
+    }
+
+    // Surface the full-screen game dialog when a running game requests user confirmation/alert
+    // while minimized into the corner button (for example, a peer requesting a game restart).
+    LaunchedEffect(controller.activeJsDialog?.id) {
+        if (controller.activeJsDialog != null && ongoing) {
+            visible = true
+            closed = false
+        }
+    }
+
     val unreadMoves = remember(visible, session.receivedPackets, lastSeenPacketSeq) {
         if (visible) 0 else session.receivedPackets.count { it.sequence > lastSeenPacketSeq }
     }
@@ -1084,6 +1561,7 @@ internal fun GameHost(
         if (!ongoing) closed = true
     }
     val stop: () -> Unit = {
+        controller.dismissAllJsDialogs()
         scope.launch {
             error = (onStop?.invoke() ?: context.gameRepository().stopGame(contactId, session.id))
                 .exceptionOrNull()?.message
@@ -1123,7 +1601,7 @@ internal fun GameHost(
         ) {
             BadgedBox(
                 badge = {
-                    if (hasPendingInvite) {
+                    if (hasPendingInvite || controller.activeJsDialog != null) {
                         Badge { Text("!") }
                     } else if (unreadMoves > 0) {
                         Badge { Text(unreadMoves.toString()) }
@@ -1140,197 +1618,269 @@ internal fun GameHost(
 
     if (!visible) return
 
-    ModalBottomSheet(
+    val currentMinimize by rememberUpdatedState(minimize)
+    val backProgress = remember { Animatable(0f) }
+    val statusSubtitle = when (session.status) {
+        GameSessionStatus.Invited -> if (session.outgoing) {
+            "Waiting for $peerDisplayName to accept\u2026"
+        } else {
+            "$peerDisplayName invited you"
+        }
+        GameSessionStatus.Active -> if (session.remoteAppLoaded) {
+            "With $peerDisplayName"
+        } else {
+            "Loading $peerDisplayName's game\u2026"
+        }
+        GameSessionStatus.Declined -> "Invitation declined"
+        GameSessionStatus.Stopped -> if (session.remoteStopped) {
+            "$peerDisplayName left the game"
+        } else {
+            "Game ended"
+        }
+        GameSessionStatus.Failed -> session.error ?: "Game failed"
+    }
+
+    Dialog(
         onDismissRequest = minimize,
-        sheetGesturesEnabled = session.status == GameSessionStatus.Invited,
-        sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
         ),
     ) {
-        Column(
+        PredictiveBackHandler(enabled = controller.activeJsDialog == null && helpUrl == null) { events ->
+            try {
+                events.collect { backProgress.snapTo(it.progress) }
+                currentMinimize()
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) { backProgress.animateTo(0f) }
+                throw cancelled
+            }
+        }
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 20.dp)
-                .testTag("game_session_sheet"),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .fillMaxSize()
+                .graphicsLayer {
+                    val progress = backProgress.value
+                    val scale = 1f - 0.1f * progress
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - 0.2f * progress
+                    shape = RoundedCornerShape((28 * progress).dp)
+                    clip = progress > 0f
+                },
+            color = MaterialTheme.colorScheme.surface,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                GameEntryIcon(entry = session.entry, modifier = Modifier.size(36.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = session.appName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = when (session.status) {
-                            GameSessionStatus.Invited -> if (session.outgoing) {
-                                "Waiting for $peerDisplayName to accept…"
-                            } else {
-                                "$peerDisplayName invited you"
+            Scaffold(
+                modifier = Modifier.fillMaxSize().testTag("game_session_dialog"),
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(
+                                onClick = minimize,
+                                modifier = Modifier.testTag("minimize_game_session"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Minimize",
+                                )
                             }
-                            GameSessionStatus.Active -> if (session.remoteAppLoaded) {
-                                "With $peerDisplayName"
-                            } else {
-                                "Loading $peerDisplayName's game…"
-                            }
-                            GameSessionStatus.Declined -> "Invitation declined"
-                            GameSessionStatus.Stopped -> if (session.remoteStopped) {
-                                "$peerDisplayName left the game"
-                            } else {
-                                "Game ended"
-                            }
-                            GameSessionStatus.Failed -> session.error ?: "Game failed"
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        title = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                GameEntryIcon(entry = session.entry, modifier = Modifier.size(36.dp))
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    Text(
+                                        text = session.appName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = statusSubtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            if (ongoing && !hasPendingInvite) {
+                                TextButton(
+                                    onClick = stop,
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                    modifier = Modifier.testTag("stop_game_session"),
+                                ) {
+                                    Text(
+                                        if (session.status == GameSessionStatus.Invited) "Cancel" else "End",
+                                    )
+                                }
+                            } else if (!ongoing) {
+                                TextButton(
+                                    onClick = { visible = false; closed = true },
+                                    modifier = Modifier.testTag("close_game_session"),
+                                ) {
+                                    Text("Close")
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     )
-                }
-                OutlinedButton(
-                    shapes = ButtonDefaults.shapes(),
-                    onClick = minimize,
-                    modifier = Modifier.testTag("minimize_game_session"),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                },
+            ) { padding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 20.dp)
+                        .testTag("game_session_sheet"),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text("Minimize")
-                }
-                if (ongoing) {
-                    DestructiveOutlinedButton(
-                        onClick = stop,
-                        modifier = Modifier.testTag("stop_game_session"),
-                    ) {
+                    error?.let {
                         Text(
-                            when {
-                                session.status == GameSessionStatus.Invited && session.outgoing -> "Cancel"
-                                session.status == GameSessionStatus.Invited -> "Decline"
-                                else -> "End"
-                            },
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                } else {
-                    OutlinedButton(
-                        shapes = ButtonDefaults.shapes(),
-                        onClick = { visible = false; closed = true },
-                    ) {
-                        Text("Close")
-                    }
-                }
-            }
 
-            error?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-
-            when (session.status) {
-                GameSessionStatus.Invited -> {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text(
-                                text = if (session.outgoing) {
-                                    "Your invitation to play ${session.appName} has been sent. You can minimize this panel into the corner button and keep chatting while you wait."
-                                } else {
-                                    "$peerDisplayName wants to start ${session.appName} with you."
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            if (!session.outgoing) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        shapes = ButtonDefaults.shapes(),
-                                        modifier = Modifier.testTag("accept_game_session"),
-                                        onClick = {
-                                            scope.launch {
-                                                error = (onAccept?.invoke()
-                                                    ?: context.gameRepository().acceptGame(contactId, session.id))
-                                                    .exceptionOrNull()?.message
-                                            }
+                    when (session.status) {
+                        GameSessionStatus.Invited -> {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Text(
+                                        text = if (session.outgoing) {
+                                            "Your invitation to play ${session.appName} has been sent. You can minimize this panel into the corner button and keep chatting while you wait."
+                                        } else {
+                                            "$peerDisplayName wants to start ${session.appName} with you."
                                         },
-                                    ) {
-                                        Text("Accept & play")
-                                    }
-                                    DestructiveOutlinedButton(onClick = stop) {
-                                        Text("Decline")
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    if (!session.outgoing) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Button(
+                                                shapes = ButtonDefaults.shapes(),
+                                                modifier = Modifier.testTag("accept_game_session"),
+                                                onClick = {
+                                                    scope.launch {
+                                                        error = (onAccept?.invoke()
+                                                            ?: context.gameRepository().acceptGame(contactId, session.id))
+                                                            .exceptionOrNull()?.message
+                                                    }
+                                                },
+                                            ) {
+                                                Text("Accept & play")
+                                            }
+                                            DestructiveOutlinedButton(
+                                                onClick = stop,
+                                                modifier = Modifier.testTag("stop_game_session"),
+                                            ) {
+                                                Text("Decline")
+                                            }
+                                        }
+                                    } else {
+                                        MsngrLinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
                                     }
                                 }
-                            } else {
-                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+
+                        GameSessionStatus.Active,
+                        GameSessionStatus.Stopped,
+                        GameSessionStatus.Declined,
+                        GameSessionStatus.Failed -> {
+                            val paneWidthDp = controller.paneWidth.dp
+                            val paneHeightDp = controller.paneHeight.dp
+                            BoxWithConstraints(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                val fitScale = minOf(
+                                    maxWidth / paneWidthDp,
+                                    maxHeight / paneHeightDp,
+                                ).coerceAtLeast(0.1f)
+                                val scaledWidth = paneWidthDp * fitScale
+                                val scaledHeight = paneHeightDp * fitScale
+                                val paneShape = RoundedCornerShape(4.dp)
+                                Surface(
+                                    shape = paneShape,
+                                    color = Color.White,
+                                    contentColor = Color.Black,
+                                    tonalElevation = 0.dp,
+                                    shadowElevation = 1.dp,
+                                    modifier = Modifier
+                                        .size(width = scaledWidth, height = scaledHeight)
+                                        .clip(paneShape)
+                                        .testTag("game_webview_container"),
+                                ) {
+                                    AndroidView(
+                                        modifier = Modifier.fillMaxSize(),
+                                        factory = { ctx ->
+                                            val density = ctx.resources.displayMetrics.density.coerceAtLeast(1f)
+                                            NativeGamePaneContainer(ctx).apply {
+                                                updatePaneSize(
+                                                    widthPx = (controller.paneWidth * density).roundToInt(),
+                                                    heightPx = (controller.paneHeight * density).roundToInt(),
+                                                )
+                                                (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
+                                                addView(controller.webView)
+                                            }
+                                        },
+                                        update = { container ->
+                                            val density = container.resources.displayMetrics.density.coerceAtLeast(1f)
+                                            container.updatePaneSize(
+                                                widthPx = (controller.paneWidth * density).roundToInt(),
+                                                heightPx = (controller.paneHeight * density).roundToInt(),
+                                            )
+                                            if (controller.webView.parent !== container) {
+                                                (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
+                                                container.addView(controller.webView)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+
+                            if (session.appId == 103000 && session.status == GameSessionStatus.Active) {
+                                WordleTouchKeyboard(
+                                    onLetter = { ch -> controller.sendKey("keyup", ch.code, ch.toString()) },
+                                    onBackspace = { controller.sendKey("keyup", 8, "Backspace") },
+                                    onEnter = { controller.sendKey("keyup", 13, "Enter") },
+                                )
+                            } else if (session.appId == 102007 && session.status == GameSessionStatus.Active) {
+                                TetrisTouchControls(
+                                    onKey = { code, name -> controller.sendKey("keydown", code, name) },
+                                )
                             }
                         }
                     }
                 }
-
-                GameSessionStatus.Active,
-                GameSessionStatus.Stopped,
-                GameSessionStatus.Declined,
-                GameSessionStatus.Failed -> {
-                    val webViewHeight = remember(session.entry.height) {
-                        session.entry.height.coerceIn(360, 520).dp
-                    }
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        tonalElevation = 1.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(webViewHeight)
-                            .clip(MaterialTheme.shapes.medium)
-                            .testTag("game_webview_container"),
-                    ) {
-                        AndroidView(
-                            modifier = Modifier.fillMaxSize(),
-                            factory = { ctx ->
-                                FrameLayout(ctx).apply {
-                                    (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
-                                    addView(controller.webView)
-                                }
-                            },
-                            update = { container ->
-                                if (controller.webView.parent !== container) {
-                                    (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
-                                    container.addView(controller.webView)
-                                }
-                            },
-                        )
-                    }
-
-                    if (session.appId == 103000 && session.status == GameSessionStatus.Active) {
-                        WordleTouchKeyboard(
-                            onLetter = { ch -> controller.sendKey("keyup", ch.code, ch.toString()) },
-                            onBackspace = { controller.sendKey("keyup", 8, "Backspace") },
-                            onEnter = { controller.sendKey("keyup", 13, "Enter") },
-                        )
-                    } else if (session.appId == 102007 && session.status == GameSessionStatus.Active) {
-                        TetrisTouchControls(
-                            onKey = { code, name -> controller.sendKey("keydown", code, name) },
-                        )
-                    }
-                }
             }
         }
+    }
+
+    controller.activeJsDialog?.let { jsDialog ->
+        GameJsDialog(
+            appName = session.appName,
+            dialog = jsDialog,
+        )
     }
 
     helpUrl?.let { targetHelpUrl ->
@@ -1342,12 +1892,14 @@ internal fun GameHost(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(340.dp)
-                        .clip(MaterialTheme.shapes.small),
+                        .clip(MaterialTheme.shapes.small)
+                        .background(Color.White),
                 ) {
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
                             WebView(ctx).apply {
+                                setBackgroundColor(AndroidColor.WHITE)
                                 settings.loadsImagesAutomatically = true
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(
@@ -1368,6 +1920,90 @@ internal fun GameHost(
             },
         )
     }
+}
+
+@Composable
+private fun GameJsDialog(
+    appName: String,
+    dialog: GameJsDialogRequest,
+) {
+    var promptText by remember(dialog.id) {
+        mutableStateOf((dialog.kind as? GameJsDialogKind.Prompt)?.defaultValue.orEmpty())
+    }
+    AlertDialog(
+        modifier = Modifier.testTag("game_js_dialog"),
+        onDismissRequest = {
+            when (dialog.kind) {
+                GameJsDialogKind.Alert -> dialog.confirm()
+                GameJsDialogKind.Confirm,
+                is GameJsDialogKind.Prompt -> dialog.cancel()
+            }
+        },
+        title = { Text(appName) },
+        text = {
+            when (dialog.kind) {
+                GameJsDialogKind.Alert,
+                GameJsDialogKind.Confirm -> Text(dialog.message)
+                is GameJsDialogKind.Prompt -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (dialog.message.isNotBlank()) {
+                            Text(dialog.message)
+                        }
+                        OutlinedTextField(
+                            value = promptText,
+                            onValueChange = { promptText = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("game_js_prompt_input"),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (dialog.kind) {
+                GameJsDialogKind.Alert -> {
+                    TextButton(
+                        onClick = { dialog.confirm() },
+                        modifier = Modifier.testTag("game_js_dialog_confirm"),
+                    ) {
+                        Text("OK")
+                    }
+                }
+                GameJsDialogKind.Confirm -> {
+                    Button(
+                        shapes = ButtonDefaults.shapes(),
+                        onClick = { dialog.confirm() },
+                        modifier = Modifier.testTag("game_js_dialog_confirm"),
+                    ) {
+                        Text("OK")
+                    }
+                }
+                is GameJsDialogKind.Prompt -> {
+                    Button(
+                        shapes = ButtonDefaults.shapes(),
+                        onClick = { dialog.confirm(promptText) },
+                        modifier = Modifier.testTag("game_js_dialog_confirm"),
+                    ) {
+                        Text("OK")
+                    }
+                }
+            }
+        },
+        dismissButton = when (dialog.kind) {
+            GameJsDialogKind.Alert -> null
+            GameJsDialogKind.Confirm,
+            is GameJsDialogKind.Prompt -> {
+                {
+                    TextButton(
+                        onClick = { dialog.cancel() },
+                        modifier = Modifier.testTag("game_js_dialog_dismiss"),
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable
