@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +39,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.DisplayPictureConflict
 import org.aralozkaya.msngr.DisplayPictureSyncState
 import org.aralozkaya.msngr.SessionPrefs
@@ -99,8 +99,8 @@ internal fun DisplayPictureConflictDialog(
                         modifier = Modifier.weight(1f).testTag("use-incoming-picture")) { Text("Use incoming") }
                 }
                 if (state.busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularWavyProgressIndicator(Modifier.size(20.dp))
-                    Text("Updating display picture…", style = MaterialTheme.typography.bodySmall)
+                    MsngrCircularWavyProgressIndicator(Modifier.size(20.dp))
+                    Text("Updating display picture\u2026", style = MaterialTheme.typography.bodySmall)
                 }
                 state.error?.let { message -> Text(message, color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("picture-sync-error")) }
@@ -121,7 +121,7 @@ private fun ComparisonPicture(title: String, subtitle: String, uri: String?, mod
             modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
             Box(contentAlignment = Alignment.Center) {
                 image.painter?.let { Image(it, contentDescription = title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
-                    ?: if (image.isLoading) CircularWavyProgressIndicator(Modifier.size(24.dp))
+                    ?: if (image.isLoading) MsngrCircularWavyProgressIndicator(Modifier.size(24.dp))
                     else Icon(Icons.Default.Person, contentDescription = "No display picture", modifier = Modifier.size(48.dp))
             }
         }

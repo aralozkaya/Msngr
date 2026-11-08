@@ -21,9 +21,12 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import kotlinx.coroutines.delay
 import org.aralozkaya.msngr.LoginActivity
+import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.cachedAvatarBitmap
+import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.loadAvatarBitmap
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.shortcutAvatarBitmap
@@ -34,13 +37,18 @@ import java.util.concurrent.atomic.AtomicLong
 internal class MsngrNotificationManager(
     private val context: Context,
     private val isForeground: () -> Boolean = {
-        (context.applicationContext as? org.aralozkaya.msngr.MsngrApplication)?.visibilityTracker?.isForeground == true
+        (context.applicationContext as? MsngrApplication)?.visibilityTracker?.isForeground == true
     },
 ) {
+    @Volatile private var attachedPresence: (() -> Presence)? = null
     private var requestAccount: String? = null
     private var requestKeys = emptySet<String>()
     private var groupInvitationAccount: String? = null
     private var groupInvitationKeys = emptySet<String>()
+
+    internal fun bindPresence(presenceProvider: (() -> Presence)?) {
+        attachedPresence = presenceProvider
+    }
 
     @Synchronized
     fun syncGroupInvitations(inbox: org.aralozkaya.msngr.data.GroupInvitationInbox) {
@@ -66,6 +74,7 @@ internal class MsngrNotificationManager(
             LoginActivity.createGroupInvitationsNotificationIntent(context, inbox.accountId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         notify(GROUP_INVITATIONS_NOTIFICATION_ID, NotificationCompat.Builder(context, NotificationChannels.GROUP_INVITATIONS)
+            .setSilent(isSilentForGeneralNonChat())
             .setSmallIcon(R.drawable.ic_notification_msngr)
             .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
             .setContentTitle(context.getString(R.string.group_invitations_title)).setContentText(text)
@@ -106,6 +115,7 @@ internal class MsngrNotificationManager(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         notify(CONTACT_REQUESTS_NOTIFICATION_ID,
             NotificationCompat.Builder(context, NotificationChannels.CONTACT_REQUESTS)
+                .setSilent(isSilentForGeneralNonChat())
                 .setSmallIcon(R.drawable.ic_notification_msngr)
                 .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
                 .setContentTitle(title).setContentText(text)
@@ -135,6 +145,7 @@ internal class MsngrNotificationManager(
         notify(
             OFFLINE_MESSAGES_NOTIFICATION_ID,
             NotificationCompat.Builder(context, NotificationChannels.OFFLINE_MESSAGES)
+                .setSilent(isSilentForGeneralNonChat())
                 .setSmallIcon(R.drawable.ic_notification_msngr)
                 .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
                 .setContentTitle(context.getString(R.string.app_name))
@@ -464,15 +475,14 @@ internal class MsngrNotificationManager(
             .setContentText("New message")
             .build()
 
-        val conversationSilent = InAppNotificationPrefs.read(context)
-            .conversations[event.contactId.notificationKey()]?.backgroundSilent == true
         return baseBuilder(
             NotificationChannels.MESSAGES,
             event.contactId,
             event.contactName,
             sender,
+            isChat = true,
+            forceSilent = forceSilent,
         )
-            .setSilent(forceSilent || conversationSilent)
             .setOnlyAlertOnce(onlyAlertOnce)
             .setShortcutInfo(shortcut)
             .setShortcutId(shortcut.id)
@@ -609,8 +619,10 @@ internal class MsngrNotificationManager(
         }
         // MessagingStyle lets Android place the avatar with its app badge in the header.
         // A large icon on a plain notification is rendered as trailing content instead.
+        val isChat = channelId == NotificationChannels.MESSAGES
         return builder
             .setChannelId(channelId)
+            .setSilent(isSilentForConversation(contactId, isChat = isChat))
             .setLargeIcon(null as Bitmap?)
             .addExtras(Bundle().apply { putBoolean(EXTRA_IS_ACTION_STATUS, true) })
             .setStyle(style.addMessage(text, System.currentTimeMillis(), contact))
@@ -660,10 +672,12 @@ internal class MsngrNotificationManager(
         contactId: String,
         contactName: String,
         contact: Person,
+        isChat: Boolean = false,
+        forceSilent: Boolean = false,
     ): NotificationCompat.Builder {
         val shortcutId = conversationShortcutId(contactId)
         return NotificationCompat.Builder(context, channelId)
-            .setSilent(InAppNotificationPrefs.read(context).conversations[contactId.notificationKey()]?.backgroundSilent == true)
+            .setSilent(isSilentForConversation(contactId, isChat = isChat, forceSilent = forceSilent))
             .setSmallIcon(R.drawable.ic_notification_msngr)
             .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
             .setContentIntent(contentIntent(contactId, contactName))
@@ -672,6 +686,23 @@ internal class MsngrNotificationManager(
             .setShortcutId(shortcutId)
             .setLocusId(LocusIdCompat(shortcutId))
             .addPerson(contact)
+    }
+
+    private fun currentPresence(): Presence =
+        attachedPresence?.invoke() ?: resolveOwnPresence(context)
+
+    private fun isSilentForGeneralNonChat(): Boolean =
+        InAppNotificationPrefs.read(context).silencesPush(currentPresence(), isChat = false)
+
+    private fun isSilentForConversation(
+        contactId: String,
+        isChat: Boolean,
+        forceSilent: Boolean = false,
+    ): Boolean {
+        if (forceSilent) return true
+        val settings = InAppNotificationPrefs.read(context)
+        val conversationSilent = settings.conversations[contactId.notificationKey()]?.backgroundSilent == true
+        return conversationSilent || settings.silencesPush(currentPresence(), isChat = isChat)
     }
 
     private fun contactPerson(event: NotificationEvent, contactIcon: IconCompat): Person =
@@ -862,6 +893,25 @@ internal class MsngrNotificationManager(
         private val nextPostSequence = AtomicLong(0L)
         private val recentNotifications = ConcurrentHashMap<Int, Notification>()
         private val conversationIcons = ConcurrentHashMap<String, IconCompat>()
+
+        internal fun resolveOwnPresence(context: Context): Presence {
+            val livePresence = (context.applicationContext as? MsngrApplication)
+                ?.container
+                ?.currentRepository
+                ?.takeIf { it.hasSignedInSession }
+                ?.profile
+                ?.value
+                ?.presence
+            if (livePresence != null) return livePresence
+            return if (SessionPrefs.preferenceAccount(context) != null) {
+                SessionPrefs.readUserProfile(context).presence
+            } else {
+                Presence.Online
+            }
+        }
+
+        internal fun shouldSilenceNonChatNotification(context: Context): Boolean =
+            InAppNotificationPrefs.read(context).silencesPush(resolveOwnPresence(context), isChat = false)
 
         internal fun conversationShortcutId(contactId: String): String =
             "msngr:${UUID.nameUUIDFromBytes(contactId.lowercase().toByteArray())}"

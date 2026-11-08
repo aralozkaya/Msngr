@@ -615,6 +615,7 @@ internal class KeyboardSheetHostState(
             settledOpen = false
             if (target == null) {
                 if (displayed != null) {
+                    if (contentFocused) hideKeyboard()
                     if (hideInstantly) withInstantMotion { sheetState.hide() } else sheetState.hide()
                     displayed = null
                     measuredSheetHeightPx = 0

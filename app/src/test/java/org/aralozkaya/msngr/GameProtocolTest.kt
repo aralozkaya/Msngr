@@ -4,6 +4,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.*
+import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
 import org.aralozkaya.msngr.protocol.MsnGameProtocol
 import org.aralozkaya.msngr.protocol.P4Packet
@@ -156,6 +157,57 @@ class GameProtocolTest {
     }
 
     @Test
+    fun closingGameIncludesNativeP4CloseReasonForEitherPlayer() = runBlocking {
+        val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        for (hostCloses in listOf(true, false)) {
+            val sent = CopyOnWriteArrayList<SlpMessage>()
+            lateinit var host: MsnpGameSession
+            lateinit var guest: MsnpGameSession
+            host = MsnpGameSession(
+                source = "alice@example.test",
+                destination = "bob@example.test",
+                publish = {},
+                sendControl = { bytes ->
+                    val message = requireNotNull(SlpMessage.parse(bytes))
+                    sent.add(message)
+                    guest.handle(message)
+                },
+                sendData = { _, _, _ -> },
+            )
+            guest = MsnpGameSession(
+                source = "bob@example.test",
+                destination = "alice@example.test",
+                publish = {},
+                sendControl = { bytes ->
+                    val message = requireNotNull(SlpMessage.parse(bytes))
+                    sent.add(message)
+                    host.handle(message)
+                },
+                sendData = { _, _, _ -> },
+                resolveCatalogEntry = { _, _ -> entry },
+            )
+            try {
+                host.start(entry)
+                guest.accept()
+                (if (hostCloses) host else guest).stop()
+                val invitation = sent.first()
+                val close = sent.last()
+                assertTrue(close.firstLine.startsWith("BYE "))
+                assertEquals(invitation.callId, close.callId)
+                assertEquals(invitation.body.field("SessionID"), close.body.field("SessionID"))
+                assertEquals("application/x-msnmsgr-sessionclosebody", close.contentType)
+                assertArrayEquals(
+                    byteArrayOf(0x74, 0x03, 0x00, 0x81.toByte()),
+                    MsnBase64.decode(requireNotNull(close.body.field("Context"))),
+                )
+            } finally {
+                host.disconnect()
+                guest.disconnect()
+            }
+        }
+    }
+
+    @Test
     fun p2pV1AndV2GameSessionsNegotiateHandshakeAndExchangeMoves() = runBlocking {
         for (v2 in listOf(false, true)) {
             val hostSessions = CopyOnWriteArrayList<GameSession>()
@@ -227,5 +279,83 @@ class GameProtocolTest {
                 guestP2p.closeFileTransfers()
             }
         }
+    }
+
+    @Test
+    fun nativeGamePaneDimensionsEnforceNativeDefaultsAndWhiteboardCanvasBounds() {
+        val catalog = MsnpGameCatalogService.defaultCatalog()
+        val battleships = catalog.findEntry(102002)!!
+        assertEquals(500 to 500, nativeGamePaneDimensions(battleships))
+        assertEquals(500, battleships.width)
+        assertEquals(500, battleships.height)
+
+        val undersized = battleships.copy(width = 390, height = 350)
+        assertEquals(500 to 500, nativeGamePaneDimensions(undersized))
+
+        val zeroSized = battleships.copy(width = 0, height = 0)
+        assertEquals(500 to 500, nativeGamePaneDimensions(zeroSized))
+
+        val whiteboard = catalog.findEntry(100000)!!
+        assertEquals(500 to WHITEBOARD_NATIVE_PANE_HEIGHT, nativeGamePaneDimensions(whiteboard))
+
+        val wordle = catalog.findEntry(103000)!!
+        assertEquals(500 to WORDLE_NATIVE_PANE_HEIGHT, nativeGamePaneDimensions(wordle))
+    }
+
+    @Test
+    fun normalizeLegacyGameHtmlMergesDuplicateStylesAndFixesExpressionsWithoutTouchingScripts() {
+        val raw = """
+            <html>
+            <head>
+            <script language="javascript">
+                if (i < 3 && j > 1) { var s = '<body style="a:1" style="b:2">'; }
+            </script>
+            </head>
+            <body onload="OnLoad();" onunload="OnUnload();" style="margin:0" scroll="no" style="background-color:#516CA1">
+                <span id="pnlGameover" style="display:none;position:absolute;left:expression(document.body.clientWidth/2 - this.offsetWidth/2);
+                    top:expression(document.body.clientHeight/2 - this.offsetHeight)"></span>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val normalized = normalizeLegacyGameHtml(raw)
+        assertTrue(normalized.contains("""style="margin:0;background-color:#516CA1""""))
+        assertFalse(normalized.substringAfter("</head>").contains("""style="background-color:#516CA1""""))
+        assertTrue(normalized.contains("""var s = '<body style="a:1" style="b:2">';"""))
+        assertTrue(normalized.contains("left:50%;top:50%;transform:translate(-50%,-100%)"))
+    }
+
+    @Test
+    fun gameJsDialogRequestSettlesAtMostOnce() {
+        var confirmed = 0
+        var cancelled = 0
+        var receivedPrompt: String? = null
+        val confirmReq = GameJsDialogRequest(
+            id = 1L,
+            kind = GameJsDialogKind.Confirm,
+            message = "Restart the game?",
+            onConfirm = { confirmed++ },
+            onCancel = { cancelled++ },
+        )
+        confirmReq.confirm()
+        confirmReq.confirm()
+        confirmReq.cancel()
+        assertTrue(confirmReq.isSettled)
+        assertEquals(1, confirmed)
+        assertEquals(0, cancelled)
+
+        val promptReq = GameJsDialogRequest(
+            id = 2L,
+            kind = GameJsDialogKind.Prompt("default"),
+            message = "Enter name",
+            onConfirm = { receivedPrompt = it; confirmed++ },
+            onCancel = { cancelled++ },
+        )
+        promptReq.cancel()
+        promptReq.confirm("Alice")
+        assertTrue(promptReq.isSettled)
+        assertEquals(1, confirmed)
+        assertEquals(1, cancelled)
+        assertEquals(null, receivedPrompt)
     }
 }

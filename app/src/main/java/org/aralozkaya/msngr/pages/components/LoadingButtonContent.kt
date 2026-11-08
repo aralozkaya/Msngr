@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,7 +46,7 @@ internal fun LoadingButtonContent(
                 contentDescription = label
                 liveRegion = LiveRegionMode.Polite
             }
-            CircularWavyProgressIndicator(
+            MsngrCircularWavyProgressIndicator(
                 modifier = progressModifier.size(20.dp),
                 color = LocalContentColor.current,
             )

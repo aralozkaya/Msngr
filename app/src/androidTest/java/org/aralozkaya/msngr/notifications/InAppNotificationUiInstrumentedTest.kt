@@ -157,7 +157,7 @@ class InAppNotificationUiInstrumentedTest {
         } finally { InAppNotificationPrefs.update(context) { InAppNotificationSettings() } }
     }
 
-    @Test fun customizationsOpenFromAppBarMenuAndBackReturnsToGeneralSettings() {
+    @Test fun notificationSettingsControlsStatusSilencingChatInclusionAndInAppSubpage() {
         val context = isolatedContext()
         InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
         try {
@@ -167,21 +167,49 @@ class InAppNotificationUiInstrumentedTest {
                 }
             }
             compose.onNodeWithTag("in_app_notification_options").assertDoesNotExist()
-            compose.onNodeWithTag("in_app_notification_settings").performScrollTo().performClick()
-            compose.onNode(hasScrollAction()).performScrollToNode(
-                hasTestTag("in_app_type_vibration_${InAppNotificationType.entries.last().name}"))
-            compose.onNodeWithTag("customized_notification_settings").assertDoesNotExist()
+            compose.onNodeWithTag("notification_settings").performScrollTo().performClick()
+            compose.onNodeWithTag("silence_push_when_not_online").assertIsOn()
+            compose.onNodeWithTag("include_chat_push_when_not_online").assertIsOff()
+
+            compose.onNodeWithTag("include_chat_push_when_not_online").performClick().assertIsOn()
+            compose.runOnIdle {
+                InAppNotificationPrefs.reload(context)
+                val saved = InAppNotificationPrefs.read(context)
+                assertTrue(saved.push.silenceWhenNotOnline)
+                assertTrue(saved.push.includeChatsWhenNotOnline)
+            }
+
+            compose.onNodeWithTag("silence_push_when_not_online").performClick().assertIsOff()
+            compose.onNodeWithTag("include_chat_push_when_not_online").assertDoesNotExist()
+            compose.runOnIdle {
+                InAppNotificationPrefs.reload(context)
+                val saved = InAppNotificationPrefs.read(context)
+                assertFalse(saved.push.silenceWhenNotOnline)
+                assertTrue(saved.push.includeChatsWhenNotOnline)
+            }
+
+            compose.onNodeWithTag("silence_push_when_not_online").performClick().assertIsOn()
+            compose.onNodeWithTag("include_chat_push_when_not_online").assertIsOn()
+
             compose.onNodeWithTag("in_app_notification_options").performClick()
             screenshot("notification-options-menu", popup = true)
             compose.onNodeWithTag("customized_notification_settings").performClick()
             compose.onNodeWithTag("no_notification_customizations").assertExists()
             compose.onNodeWithTag("in_app_notification_options").assertDoesNotExist()
             compose.onNodeWithContentDescription("Back").performClick()
+            compose.onNodeWithTag("silence_push_when_not_online").assertIsOn()
+
+            compose.onNodeWithTag("in_app_notification_settings").performScrollTo().performClick()
+            compose.onNode(hasScrollAction()).performScrollToNode(
+                hasTestTag("in_app_type_vibration_${InAppNotificationType.entries.last().name}"))
+            compose.onNodeWithTag("in_app_notification_options").performClick()
+            compose.onNodeWithTag("customized_notification_settings").performClick()
+            compose.onNodeWithTag("no_notification_customizations").assertExists()
+            compose.onNodeWithContentDescription("Back").performClick()
             compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("in_app_enabled"))
             compose.onNodeWithTag("in_app_enabled").assertExists()
-            compose.onNodeWithTag("customized_notification_settings").assertDoesNotExist()
-            compose.onNodeWithTag("in_app_notification_options").performClick()
-            compose.onNodeWithTag("customized_notification_settings").assertExists()
+            compose.onNodeWithContentDescription("Back").performClick()
+            compose.onNodeWithTag("silence_push_when_not_online").assertExists()
         } finally { InAppNotificationPrefs.update(context) { InAppNotificationSettings() } }
     }
 

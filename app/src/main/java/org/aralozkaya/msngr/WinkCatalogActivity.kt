@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.protocol.*
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import java.net.HttpURLConnection
@@ -74,7 +75,7 @@ class WinkCatalogActivity : MsngrActivity() {
         }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 status?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary) }
-                if (loading) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                if (loading) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 AndroidView(factory = { context -> WebView(context).apply {
                     browser = this
                     settings.apply { javaScriptEnabled = true; allowFileAccess = false; allowContentAccess = false

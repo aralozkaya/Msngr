@@ -19,10 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material3.*
 import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
 import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnFileContext
@@ -87,12 +89,22 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
         }
     }
     Box {
-        if (busy) CircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
+        if (busy) MsngrCircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
         else IconButton(onClick = { expanded = true }, enabled = enabled) {
-            Icon(Icons.Default.AttachFile, contentDescription = "Share photos or files")
+            Icon(
+                Icons.Rounded.DashboardCustomize,
+                contentDescription = "Share or start an activity",
+            )
         }
-        DropdownMenuPopup(expanded = expanded && enabled && !busy, onDismissRequest = { expanded = false }) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1), modifier = Modifier.testTag("sharing_menu")) {
+        DropdownMenuPopup(
+            expanded = expanded && enabled && !busy,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.testTag("sharing_menu"),
+        ) {
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 2),
+                modifier = Modifier.testTag("sharing_menu_transfers"),
+            ) {
                 DropdownMenuItem(
                     text = { Text("Photos") },
                     leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
@@ -107,6 +119,12 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                     modifier = Modifier.testTag("sharing_menu_files"),
                     onClick = { expanded = false; files.launch(arrayOf("*/*")) },
                 )
+            }
+            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(1, 2),
+                modifier = Modifier.testTag("sharing_menu_activities"),
+            ) {
                 DropdownMenuItem(
                     text = { Text("Games & activities") },
                     leadingIcon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
@@ -119,7 +137,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
     }
     LaunchedEffect(enabled, busy) { if (!enabled || busy) expanded = false }
     if (gamesOpen && enabled) {
-        GameCatalogSheet(
+        GameCatalogDialog(
             contactId = contactId,
             onDismiss = { gamesOpen = false },
         )
@@ -189,9 +207,9 @@ internal fun FileTransferMessage(message: ChatMessage,
             FileTransferStatus.Cancelled -> "File transfer cancelled"
             FileTransferStatus.Failed -> transfer.error ?: "File transfer failed"
         }, style = MaterialTheme.typography.bodySmall)
-        if (transfer.status == FileTransferStatus.Transferring) LinearWavyProgressIndicator(
+        if (transfer.status == FileTransferStatus.Transferring) MsngrLinearWavyProgressIndicator(
             progress = { if (transfer.size == 0L) 0f else (transfer.transferred.toDouble() / transfer.size).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-        else if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+        else if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -341,7 +359,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             Text("Photos", style = MaterialTheme.typography.headlineSmall)
             when (share.status) {
                 PhotoShareStatus.Invited -> {
-                    Text(if (share.outgoing) "Waiting for the other person to accept…" else "You are invited to share photos.")
+                    Text(if (share.outgoing) "Waiting for the other person to accept\u2026" else "You are invited to share photos.")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!share.outgoing) Button(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                             error = (onAccept?.invoke() ?: context.sharingRepository().acceptPhotos(contactId, share.id)).exceptionOrNull()?.message
@@ -411,7 +429,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                                 when {
                                     photo.previewError != null -> Text(photo.previewError, color = MaterialTheme.colorScheme.error)
                                     photo.localPath != null -> Text("Preview unavailable.")
-                                    else -> { LinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo…") }
+                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo\u2026") }
                                 }
                             }
                         }
@@ -422,21 +440,21 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 if (selected.previewError != null && share.status == PhotoShareStatus.Active) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                     error = (onSelect?.invoke(selected.id) ?: context.sharingRepository().selectPhoto(contactId, share.id, selected.id)).exceptionOrNull()?.message
                 } }) { Text("Retry photo") }
-                if (selected.originalPending) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                if (selected.originalPending) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 if (selected.localPath != null) FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {
                     savePhotoId = selected.id; savedPhotoId = null
                     if (TransferPrefs.read(context).photoTree != null || hasDefaultTransferStorageAccess(context)) requestSave()
                     else savePermission.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }, enabled = !selected.originalPending && !saveRequested) {
-                    Text(if (selected.originalPending || saveRequested) "Saving…" else if (savedPhotoId == selected.id || saveState.uri != null) "Saved" else "Save photo")
+                    Text(if (selected.originalPending || saveRequested) "Saving\u2026" else if (savedPhotoId == selected.id || saveState.uri != null) "Saved" else "Save photo")
                 }
                 selected.originalError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
-            if (preparing) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            if (preparing) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(shapes = ButtonDefaults.shapes(), enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text(if (preparing) "Preparing…" else "Add photos")
+                    Text(if (preparing) "Preparing\u2026" else "Add photos")
                 }
                 DestructiveOutlinedButton(onClick = stop) { Text("Stop sharing") }
             }

@@ -26,6 +26,7 @@ internal class RealtimeNotificationBridge(
         requestsJob?.cancel()
         groupInvitationsJob?.cancel()
         inAppNotifications?.dismiss()
+        notificationManager.bindPresence { repository.profile.value.presence }
         groupInvitationsJob = scope.launch {
             var previousAccount: String? = null
             var previousKeys = emptySet<String>()

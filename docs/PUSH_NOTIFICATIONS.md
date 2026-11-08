@@ -7,9 +7,9 @@ posting Android event notifications. This includes messages, nudges, contact req
 invitations. The existing background connection service keeps its required ongoing notification.
 Pending request notifications are removed when entering the app and synchronized again when leaving it.
 
-**Settings > In-app notifications** controls banners, vibration, and independent categories for
-messages, group messages, nudges, contact requests and group invitations. Each type has its own named
-group containing its notification and vibration switches.
+**Settings > Notifications > In-app notifications** controls banners, vibration, and independent
+categories for messages, group messages, nudges, contact requests and group invitations. Each type
+has its own named group containing its notification and vibration switches.
 All current types have paired controls, so there is no **Others** group. Everything starts enabled.
 Turning off the general notification switch disables its dependent controls without changing their
 selections. General settings apply to conversations that do not have a custom notification profile.
@@ -37,11 +37,17 @@ conversation; enabling it again copies the current general settings as a fresh s
 In-app controls include alerts, banners, vibration and applicable categories.
 Background controls separately allow muting that conversation or making its Android alerts silent;
 Android permissions and channel settings still apply. The **Customized notifications** button inside
-**Settings > In-app notifications** lists every override and supports editing or deleting it. Resetting restores the
+**Settings > Notifications** (and **Settings > Notifications > In-app notifications**) lists every
+override and supports editing or deleting it. Resetting restores the
 general settings. Preferences are scoped to the signed-in account and service, and are removed with
 the account's other preferences when the account is forgotten.
 
 ## Background notifications
+
+**Settings > Notifications** silences non-chat push notifications by default whenever your own status
+is **Busy**, **Away**, or **Appear offline**, so only **Online** status produces alerting non-chat
+push notifications. Contact and group messages still alert normally unless **Include contact and
+group messages** is enabled.
 
 Msngr receives notification events over its direct MSNP connection. A user-visible Android
 `remoteMessaging` foreground service owns the process containing that connection while the app UI

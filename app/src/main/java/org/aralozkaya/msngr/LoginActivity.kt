@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -80,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
@@ -222,8 +222,8 @@ private fun LoginRoute(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                CircularWavyProgressIndicator()
-                Text("Opening secure storage…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MsngrCircularWavyProgressIndicator()
+                Text("Opening secure storage\u2026", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         return

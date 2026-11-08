@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -50,8 +51,83 @@ import org.aralozkaya.msngr.notifications.InAppNotificationOptions
 import org.aralozkaya.msngr.notifications.InAppNotificationPrefs
 import org.aralozkaya.msngr.notifications.InAppNotificationType
 import org.aralozkaya.msngr.notifications.notificationKey
+import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.pages.components.NotificationCustomizationRow
 import org.aralozkaya.msngr.pages.components.PageContentList
+
+@Composable
+internal fun NotificationSettingsScreen(
+    innerPadding: PaddingValues,
+    scrollBehavior: TopAppBarScrollBehavior,
+    onInAppNotifications: () -> Unit,
+) {
+    val context = LocalContext.current
+    val settings by remember(context) { InAppNotificationPrefs.state(context) }.collectAsState()
+    PageContentList(
+        innerPadding = innerPadding,
+        scrollBehavior = scrollBehavior,
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+    ) {
+        item(key = "silence-push-when-not-online") {
+            ExpandableSettingsGroup(
+                expanded = settings.push.silenceWhenNotOnline,
+                master = { shapes ->
+                    SegmentedListItem(
+                        checked = settings.push.silenceWhenNotOnline,
+                        onCheckedChange = { enabled ->
+                            InAppNotificationPrefs.setSilencePushWhenNotOnline(context, enabled)
+                        },
+                        shapes = shapes,
+                        modifier = Modifier.fillMaxWidth().testTag("silence_push_when_not_online"),
+                        trailingContent = {
+                            Switch(checked = settings.push.silenceWhenNotOnline, onCheckedChange = null)
+                        },
+                        supportingContent = {
+                            Text(
+                                "Deliver non-chat push notifications silently when your status is " +
+                                    "Busy, Away, or Appear offline.",
+                            )
+                        },
+                        content = { Text("Silence push notifications when not Online") },
+                    )
+                },
+            ) { shapes, colors ->
+                SegmentedListItem(
+                    checked = settings.push.includeChatsWhenNotOnline,
+                    onCheckedChange = { enabled ->
+                        InAppNotificationPrefs.setIncludeChatsWhenNotOnline(context, enabled)
+                    },
+                    shapes = shapes,
+                    colors = colors,
+                    modifier = Modifier.fillMaxWidth().testTag("include_chat_push_when_not_online"),
+                    trailingContent = {
+                        Checkbox(
+                            checked = settings.push.includeChatsWhenNotOnline,
+                            onCheckedChange = null,
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            "Also silence contact and group message push notifications when your " +
+                                "status is not Online.",
+                        )
+                    },
+                    content = { Text("Include contact and group messages") },
+                )
+            }
+        }
+        settingsSectionSpacer()
+        item(key = "in-app-notifications") {
+            SegmentedListItem(
+                onClick = onInAppNotifications,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                modifier = Modifier.fillMaxWidth().testTag("in_app_notification_settings"),
+                supportingContent = { Text("Banners and vibration while Msngr is open.") },
+                content = { Text("In-app notifications") },
+            )
+        }
+    }
+}
 
 @Composable
 internal fun InAppNotificationSettingsScreen(
