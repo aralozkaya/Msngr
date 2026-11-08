@@ -30,6 +30,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.*
+import org.aralozkaya.msngr.pages.components.MsngrLinearWavyProgressIndicator
+import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
 import org.aralozkaya.msngr.data.EmotionSoundService
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 import org.aralozkaya.msngr.protocol.EmotionSound
@@ -263,7 +265,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             }
         }, footer = {
             val hash = MsnEmotionSound.hash(search.text.toString())
-            if (actionBusy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            if (actionBusy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             (error ?: player.error ?: status)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                 color = if (error != null || player.error != null) MaterialTheme.colorScheme.error else LocalContentColor.current) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -287,7 +289,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
         }
         when {
             loadingOnline -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                LoadingIndicator(Modifier.testTag("emotion_sound_online_loading").semantics { contentDescription = "Loading online sounds" })
+                MsngrLoadingIndicator(Modifier.testTag("emotion_sound_online_loading").semantics { contentDescription = "Loading online sounds" })
             }
             online && catalogError != null -> {
                 Text(catalogError!!, color = MaterialTheme.colorScheme.error)
@@ -376,7 +378,7 @@ internal fun EmotionSoundMessageSheet(message: org.aralozkaya.msngr.data.ChatMes
                 shapes = ListItemDefaults.segmentedShapes(1, 2),
                 leadingContent = { Icon(if (saved) Icons.Default.Delete else Icons.Default.Add, null) },
                 content = { Text(if (saved) "Remove from saved sounds" else "Add to saved sounds") })
-            if (busy) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             (error ?: player.error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }

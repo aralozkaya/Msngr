@@ -34,6 +34,7 @@ import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
 import org.aralozkaya.msngr.pages.InAppNotificationSettingsMenu
 import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
+import org.aralozkaya.msngr.pages.NotificationSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
 import org.aralozkaya.msngr.pages.SettingsScreen
 import org.aralozkaya.msngr.pages.UpdateSettingsScreen
@@ -130,7 +131,10 @@ internal fun SettingsRoute(
                         }
                     },
                     actions = {
-                        if (destination == SettingsDestination.InAppNotifications) {
+                        if (
+                            destination == SettingsDestination.Notifications ||
+                            destination == SettingsDestination.InAppNotifications
+                        ) {
                             InAppNotificationSettingsMenu(
                                 onCustomizedNotifications = { navigateTo(SettingsDestination.CustomizedNotifications) },
                             )
@@ -147,6 +151,11 @@ internal fun SettingsRoute(
                         SettingsDestination.Appearance -> AppearanceSettingsScreen(
                             innerPadding = innerPadding,
                             scrollBehavior = scrollBehavior,
+                        )
+                        SettingsDestination.Notifications -> NotificationSettingsScreen(
+                            innerPadding = innerPadding,
+                            scrollBehavior = scrollBehavior,
+                            onInAppNotifications = { navigateTo(SettingsDestination.InAppNotifications) },
                         )
                         SettingsDestination.InAppNotifications -> InAppNotificationSettingsScreen(
                             innerPadding = innerPadding,

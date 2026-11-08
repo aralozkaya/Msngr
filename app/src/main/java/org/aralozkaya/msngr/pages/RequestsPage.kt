@@ -30,7 +30,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
 import org.aralozkaya.msngr.ContactInvitationSettings
 import org.aralozkaya.msngr.MessengerPlusText
 import org.aralozkaya.msngr.R
@@ -105,7 +105,7 @@ internal fun RequestsPage(
     ) {
         if (refreshing) {
             val refreshingDescription = stringResource(R.string.requests_refreshing)
-            LoadingIndicator(
+            MsngrLoadingIndicator(
                 modifier = Modifier.align(Alignment.Center).testTag("requests-refresh-indicator")
                     .semantics { contentDescription = refreshingDescription },
             )

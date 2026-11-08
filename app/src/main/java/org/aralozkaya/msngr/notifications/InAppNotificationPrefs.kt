@@ -41,6 +41,7 @@ internal object InAppNotificationPrefs {
                         item.optBoolean("backgroundEnabled", true), item.optBoolean("backgroundSilent", false)))
                 }
             },
+            push = decodePushOptions(json.optJSONObject("push")),
         )
     }
 
@@ -48,6 +49,7 @@ internal object InAppNotificationPrefs {
     fun update(context: Context, transform: (InAppNotificationSettings) -> InAppNotificationSettings) {
         val settings = transform(read(context))
         val json = JSONObject().put("defaults", encodeOptions(settings.defaults))
+            .put("push", encodePushOptions(settings.push))
             .put("conversations", JSONArray().also { array ->
                 settings.conversations.values.forEach { custom ->
                     array.put(JSONObject().put("id", custom.contactId).put("name", custom.displayName)
@@ -57,6 +59,14 @@ internal object InAppNotificationPrefs {
             })
         AccountPreferences.preferences(context, NAME).edit { putString("settings", json.toString()) }
         mutableState.value = settings
+    }
+
+    fun setSilencePushWhenNotOnline(context: Context, enabled: Boolean) = update(context) { settings ->
+        settings.copy(push = settings.push.copy(silenceWhenNotOnline = enabled))
+    }
+
+    fun setIncludeChatsWhenNotOnline(context: Context, enabled: Boolean) = update(context) { settings ->
+        settings.copy(push = settings.push.copy(includeChatsWhenNotOnline = enabled))
     }
 
     fun customize(context: Context, id: String, name: String, isGroup: Boolean,
@@ -84,6 +94,15 @@ internal object InAppNotificationPrefs {
     fun reset(context: Context, id: String) = update(context) {
         it.copy(conversations = it.conversations - id.notificationKey())
     }
+
+    private fun decodePushOptions(json: JSONObject?): PushNotificationOptions = PushNotificationOptions(
+        silenceWhenNotOnline = json?.optBoolean("silenceWhenNotOnline", true) ?: true,
+        includeChatsWhenNotOnline = json?.optBoolean("includeChatsWhenNotOnline", false) ?: false,
+    )
+
+    private fun encodePushOptions(options: PushNotificationOptions): JSONObject = JSONObject()
+        .put("silenceWhenNotOnline", options.silenceWhenNotOnline)
+        .put("includeChatsWhenNotOnline", options.includeChatsWhenNotOnline)
 
     private fun decodeOptions(json: JSONObject?): InAppNotificationOptions = InAppNotificationOptions(
         enabled = json?.optBoolean("enabled", true) ?: true,

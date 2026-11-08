@@ -115,7 +115,7 @@ internal fun SessionsDialog(
                                 ) {
                                     LoadingButtonContent(
                                         loading = sessionBusy,
-                                        label = "Logging out…",
+                                        label = "Logging out\u2026",
                                         indicatorModifier = Modifier.testTag("logout-session-loading-${session.id}"),
                                     ) {
                                         Text("Log out")
@@ -136,7 +136,7 @@ internal fun SessionsDialog(
                         ) {
                             LoadingButtonContent(
                                 loading = otherBusy,
-                                label = "Logging out…",
+                                label = "Logging out\u2026",
                                 indicatorModifier = Modifier.testTag("logout-other-sessions-loading"),
                             ) {
                                 Text("Log out other sessions")
@@ -154,7 +154,7 @@ internal fun SessionsDialog(
                         ) {
                             LoadingButtonContent(
                                 loading = allBusy,
-                                label = "Logging out…",
+                                label = "Logging out\u2026",
                                 indicatorModifier = Modifier.testTag("logout-all-sessions-loading"),
                             ) {
                                 Text("Log out all sessions")
