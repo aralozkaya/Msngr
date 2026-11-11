@@ -119,8 +119,9 @@ internal val LocalKeyboardSheetHost = staticCompositionLocalOf<KeyboardSheetHost
  *
  * - Opening a sheet over the keyboard places it in the keyboard's exact slot without animation,
  *   then closes the keyboard, revealing the sheet as the keyboard slides away.
- * - A keyboard opened by an input outside the sheet covers it, and the sheet is removed only
- *   after that keyboard animation has finished.
+ * - A keyboard requested by an editor outside the sheet waits for an expanded sheet to
+ *   collapse to the keyboard's slot, then covers it. The sheet is removed after the keyboard
+ *   animation has finished.
  * - An input inside the sheet lets both coexist: the sheet's content is padded above the
  *   keyboard, and the page content is padded along with it.
  *
@@ -459,6 +460,7 @@ internal class KeyboardSheetHostState(
         private set
     internal var appliedInstantMotion by mutableStateOf(false)
     private var hideInstantly = false
+    private var pendingKeyboardShow by mutableStateOf<(() -> Unit)?>(null)
 
     /** Whether the sheet has settled open, so a hidden state can only come from the user. */
     private var settledOpen by mutableStateOf(false)
@@ -472,26 +474,45 @@ internal class KeyboardSheetHostState(
     /** Whether the keyboard has been closed since the sheet was requested. */
     private var keyboardReleased = false
 
-    val keepOpenOnInputTap: Boolean
+    private val keepOpenOnInputTap: Boolean
         get() = requested?.keepOpenOnInputTap == true
+
+    private val deferKeyboardShow: Boolean
+        get() = requested != null && (
+            pendingKeyboardShow != null || isExpandedBeyondKeyboard ||
+                (sheetState.hasPartiallyExpandedState && sheetState.targetValue == SheetValue.Expanded)
+            )
+
+    internal val handlesKeyboardOnInputTap: Boolean
+        get() = keepOpenOnInputTap || deferKeyboardShow
+
+    internal fun showKeyboard(show: () -> Unit) {
+        if (keepOpenOnInputTap) return
+        if (deferKeyboardShow) pendingKeyboardShow = show else show()
+    }
+
+    private fun updateRequest(entry: KeyboardSheetEntry?) {
+        pendingKeyboardShow = null
+        requested = entry
+    }
 
     fun request(entry: KeyboardSheetEntry) {
         val previous = requested
         if (previous === entry) return
-        requested = entry
+        updateRequest(entry)
         previous?.onDismissRequest?.invoke()
     }
 
     fun release(entry: KeyboardSheetEntry) {
         if (requested !== entry) return
         hideInstantly = false
-        requested = null
+        updateRequest(null)
     }
 
     fun dismiss(instant: Boolean = false) {
         val entry = requested ?: return
         hideInstantly = instant
-        requested = null
+        updateRequest(null)
         entry.onDismissRequest()
     }
 
@@ -604,6 +625,17 @@ internal class KeyboardSheetHostState(
         storedHeightPx: () -> Int,
         hideKeyboard: () -> Unit,
     ) = coroutineScope {
+        launch {
+            snapshotFlow { pendingKeyboardShow }.collectLatest { show ->
+                if (show == null) return@collectLatest
+                try {
+                    if (sheetState.hasPartiallyExpandedState) collapse()
+                    if (pendingKeyboardShow === show) show()
+                } finally {
+                    if (pendingKeyboardShow === show) pendingKeyboardShow = null
+                }
+            }
+        }
         // Dragging the sheet down or tapping its handle hides it through Material's state.
         launch {
             snapshotFlow {
