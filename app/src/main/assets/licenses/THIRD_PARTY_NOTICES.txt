@@ -89,32 +89,32 @@ License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.animation:animation-android:1.13.0-beta02
+androidx.compose.animation:animation-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.animation:animation-core-android:1.13.0-beta02
+androidx.compose.animation:animation-core-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.foundation:foundation-android:1.13.0-beta02
+androidx.compose.foundation:foundation-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.foundation:foundation-layout-android:1.13.0-beta02
+androidx.compose.foundation:foundation-layout-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.material3:material3-android:1.5.0-beta02
+androidx.compose.material3:material3-android:1.5.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.material3:material3-ripple-android:1.5.0-beta02
+androidx.compose.material3:material3-ripple-android:1.5.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
@@ -129,77 +129,77 @@ License: Apache-2.0
 Source: https://maven.google.com/
 Notices: 1594acf89d0ee22f8238c8d52c8277c5ed88ddad9009e8d40d7d1d4232e9852a, 2706e0b7be059a5104b83e11ed35025ad8d96e405785a1c851d71d29d5c7a42e, 9793e5b454f0b942d8dc3acfbb46437f08940e5292e609d2b40c3aa4cfa2cc9d, ab50bed9093b45bb592d14c958c3178501a7428b520b480574bc7d6a112f69af, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, e527c0612a53be05a4b712c7b5c90b554dfcfa3b94e7acaa46c99639111691b2
 
-androidx.compose.material:material-ripple-android:1.13.0-beta02
+androidx.compose.material:material-ripple-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.runtime:runtime-android:1.13.0-beta02
+androidx.compose.runtime:runtime-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.runtime:runtime-annotation-android:1.13.0-beta02
+androidx.compose.runtime:runtime-annotation-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.runtime:runtime-retain-android:1.13.0-beta02
+androidx.compose.runtime:runtime-retain-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.runtime:runtime-saveable-android:1.13.0-beta02
+androidx.compose.runtime:runtime-saveable-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-android:1.13.0-beta02
+androidx.compose.ui:ui-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-geometry-android:1.13.0-beta02
+androidx.compose.ui:ui-geometry-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-graphics-android:1.13.0-beta02
+androidx.compose.ui:ui-graphics-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-test-manifest:1.13.0-beta02
+androidx.compose.ui:ui-test-manifest:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-text-android:1.13.0-beta02
+androidx.compose.ui:ui-text-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-tooling-android:1.13.0-beta02
+androidx.compose.ui:ui-tooling-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-tooling-data-android:1.13.0-beta02
+androidx.compose.ui:ui-tooling-data-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-tooling-preview-android:1.13.0-beta02
+androidx.compose.ui:ui-tooling-preview-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-unit-android:1.13.0-beta02
+androidx.compose.ui:ui-unit-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.compose.ui:ui-util-android:1.13.0-beta02
+androidx.compose.ui:ui-util-android:1.13.0-rc01
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
@@ -319,12 +319,12 @@ License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.navigation3:navigation3-runtime-android:1.3.0-alpha03
+androidx.navigation3:navigation3-runtime-android:1.3.0-alpha04
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-androidx.navigation3:navigation3-ui-android:1.3.0-alpha03
+androidx.navigation3:navigation3-ui-android:1.3.0-alpha04
 License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec

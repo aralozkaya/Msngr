@@ -259,7 +259,7 @@
       "artifactSha256": "939b4a8697640e77d83e4e8b4c4a9d18f8130198c5961194af8dd9db9dc7c353"
     },
     {
-      "name": "androidx.compose.animation:animation-android:1.13.0-beta02",
+      "name": "androidx.compose.animation:animation-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -271,10 +271,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "ccbbd33219b43e9f9f447ac5d40eba4b640c89edd4995665c877b1122dde16a9"
+      "artifactSha256": "195962951cc645c256fce1eb7d95a43b271a318019ecc98343afb58926fc0d80"
     },
     {
-      "name": "androidx.compose.animation:animation-core-android:1.13.0-beta02",
+      "name": "androidx.compose.animation:animation-core-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -286,10 +286,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "0d0c1a44ce9d00730eac1418a82825f6c2154760926a6dcea708f1c244bc4848"
+      "artifactSha256": "a975c379a3b59894a869067fe7d471fd55d8fa3af067c04aa026c9fca2be9133"
     },
     {
-      "name": "androidx.compose.foundation:foundation-android:1.13.0-beta02",
+      "name": "androidx.compose.foundation:foundation-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -301,10 +301,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "ef2b56844de7a0fb5f35bd3a817276202174b98af5bed5de1c808a491112e4d4"
+      "artifactSha256": "61a91dbac1eb8eb950f28a99c160866018462c7fdba0060cf1425a14494e725e"
     },
     {
-      "name": "androidx.compose.foundation:foundation-layout-android:1.13.0-beta02",
+      "name": "androidx.compose.foundation:foundation-layout-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -316,10 +316,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "04efa5cb2b7333a439fe2b7a5a36b6688f595f838f3d20942defa31eed8cf00b"
+      "artifactSha256": "250e06eabb3c7fb5583e537a976ffc9e65191516d4d49d0665fcf56acbab67de"
     },
     {
-      "name": "androidx.compose.material3:material3-android:1.5.0-beta02",
+      "name": "androidx.compose.material3:material3-android:1.5.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -331,10 +331,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "937daaf7b67833e9efceb297a3a89f957ccd993f7d736e1ac96ef7ff5081e5db"
+      "artifactSha256": "eb055c58e9d81cbf9cb38bca4541a7dc701660e558f37f91edab2d622ac24e9a"
     },
     {
-      "name": "androidx.compose.material3:material3-ripple-android:1.5.0-beta02",
+      "name": "androidx.compose.material3:material3-ripple-android:1.5.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -346,7 +346,7 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "53b45250725c2de9d61d3842692c19cd268ca721d9b67bff2e58d782d62199ab"
+      "artifactSha256": "9b00179905d1d42a80dd4dc0f1c94b5dc0faecb0e6ecff2d8e1b8f0f98c3025c"
     },
     {
       "name": "androidx.compose.material:material-icons-core-android:1.7.8",
@@ -382,7 +382,7 @@
       "artifactSha256": "64e86269f1106848981dd76f0046f81b46f3bd92efb22645de8fd044c0402b61"
     },
     {
-      "name": "androidx.compose.material:material-ripple-android:1.13.0-beta02",
+      "name": "androidx.compose.material:material-ripple-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -394,10 +394,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "a477e53b607dfc430374a6609e10f485637b603703d8064330850ab0661ea56b"
+      "artifactSha256": "dc23fc9ebbe0dfc8b77b1d24136cc91c3ec369b59f83876c5265e4bae028c946"
     },
     {
-      "name": "androidx.compose.runtime:runtime-android:1.13.0-beta02",
+      "name": "androidx.compose.runtime:runtime-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -409,10 +409,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "03cc173735fcb2c8b3e313851979009846129ca31637e2c457bd944be2981578"
+      "artifactSha256": "7b8684fb0ebb7d0c60c9cc4bfa60a2fab70684d30f1fd42d0e7588922ceca685"
     },
     {
-      "name": "androidx.compose.runtime:runtime-annotation-android:1.13.0-beta02",
+      "name": "androidx.compose.runtime:runtime-annotation-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -424,10 +424,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "3406fc08ea95e27579a8f349b094540f8e53013b3e0f10484b5eff74e96842ff"
+      "artifactSha256": "ce27bc1a8078c336d4204534070d967ae1e1bd4930e7052209334c16d4bef536"
     },
     {
-      "name": "androidx.compose.runtime:runtime-retain-android:1.13.0-beta02",
+      "name": "androidx.compose.runtime:runtime-retain-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -439,10 +439,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "3dc4ddec4c36622867a88e180ec868def982f784cd3254708859b259f86630de"
+      "artifactSha256": "2f16dfadde48c558b02c172cb5e678851ee8f7a808c0015184721e8109c7bbc1"
     },
     {
-      "name": "androidx.compose.runtime:runtime-saveable-android:1.13.0-beta02",
+      "name": "androidx.compose.runtime:runtime-saveable-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -454,10 +454,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "a395dbaeff2a05ec507d120866010782124fd43d2f1c55b4b52be76b8896e4d8"
+      "artifactSha256": "2ff5f2b15ded9aa84e1445ac1a4a2637196942912e745742b790231387c269e8"
     },
     {
-      "name": "androidx.compose.ui:ui-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -469,10 +469,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "98c7b5bfae2fa50fb17aa77322d8c3470d79421f261b503972c23be94793715f"
+      "artifactSha256": "59821c8a1198b0e48cefb2a36c22eaa7bf086ef0073ac1ba40d6f352ae939a00"
     },
     {
-      "name": "androidx.compose.ui:ui-geometry-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-geometry-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -484,10 +484,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "fafb07beb5ae87dff28aacefd6d9291d2e07b0fece0d14b4cbf7b4699c21321c"
+      "artifactSha256": "13a014fa64c502ff5a619dc415608540ad61458c39deecd7820dcaa7bb3599cf"
     },
     {
-      "name": "androidx.compose.ui:ui-graphics-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-graphics-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -499,10 +499,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "37eb8abb89d1345723f926d4be4139c4b08e6bc591862e199df3d326413bd8ef"
+      "artifactSha256": "86e710a38ec7d40022aa22b3b12ab05e54706875be3c0b00dc3078ae4417fcf5"
     },
     {
-      "name": "androidx.compose.ui:ui-test-manifest:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-test-manifest:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -513,10 +513,10 @@
       "variants": [
         "debug"
       ],
-      "artifactSha256": "a52add5709fd907340357200f01f010ed0385fac7674f469322be61d6e3289c1"
+      "artifactSha256": "ffbd47b067cde802af1c7c5d794b9922b2deceb9a423b60ec24580722df6cc1b"
     },
     {
-      "name": "androidx.compose.ui:ui-text-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-text-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -528,10 +528,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "8d2bf03a19dbb47cd65e2cdcc360c35ede08e56981f7dc2b894a8f1f2260a6b4"
+      "artifactSha256": "e9201883e4c1bbbd8bc7215ab5bb09d0eecd62c95c3e6e6bb646ce8c57fdc0e6"
     },
     {
-      "name": "androidx.compose.ui:ui-tooling-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-tooling-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -542,10 +542,10 @@
       "variants": [
         "debug"
       ],
-      "artifactSha256": "fb5e827779511615f1b314b521552130ac36e2a1a9c3d005f1ab39fdef202c8e"
+      "artifactSha256": "215be0277e3cedf2692794137653522c1d714fc9ff4ba06d6f343594e0505ae1"
     },
     {
-      "name": "androidx.compose.ui:ui-tooling-data-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-tooling-data-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -556,10 +556,10 @@
       "variants": [
         "debug"
       ],
-      "artifactSha256": "09a9ca85df778766e4d52a8e4fe925a76651ff6d5919bcf491978890afc32ba9"
+      "artifactSha256": "f6142283ea4f9fc7ef97af161fff24ccc6dd22d8ef5cdd2d889cb15b99d76d14"
     },
     {
-      "name": "androidx.compose.ui:ui-tooling-preview-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-tooling-preview-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -571,10 +571,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "697bbeb9cbf353f1cd0d4a793660302459ac551f315303e2bc84215a222d39ff"
+      "artifactSha256": "7b611a2cf0c2f666cc19e8cadabcc0e308ab4f47ab65503d0973511eef9f546e"
     },
     {
-      "name": "androidx.compose.ui:ui-unit-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-unit-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -586,10 +586,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "879f756faa189a89ac7917a51cf01b5ae620f8b03d37f29eaa819fd64fef50cd"
+      "artifactSha256": "579cbb2c958f1538328c4026754aee8fc3d5a1bdb1efe21c61d39e12f5364440"
     },
     {
-      "name": "androidx.compose.ui:ui-util-android:1.13.0-beta02",
+      "name": "androidx.compose.ui:ui-util-android:1.13.0-rc01",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -601,7 +601,7 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "717a567bb28d13502ca9175cde24eba5fa1bf983578ef0446ccc181d2df519e0"
+      "artifactSha256": "3bdd29dbf58895b6e2595b11aef7ef07457eadd9797168652843ed75696aa705"
     },
     {
       "name": "androidx.concurrent:concurrent-futures-ktx:1.1.0",
@@ -945,7 +945,7 @@
       "artifactSha256": "1761707c1ddee002bd97e1a0889a5016f7cd6bd8e0b6b069bcba8b2523d63723"
     },
     {
-      "name": "androidx.navigation3:navigation3-runtime-android:1.3.0-alpha03",
+      "name": "androidx.navigation3:navigation3-runtime-android:1.3.0-alpha04",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -957,10 +957,10 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "b6b18fb170dc8b4e632dace0ea85c84263da85a603ee0390607d28ce85433036"
+      "artifactSha256": "43a3fd25c82f0bba85c5c8d62c9986a0c5e3827d1b050dbf2bc8ca575dacfd33"
     },
     {
-      "name": "androidx.navigation3:navigation3-ui-android:1.3.0-alpha03",
+      "name": "androidx.navigation3:navigation3-ui-android:1.3.0-alpha04",
       "license": "Apache-2.0",
       "source": "https://maven.google.com/",
       "notices": [
@@ -972,7 +972,7 @@
         "debug",
         "release"
       ],
-      "artifactSha256": "6d3460410fda701de2c9963876c416249c5a11ecaaccbfcb12e650a73f336c73"
+      "artifactSha256": "5712cf625c39e4fe4d235db434ce07e49d7a9dffd03e4795e2ed43b04180b0cd"
     },
     {
       "name": "androidx.navigationevent:navigationevent-android:1.2.0-rc01",
@@ -5619,8 +5619,8 @@
     }
   ],
   "files": {
-    "index.html": "6593120ef11281fcff0587b5c184391560a9aa25c8f618402f86a8a8cdcfaf2f",
+    "index.html": "62bedc33d636ec6304364313d05570b9f27ada34a9e04a35f44706eab3975082",
     "library-sources.zip": "ac004e4b1eff760fd2ee5087b65a617f57f023353019f1a3fdc1ef6d0817915d",
-    "THIRD_PARTY_NOTICES.txt": "e7687de2704669d019cf35da06cc31a91707cf4b67568d512b14b1ddb52dc7dc"
+    "THIRD_PARTY_NOTICES.txt": "3e7917e8e5fdf028231dc0108b45e6a66179cb6d533ca6dec50fad236c52d84a"
   }
 }
