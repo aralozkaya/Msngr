@@ -1,15 +1,26 @@
 package org.aralozkaya.msngr
 
 import android.content.Context
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -21,6 +32,7 @@ import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.flow.first
 import org.aralozkaya.msngr.pages.components.DefaultKeyboardSheetHeight
 import org.aralozkaya.msngr.pages.components.KeyboardSheet
 import org.aralozkaya.msngr.pages.components.keyboardSheetWindowInsets
@@ -49,7 +61,7 @@ class KeyboardSheetScaffoldInstrumentedTest {
             .edit().clear().commit()
     }
 
-    private fun showScaffold() {
+    private fun showScaffold(pageContent: @Composable () -> Unit = {}) {
         compose.setContent {
             MsngrTheme {
                 Box(Modifier.fillMaxSize().testTag(PAGE_TAG)) {
@@ -59,6 +71,7 @@ class KeyboardSheetScaffoldInstrumentedTest {
                             .windowInsetsPadding(keyboardSheetWindowInsets())
                             .testTag(INSET_TAG),
                     )
+                    pageContent()
                     KeyboardSheet(visible = firstVisible, onDismissRequest = { firstVisible = false }) {
                         Box(Modifier.fillMaxSize().testTag(FIRST_TAG))
                     }
@@ -137,6 +150,67 @@ class KeyboardSheetScaffoldInstrumentedTest {
         Espresso.pressBack()
         compose.waitUntil(5_000) { !exists(EXPANDABLE_TAG) }
         compose.runOnIdle { assertFalse(expandableVisible) }
+    }
+
+    @Test
+    fun tappingTheEditorCollapsesAnExpandedSheetBeforeTheKeyboardStarts() {
+        assertCollapseBeforeKeyboard {
+            compose.onNodeWithContentDescription("Message input").performTouchInput { click() }
+        }
+    }
+
+    @Test
+    fun requestingTheKeyboardFromTheEditorControllerAlsoWaitsForCollapse() {
+        assertCollapseBeforeKeyboard { editor ->
+            compose.runOnIdle { editor.requestFocusAndShowKeyboard() }
+        }
+    }
+
+    @OptIn(ExperimentalLayoutApi::class)
+    private fun assertCollapseBeforeKeyboard(openKeyboard: (MessengerPlusEditorController) -> Unit) {
+        compose.runOnUiThread {
+            compose.activity.enableEdgeToEdge()
+            @Suppress("DEPRECATION")
+            compose.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        val editor = MessengerPlusEditorController()
+        var sheetHeightAtImeStart: Float? = null
+        showScaffold {
+            Box(Modifier.statusBarsPadding()) {
+                MsnEmoticonEditor(
+                    value = "",
+                    onValueChange = {},
+                    convertTypedShortcuts = false,
+                    useOriginalEmoticons = false,
+                    controller = editor,
+                )
+            }
+            val density = LocalDensity.current
+            val sheet = keyboardSheetWindowInsets()
+            val imeTarget = WindowInsets.imeAnimationTarget
+            LaunchedEffect(sheet, imeTarget, density) {
+                val height = snapshotFlow {
+                    sheet.getBottom(density).takeIf { imeTarget.getBottom(density) > 0 }
+                }.first { it != null }
+                sheetHeightAtImeStart = with(density) { checkNotNull(height).toDp().value }
+            }
+        }
+        compose.runOnIdle { expandableVisible = true }
+        compose.onNodeWithContentDescription(DRAG_HANDLE).performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        assertTrue(sheetTop() < defaultTop())
+
+        openKeyboard(editor)
+
+        compose.waitUntil(5_000) { !exists(EXPANDABLE_TAG) }
+        compose.runOnIdle {
+            assertEquals(
+                "The sheet should be at its open height when the keyboard starts",
+                DefaultKeyboardSheetHeight.value,
+                checkNotNull(sheetHeightAtImeStart),
+                1f,
+            )
+        }
     }
 
     @Test
