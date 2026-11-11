@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -23,7 +24,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.notifications.InAppNotificationPrefs
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -107,6 +110,20 @@ class SettingsNavigationInstrumentedTest {
         assertFalse(toolbarExitRequested)
     }
 
+    @Test fun returningPageReceivesTouchesDuringToolbarBackAnimation() {
+        assertBackHandsOffTouches {
+            compose.mainClock.autoAdvance = false
+            compose.onNodeWithContentDescription("Back").performClick()
+        }
+    }
+
+    @Test fun returningPageReceivesTouchesAfterPredictiveBackCommits() {
+        assertBackHandsOffTouches {
+            startGesture(BackEventCompat.EDGE_LEFT, 0.6f)
+            compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        }
+    }
+
     @Test fun predictiveBackDuringForwardAnimationCompletesAndAllowsNavigationAgain() {
         compose.mainClock.autoAdvance = false
         compose.onNodeWithText("Appearance").performClick()
@@ -161,6 +178,27 @@ class SettingsNavigationInstrumentedTest {
         back()
         compose.onNodeWithText("About").assertIsDisplayed()
         assertEquals(rootScroll, scrollOffset(), 0f)
+    }
+
+    private fun assertBackHandsOffTouches(closeSubpage: () -> Unit) {
+        openCategory("Notifications")
+        val original = InAppNotificationPrefs.read(context)
+        try {
+            compose.onNodeWithTag("in_app_notification_settings").performClick()
+            compose.onNodeWithTag("in_app_enabled").assertIsDisplayed()
+
+            closeSubpage()
+            compose.mainClock.advanceTimeBy(96)
+            compose.onNodeWithTag("silence_push_when_not_online").performTouchInput { click() }
+
+            compose.runOnIdle {
+                val settings = InAppNotificationPrefs.read(context)
+                assertEquals(original.defaults, settings.defaults)
+                assertEquals(!original.push.silenceWhenNotOnline, settings.push.silenceWhenNotOnline)
+            }
+        } finally {
+            InAppNotificationPrefs.update(context) { original }
+        }
     }
 
     private fun scrollOffset(): Float = compose.onNode(hasScrollAction()).fetchSemanticsNode()

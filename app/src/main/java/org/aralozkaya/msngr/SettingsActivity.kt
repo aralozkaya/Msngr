@@ -5,7 +5,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.CapturedAnimatedVisibility
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -93,7 +96,8 @@ internal fun SettingsRoute(
     }
     val transition: AnimatedContentTransitionScope<*>.(
         AnimatedContentTransitionScope.SlideDirection,
-    ) -> ContentTransform = { direction ->
+        ExitTransition,
+    ) -> ContentTransform = { direction, exitEffects ->
         (
             slideIntoContainer(
                 towards = direction,
@@ -105,7 +109,7 @@ internal fun SettingsRoute(
                 towards = direction,
                 animationSpec = spatialSpec,
                 targetOffset = { it / 4 },
-            ) + fadeOut(animationSpec = effectsSpec),
+            ) + exitEffects,
         )
     }
 
@@ -114,89 +118,105 @@ internal fun SettingsRoute(
         onBack = pop,
         modifier = Modifier.fillMaxSize(),
         transitionSpec = {
-            transition(AnimatedContentTransitionScope.SlideDirection.Start)
+            transition(AnimatedContentTransitionScope.SlideDirection.Start, fadeOut(effectsSpec))
         },
         popTransitionSpec = {
-            transition(AnimatedContentTransitionScope.SlideDirection.End)
+            transition(AnimatedContentTransitionScope.SlideDirection.End, ExitTransition.None)
         },
         entryProvider = { key ->
             NavEntry(key) { destination ->
-                SecondaryPageScaffold(
-                    title = destination.title,
-                    onBack = {
-                        if (destination == SettingsDestination.Root) {
-                            onBack()
-                        } else {
-                            pop()
-                        }
-                    },
-                    actions = {
-                        if (
-                            destination == SettingsDestination.Notifications ||
-                            destination == SettingsDestination.InAppNotifications
-                        ) {
-                            InAppNotificationSettingsMenu(
-                                onCustomizedNotifications = { navigateTo(SettingsDestination.CustomizedNotifications) },
-                            )
-                        }
-                    },
-                ) { innerPadding, scrollBehavior ->
-                    when (destination) {
-                        SettingsDestination.Root -> SettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                            onDestinationSelected = navigateTo,
-                            onDeleteAllChatHistories = onDeleteAllChatHistories,
-                        )
-                        SettingsDestination.Appearance -> AppearanceSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.Notifications -> NotificationSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                            onInAppNotifications = { navigateTo(SettingsDestination.InAppNotifications) },
-                        )
-                        SettingsDestination.InAppNotifications -> InAppNotificationSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.CustomizedNotifications -> CustomizedNotificationsScreen(innerPadding, scrollBehavior)
-                        SettingsDestination.MessengerPlus -> MessengerPlusSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.Emoticons -> EmoticonSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.ContactInvitations -> ContactInvitationSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.Transfers -> org.aralozkaya.msngr.pages.TransferSettingsScreen(innerPadding, scrollBehavior)
-                        SettingsDestination.Connection -> ConnectionSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                            onDestinationSelected = navigateTo,
-                        )
-                        SettingsDestination.ConnectionInformation -> ConnectionInformationScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                        SettingsDestination.About -> AboutSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                            onLicenses = { navigateTo(SettingsDestination.Licenses) },
-                        )
-                        SettingsDestination.Licenses -> org.aralozkaya.msngr.pages.OpenSourceLicensesScreen(innerPadding)
-                        SettingsDestination.Updates -> UpdateSettingsScreen(
-                            innerPadding = innerPadding,
-                            scrollBehavior = scrollBehavior,
-                        )
-                    }
+                // Animate the last frame after a pop and dispose the outgoing controls immediately.
+                CapturedAnimatedVisibility(
+                    visible = destination in backStack,
+                    enter = EnterTransition.None,
+                    exit = fadeOut(effectsSpec),
+                ) {
+                    SettingsPage(
+                        destination = destination,
+                        navigateTo = navigateTo,
+                        onBack = if (destination == SettingsDestination.Root) onBack else pop,
+                        onDeleteAllChatHistories = onDeleteAllChatHistories,
+                    )
                 }
             }
         },
     )
+}
+
+@Composable
+private fun SettingsPage(
+    destination: SettingsDestination,
+    navigateTo: (SettingsDestination) -> Unit,
+    onBack: () -> Unit,
+    onDeleteAllChatHistories: () -> Unit,
+) {
+    SecondaryPageScaffold(
+        title = destination.title,
+        onBack = onBack,
+        actions = {
+            if (
+                destination == SettingsDestination.Notifications ||
+                destination == SettingsDestination.InAppNotifications
+            ) {
+                InAppNotificationSettingsMenu(
+                    onCustomizedNotifications = { navigateTo(SettingsDestination.CustomizedNotifications) },
+                )
+            }
+        },
+    ) { innerPadding, scrollBehavior ->
+        when (destination) {
+            SettingsDestination.Root -> SettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                onDestinationSelected = navigateTo,
+                onDeleteAllChatHistories = onDeleteAllChatHistories,
+            )
+            SettingsDestination.Appearance -> AppearanceSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.Notifications -> NotificationSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                onInAppNotifications = { navigateTo(SettingsDestination.InAppNotifications) },
+            )
+            SettingsDestination.InAppNotifications -> InAppNotificationSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.CustomizedNotifications -> CustomizedNotificationsScreen(innerPadding, scrollBehavior)
+            SettingsDestination.MessengerPlus -> MessengerPlusSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.Emoticons -> EmoticonSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.ContactInvitations -> ContactInvitationSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.Transfers -> org.aralozkaya.msngr.pages.TransferSettingsScreen(innerPadding, scrollBehavior)
+            SettingsDestination.Connection -> ConnectionSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                onDestinationSelected = navigateTo,
+            )
+            SettingsDestination.ConnectionInformation -> ConnectionInformationScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+            SettingsDestination.About -> AboutSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                onLicenses = { navigateTo(SettingsDestination.Licenses) },
+            )
+            SettingsDestination.Licenses -> org.aralozkaya.msngr.pages.OpenSourceLicensesScreen(innerPadding)
+            SettingsDestination.Updates -> UpdateSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+            )
+        }
+    }
 }
