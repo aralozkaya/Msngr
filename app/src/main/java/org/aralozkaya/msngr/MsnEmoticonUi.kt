@@ -21,7 +21,9 @@ import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.util.TypedValue
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.compose.foundation.layout.PaddingValues
@@ -74,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.SoftwareKeyboardControllerCompat
+import org.aralozkaya.msngr.pages.components.KeyboardSheetHostState
 import org.aralozkaya.msngr.pages.components.LocalKeyboardSheetHost
 import kotlin.math.ceil
 import kotlin.math.max
@@ -235,7 +238,9 @@ internal fun MsnEmoticonEditor(
     val currentOnColors by rememberUpdatedState(onColors)
     val currentOnTextStyle by rememberUpdatedState(onTextStyle)
     var editorFocused by remember { mutableStateOf(false) }
-    val keepSheetOpenOnTap = LocalKeyboardSheetHost.current?.keepOpenOnInputTap == true
+    val sheetHost = LocalKeyboardSheetHost.current
+    // Suppress TextView's own IME request when the sheet needs to handle the tap.
+    val showSoftInputOnFocus = sheetHost?.handlesKeyboardOnInputTap != true
     val contentColor = LocalContentColor.current
     val adaptiveColor = MaterialTheme.colorScheme.primary.toArgb()
     val textStyle = LocalTextStyle.current
@@ -249,7 +254,8 @@ internal fun MsnEmoticonEditor(
         factory = { context ->
             MsnEditText(context).also { editor ->
                 editor.allowUnicodeEmoji = allowUnicodeEmoji
-                editor.showSoftInputOnFocus = !keepSheetOpenOnTap
+                editor.keyboardSheetHost = sheetHost
+                editor.showSoftInputOnFocus = showSoftInputOnFocus
                 editor.configureSingleLine(singleLine, autoCorrect = onSearch == null)
                 editor.setExternalValue(value)
                 initialSelection?.let { selection ->
@@ -272,6 +278,7 @@ internal fun MsnEmoticonEditor(
                     currentOnFocusChanged(focused)
                 }
                 editor.setOnClickListener {
+                    if (!editor.showSoftInputOnFocus) editor.showKeyboard()
                     currentOnTap()
                 }
                 editor.setOnEditorActionListener { _, actionId, _ ->
@@ -318,7 +325,8 @@ internal fun MsnEmoticonEditor(
             editor.onValueChanged = onValueChange
             editor.allowUnicodeEmoji = allowUnicodeEmoji
             editor.isEnabled = enabled
-            editor.showSoftInputOnFocus = !keepSheetOpenOnTap
+            editor.keyboardSheetHost = sheetHost
+            editor.showSoftInputOnFocus = showSoftInputOnFocus
             editor.configureSingleLine(singleLine, autoCorrect = onSearch == null)
             if (onSearch != null) editor.imeOptions = EditorInfo.IME_ACTION_SEARCH
             // Even an unchanged hint rebuilds TextView's layout and dismisses its
@@ -426,9 +434,7 @@ internal class MessengerPlusEditorController(
 
     fun requestFocusAndShowKeyboard() {
         val target = editor ?: return
-        if (target.requestFocus() && target.showSoftInputOnFocus) {
-            SoftwareKeyboardControllerCompat(target).show()
-        }
+        if (target.requestFocus()) target.showKeyboard()
     }
 
     fun hideKeyboard() {
@@ -721,6 +727,31 @@ private fun inlineContentKey(index: Int): String = "msn-emoticon-$index"
 
 internal class MsnEditText(context: Context) : EditText(context) {
     private var nativeStyle = NativeTextStyle()
+    var keyboardSheetHost: KeyboardSheetHostState? = null
+    private val showKeyboardWhenFocused: () -> Unit = {
+        if (isAttachedToWindow && hasFocus()) SoftwareKeyboardControllerCompat(this).show()
+    }
+    private val keyboardTapDetector by lazy {
+        GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapUp(event: MotionEvent): Boolean {
+                showKeyboard()
+                return true
+            }
+        })
+    }
+
+    fun showKeyboard() {
+        val host = keyboardSheetHost
+        if (host != null) host.showKeyboard(showKeyboardWhenFocused)
+        else if (showSoftInputOnFocus) showKeyboardWhenFocused()
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val handled = super.onTouchEvent(event)
+        // The first tap can focus the editor without calling its click listener.
+        if (handled && isEnabled && !showSoftInputOnFocus) keyboardTapDetector.onTouchEvent(event)
+        return handled
+    }
 
     fun setNativeStyle(style: NativeTextStyle) {
         if (nativeStyle == style) return
