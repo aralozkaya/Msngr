@@ -295,6 +295,8 @@ object MsnpGameCatalogService {
             host == "static.levelleap.com" ||
             host.endsWith(".escargot.chat") ||
             host.endsWith(".nina.chat") ||
+            host.endsWith(".ctsrv.xyz") ||
+            host.endsWith(".ugnet.xyz") ||
             host.endsWith(".ctsrv.gay") ||
             host.endsWith(".ugnet.gay")
         ) {
