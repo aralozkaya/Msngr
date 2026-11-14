@@ -176,24 +176,24 @@ object ServerPresets {
     )
 
     private val crossTalk = ServerOverrides(
-        mainServer = "ms.msgrsvcs.ctsrv.gay",
-        configServer = "conf.msgrsvcs.ctsrv.gay",
+        mainServer = "ms.msgrsvcs.ctsrv.xyz",
+        configServer = "conf.msgrsvcs.ctsrv.xyz",
         // Reroute does not replace Plus! URLs. Use the restored public sound library independently of MSNP.
         emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
         authServerEnabled = true,
-        authServer = "ctas.login.ugnet.gay",
+        authServer = "ctas.login.ugnet.xyz",
         addressBookServerEnabled = true,
-        addressBookServer = "ctsvcs.addressbook.ugnet.gay",
+        addressBookServer = "ctsvcs.addressbook.ugnet.xyz",
         adsServerEnabled = true,
-        adsServer = "ctsvcs.advertising.ugnet.gay",
+        adsServer = "ctsvcs.advertising.ugnet.xyz",
         storageServerEnabled = true,
-        storageServer = "cts.storage.ugnet.gay",
+        storageServer = "cts.storage.ugnet.xyz",
         socialServerEnabled = true,
-        socialServer = "social.ugnet.gay",
+        socialServer = "social.ugnet.xyz",
         activitiesServerEnabled = true,
-        activitiesServer = "mactivities.msgrsvcs.ctsrv.gay",
+        activitiesServer = "mactivities.msgrsvcs.ctsrv.xyz",
         mailServerEnabled = true,
-        mailServer = "mail.ugnet.gay",
+        mailServer = "mail.ugnet.xyz",
     )
 
     fun presetFor(provider: String): ServerOverrides = when (provider) {

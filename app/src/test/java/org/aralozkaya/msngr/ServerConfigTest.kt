@@ -41,14 +41,15 @@ class ServerConfigTest {
             customServers = ServerOverrides(),
         )
 
-        assertEquals("ms.msgrsvcs.ctsrv.gay", resolved.mainServer)
-        assertEquals("conf.msgrsvcs.ctsrv.gay", resolved.configServer)
-        assertEquals("ctas.login.ugnet.gay", resolved.authServer)
-        assertEquals("ctsvcs.addressbook.ugnet.gay", resolved.addressBookServer)
-        assertEquals("ctsvcs.advertising.ugnet.gay", resolved.adsServer)
-        assertEquals("cts.storage.ugnet.gay", resolved.storageServer)
-        assertEquals("social.ugnet.gay", resolved.socialServer)
-        assertEquals("mactivities.msgrsvcs.ctsrv.gay", resolved.activitiesServer)
+        assertEquals("ms.msgrsvcs.ctsrv.xyz", resolved.mainServer)
+        assertEquals("conf.msgrsvcs.ctsrv.xyz", resolved.configServer)
+        assertEquals("ctas.login.ugnet.xyz", resolved.authServer)
+        assertEquals("ctsvcs.addressbook.ugnet.xyz", resolved.addressBookServer)
+        assertEquals("ctsvcs.advertising.ugnet.xyz", resolved.adsServer)
+        assertEquals("cts.storage.ugnet.xyz", resolved.storageServer)
+        assertEquals("social.ugnet.xyz", resolved.socialServer)
+        assertEquals("mactivities.msgrsvcs.ctsrv.xyz", resolved.activitiesServer)
+        assertEquals("mail.ugnet.xyz", resolved.mailServer)
     }
 
     @Test
