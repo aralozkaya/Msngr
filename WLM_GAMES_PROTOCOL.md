@@ -31,12 +31,12 @@ Inside `<MsgrConfig><LocalizedConfig Market="en-US"><AppDirConfig>`, WLM reads t
   <AppDirVersionURL>http://apps.escargot.nina.chat/activities/version/</AppDirVersionURL>
 </AppDirConfig>
 ```
-On CrossTalk (`conf.msgrsvcs.ctsrv.gay`), `<AppDirConfig>` resolves to:
+On CrossTalk (`conf.msgrsvcs.ctsrv.xyz`), `<AppDirConfig>` resolves to:
 ```xml
 <AppDirConfig>
-  <AppDirPageURL>http://mactivities.msgrsvcs.ctsrv.gay/AppDirectory/Directory.aspx?L=en-us</AppDirPageURL>
-  <AppDirSeviceURL>http://mactivities.msgrsvcs.ctsrv.gay/AppDirectory/AppDirectory.asmx</AppDirSeviceURL>
-  <AppDirVersionURL>http://mactivities.msgrsvcs.ctsrv.gay/AppDirectory/GetAppdirVersion.aspx</AppDirVersionURL>
+  <AppDirPageURL>http://mactivities.msgrsvcs.ctsrv.xyz/AppDirectory/Directory.aspx?L=en-us</AppDirPageURL>
+  <AppDirSeviceURL>http://mactivities.msgrsvcs.ctsrv.xyz/AppDirectory/AppDirectory.asmx</AppDirSeviceURL>
+  <AppDirVersionURL>http://mactivities.msgrsvcs.ctsrv.xyz/AppDirectory/GetAppdirVersion.aspx</AppDirVersionURL>
 </AppDirConfig>
 ```
 > **Note**: `<AppDirSeviceURL>` (missing the `r` in `Service`) is an original Microsoft spelling typo hardcoded at VA `0x0043e480`.

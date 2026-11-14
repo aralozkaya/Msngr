@@ -70,18 +70,18 @@ class GameProtocolTest {
         )
         assertEquals(
             listOf(
-                "https://mactivities.msgrsvcs.ctsrv.gay/AppDirectory/AppDirectory.asmx",
-                "https://mactivities.msgrsvcs.ctsrv.gay/activities/service/",
+                "https://mactivities.msgrsvcs.ctsrv.xyz/AppDirectory/AppDirectory.asmx",
+                "https://mactivities.msgrsvcs.ctsrv.xyz/activities/service/",
             ),
-            MsnpGameCatalogService.candidateServiceUrls("mactivities.msgrsvcs.ctsrv.gay"),
+            MsnpGameCatalogService.candidateServiceUrls("mactivities.msgrsvcs.ctsrv.xyz"),
         )
         assertEquals(
             "https://static.levelleap.com/app-data/tic-tac-toe/tictactoe.htm",
             MsnpGameCatalogService.upgradeKnownHttpsUrl("http://static.levelleap.com/app-data/tic-tac-toe/tictactoe.htm"),
         )
         assertEquals(
-            "https://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/reversi.htm",
-            MsnpGameCatalogService.upgradeKnownHttpsUrl("http://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/reversi.htm"),
+            "https://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/reversi.htm",
+            MsnpGameCatalogService.upgradeKnownHttpsUrl("http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/reversi.htm"),
         )
     }
 
@@ -130,9 +130,9 @@ class GameProtocolTest {
                     <Sequence>0</Sequence>
                     <Name>Reversi</Name>
                     <Description>Also known as Othello.</Description>
-                    <URL>http://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/reversi.htm</URL>
-                    <IconURL>http://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/images/icon.png</IconURL>
-                    <AppIconURL>http://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/images/icon.png</AppIconURL>
+                    <URL>http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/reversi.htm</URL>
+                    <IconURL>http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/images/icon.png</IconURL>
+                    <AppIconURL>http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/images/icon.png</AppIconURL>
                     <AppType>0</AppType>
                     <Hidden>false</Hidden>
                 </Entry>
@@ -140,7 +140,7 @@ class GameProtocolTest {
                     <CategoryID>102</CategoryID>
                     <CategoryName>Mess.be Games</CategoryName>
                     <CategoryDescription>Community games</CategoryDescription>
-                    <CategoryIconURL>http://mactivities.msgrsvcs.ctsrv.gay/static/cat.png</CategoryIconURL>
+                    <CategoryIconURL>http://mactivities.msgrsvcs.ctsrv.xyz/static/cat.png</CategoryIconURL>
                 </Category>
             </AppDir>
         """.trimIndent()
@@ -148,10 +148,10 @@ class GameProtocolTest {
         assertEquals(1, crossTalkCatalog.categories.size)
         assertEquals("Mess.be Games", crossTalkCatalog.categories.single().name)
         assertEquals("Community games", crossTalkCatalog.categories.single().description)
-        assertEquals("https://mactivities.msgrsvcs.ctsrv.gay/static/cat.png", crossTalkCatalog.categories.single().iconUrl)
+        assertEquals("https://mactivities.msgrsvcs.ctsrv.xyz/static/cat.png", crossTalkCatalog.categories.single().iconUrl)
         assertEquals(10291359, crossTalkCatalog.entries.single().appId)
         assertEquals(
-            "https://mactivities.msgrsvcs.ctsrv.gay/static/app-data/messbe/reversi/reversi.htm",
+            "https://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/reversi/reversi.htm",
             crossTalkCatalog.entries.single().url,
         )
     }
