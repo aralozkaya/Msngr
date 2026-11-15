@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,14 +39,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -343,23 +345,40 @@ fun ConnectionSettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("When the picture from Messenger differs from the one saved on this device:")
-                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                        DisplayPictureSyncBehavior.entries.forEachIndexed { index, behavior ->
-                            SegmentedListItem(
-                                onClick = {
-                                    DisplayPictureSyncPrefs.setBehavior(context, behavior)
-                                    pictureBehavior = behavior
-                                    showPictureBehavior = false
-                                    runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
-                                        context.displayPictureSync.requestRefresh(it)
+                    Column(Modifier.selectableGroup()) {
+                        DisplayPictureSyncBehavior.entries.forEach { behavior ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 56.dp)
+                                    .selectable(
+                                        selected = pictureBehavior == behavior,
+                                        onClick = {
+                                            DisplayPictureSyncPrefs.setBehavior(context, behavior)
+                                            pictureBehavior = behavior
+                                            showPictureBehavior = false
+                                            runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
+                                                context.displayPictureSync.requestRefresh(it)
+                                            }
+                                        },
+                                        role = Role.RadioButton,
+                                    )
+                                    .testTag("picture-sync-${behavior.name}"),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                RadioButton(selected = pictureBehavior == behavior, onClick = null)
+                                Column {
+                                    Text(behavior.label)
+                                    if (behavior == DisplayPictureSyncBehavior.AskEveryTime) {
+                                        Text(
+                                            text = "Default",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
-                                },
-                                shapes = ListItemDefaults.segmentedShapes(index, DisplayPictureSyncBehavior.entries.size),
-                                modifier = Modifier.fillMaxWidth().testTag("picture-sync-${behavior.name}")
-                                    .semantics { role = Role.RadioButton; selected = pictureBehavior == behavior },
-                                leadingContent = { RadioButton(selected = pictureBehavior == behavior, onClick = null) },
-                                supportingContent = if (behavior == DisplayPictureSyncBehavior.AskEveryTime) ({ Text("Default") }) else null,
-                            ) { Text(behavior.label) }
+                                }
+                            }
                         }
                     }
                 }
