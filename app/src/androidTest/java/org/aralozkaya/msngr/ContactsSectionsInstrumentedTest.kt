@@ -28,6 +28,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.ContactsPage
+import org.aralozkaya.msngr.pages.components.LoggedInUserProfileCard
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -251,6 +252,42 @@ class ContactsSectionsInstrumentedTest {
             ViewCompat.getRootWindowInsets(editor)?.isVisible(WindowInsetsCompat.Type.ime()) == false
         }
         assertSearchStopped()
+    }
+
+    @Test fun loggedInUserCardOmitsEditIconWithoutBreakingLayout() {
+        var editClicks = 0
+        val username = "Very Long Logged In Username That Ellipsizes"
+        val statusMessage = "Personal status message"
+        compose.setContent {
+            MsngrTheme {
+                LoggedInUserProfileCard(
+                    profile = UserProfileSnapshot(username, "me@example.com", Presence.Online, statusMessage = statusMessage),
+                    onPresenceSelected = {},
+                    onEditProfile = { editClicks++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Edit profile", useUnmergedTree = true).assertDoesNotExist()
+        val usernameNode = compose.onNodeWithText(username, useUnmergedTree = true).assertIsDisplayed()
+        val statusNode = compose.onNodeWithText(statusMessage, useUnmergedTree = true).assertIsDisplayed()
+        val presenceNode = compose.onNodeWithText("Online", useUnmergedTree = true).assertIsDisplayed()
+        val usernameBounds = usernameNode.fetchSemanticsNode().boundsInRoot
+        val statusBounds = statusNode.fetchSemanticsNode().boundsInRoot
+        val presenceBounds = presenceNode.fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Username (${usernameBounds}) should stay above personal message (${statusBounds})",
+            usernameBounds.bottom <= statusBounds.top,
+        )
+        assertTrue(
+            "Personal message (${statusBounds}) should stay above presence button (${presenceBounds})",
+            statusBounds.bottom <= presenceBounds.top,
+        )
+        assertTrue(
+            "Username height (${usernameBounds.height}) should stay single-line relative to status (${statusBounds.height})",
+            usernameBounds.height < statusBounds.height * 3f,
+        )
+        compose.onNodeWithText(username).performClick()
+        compose.runOnIdle { assertEquals(1, editClicks) }
     }
 
     private fun assertSearchStopped() {
