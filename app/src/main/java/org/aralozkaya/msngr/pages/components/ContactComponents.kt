@@ -109,28 +109,17 @@ fun LoggedInUserProfileCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Row(
+                    MessengerPlusText(
+                        text = profile.username,
+                        sceneGlow = scene != null,
+                        color = if (scene != null) sceneInk else androidx.compose.ui.graphics.Color.Unspecified,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        MessengerPlusText(
-                            text = profile.username,
-                            sceneGlow = scene != null,
-                            color = if (scene != null) sceneInk else androidx.compose.ui.graphics.Color.Unspecified,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit profile",
-                            tint = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     MsnEmoticonText(
                         text = profile.statusMessage.ifBlank { "No personal message" },
                         useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
