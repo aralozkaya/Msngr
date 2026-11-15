@@ -45,7 +45,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedButton
@@ -582,7 +581,6 @@ private fun LoginScreen(
                         trailingIcon = {
                             IconButton(
                                 onClick = { passwordShown = !passwordShown },
-                                shapes = IconButtonDefaults.shapes(),
                             ) {
                                 if (passwordShown) {
                                     Icon(
