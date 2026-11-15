@@ -545,9 +545,10 @@ private fun LoginScreen(
                                             shapes = MenuDefaults.groupShape(0, 1),
                                             interactionSource = accountMenuInteractionSource,
                                         ) {
-                                            rememberedAccounts.forEach { account ->
+                                            rememberedAccounts.forEachIndexed { index, account ->
                                                 DropdownMenuItem(
                                                     text = { Text(account.accountLabel) },
+                                                    shape = MenuDefaults.itemShape(index, rememberedAccounts.size).shape,
                                                     onClick = {
                                                         accountMenuOpen = false
                                                         onSavedAccountSelected(account)
@@ -662,9 +663,10 @@ private fun LoginScreen(
                                     shapes = MenuDefaults.groupShape(0, 1),
                                     interactionSource = presenceMenuInteractionSource,
                                 ) {
-                                    Presence.entries.forEach { presence ->
+                                    Presence.entries.forEachIndexed { index, presence ->
                                         DropdownMenuItem(
                                             text = { Text(presence.ownStatusLabel()) },
+                                            shape = MenuDefaults.itemShape(index, Presence.entries.size).shape,
                                             onClick = {
                                                 presenceMenuOpen = false
                                                 onLoginPresenceChange(presence)
@@ -741,9 +743,10 @@ private fun LoginScreen(
                                 shapes = MenuDefaults.groupShape(0, 1),
                                 interactionSource = providerMenuInteractionSource,
                             ) {
-                                ServerPresets.providerOptions.forEach { option ->
+                                ServerPresets.providerOptions.forEachIndexed { index, option ->
                                     DropdownMenuItem(
                                         text = { Text(option) },
+                                        shape = MenuDefaults.itemShape(index, ServerPresets.providerOptions.size).shape,
                                         onClick = {
                                             providerMenuOpen = false
                                             onProviderSelected(option)
