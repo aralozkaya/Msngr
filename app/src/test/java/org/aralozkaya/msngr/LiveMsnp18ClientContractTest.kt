@@ -528,6 +528,42 @@ class LiveMsnp18ClientContractTest {
         } finally { repository.logout() }
     }
 
+    @Test fun incomingServerChallengeIsAnsweredWithValidQryAndKeepsSessionActive() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val client = sessionClient(notification)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val challenge = "49712575236804373782"
+            notification.deliver(MsnpCommand("CHL", 0, listOf(challenge)))
+            withTimeout(1_000) { while (notification.sent.none { it.verb == "QRY" }) yield() }
+            val response = notification.sent.last { it.verb == "QRY" }
+            assertEquals(listOf(Msnp18Protocol.PRODUCT_ID, "32"), response.parameters)
+            assertEquals(
+                "d78756ae3aadc55b0452eb3ebf038fa6",
+                String(requireNotNull(response.payload), Charsets.US_ASCII),
+            )
+            notification.deliver(MsnpCommand("QRY", response.transactionId))
+            delay(50)
+            assertEquals(listOf(client.sessions.value.single()), client.sessions.value)
+        } finally { client.close() }
+    }
+
+    @Test fun challengeDeliveredDuringSignInTransactionIsAnsweredImmediately() = runBlocking {
+        val notification = ContractNotificationTransport(email).apply {
+            deliverChallengeBeforeAdl("32796436537702972644")
+        }
+        val client = sessionClient(notification)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val response = notification.sent.single { it.verb == "QRY" }
+            assertEquals(listOf(Msnp18Protocol.PRODUCT_ID, "32"), response.parameters)
+            assertEquals(
+                "73f89e4d1d618fa8ff75be016ac6a129",
+                String(requireNotNull(response.payload), Charsets.US_ASCII),
+            )
+        } finally { client.close() }
+    }
+
     @Test fun automaticLogoutRejectionClosesTheNewConnection() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val client = sessionClient(notification)
@@ -2108,9 +2144,14 @@ private class ContractNotificationTransport(
     var connectedPort: Int? = null
         private set
     private var failNextChg = false
+    private var challengeBeforeAdl: String? = null
 
     fun failNextChg() {
         failNextChg = true
+    }
+
+    fun deliverChallengeBeforeAdl(challenge: String) {
+        challengeBeforeAdl = challenge
     }
 
     override suspend fun connect(host: String, port: Int, timeoutMillis: Int) {
@@ -2154,7 +2195,13 @@ private class ContractNotificationTransport(
                     listOf("SB", "mock-switchboard.example:1864", "CKI", "mock-key"),
                 ),
             )
-            "ADL", "RML" -> deliver(MsnpCommand(command.verb, command.transactionId, listOf("OK")))
+            "ADL", "RML" -> {
+                challengeBeforeAdl?.let { challenge ->
+                    challengeBeforeAdl = null
+                    deliver(MsnpCommand("CHL", 0, listOf(challenge)))
+                }
+                deliver(MsnpCommand(command.verb, command.transactionId, listOf("OK")))
+            }
         }
     }
 

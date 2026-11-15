@@ -350,6 +350,35 @@ class Msnp18ProtocolTest {
         assertEquals("\u000304Red\u000312Blue", status)
         assertEquals("RedBlue", MessengerPlusTextCodec.parse(status).text)
     }
+
+    @Test
+    fun challengeResponseComputesMsnp11DigestAndWireFrame() {
+        assertEquals(
+            "d78756ae3aadc55b0452eb3ebf038fa6",
+            Msnp18Protocol.computeChallengeHash("49712575236804373782"),
+        )
+        assertEquals(
+            "73f89e4d1d618fa8ff75be016ac6a129",
+            Msnp18Protocol.computeChallengeHash("32796436537702972644"),
+        )
+        assertEquals(
+            "5e370c6658a7a0a89993e6d09f32bee8",
+            Msnp18Protocol.computeChallengeHash("1234567890123456"),
+        )
+
+        val command = Msnp18Protocol.challengeResponse(10, "49712575236804373782")
+        assertEquals(
+            "QRY 10 PROD0120PW!CCV9@ 32\r\nd78756ae3aadc55b0452eb3ebf038fa6",
+            String(MsnpFrameCodec.encode(command), StandardCharsets.US_ASCII),
+        )
+
+        val decoded = MsnpFrameDecoder().feed("CHL 0 49712575236804373782\r\nQRY 10\r\n".toByteArray())
+        assertEquals(listOf("CHL", "QRY"), decoded.map(MsnpCommand::verb))
+        assertEquals(0, decoded[0].transactionId)
+        assertEquals(listOf("49712575236804373782"), decoded[0].parameters)
+        assertEquals(10, decoded[1].transactionId)
+        assertTrue(decoded[1].parameters.isEmpty())
+    }
 }
 
 internal fun mockDisplayPictureBytes(): ByteArray = byteArrayOf(

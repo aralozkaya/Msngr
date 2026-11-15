@@ -1848,6 +1848,10 @@ internal class LiveMsnp18Client(
     ): MsnpCommand {
         while (true) {
             val command = transport.receive()
+            if (command.verb == "CHL" && command.transactionId != transactionId) {
+                handleChallenge(command)
+                continue
+            }
             if (command.transactionId != transactionId) continue
             if (command.verb.firstOrNull()?.isDigit() == true) {
                 throw command.toProtocolError()
@@ -2030,6 +2034,19 @@ internal class LiveMsnp18Client(
                 offlineRefreshRequests?.trySend(Unit)
             }
             "RNG" -> scope.launch { acceptIncomingSwitchboard(command) }
+            "CHL" -> handleChallenge(command)
+        }
+    }
+
+    private suspend fun handleChallenge(command: MsnpCommand) {
+        val challenge = command.parameters.firstOrNull()?.takeIf(String::isNotBlank) ?: return
+        try {
+            send(Msnp18Protocol.challengeResponse(nextTransactionId(), challenge))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (signedInEmail.isBlank()) throw error
+            reportConnectionLoss(error, force = true)
         }
     }
 
