@@ -15,9 +15,11 @@ version tag, publication date, and release notes. Updates work only in installed
 - Turn off **Check automatically** to cancel automatic checking. **Check for updates**
   continues to work manually. The checking frequency selector expands below the switch
   while automatic checking is enabled; collapsing it preserves the selected frequency.
-- Stable releases are the default. **Include prereleases** also offers alpha, beta, and rc
-  releases. Versions follow the release-tag/versionCode contract in `app/build.gradle.kts`;
-  republishing an old version does not make it an upgrade.
+- Stable releases are the default for stable builds, while prerelease builds default
+  **Include prereleases** to on (without overriding previously saved preferences).
+  **Include prereleases** also offers alpha, beta, and rc releases. Versions follow the
+  release-tag/versionCode contract in `app/build.gradle.kts`; republishing an old version
+  does not make it an upgrade.
 - **Skip this version** suppresses that release's badges and notification. A later version
   is still offered. The release remains available on the updates page for a manual download;
   **Stop skipping this version** restores its badge.
