@@ -65,18 +65,30 @@ internal class DisplayPictureSync(private val context: Context, private val poll
             mutex.withLock {
                 runCatching {
                     val account = checkNotNull(currentAccount(repository)) { "The signed-in account changed. Please try again." }
+                    val normalizedStatus = statusMessage.replace('\r', ' ').replace('\n', ' ').trim()
                     repository.updateProfile(username, avatarUri, pictureBytes, updateDisplayPicture = pictureChanged).getOrThrow()
                     check(currentAccount(repository) == account) { "The signed-in account changed. Please try again." }
                     val saved = if (pictureChanged) OwnDisplayPictureStore.write(context, account, pictureBytes) else null
-                    SessionPrefs.saveUserProfile(context, username, repository.profile.value.presence,
-                        avatarUri = saved?.uri ?: avatarUri, statusMessage = statusMessage, saveDisplayPicture = false)
                     if (saved != null) {
                         showLocal(repository, account, saved)
                         dismissedConflict = null
                         stateAccount = account
                         mutableState.value = DisplayPictureSyncState(notice = repository.displayPictureStorageIssue.value)
                     }
-                    repository.setStatusMessage(statusMessage)
+                    val roamingEnabled = DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account)
+                    repository.updateStatusMessage(normalizedStatus).onFailure {
+                        if (roamingEnabled) {
+                            SessionPrefs.saveUserProfile(context, username, repository.profile.value.presence,
+                                avatarUri = saved?.uri ?: avatarUri, statusMessage = normalizedStatus, saveDisplayPicture = false)
+                            SessionPrefs.setPendingStatusMessagePublish(context, true, account)
+                        }
+                    }.getOrThrow()
+                    SessionPrefs.saveUserProfile(context, username, repository.profile.value.presence,
+                        avatarUri = saved?.uri ?: avatarUri, statusMessage = normalizedStatus, saveDisplayPicture = false)
+                    if (roamingEnabled) {
+                        SessionPrefs.recordServerStatusMessage(context, normalizedStatus, account)
+                        SessionPrefs.setPendingStatusMessagePublish(context, false, account)
+                    }
                 }.onFailure { if (it is CancellationException) throw it }
             }
         }
@@ -93,12 +105,27 @@ internal class DisplayPictureSync(private val context: Context, private val poll
         mutableState.value = DisplayPictureSyncState()
         observationJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             repository.events.collect { event ->
-                if (event is MessengerEvent.OwnDisplayPictureChanged &&
+                val roamingEnabled = DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(
+                    context,
+                    repository.signedInAccountIdentity,
+                )
+                if (roamingEnabled && event is MessengerEvent.OwnPersonalStatusChanged &&
+                    event.account == repository.signedInAccountIdentity) {
+                    if (currentAccount(repository) == event.account) {
+                        val profile = repository.profile.value
+                        SessionPrefs.saveUserProfile(context, profile.username, profile.presence,
+                            avatarUri = profile.avatarUri, statusMessage = event.statusMessage, saveDisplayPicture = false)
+                        SessionPrefs.recordServerStatusMessage(context, event.statusMessage, event.account)
+                        SessionPrefs.setPendingStatusMessagePublish(context, false, event.account)
+                    }
+                } else if (roamingEnabled && event is MessengerEvent.OwnDisplayPictureChanged &&
                     event.account == repository.signedInAccountIdentity) {
                     if (currentAccount(repository) == event.account && event.personalMessage != null) {
                         val profile = repository.profile.value
                         SessionPrefs.saveUserProfile(context, profile.username, profile.presence,
                             avatarUri = profile.avatarUri, statusMessage = event.personalMessage, saveDisplayPicture = false)
+                        SessionPrefs.recordServerStatusMessage(context, event.personalMessage, event.account)
+                        SessionPrefs.setPendingStatusMessagePublish(context, false, event.account)
                     }
                     // The notification is an invalidation, never proof of removal.
                     // Refresh even in the background, retaining choices for the next foreground.
@@ -125,6 +152,16 @@ internal class DisplayPictureSync(private val context: Context, private val poll
                 // Do not reset a dismissed choice on each poll.
                 refresh(repository)
             }
+        }
+    }
+
+    fun onRoamingPreferenceChanged(repository: MessengerRepository, enabled: Boolean) {
+        if (enabled) {
+            requestRefresh(repository)
+        } else {
+            refreshJob?.cancel()
+            dismissedConflict = null
+            mutableState.value = DisplayPictureSyncState()
         }
     }
 
@@ -158,6 +195,11 @@ internal class DisplayPictureSync(private val context: Context, private val poll
     suspend fun restore(repository: MessengerRepository, serverProfile: UserProfileSnapshot, skipNextRefresh: Boolean = false) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val account = currentAccount(repository) ?: return@withLock
+            if (!DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account)) {
+                applyLocalOnlyPicture(repository, account)
+                if (skipNextRefresh) foregroundRestore = repository to account
+                return@withLock
+            }
             val bytes = serverProfile.avatarUri?.let { context.loadDisplayPictureBytes(it) }
             val incoming = validate(IncomingDisplayPicture(bytes, serverProfile.displayPictureFetched &&
                 (serverProfile.avatarUri == null || bytes != null)))
@@ -172,6 +214,10 @@ internal class DisplayPictureSync(private val context: Context, private val poll
         mutex.withLock {
             val account = currentAccount(repository) ?: run {
                 mutableState.value = DisplayPictureSyncState()
+                return@withLock
+            }
+            if (!DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account)) {
+                applyLocalOnlyPicture(repository, account)
                 return@withLock
             }
             val baseline = OwnDisplayPictureStore.read(context, account)
@@ -234,8 +280,7 @@ internal class DisplayPictureSync(private val context: Context, private val poll
         return if (picture != null && !picture.requiresResize) incoming else IncomingDisplayPicture()
     }
 
-    private suspend fun reconcile(repository: MessengerRepository, account: AccountIdentity, incoming: IncomingDisplayPicture) {
-        if (currentAccount(repository) != account) return
+    private suspend fun readLocalSnapshot(account: AccountIdentity): SavedDisplayPicture {
         var local = OwnDisplayPictureStore.read(context, account)
         if (!local.initialized) {
             // Migrate older content/file references only when they can actually be read.
@@ -243,6 +288,30 @@ internal class DisplayPictureSync(private val context: Context, private val poll
             val bytes = legacy?.let { context.loadDisplayPictureBytes(it) }
             if (bytes != null) local = OwnDisplayPictureStore.write(context, account, bytes)
         }
+        return local
+    }
+
+    private suspend fun applyLocalOnlyPicture(repository: MessengerRepository, account: AccountIdentity) {
+        val local = readLocalSnapshot(account)
+        if (currentAccount(repository) != account) return
+        if (stateAccount != account || state.value.conflict != null || state.value.error != null) {
+            mutableState.value = DisplayPictureSyncState()
+            stateAccount = account
+        }
+        dismissedConflict = null
+        if (local.initialized) {
+            try { repository.useDisplayPicture(local.uri, local.bytes, publish = false, account = account) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Retain the local picture while the connection recovers. */ }
+            showLocal(repository, account, local)
+        } else {
+            repository.showStoredDisplayPicture(null, account)
+        }
+    }
+
+    private suspend fun reconcile(repository: MessengerRepository, account: AccountIdentity, incoming: IncomingDisplayPicture) {
+        if (currentAccount(repository) != account) return
+        val local = readLocalSnapshot(account)
         if (currentAccount(repository) != account) return
         if (stateAccount != account) {
             mutableState.value = DisplayPictureSyncState()

@@ -2091,6 +2091,275 @@ class LiveMsnp18ClientContractTest {
 
         client.close()
     }
+
+    @Test fun changePersonalMessagePublishesUuxAndStorageUpdateSkippingRedundantUpdates() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val storageUpdates = CopyOnWriteArrayList<Pair<String, String>>()
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ ->
+                StorageProfile(
+                    profileResourceId = "123!101",
+                    personalStatus = "Initial status",
+                )
+            },
+            updateStoragePersonalStatus = { _, _, profileResourceId, personalStatus ->
+                storageUpdates += profileResourceId to personalStatus
+            },
+        )
+        try {
+            val profile = client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            assertEquals("Initial status", profile.statusMessage)
+
+            // Same normalized status right after sign-in skips redundant UpdateProfile.
+            client.changePersonalMessage("  Initial\r\nstatus  ")
+            assertTrue(storageUpdates.isEmpty())
+
+            client.changePersonalMessage("New status")
+            assertEquals(listOf("123!101" to "New status"), storageUpdates.toList())
+
+            // Self UBX from another endpoint invalidates confirmed storage state.
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:$email"),
+                    payload = "<Data><PSM>From desktop</PSM></Data>".toByteArray(),
+                ),
+            )
+            delay(50)
+            client.changePersonalMessage("New status")
+            assertEquals(
+                listOf("123!101" to "New status", "123!101" to "New status"),
+                storageUpdates.toList(),
+            )
+
+            // Clearing sends empty UpdateProfile once and skips duplicate clear.
+            client.changePersonalMessage("   ")
+            client.changePersonalMessage("")
+            assertEquals(
+                listOf("123!101" to "New status", "123!101" to "New status", "123!101" to ""),
+                storageUpdates.toList(),
+            )
+
+            val uuxPayloads = notification.sent.filter { it.verb == "UUX" }.mapNotNull {
+                it.payload?.toString(Charsets.UTF_8)
+            }
+            assertTrue(uuxPayloads.any { it.contains("<PSM>Initial status</PSM>") })
+            assertTrue(uuxPayloads.any { it.contains("<PSM>New status</PSM>") })
+            assertTrue(uuxPayloads.any { it.contains("<PSM></PSM>") })
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test fun changePersonalMessageToleratesUnsupportedStorageFaultButPropagatesIoErrors() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        var storageError: Exception? = IllegalStateException("SOAP fault 500: ActionNotSupported")
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> StorageProfile(profileResourceId = "123!101") },
+            updateStoragePersonalStatus = { _, _, _, _ ->
+                storageError?.let { throw it }
+            },
+        )
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+
+            // Escargot/minimal servers without UpdateProfile PersonalStatus support still succeed via UUX.
+            client.changePersonalMessage("Escargot status")
+
+            storageError = IOException("storage timed out")
+            val failure = runCatching { client.changePersonalMessage("Fails") }
+            assertTrue(failure.isFailure)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test fun notNotificationSyncsRemotePersonalStatusUpdateAndConfirmedDeletion() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val remoteStatus = AtomicReference<String?>("Old status")
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ ->
+                StorageProfile(
+                    profileResourceId = "123!101",
+                    personalStatus = remoteStatus.get(),
+                )
+            },
+        )
+        val received = CopyOnWriteArrayList<String>()
+        val notifications = AtomicInteger(0)
+        val collector = launch {
+            client.events.collect { event ->
+                when (event) {
+                    is MessengerEvent.OwnDisplayPictureChanged -> notifications.incrementAndGet()
+                    is MessengerEvent.OwnPersonalStatusChanged -> received += event.statusMessage
+                    else -> Unit
+                }
+            }
+        }
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+
+            remoteStatus.set("Updated on PC")
+            notification.deliver(
+                MsnpCommand(
+                    verb = "NOT",
+                    parameters = listOf("34"),
+                    payload = "<NOTIFICATION siteid=\"45705\"/>".toByteArray(),
+                ),
+            )
+            withTimeout(1_000) {
+                while (notifications.get() < 1) yield()
+            }
+            client.fetchOwnDisplayPicture()
+            withTimeout(1_000) {
+                while (!received.contains("Updated on PC")) yield()
+            }
+
+            remoteStatus.set(null)
+            client.fetchOwnDisplayPicture()
+            withTimeout(1_000) {
+                while (!received.contains("")) yield()
+            }
+            assertEquals(listOf("Updated on PC", ""), received.toList())
+        } finally {
+            collector.cancel()
+            client.close()
+        }
+    }
+
+    @Test fun ownProfileRefreshDoesNotClearLiveUbxStatusWhenStorageNeverHadPersonalStatus() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ -> StorageProfile(profileResourceId = "123!101", personalStatus = null) },
+        )
+        val received = CopyOnWriteArrayList<String>()
+        val collector = launch {
+            client.events.collect { event ->
+                if (event is MessengerEvent.OwnPersonalStatusChanged) {
+                    received += event.statusMessage
+                }
+            }
+        }
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:$email"),
+                    payload = "<Data><PSM>Live UBX status</PSM></Data>".toByteArray(),
+                ),
+            )
+            delay(50)
+            client.fetchOwnDisplayPicture()
+            assertTrue(received.isEmpty())
+        } finally {
+            collector.cancel()
+            client.close()
+        }
+    }
+
+    @Test fun roamingDisabledPublishesSessionUuxAndChgWithoutStorageOrRemoteAdoption() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val profileFetches = AtomicInteger(0)
+        val statusUpdates = CopyOnWriteArrayList<String>()
+        val pictureStorageOps = AtomicInteger(0)
+        var roaming = false
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList()) },
+            fetchStorageProfile = { _, _ ->
+                profileFetches.incrementAndGet()
+                StorageProfile(
+                    profileResourceId = "123!101",
+                    expressionProfileResourceId = "123!102",
+                    photoResourceId = "123!103",
+                    personalStatus = "Server status",
+                    displayPictureUrl = "https://example.test/server.png",
+                    displayPictureStateKnown = true,
+                )
+            },
+            fetchDisplayPicture = { _, _ -> mockDisplayPictureBytes() },
+            updateStoragePersonalStatus = { _, _, _, status -> statusUpdates += status },
+            updateStorageDisplayPicture = { _, _, _, _ -> pictureStorageOps.incrementAndGet() },
+            createStorageDisplayPicture = { _, _, _, _ ->
+                pictureStorageOps.incrementAndGet()
+                "123!104"
+            },
+            removeStorageDisplayPicture = { _, _, _, _ -> pictureStorageOps.incrementAndGet() },
+            useRoamingProfile = { roaming },
+        )
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch { client.events.collect { events += it } }
+        try {
+            val signedIn = client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            assertEquals(0, profileFetches.get())
+            assertEquals("", signedIn.statusMessage)
+            assertNull(signedIn.avatarUri)
+            assertFalse(signedIn.displayPictureFetched)
+
+            client.changePersonalMessage("Phone-only status")
+            client.changeDisplayPicture(mockDisplayPictureBytes())
+
+            assertTrue(statusUpdates.isEmpty())
+            assertEquals(0, pictureStorageOps.get())
+            assertNull(client.displayPictureStorageIssue.value)
+            val uuxPayloads = notification.sent.filter { it.verb == "UUX" }.mapNotNull {
+                it.payload?.toString(Charsets.UTF_8)
+            }
+            assertTrue(uuxPayloads.any { it.contains("<PSM>Phone-only status</PSM>") })
+            assertTrue(
+                notification.sent.any {
+                    it.verb == "CHG" && it.parameters.getOrNull(2)?.contains("msnobj", ignoreCase = true) == true
+                },
+            )
+
+            // Remote notifications/self-UBX must not adopt roaming state while roaming is off.
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:$email"),
+                    payload = "<Data><PSM>PC status</PSM></Data>".toByteArray(),
+                ),
+            )
+            notification.deliver(
+                MsnpCommand(
+                    verb = "NOT",
+                    parameters = listOf("34"),
+                    payload = "<NOTIFICATION siteid=\"45705\"/>".toByteArray(),
+                ),
+            )
+            delay(50)
+            assertFalse(client.fetchOwnDisplayPicture().fetched)
+            assertEquals(0, profileFetches.get())
+            assertTrue(
+                events.none {
+                    it is MessengerEvent.OwnPersonalStatusChanged ||
+                        it is MessengerEvent.OwnDisplayPictureChanged
+                },
+            )
+
+            // Re-enabling roaming immediately resumes permanent storage persistence.
+            roaming = true
+            client.changePersonalMessage("Synced everywhere")
+            assertEquals(listOf("Synced everywhere"), statusUpdates.toList())
+        } finally {
+            collector.cancel()
+            client.close()
+        }
+    }
 }
 
 private class RecordingContactDisplayPictureCache(

@@ -250,6 +250,9 @@ fun ConnectionSettingsScreen(
 ) {
     val context = LocalContext.current
     val account = SessionPrefs.preferenceAccount(context)
+    var usesSamePictureAndStatusEverywhere by remember(account) {
+        mutableStateOf(DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account))
+    }
     var pictureBehavior by remember(account) { mutableStateOf(DisplayPictureSyncPrefs.behavior(context)) }
     var showPictureBehavior by rememberSaveable { mutableStateOf(false) }
     var keepsBackgroundConnection by rememberSaveable {
@@ -300,13 +303,37 @@ fun ConnectionSettingsScreen(
             )
         }
         settingsSectionSpacer()
-        item(key = "display-picture-sync") {
-            SegmentedListItem(
-                onClick = { showPictureBehavior = true },
-                shapes = ListItemDefaults.segmentedShapes(0, 1),
-                modifier = Modifier.settingsRow().testTag("display-picture-sync-setting"),
-                supportingContent = { Text(pictureBehavior.label) },
-            ) { Text("Display picture changes") }
+        item(key = "roaming-profile") {
+            ExpandableSettingsGroup(
+                expanded = usesSamePictureAndStatusEverywhere,
+                master = { shapes ->
+                    SegmentedListItem(
+                        checked = usesSamePictureAndStatusEverywhere,
+                        onCheckedChange = { enabled ->
+                            DisplayPictureSyncPrefs.setUsesSamePictureAndStatusEverywhere(context, enabled, account)
+                            usesSamePictureAndStatusEverywhere = enabled
+                            if (!enabled) showPictureBehavior = false
+                            runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
+                                context.displayPictureSync.onRoamingPreferenceChanged(it, enabled)
+                            }
+                        },
+                        shapes = shapes,
+                        modifier = Modifier.settingsRow().testTag("roaming-profile-setting"),
+                        trailingContent = { Switch(checked = usesSamePictureAndStatusEverywhere, onCheckedChange = null) },
+                        supportingContent = {
+                            Text("Sync display picture and personal message changes across places where you sign in.")
+                        },
+                    ) { Text("Use the same display picture and personal message wherever I sign in") }
+                },
+            ) { shapes, colors ->
+                SegmentedListItem(
+                    onClick = { showPictureBehavior = true },
+                    shapes = shapes,
+                    colors = colors,
+                    modifier = Modifier.settingsRow().testTag("display-picture-sync-setting"),
+                    supportingContent = { Text(pictureBehavior.label) },
+                ) { Text("Display picture changes") }
+            }
         }
     }
     if (showPictureBehavior) {
