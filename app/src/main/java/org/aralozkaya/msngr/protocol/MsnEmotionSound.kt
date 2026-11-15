@@ -12,6 +12,9 @@ data class EmotionSoundMessage(val sound: EmotionSound, val displayText: String)
 /** Plus! sounds travel inside ordinary, styled text/plain messages (including circle messages). */
 object MsnEmotionSound {
     const val DEFAULT_SERVER = "https://bart.nina.chat/esnd/snd/"
+    const val CROSSTALK_SERVER = "https://snd.msgrsvcs.ctsrv.xyz/esnd/snd/"
+    const val ESCARGOT_CATALOG_URL = "https://escargot.chat/sounds/"
+    const val CROSSTALK_CATALOG_URL = "https://crosstalk.im/sounds"
     const val MAX_BYTES = 1024 * 1024
     const val CUSTOM_PREFIX = "[Messenger Plus! Sound] - Data{"
     private val hashPattern = Regex("[0-9A-Fa-f]{12}")

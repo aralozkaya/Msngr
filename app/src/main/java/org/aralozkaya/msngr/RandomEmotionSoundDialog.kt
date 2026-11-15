@@ -34,7 +34,9 @@ internal fun RandomEmotionSoundDialog(
     val context = LocalContext.current
     val player = rememberEmotionSoundController()
     val scope = rememberCoroutineScope()
-    val soundService = remember(player.server, service) { service ?: EmotionSoundService(player.server) }
+    val soundService = remember(player.server, service) {
+        service ?: org.aralozkaya.msngr.protocol.MsnEmotionSound.server(player.server)?.let(::EmotionSoundService)
+    }
     var language by remember { mutableIntStateOf(0) }
     var candidate by remember { mutableStateOf<Pair<EmotionSound, ByteArray>?>(null) }
     var downloading by remember { mutableStateOf(false) }
@@ -46,6 +48,10 @@ internal fun RandomEmotionSoundDialog(
     } ?: emotionSoundCategories[category]
 
     fun download() {
+        val activeService = soundService ?: run {
+            error = "Online emotion sounds are not configured for this service."
+            return
+        }
         player.stop()
         candidate = null
         downloading = true
@@ -53,7 +59,7 @@ internal fun RandomEmotionSoundDialog(
         scope.launch {
             try {
                 player.checkAccount()
-                val result = soundService.random(if (category == 0) (1..5).random() else category, language)
+                val result = activeService.random(if (category == 0) (1..5).random() else category, language)
                 player.checkAccount()
                 candidate = result
             } catch (cancel: CancellationException) { throw cancel }

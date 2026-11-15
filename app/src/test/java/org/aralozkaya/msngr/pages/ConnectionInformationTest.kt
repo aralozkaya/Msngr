@@ -14,28 +14,45 @@ class ConnectionInformationTest {
             mainServer = "messenger.example",
             configServer = "config.example",
             emotionSoundServer = "https://sounds.example/custom",
+            winkCatalogServer = "https://winks.example/catalog/",
         )
         val servers = ServerPresets.resolveForProvider(ProviderOptions.CUSTOM, custom)
 
         assertEquals(
             listOf(
-                "Winks" to WinkCatalogActivity.CATALOG_URL,
+                "Winks" to "https://winks.example/catalog/",
                 "Emotion sounds" to "https://sounds.example/custom/",
             ),
-            messengerPlusConnectionDetails(WinkCatalogActivity.CATALOG_URL, servers.emotionSoundServer),
+            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
         )
     }
 
-    @Test fun absentSoundOverrideDisplaysTheResolvedDefault() {
+    @Test fun absentCustomUrlsDisplayNotConfiguredWithoutEscargotFallbacks() {
         val servers = ServerPresets.resolveForProvider(ProviderOptions.CUSTOM, ServerOverrides(
             mainServer = "messenger.example",
             configServer = "config.example",
             emotionSoundServer = "",
+            winkCatalogServer = "",
         ))
 
         assertEquals(
-            "Emotion sounds" to MsnEmotionSound.DEFAULT_SERVER,
-            messengerPlusConnectionDetails(null, servers.emotionSoundServer).last(),
+            listOf(
+                "Winks" to "Not configured",
+                "Emotion sounds" to "Not configured",
+            ),
+            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
+        )
+    }
+
+    @Test fun crosstalkDetailsUseCrosstalkSoundServerAndDisableThirdPartyWinks() {
+        val servers = ServerPresets.resolveForProvider(ProviderOptions.CROSSTALK, ServerOverrides())
+
+        assertEquals(
+            listOf(
+                "Winks" to "Not configured",
+                "Emotion sounds" to MsnEmotionSound.CROSSTALK_SERVER,
+            ),
+            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
         )
     }
 

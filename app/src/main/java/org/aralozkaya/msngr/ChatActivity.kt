@@ -282,8 +282,15 @@ private fun ChatRoute(
             repository.pendingEmotionSounds.collect { pending ->
                 pending[contactId]?.let { message ->
                     repository.consumePendingEmotionSound(contactId, message.id)
-                    if (plusSettings.playEmotionSounds && System.currentTimeMillis() - message.timestampMillis in 0..60_000)
-                        message.emotionSound?.sound?.let(soundPlayer::play)
+                    if (plusSettings.playEmotionSounds && System.currentTimeMillis() - message.timestampMillis in 0..60_000) {
+                        val sound = message.emotionSound?.sound
+                        if (sound != null) {
+                            val canPlay = soundPlayer.onlineEnabled || kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                soundPlayer.account?.let { context.emotionSoundStore().bytes(it, soundPlayer.server, sound) } != null
+                            }
+                            if (canPlay) soundPlayer.play(sound)
+                        }
+                    }
                 }
             }
         }

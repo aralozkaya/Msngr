@@ -432,4 +432,24 @@ class WinkInstrumentedTest {
         WinkPrefs.reload(context)
         assertFalse(WinkPrefs.state(context).value.playWinks)
     }
+
+    @Test fun crosstalkHidesThirdPartyWinkCatalogWhileKeepingBuiltIns() {
+        SessionPrefs.completeLogin(
+            context,
+            "wink-crosstalk-${System.nanoTime()}@example.test",
+            "mock-password",
+            false,
+            ProviderOptions.CROSSTALK,
+            ServerOverrides(),
+            true,
+        )
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            Box(Modifier.fillMaxSize()) {
+                WinkPicker(true, true, {}) { _, _ -> Result.success(Unit) }
+            }
+        } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Bouncy Ball").assertIsDisplayed()
+        compose.onNodeWithText("Get more winks").assertDoesNotExist()
+    }
 }

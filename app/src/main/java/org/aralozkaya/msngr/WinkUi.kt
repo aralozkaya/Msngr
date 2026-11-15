@@ -50,6 +50,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
     var busy by remember { mutableStateOf(false) }
     val libraryChanges by context.winkStore().libraryChanges.collectAsState()
     var preview by remember(account) { mutableStateOf<WinkReference?>(null) }
+    val catalogConfigured = SessionPrefs.readServerConfig(context).winkCatalogServer.isNotBlank()
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) generation++ }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
@@ -61,10 +62,14 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
         header = {
             Text("Winks", style = MaterialTheme.typography.titleMedium)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        }, footer = {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
+        }, footer = if (catalogConfigured) {
+            {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text("Get more winks") }
+                }
             }
+        } else {
+            null
         }) {
         catalog.chunked(4).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

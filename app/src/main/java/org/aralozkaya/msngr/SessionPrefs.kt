@@ -36,7 +36,8 @@ data class ServerOverrides(
     val activitiesServer: String = "",
     val mailServerEnabled: Boolean = false,
     val mailServer: String = "",
-    val emotionSoundServer: String = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
+    val emotionSoundServer: String = "",
+    val winkCatalogServer: String = "",
 ) {
     fun normalized(): ServerOverrides = copy(
         mainServer = mainServer.trim(),
@@ -49,6 +50,7 @@ data class ServerOverrides(
         activitiesServer = activitiesServer.trim(),
         mailServer = mailServer.trim(),
         emotionSoundServer = emotionSoundServer.trim(),
+        winkCatalogServer = winkCatalogServer.trim(),
     )
 
     fun hasRequiredServers(): Boolean =
@@ -66,7 +68,10 @@ data class ServerOverrides(
             (!value.socialServerEnabled || value.socialServer.isNotEmpty()) &&
             (!value.activitiesServerEnabled || value.activitiesServer.isNotEmpty()) &&
             (!value.mailServerEnabled || value.mailServer.isNotEmpty()) &&
-            org.aralozkaya.msngr.protocol.MsnEmotionSound.server(value.emotionSoundServer) != null
+            (value.emotionSoundServer.isEmpty() ||
+                org.aralozkaya.msngr.protocol.MsnEmotionSound.server(value.emotionSoundServer) != null) &&
+            (value.winkCatalogServer.isEmpty() ||
+                WinkDownloads.catalogUrl(value.winkCatalogServer) != null)
     }
 
     fun toResolved(): ServerConfig {
@@ -96,7 +101,8 @@ data class ServerOverrides(
             ),
             mailServer = optional(value.mailServerEnabled, value.mailServer, value.mainServer),
             emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.server(value.emotionSoundServer)
-                ?: org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
+                .orEmpty(),
+            winkCatalogServer = WinkDownloads.catalogUrl(value.winkCatalogServer).orEmpty(),
         )
     }
 
@@ -116,7 +122,8 @@ data class ServerConfig(
     val socialServer: String,
     val activitiesServer: String,
     val mailServer: String,
-    val emotionSoundServer: String = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
+    val emotionSoundServer: String = "",
+    val winkCatalogServer: String = "",
 )
 
 /** Each remembered account has its own encrypted credentials and service configuration. */
@@ -173,13 +180,13 @@ object ServerPresets {
         activitiesServerEnabled = true,
         activitiesServer = "apps.escargot.nina.chat",
         emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
+        winkCatalogServer = WinkCatalogActivity.CATALOG_URL,
     )
 
     private val crossTalk = ServerOverrides(
         mainServer = "ms.msgrsvcs.ctsrv.xyz",
         configServer = "conf.msgrsvcs.ctsrv.xyz",
-        // Reroute does not replace Plus! URLs. Use the restored public sound library independently of MSNP.
-        emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.DEFAULT_SERVER,
+        emotionSoundServer = org.aralozkaya.msngr.protocol.MsnEmotionSound.CROSSTALK_SERVER,
         authServerEnabled = true,
         authServer = "ctas.login.ugnet.xyz",
         addressBookServerEnabled = true,
@@ -585,7 +592,8 @@ private object SessionRuntime {
 
 /** Binary codec avoids persisting a partly encrypted object graph or relying on reflection. */
 internal object StoredAccountCodec {
-    private const val VERSION = 5
+    private const val VERSION = 6
+    private const val SOUND_SERVER_VERSION = 5
     private const val AUTOMATIC_SIGN_IN_VERSION = 4
     private const val MOCK_SERVER_VERSION = 3
     private const val LEGACY_VERSION = 2
@@ -614,6 +622,7 @@ internal object StoredAccountCodec {
             output.writeBoolean(value.automaticSignIn)
             output.writeUTF(value.loginPresence.name)
             output.writeUTF(value.customServers.emotionSoundServer)
+            output.writeUTF(value.customServers.winkCatalogServer)
         }
         bytes.toByteArray()
     }
@@ -671,8 +680,16 @@ internal object StoredAccountCodec {
                 Presence.Online
             },
         ).let { account ->
-            if (version >= 5) account.copy(customServers = account.customServers.copy(emotionSoundServer = it.readUTF()))
-            else account
+            val withSound = if (version >= SOUND_SERVER_VERSION) {
+                account.copy(customServers = account.customServers.copy(emotionSoundServer = it.readUTF()))
+            } else {
+                account
+            }
+            if (version >= VERSION) {
+                withSound.copy(customServers = withSound.customServers.copy(winkCatalogServer = it.readUTF()))
+            } else {
+                withSound
+            }
         }
     }
 

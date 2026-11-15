@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr
 
+import org.aralozkaya.msngr.protocol.MsnEmotionSound
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,6 +51,22 @@ class ServerConfigTest {
         assertEquals("social.ugnet.xyz", resolved.socialServer)
         assertEquals("mactivities.msgrsvcs.ctsrv.xyz", resolved.activitiesServer)
         assertEquals("mail.ugnet.xyz", resolved.mailServer)
+        assertEquals(MsnEmotionSound.CROSSTALK_SERVER, resolved.emotionSoundServer)
+        assertEquals("", resolved.winkCatalogServer)
+        val allEndpoints = listOf(
+            resolved.mainServer,
+            resolved.configServer,
+            resolved.authServer,
+            resolved.addressBookServer,
+            resolved.adsServer,
+            resolved.storageServer,
+            resolved.socialServer,
+            resolved.activitiesServer,
+            resolved.mailServer,
+            resolved.emotionSoundServer,
+            resolved.winkCatalogServer,
+        )
+        assertTrue(allEndpoints.none { "escargot" in it.lowercase() || "nina" in it.lowercase() })
     }
 
     @Test
@@ -62,6 +79,28 @@ class ServerConfigTest {
         assertEquals("ds.escargot.nina.chat", resolved.mainServer)
         assertEquals("mconf.escargot.nina.chat", resolved.configServer)
         assertEquals("apps.escargot.nina.chat", resolved.activitiesServer)
+        assertEquals(MsnEmotionSound.DEFAULT_SERVER, resolved.emotionSoundServer)
+        assertEquals(WinkCatalogActivity.CATALOG_URL, resolved.winkCatalogServer)
+    }
+
+    @Test
+    fun customServersLeaveOptionalMediaServicesUnconfiguredUnlessSet() {
+        val unconfigured = ServerOverrides(
+            mainServer = "main.example",
+            configServer = "config.example",
+        )
+        assertTrue(unconfigured.isValid())
+        assertEquals("", unconfigured.toResolved().emotionSoundServer)
+        assertEquals("", unconfigured.toResolved().winkCatalogServer)
+
+        assertFalse(unconfigured.copy(emotionSoundServer = "not-a-url").isValid())
+        assertFalse(unconfigured.copy(winkCatalogServer = "not-a-url").isValid())
+        assertTrue(
+            unconfigured.copy(
+                emotionSoundServer = "https://sounds.example/esnd/snd",
+                winkCatalogServer = "https://winks.example/catalog/",
+            ).isValid(),
+        )
     }
 
     @Test
