@@ -48,6 +48,7 @@ class UpdateManager internal constructor(
     private val context: Context,
     supported: Boolean = supportsUpdates(context),
     private val installedCode: Int = BuildConfig.VERSION_CODE,
+    installedVersionName: String = BuildConfig.VERSION_NAME,
     private val releaseSource: () -> List<AppRelease> = { GitHubReleases().fetch() },
 ) {
     private val prefs = context.getSharedPreferences("msngr_updates", Context.MODE_PRIVATE)
@@ -60,7 +61,7 @@ class UpdateManager internal constructor(
             enabled = prefs.getBoolean("enabled", true),
             interval = UpdateInterval.entries.firstOrNull { it.name == prefs.getString("interval", null) }
                 ?: UpdateInterval.Every24Hours,
-            includePrereleases = prefs.getBoolean("prereleases", false),
+            includePrereleases = prefs.getBoolean("prereleases", isPrereleaseVersion(installedVersionName)),
             skippedTag = prefs.getString("skipped", null),
         ),
         release = storedRelease(prefs.getString("release", null))?.takeIf { it.version.code > installedCode },

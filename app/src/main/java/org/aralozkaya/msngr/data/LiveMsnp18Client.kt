@@ -121,6 +121,12 @@ internal class LiveMsnp18Client(
         expressionProfileResourceId: String,
         photoResourceId: String,
     ) -> Unit = MsnpStorageService::removeDisplayPicture,
+    private val updateStoragePersonalStatus: suspend (
+        host: String,
+        ticket: String,
+        profileResourceId: String,
+        personalStatus: String,
+    ) -> Unit = MsnpStorageService::updatePersonalStatus,
     private val winkStore: WinkStore? = null,
     private val fileTransferDirectory: java.io.File? = null,
     private val contactDisplayPictureCache: ContactDisplayPictureCache =
@@ -150,6 +156,7 @@ internal class LiveMsnp18Client(
     private val leaveAddressBookGroup: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::leaveGroup,
     private val fetchAddressBookGroupMembers: suspend (String, String, String) -> List<GroupMember> = MsnpAddressBookService::fetchGroupMembers,
     private val nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter(),
+    private val useRoamingProfile: (AccountIdentity) -> Boolean = { true },
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
     private val mutableContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList())
@@ -225,6 +232,8 @@ internal class LiveMsnp18Client(
     private val contactDisplayPictureStateLock = Any()
     private val contactDisplayPictureCacheMutex = Mutex()
     private val ownDisplayPictureMutex = Mutex()
+    private val personalMessageMutex = Mutex()
+    private val personalMessageVersion = AtomicLong(0L)
     private val mutablePictureStorageIssue = MutableStateFlow<String?>(null)
     private val contactStorageIds = ConcurrentHashMap<String, String>()
     private val contactTileThumbnailHashes = ConcurrentHashMap<String, String>()
@@ -253,6 +262,9 @@ internal class LiveMsnp18Client(
     private var switchboardFallbackPort = DEFAULT_SWITCHBOARD_PORT
     private var currentPresence = Presence.Online
     private var currentPersonalMessage = ""
+    private var storagePersonalStatus: String? = null
+    private var storagePersonalStatusConfirmed = false
+    private var receivedLivePersonalMessage = false
     private var storageServer = ""
     private var storageOwnerCid = "0"
     private var contactTileHosts = emptyList<String>()
@@ -344,6 +356,8 @@ internal class LiveMsnp18Client(
         offlineServer = request.serverConfig.mainServer
         offlineTicket = token.offlineTicket
         offlineRefreshRequests = Channel(Channel.CONFLATED)
+        val accountIdentity = AccountIdentity.forServer(email, request.serverConfig, false)
+        val roamingProfile = useRoamingProfile(accountIdentity)
         val signInData = coroutineScope {
             val addressBook = async {
                 fetchAddressBook(
@@ -354,6 +368,9 @@ internal class LiveMsnp18Client(
             }
             val storage = async {
                 storageOwnerCid = addressBook.await().ownerCid ?: "0"
+                if (!roamingProfile) {
+                    return@async StorageSignInData(profile = null, picture = null, available = false)
+                }
                 val profileResult = runCatching {
                     fetchCurrentStorageProfile()
                 }
@@ -379,7 +396,11 @@ internal class LiveMsnp18Client(
         storagePhotoResourceId = storageProfile?.photoResourceId
         storageDisplayPictureAttached = storageProfile?.displayPictureUrl != null
         storageDisplayPictureHash = storedDisplayPicture?.sha256()
-        currentPersonalMessage = storageProfile?.personalStatus.orEmpty()
+        val initialServerStatus = normalizePersonalStatus(storageProfile?.personalStatus)
+        storagePersonalStatus = initialServerStatus
+        storagePersonalStatusConfirmed = signInData.storage.available && storageProfile != null
+        receivedLivePersonalMessage = false
+        currentPersonalMessage = initialServerStatus.orEmpty()
         localDisplayPicture = storedDisplayPicture
             ?.takeIf(ByteArray::isNotEmpty)
             ?.let { bytes ->
@@ -478,7 +499,7 @@ internal class LiveMsnp18Client(
             email = email,
             presence = request.initialPresence,
             avatarUri = storedDisplayPicture?.toImageDataUri(),
-            statusMessage = storageProfile?.personalStatus.orEmpty(),
+            statusMessage = if (receivedLivePersonalMessage) currentPersonalMessage else storagePersonalStatus.orEmpty(),
             displayPictureFetched = signInData.storage.available && storageProfile != null && storageProfile.displayPictureStateKnown &&
                 (storageProfile.displayPictureUrl == null || storedDisplayPicture?.isNotEmpty() == true),
         )
@@ -515,30 +536,40 @@ internal class LiveMsnp18Client(
 
     override suspend fun changePersonalMessage(statusMessage: String) {
         if (signedInEmail.isEmpty()) return
-        currentPersonalMessage = statusMessage.trim()
-        runCatching {
+        val normalized = normalizePersonalStatus(statusMessage).orEmpty()
+        personalMessageMutex.withLock {
+            val endpoint = machineGuid
+            if (signedInEmail.isEmpty()) return@withLock
+            personalMessageVersion.incrementAndGet()
+            currentPersonalMessage = normalized
             sendCurrentPersonalMessage()
+            if (isRoamingProfileEnabled()) {
+                persistStoragePersonalStatusLocked(endpoint, normalized)
+            }
         }
     }
 
     override suspend fun fetchOwnDisplayPicture() = ownDisplayPictureMutex.withLock { fetchOwnDisplayPictureLocked() }
 
     private suspend fun fetchOwnDisplayPictureLocked(): org.aralozkaya.msngr.IncomingDisplayPicture {
-        if (signedInEmail.isBlank()) return org.aralozkaya.msngr.IncomingDisplayPicture()
+        if (signedInEmail.isBlank() || !isRoamingProfileEnabled()) return org.aralozkaya.msngr.IncomingDisplayPicture()
         val endpoint = machineGuid
         val account = signedInStorageAccount
         return try {
+            val versionBefore = personalMessageVersion.get()
             val profile = fetchCurrentStorageProfile()
+            if (endpoint != machineGuid || account != signedInStorageAccount) return org.aralozkaya.msngr.IncomingDisplayPicture()
+            storageProfileResourceId = profile.profileResourceId
+            storageExpressionProfileResourceId = profile.expressionProfileResourceId
+            storagePhotoResourceId = profile.photoResourceId
+            storageDisplayPictureAttached = profile.displayPictureUrl != null
+            reconcileFetchedPersonalStatus(profile.personalStatus, versionBefore)
             if (!profile.displayPictureStateKnown) return fetchOwnPictureFromEndpoint()
             val bytes = profile.displayPictureUrl?.let { url ->
                 fetchDisplayPicture(url, MAX_DISPLAY_PICTURE_BYTES)?.takeIf { it.isNotEmpty() }
                     ?: return fetchOwnPictureFromEndpoint()
             }
             if (endpoint != machineGuid || account != signedInStorageAccount) return org.aralozkaya.msngr.IncomingDisplayPicture()
-            storageProfileResourceId = profile.profileResourceId
-            storageExpressionProfileResourceId = profile.expressionProfileResourceId
-            storagePhotoResourceId = profile.photoResourceId
-            storageDisplayPictureAttached = profile.displayPictureUrl != null
             storageDisplayPictureHash = bytes?.sha256()
             if (hasRemoteOwnPictureAnnouncement()) fetchOwnPictureFromEndpoint(bytes)
             else org.aralozkaya.msngr.IncomingDisplayPicture(bytes, fetched = true)
@@ -593,6 +624,12 @@ internal class LiveMsnp18Client(
         check(signedInEmail.isNotEmpty()) { "Sign in before changing your display picture." }
         val endpoint = machineGuid
         val normalized = image?.takeIf(ByteArray::isNotEmpty)?.copyOf()
+        if (!isRoamingProfileEnabled()) {
+            ignoredOwnPresencePicture = ownPresencePicture
+            adoptIncomingDisplayPictureLocked(normalized)
+            mutablePictureStorageIssue.value = null
+            return@withLock
+        }
         // A different endpoint can delete or replace the photo resource at any moment.
         // Never mutate a resource ID cached at sign-in, or report success after a storage outage.
         val profile = try { refreshStorageProfileIdentifiers() }
@@ -2004,7 +2041,7 @@ internal class LiveMsnp18Client(
                 endRemoteSession("The server ended this session. Please sign in again.")
             }
             "NOT" -> if (command.payload?.let(::isAddressBookNotification) == true) {
-                notifyOwnDisplayPictureChanged()
+                if (isRoamingProfileEnabled()) notifyOwnDisplayPictureChanged()
                 addressBookRefreshRequests?.trySend(Unit)
                 // Escargot publishes before its one-second membership database flush. A bounded
                 // follow-up catches newly invited/created groups omitted by the first snapshot.
@@ -2313,7 +2350,7 @@ internal class LiveMsnp18Client(
                     ownPresenceSourceHint = sourceHint
                     ignoredOwnPresencePicture = null
                     downloadedOwnPicture = null
-                    notifyOwnDisplayPictureChanged()
+                    if (isRoamingProfileEnabled()) notifyOwnDisplayPictureChanged()
                 }
             }
             return
@@ -2537,12 +2574,24 @@ internal class LiveMsnp18Client(
             }
             ownPictureSourceEndpoint = firstEndpoint
             ownPresencePicturePending = false
-            // PSM is account-wide. Retain a change from another place when a later
-            // picture update republishes UUX, instead of restoring our stale message.
-            val personalMessage = if (Regex("<PSM(?:>|\\s|/)").containsMatchIn(payload.toString(Charsets.UTF_8)))
-                Msnp18Protocol.parsePersonalMessage(payload) else null
-            if (personalMessage != null) currentPersonalMessage = personalMessage
-            notifyOwnDisplayPictureChanged(personalMessage)
+            // PSM is account-wide when roaming is enabled. Retain a change from another place
+            // when a later picture update republishes UUX, instead of restoring our stale message.
+            if (isRoamingProfileEnabled()) {
+                val personalMessage = if (Regex("<PSM(?:>|\\s|/)").containsMatchIn(payload.toString(Charsets.UTF_8)))
+                    Msnp18Protocol.parsePersonalMessage(payload) else null
+                if (personalMessage != null) {
+                    val normalized = normalizePersonalStatus(personalMessage).orEmpty()
+                    personalMessageVersion.incrementAndGet()
+                    if (normalized != currentPersonalMessage) {
+                        storagePersonalStatusConfirmed = false
+                    }
+                    currentPersonalMessage = normalized
+                    receivedLivePersonalMessage = true
+                    notifyOwnDisplayPictureChanged(normalized)
+                } else {
+                    notifyOwnDisplayPictureChanged(null)
+                }
+            }
             return
         }
         val endpointId = ENDPOINT_DATA_ID.find(String(payload, StandardCharsets.UTF_8))
@@ -2560,6 +2609,70 @@ internal class LiveMsnp18Client(
 
     private fun notifyOwnDisplayPictureChanged(personalMessage: String? = null) {
         signedInIdentity?.let { mutableEvents.tryEmit(MessengerEvent.OwnDisplayPictureChanged(it, personalMessage)) }
+    }
+
+    private fun notifyOwnPersonalStatusChanged(statusMessage: String) {
+        signedInIdentity?.let { mutableEvents.tryEmit(MessengerEvent.OwnPersonalStatusChanged(it, statusMessage)) }
+    }
+
+    private fun isRoamingProfileEnabled(): Boolean = signedInIdentity?.let(useRoamingProfile) ?: true
+
+    private suspend fun persistStoragePersonalStatusLocked(endpoint: String, normalized: String) {
+        if (storageServer.isBlank() || storageTicket.isBlank()) return
+        if (storagePersonalStatusConfirmed && storagePersonalStatus.orEmpty() == normalized) return
+        val profileResourceId = storageProfileResourceId ?: runCatching {
+            val versionBefore = personalMessageVersion.get()
+            refreshStorageProfileIdentifiers().also { profile ->
+                if (personalMessageVersion.get() == versionBefore) {
+                    storagePersonalStatus = normalizePersonalStatus(profile.personalStatus)
+                    storagePersonalStatusConfirmed = true
+                }
+            }.profileResourceId
+        }.getOrNull()
+        if (profileResourceId.isNullOrBlank() || endpoint != machineGuid || signedInEmail.isEmpty()) return
+        if (storagePersonalStatusConfirmed && storagePersonalStatus.orEmpty() == normalized) return
+        runCatching {
+            updateStoragePersonalStatus(storageServer, storageTicket, profileResourceId, normalized)
+        }.onSuccess {
+            storagePersonalStatus = normalized.ifEmpty { null }
+            storagePersonalStatusConfirmed = true
+        }.onFailure { error ->
+            if (!isUnsupportedStorageUpdateError(error)) throw error
+        }
+    }
+
+    private fun reconcileFetchedPersonalStatus(rawStatus: String?, versionBefore: Long) {
+        if (personalMessageVersion.get() != versionBefore) return
+        val fetched = normalizePersonalStatus(rawStatus)
+        val previousStorage = storagePersonalStatus
+        val wasConfirmed = storagePersonalStatusConfirmed
+        storagePersonalStatus = fetched
+        storagePersonalStatusConfirmed = true
+        when {
+            fetched != null && fetched != currentPersonalMessage -> {
+                currentPersonalMessage = fetched
+                notifyOwnPersonalStatusChanged(fetched)
+            }
+            fetched == null && wasConfirmed && !previousStorage.isNullOrEmpty() && currentPersonalMessage == previousStorage -> {
+                currentPersonalMessage = ""
+                notifyOwnPersonalStatusChanged("")
+            }
+        }
+    }
+
+    private fun normalizePersonalStatus(value: String?): String? =
+        MsnpStorageService.normalizePersonalStatus(value)
+
+    private fun isUnsupportedStorageUpdateError(error: Throwable): Boolean {
+        val message = error.message?.lowercase().orEmpty()
+        return "doesnotexist" in message ||
+            "does not exist" in message ||
+            "unsupported" in message ||
+            "notsupported" in message ||
+            "not supported" in message ||
+            "not implemented" in message ||
+            "http 404" in message ||
+            "http 501" in message
     }
 
     private fun updateContact(email: String, transform: (Contact?) -> Contact?) {
@@ -3494,6 +3607,9 @@ internal class LiveMsnp18Client(
         mutableSessions.value = emptyList()
         currentPresence = Presence.Online
         currentPersonalMessage = ""
+        storagePersonalStatus = null
+        storagePersonalStatusConfirmed = false
+        receivedLivePersonalMessage = false
         storageServer = ""
         storageOwnerCid = "0"
         contactTileHosts = emptyList()

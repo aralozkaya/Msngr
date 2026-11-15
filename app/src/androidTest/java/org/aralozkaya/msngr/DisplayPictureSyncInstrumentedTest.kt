@@ -399,6 +399,169 @@ class DisplayPictureSyncInstrumentedTest {
         }
     }
 
+    @Test fun saveProfileAwaitsStatusFailureAndMarksPendingPublishUntilSucceeded() = runBlocking {
+        sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
+        val avatarUri = repository.profile.value.avatarUri
+
+        client.statusFailure = IOException("storage offline")
+        val failed = sync.saveProfile(
+            repository,
+            "You",
+            avatarUri,
+            null,
+            pictureChanged = false,
+            statusMessage = "Pending edit",
+        )
+        assertTrue(failed.isFailure)
+        val pendingMerge = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = "From server"),
+            account,
+        )
+        assertEquals("Pending edit", pendingMerge.profile.statusMessage)
+        assertTrue(pendingMerge.shouldPublishStatusMessage)
+
+        client.statusFailure = null
+        sync.saveProfile(
+            repository,
+            "You",
+            avatarUri,
+            null,
+            pictureChanged = false,
+            statusMessage = "Synced edit",
+        ).getOrThrow()
+        assertEquals(listOf("Synced edit"), client.publishedStatuses)
+
+        val syncedMerge = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = "From PC"),
+            account,
+        )
+        assertEquals("From PC", syncedMerge.profile.statusMessage)
+        // Non-empty server status still needs UUX on the newly signed-in MSNP session.
+        assertTrue(syncedMerge.shouldPublishStatusMessage)
+    }
+
+    @Test fun mergeSignedInProfileAdoptsServerUpdatesAndConfirmedDeletionsWithoutOverwritingPendingOrEscargotEdits() {
+        SessionPrefs.saveUserProfile(
+            context,
+            username = "You",
+            presence = Presence.Online,
+            avatarUri = null,
+            statusMessage = "Old phone status",
+            saveDisplayPicture = false,
+        )
+        SessionPrefs.recordServerStatusMessage(context, "Old phone status", account)
+
+        val remoteUpdated = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = "From desktop"),
+            account,
+        )
+        assertEquals("From desktop", remoteUpdated.profile.statusMessage)
+        assertTrue(remoteUpdated.shouldPublishStatusMessage)
+
+        val remoteCleared = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = ""),
+            account,
+        )
+        assertEquals("", remoteCleared.profile.statusMessage)
+        assertFalse(remoteCleared.shouldPublishStatusMessage)
+
+        // When no server status was ever recorded (e.g. Escargot without GetProfile PSM), preserve local.
+        SessionPrefs.saveUserProfile(
+            context,
+            username = "You",
+            presence = Presence.Online,
+            avatarUri = null,
+            statusMessage = "Local Escargot status",
+            saveDisplayPicture = false,
+        )
+        SessionPrefs.recordServerStatusMessage(context, "", account)
+        val escargotPreserved = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = ""),
+            account,
+        )
+        assertEquals("Local Escargot status", escargotPreserved.profile.statusMessage)
+        assertTrue(escargotPreserved.shouldPublishStatusMessage)
+
+        // Pending offline edit overrides even a newer server status until published.
+        SessionPrefs.saveUserProfile(
+            context,
+            username = "You",
+            presence = Presence.Online,
+            avatarUri = null,
+            statusMessage = "Offline edit",
+            saveDisplayPicture = false,
+        )
+        SessionPrefs.recordServerStatusMessage(context, "From desktop", account)
+        SessionPrefs.setPendingStatusMessagePublish(context, true, account)
+        val pendingWins = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = "Other client"),
+            account,
+        )
+        assertEquals("Offline edit", pendingWins.profile.statusMessage)
+        assertTrue(pendingWins.shouldPublishStatusMessage)
+    }
+
+    @Test fun roamingSettingDefaultsOnAndHidesDisplayPictureChangesWhenTurnedOff() {
+        compose.setContent {
+            CompositionLocalProvider(LocalContext provides context) {
+                MsngrTheme { ConnectionSettingsScreen(PaddingValues(), TopAppBarDefaults.pinnedScrollBehavior(), {}) }
+            }
+        }
+        assertTrue(DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account))
+        compose.onNodeWithTag("roaming-profile-setting").performScrollTo().assertExists()
+        compose.onNodeWithTag("display-picture-sync-setting").performScrollTo().assertExists()
+
+        compose.onNodeWithTag("roaming-profile-setting").performScrollTo().performClick()
+        assertFalse(DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account))
+        compose.onNodeWithTag("display-picture-sync-setting").assertDoesNotExist()
+
+        compose.onNodeWithTag("roaming-profile-setting").performScrollTo().performClick()
+        assertTrue(DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account))
+        compose.onNodeWithTag("display-picture-sync-setting").performScrollTo().assertExists()
+
+        DisplayPictureSyncPrefs.setUsesSamePictureAndStatusEverywhere(context, false, account)
+        SessionPrefs.disableRememberedCredentials(context, account = account)
+        assertTrue(DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account))
+    }
+
+    @Test fun roamingDisabledKeepsLocalPictureAndStatusAcrossSignInAndRefresh() = runBlocking {
+        OwnDisplayPictureStore.write(context, account, old)
+        SessionPrefs.saveUserProfile(
+            context,
+            username = "You",
+            presence = Presence.Online,
+            avatarUri = null,
+            statusMessage = "Local device status",
+            saveDisplayPicture = false,
+        )
+        SessionPrefs.recordServerStatusMessage(context, "Old server status", account)
+        DisplayPictureSyncPrefs.setUsesSamePictureAndStatusEverywhere(context, false, account)
+
+        val merged = SessionPrefs.mergeSignedInProfile(
+            context,
+            UserProfileSnapshot("You", email, Presence.Online, statusMessage = "From PC"),
+            account,
+        )
+        assertEquals("Local device status", merged.profile.statusMessage)
+        assertTrue(merged.shouldPublishStatusMessage)
+
+        val profile = connect(IncomingDisplayPicture(new, true))
+        sync.restore(repository, profile)
+        sync.refresh(repository)
+
+        assertNull(sync.state.value.conflict)
+        assertEquals(0, client.fetches)
+        assertTrue(client.published.isEmpty())
+        assertArrayEquals(old, OwnDisplayPictureStore.read(context, account).bytes)
+        assertArrayEquals(old, context.loadDisplayPictureBytes(repository.profile.value.avatarUri))
+    }
+
     private fun login() = SessionPrefs.completeLogin(context, email, "password", true, ProviderOptions.ESCARGOT,
         ServerOverrides(), useMockServer = true)
 
@@ -413,9 +576,11 @@ class DisplayPictureSyncInstrumentedTest {
         var incoming = IncomingDisplayPicture()
         var fetches = 0
         var uploadFailure: Exception? = null
+        var statusFailure: Exception? = null
         var fetchStarted: CompletableDeferred<Unit>? = null
         var fetchGate: CompletableDeferred<Unit>? = null
         val published = mutableListOf<ByteArray?>()
+        val publishedStatuses = mutableListOf<String>()
         override suspend fun signIn(request: SignInRequest) = Result.success(UserProfileSnapshot("You", request.email,
             request.initialPresence, incoming.bytes?.takeIf { org.aralozkaya.msngr.protocol.DisplayPictureFormat.detect(it) != null }?.displayPictureDataUri(),
             displayPictureFetched = incoming.fetched))
@@ -431,6 +596,10 @@ class DisplayPictureSyncInstrumentedTest {
             incoming = IncomingDisplayPicture(image?.copyOf(), true)
         }
         override suspend fun adoptIncomingDisplayPicture(image: ByteArray?) = Unit
+        override suspend fun changePersonalMessage(statusMessage: String) {
+            statusFailure?.let { throw it }
+            publishedStatuses += statusMessage
+        }
     }
 
     private fun screenshot(name: String) {
