@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContent
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -46,7 +45,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedButton
@@ -82,6 +80,7 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.pages.components.CustomServerDialog
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.pages.components.MockServerBanner
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -545,9 +544,10 @@ private fun LoginScreen(
                                             shapes = MenuDefaults.groupShape(0, 1),
                                             interactionSource = accountMenuInteractionSource,
                                         ) {
-                                            rememberedAccounts.forEach { account ->
+                                            rememberedAccounts.forEachIndexed { index, account ->
                                                 DropdownMenuItem(
                                                     text = { Text(account.accountLabel) },
+                                                    shape = MenuDefaults.itemShape(index, rememberedAccounts.size).shape,
                                                     onClick = {
                                                         accountMenuOpen = false
                                                         onSavedAccountSelected(account)
@@ -581,7 +581,6 @@ private fun LoginScreen(
                         trailingIcon = {
                             IconButton(
                                 onClick = { passwordShown = !passwordShown },
-                                shapes = IconButtonDefaults.shapes(),
                             ) {
                                 if (passwordShown) {
                                     Icon(
@@ -662,9 +661,10 @@ private fun LoginScreen(
                                     shapes = MenuDefaults.groupShape(0, 1),
                                     interactionSource = presenceMenuInteractionSource,
                                 ) {
-                                    Presence.entries.forEach { presence ->
+                                    Presence.entries.forEachIndexed { index, presence ->
                                         DropdownMenuItem(
                                             text = { Text(presence.ownStatusLabel()) },
+                                            shape = MenuDefaults.itemShape(index, Presence.entries.size).shape,
                                             onClick = {
                                                 presenceMenuOpen = false
                                                 onLoginPresenceChange(presence)
@@ -741,9 +741,10 @@ private fun LoginScreen(
                                 shapes = MenuDefaults.groupShape(0, 1),
                                 interactionSource = providerMenuInteractionSource,
                             ) {
-                                ServerPresets.providerOptions.forEach { option ->
+                                ServerPresets.providerOptions.forEachIndexed { index, option ->
                                     DropdownMenuItem(
                                         text = { Text(option) },
+                                        shape = MenuDefaults.itemShape(index, ServerPresets.providerOptions.size).shape,
                                         onClick = {
                                             providerMenuOpen = false
                                             onProviderSelected(option)
@@ -761,150 +762,5 @@ private fun LoginScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CustomServerDialog(
-    initial: ServerOverrides,
-    onDismiss: () -> Unit,
-    onSave: (ServerOverrides) -> Unit,
-) {
-    var draft by remember(initial) { mutableStateOf(initial) }
-    var mainPort by remember(initial) { mutableStateOf(initial.mainPort.toString()) }
-    var switchboardPort by remember(initial) { mutableStateOf(initial.switchboardPort.toString()) }
-    val normalized = draft.copy(
-        mainPort = mainPort.toIntOrNull() ?: 0,
-        switchboardPort = switchboardPort.toIntOrNull() ?: 0,
-    ).normalized()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Custom MSNP service") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    "Notification and config endpoints are required. Optional services fall back to the notification host.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ServerTextField("Notification host", draft.mainServer) {
-                    draft = draft.copy(mainServer = it)
-                }
-                ServerTextField("Notification port", mainPort, KeyboardType.Number) {
-                    mainPort = it
-                }
-                ServerTextField("Switchboard port", switchboardPort, KeyboardType.Number) {
-                    switchboardPort = it
-                }
-                ServerTextField("Configuration host", draft.configServer) {
-                    draft = draft.copy(configServer = it)
-                }
-                OptionalServerField("Authentication", draft.authServerEnabled, draft.authServer, {
-                    draft = draft.copy(authServerEnabled = it)
-                }, { draft = draft.copy(authServer = it) })
-                OptionalServerField(
-                    "Address book",
-                    draft.addressBookServerEnabled,
-                    draft.addressBookServer,
-                    { draft = draft.copy(addressBookServerEnabled = it) },
-                    { draft = draft.copy(addressBookServer = it) },
-                )
-                OptionalServerField("Storage", draft.storageServerEnabled, draft.storageServer, {
-                    draft = draft.copy(storageServerEnabled = it)
-                }, { draft = draft.copy(storageServer = it) })
-                OptionalServerField("Advertising", draft.adsServerEnabled, draft.adsServer, {
-                    draft = draft.copy(adsServerEnabled = it)
-                }, { draft = draft.copy(adsServer = it) })
-                OptionalServerField("Social", draft.socialServerEnabled, draft.socialServer, {
-                    draft = draft.copy(socialServerEnabled = it)
-                }, { draft = draft.copy(socialServer = it) })
-                OptionalServerField(
-                    "Games & activities",
-                    draft.activitiesServerEnabled,
-                    draft.activitiesServer,
-                    { draft = draft.copy(activitiesServerEnabled = it) },
-                    { draft = draft.copy(activitiesServer = it) },
-                )
-                EmoticonOutlinedTextField(
-                    value = draft.winkCatalogServer,
-                    onValueChange = { draft = draft.copy(winkCatalogServer = it) },
-                    label = { Text("Winks catalog URL") },
-                    supportingText = { Text("Optional. Full HTTP or HTTPS wink catalog URL") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth().testTag("wink_catalog_server"),
-                )
-                EmoticonOutlinedTextField(
-                    value = draft.emotionSoundServer,
-                    onValueChange = { draft = draft.copy(emotionSoundServer = it) },
-                    label = { Text("Emotion sounds service URL") },
-                    supportingText = { Text("Optional. Full HTTP or HTTPS base URL, ending in /esnd/snd/") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth().testTag("emotion_sound_server"),
-                )
-                OptionalServerField("Mail", draft.mailServerEnabled, draft.mailServer, {
-                    draft = draft.copy(mailServerEnabled = it)
-                }, { draft = draft.copy(mailServer = it) })
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(normalized) },
-                shapes = ButtonDefaults.shapes(),
-                enabled = normalized.isValid(),
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-@Composable
-private fun ServerTextField(
-    label: String,
-    value: String,
-    keyboardType: KeyboardType = KeyboardType.Uri,
-    onValueChange: (String) -> Unit,
-) {
-    EmoticonOutlinedTextField(
-        value = value,
-        onValueChange = { onValueChange(it.withoutUnicodeEmoji()) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-    )
-}
-
-@Composable
-private fun OptionalServerField(
-    label: String,
-    enabled: Boolean,
-    value: String,
-    onEnabledChange: (Boolean) -> Unit,
-    onValueChange: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-            Switch(checked = enabled, onCheckedChange = onEnabledChange)
-        }
-        if (enabled) ServerTextField("$label host", value, onValueChange = onValueChange)
     }
 }

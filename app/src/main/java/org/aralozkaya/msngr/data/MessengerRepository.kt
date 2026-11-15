@@ -156,6 +156,7 @@ sealed interface MessengerEvent {
     data class ConnectionLost(val reason: String?) : MessengerEvent
     data class SignedOut(val reason: String) : MessengerEvent
     data class OwnDisplayPictureChanged(val account: AccountIdentity, val personalMessage: String? = null) : MessengerEvent
+    data class OwnPersonalStatusChanged(val account: AccountIdentity, val statusMessage: String) : MessengerEvent
 }
 
 private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyList()).asStateFlow()
@@ -946,6 +947,8 @@ class MessengerRepository(
                     }
                 } else if (event is MessengerEvent.OwnDisplayPictureChanged && event.account == signedInAccountIdentity) {
                     event.personalMessage?.let { status -> mutableProfile.update { it.copy(statusMessage = status) } }
+                } else if (event is MessengerEvent.OwnPersonalStatusChanged && event.account == signedInAccountIdentity) {
+                    mutableProfile.update { it.copy(statusMessage = event.statusMessage) }
                 } else if (event is MessengerEvent.SignedOut) {
                     scope.launch {
                         connectionMutex.withLock {
@@ -1094,20 +1097,27 @@ class MessengerRepository(
         publishStoredSettings: Boolean = false,
         displayPictureBytes: ByteArray? = null,
         publishDisplayPicture: Boolean = true,
+        publishStatusMessage: Boolean = publishStoredSettings,
     ) {
         mutableProfile.value = profile
         if (publishStoredSettings) {
             nicknameJob?.cancel()
             nicknameJob = scope.launch {
-                client.changeNickname(
-                    profile.username.trim().withoutMessengerPlusFormattingIfDisabled(),
-                )
+                runCatching {
+                    client.changeNickname(
+                        profile.username.trim().withoutMessengerPlusFormattingIfDisabled(),
+                    )
+                }
             }
-            personalMessageJob?.cancel()
-            personalMessageJob = scope.launch {
-                client.changePersonalMessage(
-                    profile.statusMessage.trim().withoutMessengerPlusFormattingIfDisabled(),
-                )
+            if (publishStatusMessage) {
+                personalMessageJob?.cancel()
+                personalMessageJob = scope.launch {
+                    runCatching {
+                        client.changePersonalMessage(
+                            profile.statusMessage.trim().withoutMessengerPlusFormattingIfDisabled(),
+                        )
+                    }
+                }
             }
             if (publishDisplayPicture && (displayPictureBytes != null || profile.avatarUri == null)) {
                 displayPictureJob?.cancel()
@@ -1133,8 +1143,29 @@ class MessengerRepository(
         personalMessageJob?.cancel()
         personalMessageJob = scope.launch {
             delay(PERSONAL_MESSAGE_DEBOUNCE_MILLIS)
-            client.changePersonalMessage(normalized.trim())
+            runCatching { client.changePersonalMessage(normalized.trim()) }
         }
+    }
+
+    /** Updates and awaits publication of the signed-in user's personal status message. */
+    suspend fun updateStatusMessage(statusMessage: String): Result<Unit> {
+        val normalized = statusMessage
+            .replace('\r', ' ')
+            .replace('\n', ' ')
+            .withoutMessengerPlusFormattingIfDisabled()
+            .trim()
+        personalMessageJob?.cancel()
+        val previous = mutableProfile.value.statusMessage
+        mutableProfile.update { it.copy(statusMessage = normalized) }
+        val result = runCatching {
+            client.changePersonalMessage(normalized)
+        }
+        result.onFailure {
+            mutableProfile.update { current ->
+                if (current.statusMessage == normalized) current.copy(statusMessage = previous) else current
+            }
+        }
+        return result
     }
 
     suspend fun updateProfile(

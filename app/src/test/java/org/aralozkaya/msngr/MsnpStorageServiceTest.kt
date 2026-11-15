@@ -180,6 +180,66 @@ class MsnpStorageServiceTest {
         assertEquals("12345!205", resourceId)
     }
 
+    @Test
+    fun buildsUpdatePersonalStatusRequestSettingEscapedStatus() {
+        val request = MsnpStorageService.buildUpdatePersonalStatusRequest(
+            ticket = "t=ticket&p=proof",
+            profileResourceId = "12345!101",
+            personalStatus = "  Hello & <World>\r\nNext  ",
+        )
+
+        val document = parse(request)
+        val storageTicket = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "TicketToken",
+        )
+        val resourceIds = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "ResourceID",
+        )
+        val statuses = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "PersonalStatus",
+        )
+        val deletions = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "profileAttributesToDelete",
+        )
+
+        assertEquals("t=ticket&p=proof", storageTicket.item(0).textContent)
+        assertEquals("12345!101", resourceIds.item(0).textContent)
+        assertEquals("Hello & <World> Next", statuses.item(0).textContent)
+        assertEquals(0, deletions.length)
+    }
+
+    @Test
+    fun buildsUpdatePersonalStatusRequestDeletingClearedStatus() {
+        val request = MsnpStorageService.buildUpdatePersonalStatusRequest(
+            ticket = "t=ticket",
+            profileResourceId = "12345!101",
+            personalStatus = "   ",
+        )
+
+        val document = parse(request)
+        val deletions = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "profileAttributesToDelete",
+        )
+        val personalStatus = document.getElementsByTagNameNS(
+            "http://www.msn.com/webservices/storage/2008",
+            "PersonalStatus",
+        )
+
+        assertEquals(1, deletions.length)
+        assertEquals(1, personalStatus.length)
+        assertEquals("true", personalStatus.item(0).textContent)
+        assertEquals("ExpressionProfileAttributes", personalStatus.item(0).parentNode.localName)
+        assertEquals(
+            "profileAttributesToDelete",
+            personalStatus.item(0).parentNode.parentNode.localName,
+        )
+    }
+
     private fun parse(xml: String) = DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
     }.newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
