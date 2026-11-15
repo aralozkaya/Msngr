@@ -60,6 +60,13 @@ class UpdateModelsTest {
         assertFalse(tracker.created(isReconnect = false))
     }
 
+    @Test fun prereleaseDetectionMatchesSemverPrereleaseVersions() {
+        listOf("1.0.0-alpha.1", "1.0.0-beta.3", "1.0.0-rc.1", "1.0.0-dev", "1.0.0-beta.1+42")
+            .forEach { assertTrue(it, isPrereleaseVersion(it)) }
+        listOf("1.0.0", "2.10.3", "1.0.0+42")
+            .forEach { assertFalse(it, isPrereleaseVersion(it)) }
+    }
+
     private fun release(tag: String, prerelease: Boolean = false) = AppRelease(
         checkNotNull(ReleaseVersion.parse(tag)), 1, "Notes", prerelease, RELEASES_PAGE, null)
 }

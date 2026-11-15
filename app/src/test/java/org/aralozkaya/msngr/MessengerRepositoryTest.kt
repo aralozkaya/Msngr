@@ -661,6 +661,83 @@ class MessengerRepositoryTest {
         )
         repository.logout()
     }
+
+    @Test
+    fun updateStatusMessageAwaitsPublishAndRollsBackOnFailure() = runBlocking {
+        val client = RecordingMsnpClient()
+        val repository = MessengerRepository(client)
+        val request = SignInRequest(
+            MockServerData.ACCOUNT_EMAIL,
+            MockServerData.ACCOUNT_PASSWORD,
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()),
+        )
+        repository.signIn(request).getOrThrow()
+
+        repository.updateStatusMessage("Busy right now").getOrThrow()
+        assertEquals("Busy right now", withTimeout(1_000) { client.statusMessageUpdates.receive() })
+        assertEquals("Busy right now", repository.profile.value.statusMessage)
+
+        client.personalMessageFailure = IOException("storage offline")
+        val failed = repository.updateStatusMessage("Failed edit")
+
+        assertTrue(failed.isFailure)
+        assertEquals("Busy right now", repository.profile.value.statusMessage)
+        assertTrue(client.statusMessageUpdates.isEmpty)
+        repository.logout()
+    }
+
+    @Test
+    fun ownPersonalStatusChangedEventUpdatesProfileWithoutRePublishing() = runBlocking {
+        val client = RecordingMsnpClient()
+        val repository = MessengerRepository(client)
+        val serverConfig = ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides())
+        val request = SignInRequest(
+            MockServerData.ACCOUNT_EMAIL,
+            MockServerData.ACCOUNT_PASSWORD,
+            serverConfig,
+        )
+        repository.signIn(request).getOrThrow()
+
+        client.events.emit(
+            MessengerEvent.OwnPersonalStatusChanged(
+                AccountIdentity.forServer(MockServerData.ACCOUNT_EMAIL, serverConfig, useMockServer = false),
+                "Updated from PC",
+            ),
+        )
+
+        withTimeout(1_000) {
+            repository.profile.first { it.statusMessage == "Updated from PC" }
+        }
+        assertEquals("Updated from PC", repository.profile.value.statusMessage)
+        assertTrue(client.statusMessageUpdates.isEmpty)
+        repository.logout()
+    }
+
+    @Test
+    fun setLocalProfileCanSkipRepublishingStatusWhenPreservingPendingLocalStatus() = runBlocking {
+        val client = RecordingMsnpClient()
+        val repository = MessengerRepository(client)
+        val request = SignInRequest(
+            MockServerData.ACCOUNT_EMAIL,
+            MockServerData.ACCOUNT_PASSWORD,
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()),
+        )
+        repository.signIn(request).getOrThrow()
+
+        repository.setLocalProfile(
+            repository.profile.value.copy(
+                username = "Restored",
+                statusMessage = "Pending offline edit",
+            ),
+            publishStoredSettings = true,
+            publishStatusMessage = false,
+        )
+
+        assertEquals("Restored", withTimeout(1_000) { client.nicknameUpdates.receive() })
+        assertTrue(client.statusMessageUpdates.isEmpty)
+        assertEquals("Pending offline edit", repository.profile.value.statusMessage)
+        repository.logout()
+    }
 }
 
 private class RecordingMsnpClient : MsnpClient {
@@ -681,6 +758,7 @@ private class RecordingMsnpClient : MsnpClient {
     val signInRequests = mutableListOf<SignInRequest>()
     var signInFailure: Exception? = null
     var displayPictureFailure: Exception? = null
+    var personalMessageFailure: Exception? = null
     var nudgeFailure: Exception? = null
 
     override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> {
@@ -703,6 +781,7 @@ private class RecordingMsnpClient : MsnpClient {
     }
 
     override suspend fun changePersonalMessage(statusMessage: String) {
+        personalMessageFailure?.let { throw it }
         statusMessageUpdates.send(statusMessage)
     }
 

@@ -9,14 +9,27 @@ internal suspend fun Context.restoreSignedInProfile(
     serverProfile: UserProfileSnapshot,
     presence: Presence,
 ) {
-    val mergedProfile = SessionPrefs.mergeServerProfile(this, serverProfile)
-        .copy(presence = presence)
+    val roamingEnabled = DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(this)
+    val merged = SessionPrefs.mergeSignedInProfile(this, serverProfile)
+    val mergedProfile = merged.profile.copy(presence = presence)
     repository.setLocalProfile(
         profile = mergedProfile,
         publishStoredSettings = true,
         // Fetch and compare before publishing a local picture over the server's one.
         publishDisplayPicture = false,
+        publishStatusMessage = false,
     )
+    if (merged.shouldPublishStatusMessage) {
+        repository.updateStatusMessage(mergedProfile.statusMessage).onSuccess {
+            if (roamingEnabled) {
+                SessionPrefs.recordServerStatusMessage(this, mergedProfile.statusMessage)
+                SessionPrefs.setPendingStatusMessagePublish(this, false)
+            }
+        }
+    } else if (roamingEnabled) {
+        SessionPrefs.recordServerStatusMessage(this, serverProfile.statusMessage)
+        SessionPrefs.setPendingStatusMessagePublish(this, false)
+    }
     displayPictureSync.restore(repository, serverProfile,
         skipNextRefresh = (applicationContext as MsngrApplication).visibilityTracker.isForeground)
     val localProfile = repository.profile.value

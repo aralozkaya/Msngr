@@ -58,6 +58,9 @@ data class UpdateState(
     val hasUpdate: Boolean get() = supported && release != null && release.version.tag != preferences.skippedTag
 }
 
+internal fun isPrereleaseVersion(versionName: String): Boolean =
+    versionName.substringBefore('+').contains('-')
+
 internal fun newestRelease(releases: List<AppRelease>, installedCode: Int, includePrereleases: Boolean): AppRelease? =
     releases.filter { it.version.code > installedCode && (includePrereleases || !it.prerelease) }
         .maxByOrNull { it.version.code }
