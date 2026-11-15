@@ -111,7 +111,22 @@ class StatusShortcutActivity : ComponentActivity() {
             val repository = applicationContext.connectedRepositoryForNotificationAction()
                 ?: return@withContext false
             presence?.let(repository::setPresence)
-            statusMessage?.let(repository::setStatusMessage)
+            if (statusMessage != null) {
+                val roamingEnabled = DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(
+                    this@StatusShortcutActivity,
+                    repository.signedInAccountIdentity,
+                )
+                repository.updateStatusMessage(statusMessage).onSuccess {
+                    if (roamingEnabled) {
+                        SessionPrefs.recordServerStatusMessage(this@StatusShortcutActivity, statusMessage)
+                        SessionPrefs.setPendingStatusMessagePublish(this@StatusShortcutActivity, false)
+                    }
+                }.onFailure {
+                    if (roamingEnabled) {
+                        SessionPrefs.setPendingStatusMessagePublish(this@StatusShortcutActivity, true)
+                    }
+                }.getOrThrow()
+            }
             val profile = repository.profile.value
             SessionPrefs.saveUserProfile(
                 context = this@StatusShortcutActivity,
