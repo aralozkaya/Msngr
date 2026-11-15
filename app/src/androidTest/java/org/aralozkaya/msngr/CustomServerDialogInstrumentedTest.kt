@@ -14,7 +14,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.aralozkaya.msngr.pages.components.CustomServerDialog
 import org.junit.Assert.assertEquals
@@ -103,7 +106,7 @@ class CustomServerDialogInstrumentedTest {
 
         compose.runOnUiThread { visible.value = true }
         compose.onNodeWithTag("custom-server-modal").assertIsDisplayed()
-        pressBack()
+        onView(isRoot()).inRoot(isDialog()).perform(ViewActions.pressBack())
         compose.onNodeWithTag("custom-server-modal").assertDoesNotExist()
         assertNull(saved)
     }
