@@ -55,7 +55,7 @@ class UpdateInstrumentedTest {
         val beta = checkNotNull(parseGitHubRelease(fixture().put("tag_name", "v1.3.0-beta.1")))
         var requests = 0
         fun manager() = UpdateManager(context, supported = true, installedCode = 1,
-            releaseSource = { requests++; listOf(beta, stable) })
+            installedVersionName = "1.0.0", releaseSource = { requests++; listOf(beta, stable) })
         val first = manager()
         first.configure(first.state.value.preferences.copy(enabled = false))
         assertTrue(first.check())
@@ -78,6 +78,49 @@ class UpdateInstrumentedTest {
         assertEquals(stable.version, restored.state.value.release?.version)
         assertFalse(restored.state.value.hasUpdate) // The skipped stable release stays skipped.
         context.getSharedPreferences("msngr_updates", Context.MODE_PRIVATE).edit().clear().commit()
+        Unit
+    }
+
+    @Test fun prereleaseBuildsDefaultToPrereleaseChecksWithoutOverridingSavedSettings() = runBlocking {
+        val context = isolatedContext()
+        val stable = checkNotNull(parseGitHubRelease(fixture().put("tag_name", "v1.2.3").put("prerelease", false)))
+        val beta = checkNotNull(parseGitHubRelease(fixture().put("tag_name", "v1.3.0-beta.1")))
+        fun manager(versionName: String) = UpdateManager(
+            context,
+            supported = true,
+            installedCode = 1,
+            installedVersionName = versionName,
+            releaseSource = { listOf(beta, stable) },
+        )
+
+        try {
+            val unconfiguredStable = manager("1.0.0")
+            assertFalse(unconfiguredStable.state.value.preferences.includePrereleases)
+
+            val unconfiguredPrerelease = manager("1.0.0-beta.3")
+            assertTrue(unconfiguredPrerelease.state.value.preferences.includePrereleases)
+            assertTrue(unconfiguredPrerelease.check(manual = true))
+            assertEquals(beta.version, unconfiguredPrerelease.state.value.release?.version)
+
+            val returnedToStableWhileUnconfigured = manager("1.0.0")
+            assertFalse(returnedToStableWhileUnconfigured.state.value.preferences.includePrereleases)
+
+            unconfiguredPrerelease.configure(
+                unconfiguredPrerelease.state.value.preferences.copy(includePrereleases = false)
+            )
+            val configuredOffOnPrerelease = manager("1.0.0-beta.4")
+            assertFalse(configuredOffOnPrerelease.state.value.preferences.includePrereleases)
+            assertTrue(configuredOffOnPrerelease.check(manual = true))
+            assertEquals(stable.version, configuredOffOnPrerelease.state.value.release?.version)
+
+            configuredOffOnPrerelease.configure(
+                configuredOffOnPrerelease.state.value.preferences.copy(includePrereleases = true)
+            )
+            val configuredOnForStable = manager("1.0.0")
+            assertTrue(configuredOnForStable.state.value.preferences.includePrereleases)
+        } finally {
+            context.getSharedPreferences("msngr_updates", Context.MODE_PRIVATE).edit().clear().commit()
+        }
         Unit
     }
 

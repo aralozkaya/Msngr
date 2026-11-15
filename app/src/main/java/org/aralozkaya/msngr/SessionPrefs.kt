@@ -232,6 +232,8 @@ object SessionPrefs {
     private const val KEY_PRESENCE = "presence"
     private const val KEY_AVATAR_URI = "avatar_uri"
     private const val KEY_STATUS_MESSAGE = "status_message"
+    private const val KEY_LAST_SERVER_STATUS_MESSAGE = "last_server_status_message"
+    private const val KEY_PENDING_STATUS_PUBLISH = "pending_status_publish"
     private const val KEY_REMOTE_SIGN_OUT = "remote_sign_out"
     internal const val KEY_SIGN_OUT_OTHER_SESSIONS = "sign_out_other_sessions_on_sign_in"
 
@@ -509,6 +511,79 @@ object SessionPrefs {
                 }
             }
         }
+    }
+
+    internal data class SignedInProfileMerge(
+        val profile: UserProfileSnapshot,
+        val shouldPublishStatusMessage: Boolean,
+    )
+
+    internal fun setPendingStatusMessagePublish(
+        context: Context,
+        pending: Boolean,
+        account: AccountIdentity? = preferenceAccount(context),
+    ) {
+        val target = account ?: return
+        AccountPreferences.forAccount(context, PROFILE_PREFS, target).edit {
+            putBoolean(KEY_PENDING_STATUS_PUBLISH, pending)
+        }
+    }
+
+    internal fun recordServerStatusMessage(
+        context: Context,
+        statusMessage: String?,
+        account: AccountIdentity? = preferenceAccount(context),
+    ) {
+        val target = account ?: return
+        val normalized = statusMessage.orEmpty().replace('\r', ' ').replace('\n', ' ').trim()
+        AccountPreferences.forAccount(context, PROFILE_PREFS, target).edit {
+            putString(KEY_LAST_SERVER_STATUS_MESSAGE, normalized)
+        }
+    }
+
+    internal fun mergeSignedInProfile(
+        context: Context,
+        serverProfile: UserProfileSnapshot,
+        account: AccountIdentity? = accountForEmail(context, serverProfile.email),
+    ): SignedInProfileMerge {
+        val base = mergeServerProfile(context, serverProfile, account)
+        if (account == null || account.email != serverProfile.email.normalizedAccountEmail()) {
+            return SignedInProfileMerge(base, shouldPublishStatusMessage = base.statusMessage.isNotEmpty())
+        }
+        val profilePrefs = AccountPreferences.forAccount(context, PROFILE_PREFS, account)
+        if (!DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account)) {
+            return SignedInProfileMerge(
+                profile = base,
+                shouldPublishStatusMessage = base.statusMessage.isNotEmpty(),
+            )
+        }
+        val pendingPublish = profilePrefs.getBoolean(KEY_PENDING_STATUS_PUBLISH, false)
+        val lastServerStatus = profilePrefs.getString(KEY_LAST_SERVER_STATUS_MESSAGE, "").orEmpty()
+        val serverStatus = serverProfile.statusMessage.replace('\r', ' ').replace('\n', ' ').trim()
+        val resolvedStatus: String
+        val shouldPublishStatus: Boolean
+        when {
+            pendingPublish -> {
+                resolvedStatus = base.statusMessage
+                shouldPublishStatus = true
+            }
+            serverStatus.isNotEmpty() -> {
+                resolvedStatus = serverStatus
+                shouldPublishStatus = true
+            }
+            lastServerStatus.isNotEmpty() -> {
+                resolvedStatus = ""
+                shouldPublishStatus = false
+            }
+            else -> {
+                resolvedStatus = base.statusMessage
+                shouldPublishStatus = resolvedStatus.isNotEmpty()
+            }
+        }
+        return SignedInProfileMerge(
+            profile = base.copy(statusMessage = resolvedStatus),
+            shouldPublishStatusMessage = shouldPublishStatus,
+        )
     }
 
     fun logout() {

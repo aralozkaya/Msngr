@@ -84,6 +84,21 @@ internal object MsnpStorageService {
         )
     }
 
+    /** Persists or clears the roaming PersonalStatus via SchematizedStore UpdateProfile. */
+    suspend fun updatePersonalStatus(
+        host: String,
+        ticket: String,
+        profileResourceId: String,
+        personalStatus: String,
+    ) {
+        require(profileResourceId.isNotBlank()) { "The storage profile has no profile resource ID." }
+        post(
+            host,
+            "UpdateProfile",
+            buildUpdatePersonalStatusRequest(ticket, profileResourceId, personalStatus),
+        )
+    }
+
     internal fun buildGetProfileRequest(ticket: String, ownerCid: String = "0"): String = envelope(ticket) {
         """
         <GetProfile xmlns="$NAMESPACE">
@@ -175,6 +190,47 @@ internal object MsnpStorageService {
           </targetHandles>
         </DeleteRelationships>
         """.trimIndent()
+    }
+
+    internal fun normalizePersonalStatus(value: String?): String? =
+        value?.replace("\r\n", " ")?.replace('\r', ' ')?.replace('\n', ' ')?.trim()?.ifEmpty { null }
+
+    internal fun buildUpdatePersonalStatusRequest(
+        ticket: String,
+        profileResourceId: String,
+        personalStatus: String,
+    ): String = envelope(ticket) {
+        val normalized = normalizePersonalStatus(personalStatus).orEmpty()
+        if (normalized.isEmpty()) {
+            """
+            <UpdateProfile xmlns="$NAMESPACE">
+              <profile>
+                <ResourceID>${profileResourceId.storageEscapeXml()}</ResourceID>
+                <ExpressionProfile>
+                  <FreeText>Update</FreeText>
+                  <Flags>0</Flags>
+                </ExpressionProfile>
+              </profile>
+              <profileAttributesToDelete>
+                <ExpressionProfileAttributes>
+                  <PersonalStatus>true</PersonalStatus>
+                </ExpressionProfileAttributes>
+              </profileAttributesToDelete>
+            </UpdateProfile>
+            """.trimIndent()
+        } else {
+            """
+            <UpdateProfile xmlns="$NAMESPACE">
+              <profile>
+                <ResourceID>${profileResourceId.storageEscapeXml()}</ResourceID>
+                <ExpressionProfile>
+                  <FreeText>Update</FreeText>
+                  <PersonalStatus>${normalized.storageEscapeXml()}</PersonalStatus>
+                </ExpressionProfile>
+              </profile>
+            </UpdateProfile>
+            """.trimIndent()
+        }
     }
 
     internal fun parseCreatedDocumentResourceId(xml: String): String {
