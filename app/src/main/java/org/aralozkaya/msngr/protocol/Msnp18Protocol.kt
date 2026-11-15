@@ -13,7 +13,10 @@ import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 
@@ -68,6 +71,82 @@ object Msnp18Protocol {
     )
 
     fun ping() = MsnpCommand(verb = "PNG")
+
+    /** Builds the MSNP11+ QRY response for a server CHL challenge. */
+    fun challengeResponse(
+        transactionId: Int,
+        challenge: String,
+        productId: String = PRODUCT_ID,
+        productKey: String = PRODUCT_KEY,
+    ): MsnpCommand {
+        val digest = computeChallengeHash(challenge, productId, productKey)
+            .toByteArray(StandardCharsets.US_ASCII)
+        return MsnpCommand(
+            verb = "QRY",
+            transactionId = transactionId,
+            parameters = listOf(productId, digest.size.toString()),
+            payload = digest,
+        )
+    }
+
+    /** Computes the 32-character lowercase hex digest required by MSNP11+ CHL/QRY. */
+    fun computeChallengeHash(
+        challenge: String,
+        productId: String = PRODUCT_ID,
+        productKey: String = PRODUCT_KEY,
+    ): String {
+        require(challenge.isNotEmpty()) { "MSNP challenge cannot be empty." }
+        val keyDigest = MessageDigest.getInstance("MD5")
+            .digest((challenge + productKey).toByteArray(StandardCharsets.US_ASCII))
+        val privateSeed = IntArray(4) { index ->
+            littleEndianInt(keyDigest, index * 4) and 0x7FFF_FFFF
+        }
+
+        val rawPublic = (challenge + productId).toByteArray(StandardCharsets.US_ASCII)
+        val paddedPublic = rawPublic + ByteArray(8 - (rawPublic.size % 8)) { '0'.code.toByte() }
+        val publicSeed = IntArray(paddedPublic.size / 4) { index ->
+            littleEndianInt(paddedPublic, index * 4) and 0x7FFF_FFFF
+        }
+
+        var high = 0L
+        var low = 0L
+        for (index in publicSeed.indices step 2) {
+            var temp = (publicSeed[index].toLong() * CHALLENGE_MAGIC) % CHALLENGE_MODULUS
+            temp = (temp + high) % CHALLENGE_MODULUS
+            temp = (temp * privateSeed[0] + privateSeed[1]) % CHALLENGE_MODULUS
+
+            high = (publicSeed[index + 1].toLong() + temp) % CHALLENGE_MODULUS
+            high = (high * privateSeed[2] + privateSeed[3]) % CHALLENGE_MODULUS
+
+            low += high + temp
+        }
+
+        val finalHigh = ((high + privateSeed[1]) % CHALLENGE_MODULUS).toInt()
+        val finalLow = ((low + privateSeed[3]) % CHALLENGE_MODULUS).toInt()
+        val key = ByteBuffer.allocate(8)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .putInt(finalHigh)
+            .putInt(finalLow)
+            .array()
+
+        return buildString(32) {
+            for (index in keyDigest.indices) {
+                val xorByte = (keyDigest[index].toInt() xor key[index % 8].toInt()) and 0xFF
+                append(CHALLENGE_HEX_DIGITS[xorByte ushr 4])
+                append(CHALLENGE_HEX_DIGITS[xorByte and 0x0F])
+            }
+        }
+    }
+
+    private fun littleEndianInt(bytes: ByteArray, offset: Int): Int =
+        (bytes[offset].toInt() and 0xFF) or
+            ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
+            ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
+            ((bytes[offset + 3].toInt() and 0xFF) shl 24)
+
+    private const val CHALLENGE_MAGIC = 0x0E79_A9C1L
+    private const val CHALLENGE_MODULUS = 0x7FFF_FFFFL
+    private const val CHALLENGE_HEX_DIGITS = "0123456789abcdef"
 
     /** WLM's endpoint-specific sign-out notification (type 4, distinct from type 8 broadcast). */
     fun logOutSession(transactionId: Int, email: String, endpointId: String): MsnpCommand {
@@ -591,7 +670,10 @@ class Msnp18SocketTransport : MsnpTransport {
     }
 
     override suspend fun receive(): MsnpCommand = withContext(Dispatchers.IO) {
-        decodedQueue.removeFirstOrNull()?.let { return@withContext it }
+        decodedQueue.removeFirstOrNull()?.let { queued ->
+            trace("RECV ${queued.verb} payload=${queued.payload?.size ?: 0}")
+            return@withContext queued
+        }
         val stream = checkNotNull(input) { "MSNP socket is not connected" }
         val readBuffer = ByteArray(8 * 1024)
         while (true) {

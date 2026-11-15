@@ -30,19 +30,59 @@ internal class EmotionSoundService(private val server: String, private val http:
     }
     suspend fun popular(): List<EmotionSound> = withContext(Dispatchers.IO) {
         // The native protocol has local name search and ID downloads, not an invented remote search API.
-        // Escargot publishes these discoverable IDs on its public catalog, using the same sound service.
-        if (base != MsnEmotionSound.DEFAULT_SERVER && base != "http://msn.bart.escargot.chat/esnd/snd/") return@withContext emptyList()
-        val html = http.get("https://escargot.chat/sounds/").toString(Charsets.UTF_8)
+        // Escargot and CrossTalk publish discoverable IDs on their public sound pages.
+        when (base) {
+            MsnEmotionSound.DEFAULT_SERVER, "http://msn.bart.escargot.chat/esnd/snd/" -> {
+                parsePopularCatalog(
+                    html = http.get(MsnEmotionSound.ESCARGOT_CATALOG_URL).toString(Charsets.UTF_8),
+                    pattern = Regex("<h5>([^<]+)</h5>|playAudio\\('([0-9a-fA-F]{12})'\\);[\\s\\S]*?</i>\\s*([^<]{1,500})</th>"),
+                    categoryGroup = 1,
+                    idGroup = 2,
+                    nameGroup = 3,
+                )
+            }
+            MsnEmotionSound.CROSSTALK_SERVER -> {
+                parsePopularCatalog(
+                    html = http.get(MsnEmotionSound.CROSSTALK_CATALOG_URL).toString(Charsets.UTF_8),
+                    pattern = Regex("<h3 class=\"snd-chart-title\"[^>]*>([^<]+)</h3>|<span class=\"snd-title\"[^>]*>([^<]{1,500})</span>[\\s\\S]*?data-ct-copy=\"/sound #([0-9a-fA-F]{12})\""),
+                    categoryGroup = 1,
+                    idGroup = 3,
+                    nameGroup = 2,
+                )
+            }
+            else -> emptyList()
+        }
+    }
+
+    private fun parsePopularCatalog(
+        html: String,
+        pattern: Regex,
+        categoryGroup: Int,
+        idGroup: Int,
+        nameGroup: Int,
+    ): List<EmotionSound> {
         var category = 0
-        Regex("<h5>([^<]+)</h5>|playAudio\\('([0-9a-fA-F]{12})'\\);[\\s\\S]*?</i>\\s*([^<]{1,500})</th>").findAll(html).take(110).mapNotNull { match ->
-            if (match.groupValues[1].isNotEmpty()) {
-                category = listOf("Cartoons / Games", "TV / Movies", "Music", "Vocals", "Sound Effects").indexOf(match.groupValues[1].trim()) + 1
+        return pattern.findAll(html).take(110).mapNotNull { match ->
+            val heading = match.groupValues[categoryGroup]
+            if (heading.isNotEmpty()) {
+                category = popularCategoryIndex(heading)
                 return@mapNotNull null
             }
-            val name = match.groupValues[3].replace("&#039;", "'").replace("&quot;", "\"").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-            EmotionSound(match.groupValues[2].uppercase(java.util.Locale.ROOT), name, category)
+            val id = match.groupValues[idGroup].uppercase(java.util.Locale.ROOT)
+            val name = decodeHtmlEntities(match.groupValues[nameGroup])
+            EmotionSound(id, name, category)
         }.distinctBy { it.id }.toList()
     }
+
+    private fun popularCategoryIndex(heading: String): Int {
+        val normalized = heading.trim().replace(" / ", "/")
+        return listOf("Cartoons/Games", "TV/Movies", "Music", "Vocals", "Sound Effects").indexOf(normalized) + 1
+    }
+
+    private fun decodeHtmlEntities(text: String): String =
+        text.replace("&#039;", "'").replace("&#39;", "'")
+            .replace("&quot;", "\"").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .trim()
 }
 
 private fun getSoundResponse(url: String): ByteArray {
@@ -68,7 +108,8 @@ internal class EmotionSoundStore(private val root: File) {
     private val mutableChanges = MutableStateFlow(0L)
     val changes = mutableChanges.asStateFlow()
     private fun folder(account: String, server: String): File {
-        val key = MessageDigest.getInstance("SHA-256").digest((account + "\u0000" + MsnEmotionSound.server(server)).toByteArray())
+        val normalizedServer = MsnEmotionSound.server(server).orEmpty()
+        val key = MessageDigest.getInstance("SHA-256").digest((account + "\u0000" + normalizedServer).toByteArray())
             .joinToString("") { "%02x".format(it) }
         return File(root, key)
     }

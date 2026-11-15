@@ -52,12 +52,17 @@ class WinkCatalogActivity : MsngrActivity() {
         if (loading || pending != null) return
         val account = winkAccount()
         if (account == null) { status = "Sign in before adding winks."; return }
+        val catalogUrl = SessionPrefs.readServerConfig(this).winkCatalogServer
+        if (WinkDownloads.catalogUrl(catalogUrl) == null) {
+            status = "Third-party winks are not configured for this service."
+            return
+        }
         importAccount = account
         loading = true; status = null
         importJob = lifecycleScope.launch {
             try {
                 pending = withContext(Dispatchers.IO) {
-                    val bytes = WinkDownloads.download(uri.toString())
+                    val bytes = WinkDownloads.download(uri.toString(), catalogUrl)
                     MsnWinkPackage.install(bytes, name)
                 }
             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
@@ -69,12 +74,27 @@ class WinkCatalogActivity : MsngrActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @SuppressLint("SetJavaScriptEnabled")
     @Composable private fun Catalog() {
+        val catalogUrl = WinkDownloads.catalogUrl(SessionPrefs.readServerConfig(this).winkCatalogServer)
+        val catalogUri = remember(catalogUrl) { catalogUrl?.let(Uri::parse) }
         BackHandler { if (browser?.canGoBack() == true) browser?.goBack() else finish() }
         Scaffold(topBar = { TopAppBar(title = { Text("Get more winks") }, navigationIcon = {
             IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 status?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary) }
+                if (catalogUrl == null || catalogUri == null) {
+                    if (status == null) {
+                        Text(
+                            "Third-party winks are not configured for this service.",
+                            Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    return@Column
+                }
+                val catalogHost = catalogUri.host.orEmpty()
+                val catalogPath = catalogUri.path.orEmpty().ifEmpty { "/" }
+                val catalogBasePath = if (catalogPath.endsWith('/')) catalogPath else catalogPath.substringBeforeLast('/') + "/"
                 if (loading) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 AndroidView(factory = { context -> WebView(context).apply {
                     browser = this
@@ -88,8 +108,8 @@ class WinkCatalogActivity : MsngrActivity() {
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                             val url = request.url
-                            val packageUrl = if (url.scheme == "https" && url.host == "apps.escargot.nina.chat" &&
-                                url.path == "/content/winks/") url.getQueryParameter("msngr-install") else null
+                            val packageUrl = if (url.scheme in listOf("https", catalogUri.scheme) && url.host == catalogHost &&
+                                url.path.orEmpty().startsWith(catalogBasePath)) url.getQueryParameter("msngr-install") else null
                             if (packageUrl != null) {
                                 view.post { prepareImport(Uri.parse(packageUrl), url.getQueryParameter("name") ?: "Wink") }
                                 return WebResourceResponse("text/plain", "UTF-8", java.io.ByteArrayInputStream(byteArrayOf()))
@@ -98,28 +118,32 @@ class WinkCatalogActivity : MsngrActivity() {
                         }
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val url = request.url
-                            if (url.scheme == "https" && url.host == "apps.escargot.nina.chat" && url.getQueryParameter("msngr-install") != null) {
+                            if (url.scheme in listOf("https", catalogUri.scheme) && url.host == catalogHost && url.getQueryParameter("msngr-install") != null) {
                                 url.getQueryParameter("msngr-install")?.let { prepareImport(Uri.parse(it), url.getQueryParameter("name") ?: "Wink") }; return true
                             }
-                            val trusted = WinkDownloads.trustedPackageUrl(url.toString())
+                            val trusted = WinkDownloads.trustedPackageUrl(url.toString(), catalogUrl)
                             if (trusted != null) { prepareImport(Uri.parse(trusted), view.title?.removePrefix("Wink - ") ?: "Wink"); return true }
-                            if (url.host == "apps.escargot.nina.chat" && url.path.orEmpty().startsWith("/content/winks/")) {
-                                if (url.scheme == "http") { view.loadUrl(url.buildUpon().scheme("https").build().toString()); return true }
-                                return url.scheme != "https"
+                            if (url.host == catalogHost && url.path.orEmpty().startsWith(catalogBasePath)) {
+                                if (url.scheme == "http" && catalogUri.scheme == "https") {
+                                    view.loadUrl(url.buildUpon().scheme("https").build().toString()); return true
+                                }
+                                return url.scheme !in listOf("https", catalogUri.scheme)
                             }
                             return true
                         }
                         override fun onPageFinished(view: WebView, url: String) {
-                            if (Uri.parse(url).host != "apps.escargot.nina.chat") return
+                            if (Uri.parse(url).host != catalogHost) return
                             // Replace the page's legacy COM call. No JavaScript-to-Java bridge is exposed.
-                            view.evaluateJavascript("window.InstallContent=function(u){fetch('https://apps.escargot.nina.chat/content/winks/?msngr-install='+encodeURIComponent(u)+'&name='+encodeURIComponent(document.title.replace(/^Wink - /,'')),{cache:'no-store'});};", null)
+                            val installBase = "${catalogUri.scheme}://${catalogUri.authority}$catalogBasePath"
+                            val quotedBase = org.json.JSONObject.quote(installBase)
+                            view.evaluateJavascript("window.InstallContent=function(u){fetch($quotedBase+'?msngr-install='+encodeURIComponent(u)+'&name='+encodeURIComponent(document.title.replace(/^Wink - /,'')),{cache:'no-store'});};", null)
                         }
                         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                             status = "The catalog stopped. Close it and try again."; view.destroy(); browser = null; return true
                         }
                     }
                     setDownloadListener { url, _, _, _, _ -> prepareImport(Uri.parse(url), title?.removePrefix("Wink - ") ?: "Wink") }
-                    loadUrl(CATALOG_URL)
+                    loadUrl(catalogUrl)
                 } }, modifier = Modifier.fillMaxSize(), onRelease = { it.stopLoading(); it.destroy(); browser = null })
             }
         }
@@ -145,18 +169,31 @@ class WinkCatalogActivity : MsngrActivity() {
 }
 
 internal object WinkDownloads {
-    fun trustedPackageUrl(value: String): String? = runCatching {
-        val uri = URI(value)
-        require(uri.scheme in listOf("https", "http") && uri.host == "static.levelleap.com" &&
-            uri.rawUserInfo == null && uri.port == -1 && uri.fragment == null &&
-            uri.path.startsWith("/sites/messaging/apps.escargot.nina.chat/winks/files/") &&
-            uri.path.lowercase().let { it.endsWith(".mco") || it.endsWith(".cab") || it.endsWith(".mct") } &&
-            uri.path.split('/').none { it == ".." || it == "." })
-        URI("https", null, uri.host, -1, uri.path, uri.query, null).toASCIIString()
+    fun catalogUrl(value: String): String? = runCatching {
+        val uri = URI(value.trim())
+        require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank())
+        require(uri.userInfo == null && uri.fragment == null)
+        require(uri.port == -1 || uri.port in 1..65535)
+        uri.toASCIIString()
     }.getOrNull()
 
-    fun download(value: String): ByteArray {
-        var url = trustedPackageUrl(value) ?: error("Only Escargot wink download links are supported.")
+    fun trustedPackageUrl(value: String, catalogUrl: String = WinkCatalogActivity.CATALOG_URL): String? = runCatching {
+        val catalog = catalogUrl(catalogUrl)?.let(::URI) ?: return@runCatching null
+        val uri = URI(value)
+        val escargotHost = catalog.toASCIIString() == WinkCatalogActivity.CATALOG_URL &&
+            uri.host == "static.levelleap.com" &&
+            uri.path.startsWith("/sites/messaging/apps.escargot.nina.chat/winks/files/")
+        val sameCatalogOrigin = uri.host == catalog.host && (uri.port == -1 || uri.port == catalog.port)
+        require(uri.scheme in listOf("https", "http") && (escargotHost || sameCatalogOrigin) &&
+            uri.rawUserInfo == null && (escargotHost && uri.port == -1 || sameCatalogOrigin) && uri.fragment == null &&
+            uri.path.lowercase().let { it.endsWith(".mco") || it.endsWith(".cab") || it.endsWith(".mct") } &&
+            uri.path.split('/').none { it == ".." || it == "." })
+        val resolvedScheme = if (uri.port == -1) "https" else uri.scheme
+        URI(resolvedScheme, null, uri.host, uri.port, uri.path, uri.query, null).toASCIIString()
+    }.getOrNull()
+
+    fun download(value: String, catalogUrl: String = WinkCatalogActivity.CATALOG_URL): ByteArray {
+        var url = trustedPackageUrl(value, catalogUrl) ?: error("This wink download link is not from the configured catalog.")
         repeat(4) {
             val connection = java.net.URL(url).openConnection() as HttpURLConnection
             connection.apply { connectTimeout = 15_000; readTimeout = 20_000; instanceFollowRedirects = false }
@@ -164,7 +201,7 @@ internal object WinkDownloads {
                 val code = connection.responseCode
                 if (code in 300..399) {
                     val next = connection.getHeaderField("Location") ?: error("Invalid download redirect.")
-                    url = trustedPackageUrl(URI(url).resolve(next).toString()) ?: error("Untrusted wink download redirect.")
+                    url = trustedPackageUrl(URI(url).resolve(next).toString(), catalogUrl) ?: error("Untrusted wink download redirect.")
                 } else {
                     check(code == 200) { "Wink download failed (HTTP $code)." }
                     require(connection.contentLengthLong <= MsnWink.MAX_CAB_BYTES) { "Wink package is too large." }

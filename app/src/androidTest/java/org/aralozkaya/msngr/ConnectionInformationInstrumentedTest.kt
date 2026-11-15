@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
@@ -37,21 +38,23 @@ class ConnectionInformationInstrumentedTest {
             mainServer = "messenger.example",
             configServer = "config.example",
             emotionSoundServer = "https://sounds.example/custom",
+            winkCatalogServer = "https://winks.example/catalog/",
         ))
 
-        assertEndpointVisible("Winks", WinkCatalogActivity.CATALOG_URL)
+        assertEndpointVisible("Winks", "https://winks.example/catalog/")
         assertEndpointVisible("Emotion sounds", "https://sounds.example/custom/")
     }
 
-    @Test fun missingSoundOverrideStillOpensWithTheDefaultUrl() {
+    @Test fun missingMediaOverridesDisplayNotConfigured() {
         showConnectionInformation(ServerOverrides(
             mainServer = "messenger.example",
             configServer = "config.example",
             emotionSoundServer = "",
+            winkCatalogServer = "",
         ))
 
-        assertEndpointVisible("Winks", WinkCatalogActivity.CATALOG_URL)
-        assertEndpointVisible("Emotion sounds", MsnEmotionSound.DEFAULT_SERVER)
+        assertEndpointVisible("Winks", "Not configured", expectedCount = 2)
+        assertEndpointVisible("Emotion sounds", "Not configured", expectedCount = 2)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -79,10 +82,14 @@ class ConnectionInformationInstrumentedTest {
         }
     }
 
-    private fun assertEndpointVisible(label: String, url: String) {
+    private fun assertEndpointVisible(label: String, url: String, expectedCount: Int = 1) {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText(label))
         compose.onNodeWithText(label).assertIsDisplayed()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText(url))
-        compose.onNodeWithText(url).assertIsDisplayed()
+        val matches = compose.onAllNodesWithText(url)
+        matches.fetchSemanticsNodes().let { nodes ->
+            check(nodes.size == expectedCount) { "Expected $expectedCount '$url' nodes, found ${nodes.size}." }
+        }
+        repeat(expectedCount) { index -> matches[index].assertIsDisplayed() }
     }
 }

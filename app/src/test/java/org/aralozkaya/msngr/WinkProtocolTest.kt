@@ -203,6 +203,12 @@ class WinkProtocolTest {
         assertEquals("https://$path", WinkDownloads.trustedPackageUrl("http://$path"))
         for (url in listOf("https://evil.test/test.mco", "file:///secret", "https://$path/../test.mco", "https://user@$path"))
             assertNull(url, WinkDownloads.trustedPackageUrl(url))
+        assertNull(WinkDownloads.trustedPackageUrl("https://$path", catalogUrl = ""))
+        assertNull(WinkDownloads.trustedPackageUrl("https://$path", catalogUrl = "https://winks.example/catalog/"))
+        assertEquals(
+            "https://winks.example/files/demo.mco",
+            WinkDownloads.trustedPackageUrl("http://winks.example/files/demo.mco", catalogUrl = "https://winks.example/catalog/"),
+        )
     }
 
     private fun storedCab(files: List<Pair<String, ByteArray>>): ByteArray {

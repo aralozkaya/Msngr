@@ -831,10 +831,19 @@ private fun CustomServerDialog(
                     { draft = draft.copy(activitiesServer = it) },
                 )
                 EmoticonOutlinedTextField(
+                    value = draft.winkCatalogServer,
+                    onValueChange = { draft = draft.copy(winkCatalogServer = it) },
+                    label = { Text("Winks catalog URL") },
+                    supportingText = { Text("Optional. Full HTTP or HTTPS wink catalog URL") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth().testTag("wink_catalog_server"),
+                )
+                EmoticonOutlinedTextField(
                     value = draft.emotionSoundServer,
                     onValueChange = { draft = draft.copy(emotionSoundServer = it) },
                     label = { Text("Emotion sounds service URL") },
-                    supportingText = { Text("Full HTTP or HTTPS base URL, ending in /esnd/snd/") },
+                    supportingText = { Text("Optional. Full HTTP or HTTPS base URL, ending in /esnd/snd/") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth().testTag("emotion_sound_server"),

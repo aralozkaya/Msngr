@@ -673,7 +673,7 @@ fun ConnectionInformationScreen(
         settingsDetailsSection(
             "Messenger Plus!",
             messengerPlusConnectionDetails(
-                winkCatalogUrl = WinkCatalogActivity.CATALOG_URL,
+                winkCatalogUrl = snapshot.resolvedServers.winkCatalogServer,
                 emotionSoundUrl = snapshot.resolvedServers.emotionSoundServer,
             ),
         )

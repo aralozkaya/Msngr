@@ -102,11 +102,17 @@ internal class EmotionSoundController(private val context: Context, val account:
     var activeId by mutableStateOf<String?>(null); private set
     var error by mutableStateOf<String?>(null); private set
     private var job: Job? = null
+    val onlineEnabled: Boolean get() = MsnEmotionSound.server(server) != null
     fun checkAccount() { check(account != null && SessionPrefs.preferenceAccount(context)?.storageId == account && SessionPrefs.readServerConfig(context).emotionSoundServer == server) { "The selected account changed. Open the sound picker again." } }
     suspend fun load(sound: EmotionSound, save: Boolean = false): Pair<EmotionSound, ByteArray> {
         checkAccount()
         val cached = withContext(Dispatchers.IO) { context.emotionSoundStore().bytes(account!!, server, sound) }
-        val result = if (cached != null) MsnEmotionSound.downloaded(cached, sound) to cached else EmotionSoundService(server).download(sound)
+        val result = if (cached != null) {
+            MsnEmotionSound.downloaded(cached, sound) to cached
+        } else {
+            check(onlineEnabled) { "Online emotion sounds are not configured for this service." }
+            EmotionSoundService(server).download(sound)
+        }
         checkAccount()
         withContext(Dispatchers.IO) {
             val saveCustom = save && result.first.builtInCode == null
@@ -210,8 +216,11 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     val search = rememberTextFieldState()
     val searchController = remember { MessengerPlusEditorController() }
     val iconButtonSize = IconButtonDefaults.smallContainerSize(widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow)
+    val onlineEnabled = catalogService != null || player.onlineEnabled
     var catalog by remember(player.account, player.server) { mutableStateOf(MsnEmotionSound.builtIns) }
-    val soundService = remember(player.server, catalogService) { catalogService ?: EmotionSoundService(player.server) }
+    val soundService = remember(player.server, catalogService) {
+        catalogService ?: MsnEmotionSound.server(player.server)?.let(::EmotionSoundService)
+    }
     // Null means not loaded; a successful empty catalog is still a completed load.
     var popular by remember(soundService) { mutableStateOf<List<EmotionSound>?>(null) }
     var catalogError by remember(soundService) { mutableStateOf<String?>(null) }
@@ -222,14 +231,20 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     var actionBusy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
-    val loadingOnline = online && popular == null && catalogError == null
+    val loadingOnline = onlineEnabled && online && popular == null && catalogError == null
     val busy = actionBusy || loadingOnline
+    LaunchedEffect(onlineEnabled) {
+        if (!onlineEnabled) {
+            online = false
+            randomDialog = false
+        }
+    }
     LaunchedEffect(visible, changes, player.account) {
         if (visible && player.account != null) catalog = withContext(Dispatchers.IO) { store.catalog(player.account, player.server) }
         if (!visible) { player.stop(); randomDialog = false }
     }
-    LaunchedEffect(visible, online, soundService, catalogAttempt) {
-        if (visible && online && popular == null && catalogError == null) {
+    LaunchedEffect(visible, online, onlineEnabled, soundService, catalogAttempt) {
+        if (visible && online && onlineEnabled && soundService != null && popular == null && catalogError == null) {
             try { popular = soundService.popular() }
             catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { catalogError = failure.message ?: "Online sounds could not be loaded." }
@@ -245,22 +260,31 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
         header = {
             CompactSearchField(search, "Search sounds", "Clear sound search",
                 Modifier.fillMaxWidth().testTag("emotion_sound_search"), controller = searchController)
-            PrimaryTabRow(
-                selectedTabIndex = if (online) 1 else 0,
-                modifier = Modifier.fillMaxWidth().testTag("emotion_sound_source"),
-                containerColor = Color.Transparent,
-            ) {
-                Tab(
-                    selected = !online, onClick = { online = false; error = null },
-                    text = { Text("Local") },
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("emotion_sound_local"),
-                )
-                Tab(
-                    selected = online, onClick = { online = true; error = null },
-                    text = { Text("Online") },
-                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("emotion_sound_online"),
+            if (onlineEnabled) {
+                PrimaryTabRow(
+                    selectedTabIndex = if (online) 1 else 0,
+                    modifier = Modifier.fillMaxWidth().testTag("emotion_sound_source"),
+                    containerColor = Color.Transparent,
+                ) {
+                    Tab(
+                        selected = !online, onClick = { online = false; error = null },
+                        text = { Text("Local") },
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("emotion_sound_local"),
+                    )
+                    Tab(
+                        selected = online, onClick = { online = true; error = null },
+                        text = { Text("Online") },
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("emotion_sound_online"),
+                    )
+                }
+            } else {
+                Text(
+                    "Online emotion sounds are not configured for this service.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("emotion_sound_online_disabled"),
                 )
             }
         }, footer = {
@@ -273,13 +297,15 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 EmotionSoundDropdown(category, emotionSoundCategories, "Sound category", "emotion_sound_category",
                     onSelected = { category = it }, enabled = !busy)
                 Spacer(Modifier.weight(1f))
-                if (hash != null) Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { action {
-                    val (sound, _) = player.load(EmotionSound(hash, "Emotion sound"), save = true)
-                    status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
-                } }) { Icon(Icons.Default.Download, null); Text("Download") }
-                else TextButton(enabled = !busy, onClick = {
-                    player.stop(); searchController.clearFocusAndHideKeyboard(); randomDialog = true
-                }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
+                if (onlineEnabled) {
+                    if (hash != null) Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { action {
+                        val (sound, _) = player.load(EmotionSound(hash, "Emotion sound"), save = true)
+                        status = "Added ${sound.name.messengerPlusPlainText()}"; online = false
+                    } }) { Icon(Icons.Default.Download, null); Text("Download") }
+                    else TextButton(enabled = !busy, onClick = {
+                        player.stop(); searchController.clearFocusAndHideKeyboard(); randomDialog = true
+                    }, modifier = Modifier.testTag("emotion_sound_random")) { Icon(Icons.Default.Shuffle, null); Text("Random") }
+                }
             }
         }) {
         val query = search.text.toString().trim().removePrefix("#")
@@ -333,7 +359,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
             }
         }
     }
-    if (visible && randomDialog) {
+    if (visible && randomDialog && onlineEnabled) {
         RandomEmotionSoundDialog(category, onDismiss = { randomDialog = false }, onKept = { sound ->
             status = "Added ${sound.name.messengerPlusPlainText()}"; online = false; randomDialog = false
         })

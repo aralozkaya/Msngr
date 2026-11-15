@@ -112,13 +112,27 @@ class EmotionSoundTest {
             "<i onclick=\"playAudio('012345abcdef');\" class=\"volume\"></i> It&#039;s &amp; sound</th>".toByteArray()
         })
         assertEquals(listOf(EmotionSound("012345ABCDEF", "It's & sound")), service.popular())
+
+        val crossTalkService = EmotionSoundService(MsnEmotionSound.CROSSTALK_SERVER, EmotionSoundHttp { url ->
+            assertEquals(MsnEmotionSound.CROSSTALK_CATALOG_URL, url)
+            """
+            <h3 class="snd-chart-title" id="sndCategory1">Cartoons/Games</h3>
+            <li class="snd-row">
+                <span class="snd-title" id="snd1-1">hoot &amp; more</span>
+                <button type="button" class="snd-id" data-ct-copy="/sound #209d830b256f"><code>209D830B256F</code></button>
+            </li>
+            """.trimIndent().toByteArray()
+        })
+        assertEquals(listOf(EmotionSound("209D830B256F", "hoot & more", 1)), crossTalkService.popular())
     }
     @Test fun soundUrlsValidateBeforeTheyAreStoredOrUsed() {
         assertEquals("http://localhost:8080/esnd/snd/", MsnEmotionSound.server(" http://localhost:8080/esnd/snd "))
         for (bad in listOf("", "sounds.example.test", "file:///tmp/", "https://user:pass@example.test/", "https://example.test/?token=a", "https://example.test/#x", "https://example.test:0/"))
             assertNull(bad, MsnEmotionSound.server(bad))
         assertTrue(ServerPresets.presetFor(ProviderOptions.ESCARGOT).isValid())
-        assertEquals(MsnEmotionSound.DEFAULT_SERVER, ServerPresets.resolveForProvider(ProviderOptions.CROSSTALK, ServerOverrides()).emotionSoundServer)
+        assertTrue(ServerPresets.presetFor(ProviderOptions.CROSSTALK).isValid())
+        assertEquals(MsnEmotionSound.CROSSTALK_SERVER, ServerPresets.resolveForProvider(ProviderOptions.CROSSTALK, ServerOverrides()).emotionSoundServer)
+        assertEquals("", ServerPresets.resolveForProvider(ProviderOptions.CUSTOM, ServerOverrides(mainServer = "ms.example", configServer = "cfg.example")).emotionSoundServer)
     }
     @Test fun libraryPersistsByAccountAndServiceAndRemovalKeepsReplayCache() {
         val directory = Files.createTempDirectory("msngr-emotion-library").toFile()

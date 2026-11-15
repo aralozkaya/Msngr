@@ -163,4 +163,27 @@ class EmotionSoundCatalogInstrumentedTest {
             assertEquals(2, calls.get())
         } finally { release.countDown() }
     }
+
+    @Test fun unconfiguredSoundServiceHidesOnlineCatalogAndRandomControls() {
+        SessionPrefs.completeLogin(
+            context,
+            "emotion-unconfigured-${UUID.randomUUID()}@example.test",
+            "test-password",
+            false,
+            ProviderOptions.CUSTOM,
+            ServerOverrides(
+                mainServer = "ms.example",
+                configServer = "cfg.example",
+                emotionSoundServer = "",
+            ),
+            true,
+        )
+        compose.setContent { MaterialTheme { KeyboardSheetScaffold {
+            Box(Modifier.fillMaxSize())
+            EmotionSoundPicker(true, true, {}, onSend = { Result.success(Unit) })
+        } } }
+        compose.onNodeWithTag("emotion_sound_online_disabled").assertIsDisplayed()
+        compose.onNodeWithTag("emotion_sound_online").assertDoesNotExist()
+        compose.onNodeWithTag("emotion_sound_random").assertDoesNotExist()
+    }
 }
