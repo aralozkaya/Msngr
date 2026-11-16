@@ -931,13 +931,20 @@ internal class LiveMsnp18Client(
         }
     }
 
+    private fun contactForFeatureCheck(email: String): Contact? =
+        mutableContacts.value.resolveContact(email)
+
     override suspend fun sendWink(contactId: String, wink: org.aralozkaya.msngr.protocol.WinkReference, bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val email = contactEmail(contactId)
             checkGroupAvailable(email)
-            val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
-            check(group == null || group.groupFeatures(signedInEmail).winks) {
-                "All online group members must support winks."
+            val target = contactForFeatureCheck(email)
+            check(target != null && !target.isBlocked && target.presence.isOnline) {
+                "Winks require the contact to be online."
+            }
+            check(target.recipientFeatures(signedInEmail).winks) {
+                if (target.isGroup) "All online group members must support winks."
+                else "This contact's client does not support winks."
             }
             check(wink.metadata.matches(bytes)) { "Wink data does not match its metadata." }
             requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes)) { "Invalid wink package." }
@@ -982,8 +989,9 @@ internal class LiveMsnp18Client(
     override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val email = contactEmail(contactId)
-            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            val contact = contactForFeatureCheck(email)
             check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) { "This contact is unavailable for photo sharing." }
+            check(contact.recipientFeatures(signedInEmail).photos) { "This contact's client does not support photo sharing." }
             val active = mutablePhotoShares.value[email.lowercase()]?.takeIf { it.status == PhotoShareStatus.Active }
             if (active != null) photoSession(email, active.id).startPhotos(photos, active.id)
             else switchboardFor(email).startPhotos(photos)
@@ -1003,9 +1011,12 @@ internal class LiveMsnp18Client(
     override suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val email = contactEmail(contactId)
-            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            val contact = contactForFeatureCheck(email)
             check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) {
                 "This contact is unavailable for games and activities."
+            }
+            check(contact.recipientFeatures(signedInEmail).activities) {
+                "This contact's client does not support games and activities."
             }
             switchboardFor(email).startGame(entry)
             Unit
@@ -1035,8 +1046,9 @@ internal class LiveMsnp18Client(
         runCatching {
             val email = contactEmail(contactId)
             check(!isGroup(email)) { "File transfers are only available in one-to-one chats." }
-            val contact = mutableContacts.value.firstOrNull { it.id.equals(email, true) }
+            val contact = contactForFeatureCheck(email)
             check(contact != null && !contact.isBlocked && contact.presence != Presence.Offline) { "This contact is unavailable for file transfers." }
+            check(contact.recipientFeatures(signedInEmail).files) { "This contact's client does not support file transfers." }
             check(signedInEmail.isNotBlank()) { "Sign in before sharing files." }
             switchboardFor(email).offerFile(file, name)
             Unit
@@ -1055,6 +1067,13 @@ internal class LiveMsnp18Client(
     override suspend fun sendVoiceClip(contactId: String, clip: VoiceClip): Result<Unit> {
         val email = contactEmail(contactId)
         if (isGroup(email)) return Result.failure(IllegalStateException("Voice clips are not supported in group chats."))
+        val contact = contactForFeatureCheck(email)
+        if (contact == null || contact.isBlocked || !contact.presence.isOnline) {
+            return Result.failure(IllegalStateException("Voice clips require the contact to be online."))
+        }
+        if (!contact.recipientFeatures(signedInEmail).voiceClips) {
+            return Result.failure(IllegalStateException("This contact's client does not support voice clips."))
+        }
         val valid = MsnVoiceClip.parse(clip.bytes())
             ?: return Result.failure(IllegalArgumentException("Invalid voice clip."))
         val message = ChatMessage(messageIds.incrementAndGet(), email.lowercase(), MessageAuthor.Me,
@@ -1074,13 +1093,15 @@ internal class LiveMsnp18Client(
                 "Messages cannot be sent to a blocked contact."
             }
             if (message.wink != null) {
-                val group = mutableContacts.value.firstOrNull { it.id == email.lowercase() && it.isGroup }
-                check(group == null || group.groupFeatures(signedInEmail).winks) {
-                    "All online group members must support winks."
-                }
-                check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
+                val target = contactForFeatureCheck(email)
+                check(target != null && target.presence != Presence.Offline) {
                     "Winks require the contact to be online."
                 }
+                check(target.recipientFeatures(signedInEmail).winks) {
+                    if (target.isGroup) "All online group members must support winks."
+                    else "This contact's client does not support winks."
+                }
+                val group = target.takeIf { it.isGroup }
                 val metadata = message.wink.metadata
                 val bytes = winkStore?.bytes(signedInStorageAccount, metadata)
                     ?: sharedWinks["${email.lowercase()}\n${metadata.sha1d}"]?.data?.bytes
@@ -1099,8 +1120,12 @@ internal class LiveMsnp18Client(
                 } else switchboardFor(email).sendWink(metadata)
             } else if (message.voiceClip != null) {
                 check(!isGroup(email)) { "Voice clips are not supported in group chats." }
-                check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
+                val contact = contactForFeatureCheck(email)
+                check(contact != null && contact.presence != Presence.Offline) {
                     "Voice clips require the contact to be online."
+                }
+                check(contact.recipientFeatures(signedInEmail).voiceClips) {
+                    "This contact's client does not support voice clips."
                 }
                 val bytes = message.voiceClip.bytes()
                 val metadata = MsnDisplayPicture.create(signedInEmail, bytes, 11)
@@ -1112,9 +1137,9 @@ internal class LiveMsnp18Client(
                 sharedVoiceClips["${email.lowercase()}\n${metadata.sha1d}"] = SharedVoice(LocalDisplayPicture(metadata, bytes), now)
                 switchboardFor(email).sendVoiceClip(metadata)
             } else if (message.inkDrawing != null) {
+                val target = contactForFeatureCheck(email)
                 if (isGroup(email)) {
-                    val format = mutableContacts.value.first { it.id == email.lowercase() }
-                        .groupFeatures(signedInEmail).inkFormat
+                    val format = target?.groupFeatures(signedInEmail)?.inkFormat
                     check(format != null) { "All online group members must support handwriting." }
                     val commands = MsnpCircles.inkMessages(
                         groupEmail = email,
@@ -1126,10 +1151,12 @@ internal class LiveMsnp18Client(
                     )
                     sendCircleMessages(message, commands)
                 } else {
-                    check(
-                        mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline,
-                    ) {
+                    check(target != null && target.presence != Presence.Offline) {
                         "Handwriting messages require the contact to be online."
+                    }
+                    val format = target.recipientFeatures(signedInEmail).inkFormat
+                    check(format != null) {
+                        "This contact's client does not support handwriting."
                     }
                     val board = try {
                         switchboardFor(email)
@@ -1140,7 +1167,7 @@ internal class LiveMsnp18Client(
                         }
                         throw error
                     }
-                    board.sendInk(message.inkDrawing)
+                    board.sendInk(message.inkDrawing, useGif = format == GroupInkFormat.Gif)
                 }
             } else if (isGroup(email)) {
                 val command = MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, message.text, style = message.nativeStyle)
@@ -1254,6 +1281,11 @@ internal class LiveMsnp18Client(
             checkGroupAvailable(email)
             check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.isBlocked != true) {
                 "Nudges cannot be sent to a blocked contact."
+            }
+            val target = contactForFeatureCheck(email)
+            check(target != null && target.recipientFeatures(signedInEmail).nudges) {
+                if (target?.isGroup == true) "All online group members must support nudges."
+                else "This contact's client does not support nudges."
             }
             val reservation = nudgeLimiter.reserveSend(email)
             var succeeded = false
@@ -1680,6 +1712,8 @@ internal class LiveMsnp18Client(
                 unreadCount = if (blocked) 0 else contact.unreadCount,
                 isMarkedUnread = !blocked && contact.isMarkedUnread,
                 isBlocked = blocked,
+                clientCapabilities = if (blocked) 0L else contact.clientCapabilities,
+                extendedCapabilities = if (blocked) 0L else contact.extendedCapabilities,
             )
         }
     }
@@ -2275,7 +2309,7 @@ internal class LiveMsnp18Client(
             nickname = publication?.name ?: group.nickname,
             members = when {
                 !removed.isNullOrEmpty() -> group.members.map {
-                    if (it.email == removed) it.copy(presence = Presence.Offline, clientCapabilities = 0L) else it
+                    if (it.email == removed) it.copy(presence = Presence.Offline, clientCapabilities = 0L, extendedCapabilities = 0L) else it
                 }
                 publication?.roster != null -> {
                     val online = publication.roster.toSet()
@@ -2286,7 +2320,8 @@ internal class LiveMsnp18Client(
                         member.copy(isPending = member.isPending && email !in online, presence = if (email in online) {
                             if (member.presence.isOnline) member.presence else Presence.Online
                         } else Presence.Offline,
-                            clientCapabilities = if (email in online && member.presence.isOnline) member.clientCapabilities else 0L)
+                            clientCapabilities = if (email in online && member.presence.isOnline) member.clientCapabilities else 0L,
+                            extendedCapabilities = if (email in online && member.presence.isOnline) member.extendedCapabilities else 0L)
                     }
                 }
                 else -> group.members
@@ -2311,9 +2346,15 @@ internal class LiveMsnp18Client(
             else -> null
         }
         val hasNetworkId = command.verb == "ILN" && command.parameters.getOrNull(2)?.toIntOrNull() != null
+        val networkId = raw.identityNetworkId()
+            ?: if (hasNetworkId) command.parameters.getOrNull(2)?.toIntOrNull() else null
         val nicknameIndex = if (hasNetworkId) 3 else 2
         val name = if (command.verb == "NLN" || command.verb == "ILN")
             command.parameters.getOrNull(nicknameIndex)?.decodeMsnpValue() else null
+        val parsedCaps = if (status?.isOnline == true) {
+            parseClientCapabilitiesPair(command.parameters.getOrNull(nicknameIndex + 1))
+        } else null
+        val endpointCaps = if (command.verb == "UBX") command.payload?.let(::parseEndpointCapabilities) else null
         updateContact(id) { group -> group?.copy(members = group.members.toMutableList().apply {
             val index = indexOfFirst { it.email == email }
             val previous = getOrNull(index) ?: GroupMember(email)
@@ -2321,10 +2362,19 @@ internal class LiveMsnp18Client(
                 isPending = previous.isPending && status?.isOnline != true,
                 displayName = name ?: previous.displayName,
                 presence = status ?: previous.presence,
+                networkId = networkId ?: previous.networkId,
                 clientCapabilities = when {
-                    status?.isOnline == true -> parseClientCapabilities(command.parameters.getOrNull(nicknameIndex + 1))
+                    parsedCaps != null -> parsedCaps.base
                     status == Presence.Offline -> 0L
+                    previous.presence.isOnline && endpointCaps != null ->
+                        mergeEndpointBaseCapabilities(previous.clientCapabilities, endpointCaps.base)
                     else -> previous.clientCapabilities
+                },
+                extendedCapabilities = when {
+                    parsedCaps != null -> parsedCaps.extended
+                    status == Presence.Offline -> 0L
+                    previous.presence.isOnline && endpointCaps != null -> endpointCaps.extended
+                    else -> previous.extendedCapabilities
                 },
             )
             if (index < 0) add(member) else set(index, member)
@@ -2334,7 +2384,8 @@ internal class LiveMsnp18Client(
 
     private suspend fun updateContactPresence(command: MsnpCommand) {
         val presence = Presence.fromMsnpCode(command.parameters.getOrNull(0).orEmpty())
-        val email = command.parameters.getOrNull(1)?.normalizedIdentity().orEmpty()
+        val rawIdentity = command.parameters.getOrNull(1).orEmpty()
+        val email = rawIdentity.normalizedIdentity()
         if (email.isEmpty()) return
         if (email.equals(signedInEmail, ignoreCase = true)) {
             val hasNetworkId = command.verb == "ILN" && command.parameters.getOrNull(2)?.toIntOrNull() != null
@@ -2359,8 +2410,16 @@ internal class LiveMsnp18Client(
         if (previousContact?.isBlocked == true) return
         val hasNetworkId = command.verb == "ILN" &&
             command.parameters.getOrNull(2)?.toIntOrNull() != null
+        val networkId = rawIdentity.identityNetworkId()
+            ?: (if (hasNetworkId) command.parameters.getOrNull(2)?.toIntOrNull() else null)
+            ?: MSNP_WINDOWS_LIVE_NETWORK_ID
         val nicknameIndex = if (hasNetworkId) 3 else 2
         val capabilitiesIndex = nicknameIndex + 1
+        val capabilities = if (presence.isOnline) {
+            parseClientCapabilitiesPair(command.parameters.getOrNull(capabilitiesIndex))
+        } else {
+            ParsedClientCapabilities()
+        }
         val nickname = command.parameters.getOrNull(nicknameIndex)
             ?.decodeMsnpValue()
             ?.takeIf(String::isNotBlank)
@@ -2375,6 +2434,9 @@ internal class LiveMsnp18Client(
             )).copy(
                 nickname = nickname ?: existing?.nickname,
                 presence = presence,
+                clientCapabilities = capabilities.base,
+                extendedCapabilities = capabilities.extended,
+                networkId = networkId,
             )
         }
         if (presence.isOnline) {
@@ -2546,7 +2608,13 @@ internal class LiveMsnp18Client(
         contactEndpointWaiters.remove(id)?.cancel()
         contactDisplayPictures.remove(id)
         closeSwitchboards(id)
-        updateContact(email) { existing -> existing?.copy(presence = Presence.Offline) }
+        updateContact(email) { existing ->
+            existing?.copy(
+                presence = Presence.Offline,
+                clientCapabilities = 0L,
+                extendedCapabilities = 0L,
+            )
+        }
         if (previousPresence != null && previousPresence != Presence.Offline &&
             (!initialPresenceSync || restoringContactPresence)
         ) {
@@ -2603,8 +2671,26 @@ internal class LiveMsnp18Client(
             pictureTrace("ENDPOINT announced")
             contactEndpointWaiters.remove(id)?.complete(Unit)
         }
+        val endpointCapabilities = parseEndpointCapabilities(payload)
+        val networkId = command.parameters.firstOrNull()?.identityNetworkId()
+            ?: command.parameters.takeIf { it.size >= 3 }?.getOrNull(1)?.toIntOrNull()
         val personalMessage = Msnp18Protocol.parsePersonalMessage(payload)
-        updateContact(email) { existing -> existing?.copy(statusMessage = personalMessage) }
+        updateContact(email) { existing ->
+            existing?.copy(
+                statusMessage = personalMessage,
+                networkId = networkId ?: existing.networkId,
+                clientCapabilities = if (existing.presence.isOnline && endpointCapabilities != null) {
+                    mergeEndpointBaseCapabilities(existing.clientCapabilities, endpointCapabilities.base)
+                } else {
+                    existing.clientCapabilities
+                },
+                extendedCapabilities = if (existing.presence.isOnline && endpointCapabilities != null) {
+                    endpointCapabilities.extended
+                } else {
+                    existing.extendedCapabilities
+                },
+            )
+        }
     }
 
     private fun notifyOwnDisplayPictureChanged(personalMessage: String? = null) {
@@ -3060,7 +3146,18 @@ internal class LiveMsnp18Client(
     }
 
     private fun ensureSwitchboardContact(id: String) {
-        updateContact(id) { existing -> existing ?: Contact(id, null, id, Presence.Online) }
+        val resolved = mutableContacts.value.resolveContact(id)
+        updateContact(id) { existing ->
+            existing ?: Contact(
+                id = id,
+                nickname = resolved?.nickname,
+                email = id,
+                presence = Presence.Online,
+                clientCapabilities = resolved?.clientCapabilities ?: 0L,
+                extendedCapabilities = resolved?.extendedCapabilities ?: 0L,
+                networkId = resolved?.networkId ?: MSNP_WINDOWS_LIVE_NETWORK_ID,
+            )
+        }
     }
 
     private fun isGroupWinkPeer(id: String): Boolean =
@@ -3932,6 +4029,12 @@ private fun String.parseNotificationEndpoint(defaultPort: Int): Pair<String, Int
     if (separator <= 0) return value to defaultPort
     val parsedPort = value.substring(separator + 1).toIntOrNull() ?: return value to defaultPort
     return value.substring(0, separator) to parsedPort
+}
+
+private fun String.identityNetworkId(): Int? {
+    val withoutEndpoint = substringBefore(';')
+    val prefix = withoutEndpoint.substringBefore(':', missingDelimiterValue = "")
+    return prefix.toIntOrNull()
 }
 
 private fun String.normalizedIdentity(): String {

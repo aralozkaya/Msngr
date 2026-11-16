@@ -14,6 +14,8 @@ internal fun mergeBlockedContactUpdate(current: List<Contact>, blocked: List<Con
             presence = if (isBlocked) Presence.Offline else contact.presence,
             unreadCount = if (isBlocked) 0 else contact.unreadCount,
             isMarkedUnread = !isBlocked && contact.isMarkedUnread,
+            clientCapabilities = if (isBlocked) 0L else contact.clientCapabilities,
+            extendedCapabilities = if (isBlocked) 0L else contact.extendedCapabilities,
         )
     }
     // Reuse the login merge's guard against resurrecting circles that have been left.
@@ -43,6 +45,8 @@ internal fun mergeAddressBookUpdate(
                     presence = if (member.isPending) member.presence else old?.takeUnless { it.isPending }?.presence ?: member.presence,
                     avatarUri = old?.avatarUri ?: member.avatarUri,
                     clientCapabilities = if (member.isPending) 0L else old?.takeUnless { it.isPending }?.clientCapabilities ?: member.clientCapabilities,
+                    extendedCapabilities = if (member.isPending) 0L else old?.takeUnless { it.isPending }?.extendedCapabilities ?: member.extendedCapabilities,
+                    networkId = if (member.isPending) MSNP_WINDOWS_LIVE_NETWORK_ID else old?.takeUnless { it.isPending }?.networkId ?: member.networkId,
                 )
             }
         }
@@ -53,6 +57,9 @@ internal fun mergeAddressBookUpdate(
             avatarUri = previous?.avatarUri ?: fresh.avatarUri,
             unreadCount = previous?.unreadCount ?: fresh.unreadCount,
             isMarkedUnread = previous?.isMarkedUnread ?: fresh.isMarkedUnread,
+            clientCapabilities = previous?.clientCapabilities ?: fresh.clientCapabilities,
+            extendedCapabilities = previous?.extendedCapabilities ?: fresh.extendedCapabilities,
+            networkId = previous?.networkId ?: fresh.networkId,
             members = members,
         ).withGroupPresence(ownEmail)
     }

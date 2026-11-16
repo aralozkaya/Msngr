@@ -125,7 +125,9 @@ class LiveCircleClientTest {
         try {
             client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
             transport.incoming.send(roster(groupId, me, "alice@example.com", "bob@example.com"))
-            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            transport.incoming.send(memberPresence("alice@example.com"))
+            transport.incoming.send(memberPresence("bob@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().groupFeatures(me).nudges } }
             client.sendNudgeWithResult(groupId).getOrThrow()
             assertTrue(client.sendNudgeWithResult(groupId).exceptionOrNull() is NudgeCooldownException)
             assertEquals(1, transport.sent.count { it.verb == "SDG" })
@@ -250,7 +252,9 @@ class LiveCircleClientTest {
         try {
             client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
             transport.incoming.send(roster(groupId, me, "alice@example.com", "bob@example.com"))
-            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            transport.incoming.send(memberPresence("alice@example.com"))
+            transport.incoming.send(memberPresence("bob@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().groupFeatures(me).nudges } }
 
             // 1. Send outgoing group handwriting
             transport.incoming.send(memberPresence("alice@example.com"))

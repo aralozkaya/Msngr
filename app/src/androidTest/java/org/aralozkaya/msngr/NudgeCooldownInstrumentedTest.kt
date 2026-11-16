@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -28,7 +29,14 @@ class NudgeCooldownInstrumentedTest {
         compose.setContent {
             MsngrTheme {
                 ChatScreen(draft = draft.value, onDraftChange = { draft.value = it },
-                    contact = Contact("peer", "Peer", "peer@example.com", Presence.Online),
+                    contact = Contact(
+                        "peer",
+                        "Peer",
+                        "peer@example.com",
+                        Presence.Online,
+                        clientCapabilities = Msnp18Protocol.CLIENT_ID,
+                        extendedCapabilities = Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+                    ),
                     messages = emptyList(), isHistoryLoaded = true, canLoadOlderMessages = false,
                     isTyping = false, onBack = {}, onSendMessage = { _, _ -> }, onRetryMessage = {},
                     onSendTyping = {}, onSendNudge = { nudges++ }, onLoadOlderMessages = {},
@@ -58,7 +66,14 @@ class NudgeCooldownInstrumentedTest {
                 ChatScreen(
                     draft = "",
                     onDraftChange = {},
-                    contact = Contact("peer", "Peer", "peer@example.com", Presence.Online),
+                    contact = Contact(
+                        "peer",
+                        "Peer",
+                        "peer@example.com",
+                        Presence.Online,
+                        clientCapabilities = Msnp18Protocol.CLIENT_ID,
+                        extendedCapabilities = Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+                    ),
                     messages = emptyList(),
                     isHistoryLoaded = true,
                     canLoadOlderMessages = false,
