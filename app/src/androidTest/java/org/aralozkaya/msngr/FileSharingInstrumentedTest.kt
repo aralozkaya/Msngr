@@ -97,7 +97,14 @@ class FileSharingInstrumentedTest {
             var draft by remember { mutableStateOf("We can keep talking") }
             ChatScreen(
                 draft = draft, onDraftChange = { draft = it },
-                contact = Contact("photo-fab-peer", "Photo sharing", "peer@example.test", Presence.Online),
+                contact = Contact(
+                    "photo-fab-peer",
+                    "Photo sharing",
+                    "peer@example.test",
+                    Presence.Online,
+                    clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+                    extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+                ),
                 messages = listOf(ChatMessage(1, "photo-fab-peer", MessageAuthor.Contact,
                     "You can keep chatting while sharing photos.", System.currentTimeMillis())),
                 isHistoryLoaded = true, canLoadOlderMessages = false, isTyping = false,
@@ -474,7 +481,14 @@ class FileSharingInstrumentedTest {
                 ChatScreen(
                     draft = draft,
                     onDraftChange = { draft = it },
-                    contact = Contact("peer", "Alex", "alex@example.test", Presence.Online),
+                    contact = Contact(
+                        "peer",
+                        "Alex",
+                        "alex@example.test",
+                        Presence.Online,
+                        clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+                        extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+                    ),
                     messages = listOf(
                         ChatMessage(
                             id = 1,

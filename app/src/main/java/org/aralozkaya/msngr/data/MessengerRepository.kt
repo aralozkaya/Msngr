@@ -59,6 +59,9 @@ data class Contact(
     val isMarkedUnread: Boolean = false,
     val isGroup: Boolean = false,
     val members: List<GroupMember> = emptyList(),
+    val clientCapabilities: Long = 0L,
+    val extendedCapabilities: Long = 0L,
+    val networkId: Int = MSNP_WINDOWS_LIVE_NETWORK_ID,
 ) {
     /** Accepted members only; pending invitations do not participate in the conversation. */
     val joinedMembers: List<GroupMember>
@@ -81,6 +84,8 @@ data class GroupMember(
     val storageId: String? = null,
     val role: GroupMemberRole = GroupMemberRole.Unknown,
     val clientCapabilities: Long = 0L,
+    val extendedCapabilities: Long = 0L,
+    val networkId: Int = MSNP_WINDOWS_LIVE_NETWORK_ID,
     /** The group invitation has been sent and is still awaiting a response. */
     val isPending: Boolean = false,
 )
@@ -94,14 +99,32 @@ internal fun Contact.withGroupPresence(ownEmail: String): Contact = if (!isGroup
 internal fun List<Contact>.resolveContact(contactId: String, profile: UserProfileSnapshot? = null): Contact? {
     firstOrNull { it.id.equals(contactId, ignoreCase = true) }?.let { return it }
     if (profile != null && profile.email.equals(contactId, ignoreCase = true)) {
-        return Contact(profile.email.lowercase(), profile.username, profile.email, profile.presence,
-            statusMessage = profile.statusMessage, avatarUri = profile.avatarUri, isForwardListContact = false)
+        return Contact(
+            profile.email.lowercase(),
+            profile.username,
+            profile.email,
+            profile.presence,
+            statusMessage = profile.statusMessage,
+            avatarUri = profile.avatarUri,
+            isForwardListContact = false,
+            clientCapabilities = if (profile.presence.isOnline) org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID else 0L,
+            extendedCapabilities = if (profile.presence.isOnline) org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong() else 0L,
+        )
     }
     val members = asSequence().filter(Contact::isGroup).flatMap { it.members.asSequence() }
         .filter { it.email.equals(contactId, ignoreCase = true) }.toList()
     val member = members.minByOrNull { it.presence.priority } ?: return null
-    return Contact(member.email.lowercase(), member.displayName, member.email, member.presence,
-        avatarUri = members.firstNotNullOfOrNull { it.avatarUri }, isForwardListContact = false)
+    return Contact(
+        member.email.lowercase(),
+        member.displayName,
+        member.email,
+        member.presence,
+        avatarUri = members.firstNotNullOfOrNull { it.avatarUri },
+        isForwardListContact = false,
+        clientCapabilities = member.clientCapabilities,
+        extendedCapabilities = member.extendedCapabilities,
+        networkId = member.networkId,
+    )
 }
 
 data class ChatMessage(
@@ -279,13 +302,25 @@ object MockServerData {
     fun rejects(email: String): Boolean = email.contains("fail", ignoreCase = true)
 
     fun contacts(): List<Contact> = listOf(
-        Contact("selin", "Selin", "selin@msngr.dev", Presence.Online, "I love MSN!", unreadCount = 2),
-        Contact("mert", "Mert", "mert@msngr.dev", Presence.Busy, "Heads down today"),
-        Contact("derya", "Derya", "derya@msngr.dev", Presence.Away, "At the studio", unreadCount = 1),
+        Contact("selin", "Selin", "selin@msngr.dev", Presence.Online, "I love MSN!", unreadCount = 2,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
+        Contact("mert", "Mert", "mert@msngr.dev", Presence.Busy, "Heads down today",
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
+        Contact("derya", "Derya", "derya@msngr.dev", Presence.Away, "At the studio", unreadCount = 1,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
         Contact("can", null, "can@msngr.dev", Presence.Offline, "Ping me later"),
-        Contact("zeynep", "Zeynep", "zeynep@msngr.dev", Presence.Online, "Coffee first", unreadCount = 3),
-        Contact("ece", "Ece", "ece@msngr.dev", Presence.Online, "Shipping build assets"),
-        Contact("deniz", "Deniz", "deniz@msngr.dev", Presence.Busy, "In a call", unreadCount = 2),
+        Contact("zeynep", "Zeynep", "zeynep@msngr.dev", Presence.Online, "Coffee first", unreadCount = 3,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
+        Contact("ece", "Ece", "ece@msngr.dev", Presence.Online, "Shipping build assets",
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
+        Contact("deniz", "Deniz", "deniz@msngr.dev", Presence.Busy, "In a call", unreadCount = 2,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()),
     )
 
     fun replyTo(message: String): String = when {
@@ -437,7 +472,12 @@ class MockMsnp18Client(
             contacts.filterNot { it.email.equals(normalized, true) } +
                 (old ?: Contact(normalized, normalized.substringBefore('@'), normalized, Presence.Online,
                     statusMessage = "Mock contact · Test data only"))
-                    .copy(isForwardListContact = true, presence = Presence.Online)
+                    .copy(
+                        isForwardListContact = true,
+                        presence = Presence.Online,
+                        clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+                        extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+                    )
         }
     }
 
@@ -553,8 +593,9 @@ class MockMsnp18Client(
         requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes))
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
         check(contact?.isBlocked != true && contact?.presence?.isOnline == true)
-        check(contact.isGroup != true || contact.groupFeatures(signedInEmail).winks) {
-            "All online group members must support winks."
+        check(contact.recipientFeatures(signedInEmail).winks) {
+            if (contact.isGroup) "All online group members must support winks."
+            else "This contact's client does not support winks."
         }
         appendMessage(ChatMessage(ids.incrementAndGet(), contactId, MessageAuthor.Me, "Wink: ${wink.name}",
             System.currentTimeMillis(), wink = wink, autoPlayWink = true))
@@ -564,6 +605,9 @@ class MockMsnp18Client(
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
         check(contact?.isGroup != true) { "Voice clips are not supported in group chats." }
         check(contact?.isBlocked != true && contact?.presence != Presence.Offline) { "Voice clips require an online contact." }
+        check(contact?.recipientFeatures(signedInEmail)?.voiceClips == true) {
+            "This contact's client does not support voice clips."
+        }
         requireNotNull(org.aralozkaya.msngr.protocol.MsnVoiceClip.parse(clip.bytes()))
         appendMessage(ChatMessage(ids.incrementAndGet(), contactId, MessageAuthor.Me, "Voice clip",
             System.currentTimeMillis(), voiceClip = clip))
@@ -573,8 +617,13 @@ class MockMsnp18Client(
         val nonEmpty = drawing.strokes.filter { it.points.isNotEmpty() }
         if (nonEmpty.isEmpty()) return Result.success(Unit)
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
-        if (contact?.isGroup == true && contact.groupFeatures(signedInEmail).inkFormat == null) {
-            return Result.failure(IllegalStateException("All online group members must support handwriting."))
+        if (contact == null || !contact.presence.isOnline || contact.isBlocked ||
+            contact.recipientFeatures(signedInEmail).inkFormat == null
+        ) {
+            return Result.failure(IllegalStateException(
+                if (contact?.isGroup == true) "All online group members must support handwriting."
+                else "This contact's client does not support handwriting.",
+            ))
         }
         appendMessage(
             ChatMessage(
@@ -637,6 +686,14 @@ class MockMsnp18Client(
     }
 
     override suspend fun sendNudgeWithResult(contactId: String): Result<Unit> = runCatching {
+        val contact = mutableContacts.value.firstOrNull { it.id == contactId }
+        check(contact != null && !contact.isBlocked && contact.presence.isOnline) {
+            "Nudges require an online contact."
+        }
+        check(contact.recipientFeatures(signedInEmail).nudges) {
+            if (contact.isGroup) "All online group members must support nudges."
+            else "This contact's client does not support nudges."
+        }
         val reservation = nudgeLimiter.reserveSend(contactId)
         appendMessage(
             ChatMessage(
@@ -676,6 +733,8 @@ class MockMsnp18Client(
                         unreadCount = 0,
                         isMarkedUnread = false,
                         isBlocked = true,
+                        clientCapabilities = 0L,
+                        extendedCapabilities = 0L,
                     )
                 } else {
                     contact
@@ -719,7 +778,8 @@ class MockMsnp18Client(
     override suspend fun startGame(contactId: String, entry: GameCatalogEntry): Result<Unit> = runCatching {
         val key = contactId.lowercase()
         val contact = mutableContacts.value.firstOrNull { it.id.equals(key, true) || it.email.equals(key, true) }
-        check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline) {
+        check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence != Presence.Offline &&
+            contact.recipientFeatures(signedInEmail).activities) {
             "This contact is unavailable for games and activities."
         }
         val sessionId = MsnpP2pUtil.randomGuid()
@@ -859,7 +919,15 @@ class MockMsnp18Client(
                 val contact = unblocked[cursor % unblocked.size]
                 val next = cycle[(cycle.indexOf(contact.presence) + 1) % cycle.size]
                 mutableContacts.update { list ->
-                    list.map { if (it.id == contact.id) it.copy(presence = next) else it }
+                    list.map {
+                        if (it.id == contact.id) {
+                            it.copy(
+                                presence = next,
+                                clientCapabilities = if (next.isOnline) org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID else 0L,
+                                extendedCapabilities = if (next.isOnline) org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong() else 0L,
+                            )
+                        } else it
+                    }
                 }
                 mutableEvents.emit(MessengerEvent.PresenceChanged(contact.id, next, contact.presence))
                 cursor++

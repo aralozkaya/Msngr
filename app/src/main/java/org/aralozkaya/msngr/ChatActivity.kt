@@ -156,7 +156,8 @@ import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
-import org.aralozkaya.msngr.data.groupFeatures
+import org.aralozkaya.msngr.data.RecipientFeatures
+import org.aralozkaya.msngr.data.recipientFeatures
 import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.notifications.otherUnreadCount
@@ -382,7 +383,9 @@ internal fun ChatScreen(
     photoShare: org.aralozkaya.msngr.data.PhotoShare? = null,
     gameSession: org.aralozkaya.msngr.data.GameSession? = null,
 ) {
-    val groupFeatures = contact?.takeIf { it.isGroup }?.groupFeatures(ownEmail)
+    val recipientFeatures = contact?.recipientFeatures(ownEmail) ?: RecipientFeatures()
+    val sharingBaseEnabled = isConversationAvailable && contact != null && !contact.isGroup &&
+        !contact.isBlocked && contact.presence.isOnline && ownPresence.isOnline
     val nudgeShakeState = rememberNudgeShakeState()
     var handledNudgeShakeCount by rememberSaveable(contact?.id) { mutableIntStateOf(0) }
     LaunchedEffect(nudgeShakeCount) {
@@ -493,7 +496,15 @@ internal fun ChatScreen(
                                 }
                             }
                         },
-                        actions = { SharingMenu(contact?.id.orEmpty(), enabled = isConversationAvailable && contact != null && !contact.isGroup && contact.presence.isOnline && ownPresence.isOnline) },
+                        actions = {
+                            SharingMenu(
+                                contactId = contact?.id.orEmpty(),
+                                enabled = sharingBaseEnabled,
+                                photosEnabled = sharingBaseEnabled && recipientFeatures.photos,
+                                filesEnabled = sharingBaseEnabled && recipientFeatures.files,
+                                activitiesEnabled = sharingBaseEnabled && recipientFeatures.activities,
+                            )
+                        },
                         title = {
                             Row(
                                 modifier = Modifier
@@ -552,7 +563,13 @@ internal fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
-                    if (photoShare != null) PhotoSharingHost(contact.id, photoShare)
+                    if (photoShare != null) {
+                        PhotoSharingHost(
+                            contactId = contact.id,
+                            share = photoShare,
+                            canAddPhotos = sharingBaseEnabled && recipientFeatures.photos,
+                        )
+                    }
                     if (gameSession != null) {
                         GameHost(
                             contactId = contact.id,
@@ -572,18 +589,24 @@ internal fun ChatScreen(
                 onNativeStyleChange = onNativeStyleChange,
                 onSizeNoticeRequested = onSizeNoticeRequested,
                 enabled = isConversationAvailable && (contact?.isGroup != true || contact.presence.isOnline),
-                handwritingEnabled = isConversationAvailable && contact?.presence?.isOnline != false &&
-                    (contact?.isGroup != true || groupFeatures?.inkFormat != null),
+                handwritingEnabled = isConversationAvailable && contact?.isBlocked != true &&
+                    contact?.presence?.isOnline == true && recipientFeatures.inkFormat != null,
                 voiceClipsVisible = contact?.isGroup != true,
-                voiceClipsEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline != false,
+                voiceClipsEnabled = isConversationAvailable && contact?.isBlocked != true &&
+                    contact?.presence?.isOnline == true && recipientFeatures.voiceClips,
                 onSendVoiceClip = onSendVoiceClip,
-                winksMenuEnabled = groupFeatures?.winks != false,
-                winksEnabled = isConversationAvailable && contact?.isBlocked != true && contact?.presence?.isOnline == true &&
-                    groupFeatures?.winks != false,
+                winksMenuEnabled = if (contact?.isGroup == true || contact?.presence?.isOnline == true) {
+                    recipientFeatures.winks
+                } else {
+                    true
+                },
+                winksEnabled = isConversationAvailable && contact?.isBlocked != true &&
+                    contact?.presence?.isOnline == true && recipientFeatures.winks,
                 onSendEmotionSound = onSendEmotionSound,
                 emotionSoundsEnabled = isConversationAvailable && contact?.isBlocked != true,
                 onSendWink = onSendWink,
-                nudgeEnabled = isConversationAvailable && contact?.presence?.isOnline != false && nudgeCooldownMillis == 0L,
+                nudgeEnabled = isConversationAvailable && contact?.isBlocked != true &&
+                    contact?.presence?.isOnline == true && recipientFeatures.nudges && nudgeCooldownMillis == 0L,
                 nudgeCooldownMillis = nudgeCooldownMillis,
                 draft = draft,
                 onDraftChange = {

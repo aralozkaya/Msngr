@@ -28,6 +28,7 @@ import org.aralozkaya.msngr.data.NudgeCooldownException
 import org.aralozkaya.msngr.data.NudgeRateLimiter
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.SsoToken
+import org.aralozkaya.msngr.data.recipientFeatures
 import org.aralozkaya.msngr.data.StorageProfile
 import org.aralozkaya.msngr.data.SwitchboardMimeMessage
 import org.aralozkaya.msngr.data.parseSwitchboardMime
@@ -183,7 +184,10 @@ class LiveMsnp18ClientContractTest {
         switchboardTransportFactory = { switchboard },
         authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
         fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact.copy(
-            presence = Presence.Online, isBlocked = blocked,
+            presence = Presence.Online,
+            isBlocked = blocked,
+            clientCapabilities = if (blocked) 0L else Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = if (blocked) 0L else Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
         ))) },
         fetchStorageProfile = { _, _ -> StorageProfile() },
         nudgeLimiter = nudgeLimiter,
@@ -2360,6 +2364,117 @@ class LiveMsnp18ClientContractTest {
             client.close()
         }
     }
+
+    @Test fun privateContactCapabilitiesFollowPresenceAndEndpointUpdatesAndGuardEveryFeature() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val directory = java.nio.file.Files.createTempDirectory("cap-guard").toFile()
+        val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
+            MsnDisplayPicture.create(email, winkBytes, 8),
+            "Screen Punch",
+        )
+        val voiceBytes = javaClass.getResourceAsStream("/voice-clips/native-siren.wav")!!.use { it.readBytes() }
+        val voiceClip = requireNotNull(org.aralozkaya.msngr.protocol.MsnVoiceClip.parse(voiceBytes))
+        val drawing = org.aralozkaya.msngr.protocol.InkDrawing(
+            strokes = listOf(org.aralozkaya.msngr.protocol.InkStroke(listOf(
+                org.aralozkaya.msngr.protocol.InkPoint(10f, 20f),
+                org.aralozkaya.msngr.protocol.InkPoint(80f, 60f),
+            ))),
+            canvasWidthPx = 220f,
+            canvasHeightPx = 90f,
+        )
+        val fileToShare = java.io.File(directory, "note.txt").apply { writeText("hello") }
+        val photo = org.aralozkaya.msngr.data.PhotoToShare("photo.png", "hash", ByteArray(4), ByteArray(4))
+        val game = org.aralozkaya.msngr.data.MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        val client = LiveMsnp18Client(
+            transport = notification,
+            switchboardTransportFactory = { switchboard },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact.copy(presence = Presence.Offline))) },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+        )
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+
+            // Minimal client (0:0) disables every optional feature.
+            notification.deliver(MsnpCommand("ILN", transactionId = 0, parameters = listOf("NLN", "1:${contact.email}", "1", "Peer", "0:0", "0")))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+            assertTrue(client.sendInkMessage(contact.id, drawing).isFailure)
+            assertTrue(client.sendWink(contact.id, winkRef, winkBytes).isFailure)
+            assertTrue(client.sendVoiceClip(contact.id, voiceClip).isFailure)
+            assertTrue(client.sendNudgeWithResult(contact.id).isFailure)
+            assertTrue(client.sendFile(contact.id, fileToShare, "note.txt").isFailure)
+            assertTrue(client.sharePhotos(contact.id, listOf(photo)).isFailure)
+            assertTrue(client.startGame(contact.id, game).isFailure)
+
+            // GIF-only handwriting capability sends GIF ink while keeping unsupported features blocked.
+            val gifOnly = (0xA0L shl 24) or 0x04L
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BSY", "1:${contact.email}", "Peer", "$gifOnly:0", "0")))
+            withTimeout(2_000) {
+                client.contacts.first {
+                    it.single().recipientFeatures(email).inkFormat == org.aralozkaya.msngr.data.GroupInkFormat.Gif
+                }
+            }
+            client.sendInkMessage(contact.id, drawing).getOrThrow()
+            val sentInkHeaders = switchboard.sent
+                .mapNotNull { it.payload?.let(::parseSwitchboardMimeHeaders) }
+                .lastOrNull { it["content-type"]?.startsWith("image/") == true }
+            assertEquals(Msnp18Protocol.INK_GIF_CONTENT_TYPE, sentInkHeaders?.get("content-type"))
+            assertTrue(client.sendVoiceClip(contact.id, voiceClip).isFailure)
+
+            // UBX without <Capabilities> preserves existing capabilities.
+            notification.deliver(MsnpCommand("UBX", parameters = listOf("1:${contact.email}"),
+                payload = "<Data><PSM>In a meeting</PSM></Data>".toByteArray()))
+            withTimeout(2_000) { client.contacts.first { it.single().statusMessage == "In a meeting" } }
+            assertEquals(gifOnly, client.contacts.value.single().clientCapabilities)
+
+            // Multi-endpoint UBX with a compatible desktop endpoint and a secondary web/mobile endpoint keeps desktop features active.
+            notification.deliver(MsnpCommand("UBX", parameters = listOf("1:${contact.email}"),
+                payload = ("<Data><EndpointData id=\"{11111111-1111-1111-1111-111111111111}\"><Capabilities>${Msnp18Protocol.ENDPOINT_CAPABILITIES}</Capabilities></EndpointData>" +
+                    "<EndpointData id=\"{22222222-2222-2222-2222-222222222222}\"><Capabilities>512:1</Capabilities></EndpointData></Data>").toByteArray()))
+            withTimeout(2_000) {
+                client.contacts.first { it.single().recipientFeatures(email).let { f -> f.voiceClips && f.files && f.photos && f.activities && f.winks && f.nudges } }
+            }
+            client.sendVoiceClip(contact.id, voiceClip).getOrThrow()
+            client.sendNudgeWithResult(contact.id).getOrThrow()
+            client.sendWink(contact.id, winkRef, winkBytes).getOrThrow()
+
+            // Federated non-Live network prefix (e.g. 32 = Yahoo!) disables MSNP interactive features even with full capability bits.
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "32:${contact.email}", "Peer", Msnp18Protocol.CLIENT_IDENTITY, "0")))
+            withTimeout(2_000) { client.contacts.first { it.single().networkId == 32 } }
+            assertEquals(org.aralozkaya.msngr.data.RecipientFeatures(), client.contacts.value.single().recipientFeatures(email))
+            assertTrue(client.sendVoiceClip(contact.id, voiceClip).isFailure)
+            assertTrue(client.sendNudgeWithResult(contact.id).isFailure)
+            assertTrue(client.startGame(contact.id, game).isFailure)
+
+            // Mobile/Web-only client bit disables rich features on Windows Live (1:) too.
+            val mobileOnline = Msnp18Protocol.CLIENT_ID or 0x01L
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:${contact.email}", "Peer", "$mobileOnline:${Msnp18Protocol.EXTENDED_CAPABILITIES}", "0")))
+            withTimeout(2_000) { client.contacts.first { it.single().networkId == 1 && (it.single().clientCapabilities and 0x01L) != 0L } }
+            assertEquals(org.aralozkaya.msngr.data.RecipientFeatures(), client.contacts.value.single().recipientFeatures(email))
+            assertTrue(client.sendInkMessage(contact.id, drawing).isFailure)
+
+            // FLN clears stored capabilities.
+            notification.deliver(MsnpCommand("FLN", parameters = listOf("1:${contact.email}")))
+            withTimeout(2_000) { client.contacts.first { !it.single().presence.isOnline } }
+            assertEquals(0L, client.contacts.value.single().clientCapabilities)
+            assertEquals(0L, client.contacts.value.single().extendedCapabilities)
+            assertTrue(client.sendVoiceClip(contact.id, voiceClip).isFailure)
+        } finally {
+            client.close()
+            directory.deleteRecursively()
+        }
+    }
+}
+
+private fun parseSwitchboardMimeHeaders(payload: ByteArray): Map<String, String> {
+    val text = payload.toString(Charsets.UTF_8)
+    val head = text.substringBefore("\r\n\r\n")
+    return head.split("\r\n").mapNotNull { line ->
+        val idx = line.indexOf(':')
+        if (idx <= 0) null else line.substring(0, idx).trim().lowercase() to line.substring(idx + 1).trim()
+    }.toMap()
 }
 
 private class RecordingContactDisplayPictureCache(

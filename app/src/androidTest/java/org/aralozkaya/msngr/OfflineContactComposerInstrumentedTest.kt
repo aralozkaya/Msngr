@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Rule
 import org.junit.Test
@@ -21,7 +22,16 @@ class OfflineContactComposerInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     @Test fun offlinePrivateChatAllowsTextAndEmoticonsButDisablesNudges() {
         val draft = mutableStateOf("")
-        val contact = mutableStateOf(Contact("peer", "Peer", "peer@example.com", Presence.Offline))
+        val contact = mutableStateOf(
+            Contact(
+                "peer",
+                "Peer",
+                "peer@example.com",
+                Presence.Offline,
+                clientCapabilities = Msnp18Protocol.CLIENT_ID,
+                extendedCapabilities = Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+            ),
+        )
         compose.setContent {
             MsngrTheme {
                 ChatScreen(draft = draft.value, onDraftChange = { draft.value = it }, contact = contact.value,

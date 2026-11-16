@@ -58,13 +58,20 @@ import java.security.MessageDigest
 private fun Context.sharingRepository() = (applicationContext as MsngrApplication).container.messengerRepository
 
 @Composable
-internal fun SharingMenu(contactId: String, enabled: Boolean) {
+internal fun SharingMenu(
+    contactId: String,
+    enabled: Boolean,
+    photosEnabled: Boolean = enabled,
+    filesEnabled: Boolean = enabled,
+    activitiesEnabled: Boolean = enabled,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
     var gamesOpen by rememberSaveable(contactId) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val anyActionEnabled = enabled && (photosEnabled || filesEnabled || activitiesEnabled)
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             busy = true
@@ -90,14 +97,14 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
     }
     Box {
         if (busy) MsngrCircularWavyProgressIndicator(Modifier.padding(12.dp).size(24.dp))
-        else IconButton(onClick = { expanded = true }, enabled = enabled) {
+        else IconButton(onClick = { expanded = true }, enabled = anyActionEnabled) {
             Icon(
                 Icons.Rounded.DashboardCustomize,
                 contentDescription = "Share or start an activity",
             )
         }
         DropdownMenuPopup(
-            expanded = expanded && enabled && !busy,
+            expanded = expanded && anyActionEnabled && !busy,
             onDismissRequest = { expanded = false },
             modifier = Modifier.testTag("sharing_menu"),
         ) {
@@ -109,6 +116,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                     text = { Text("Photos") },
                     leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                     shape = MenuDefaults.leadingItemShape,
+                    enabled = enabled && photosEnabled,
                     modifier = Modifier.testTag("sharing_menu_photos"),
                     onClick = { expanded = false; photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 )
@@ -116,6 +124,7 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                     text = { Text("Files") },
                     leadingIcon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
                     shape = MenuDefaults.middleItemShape,
+                    enabled = enabled && filesEnabled,
                     modifier = Modifier.testTag("sharing_menu_files"),
                     onClick = { expanded = false; files.launch(arrayOf("*/*")) },
                 )
@@ -129,14 +138,16 @@ internal fun SharingMenu(contactId: String, enabled: Boolean) {
                     text = { Text("Games & activities") },
                     leadingIcon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
                     shape = MenuDefaults.trailingItemShape,
+                    enabled = enabled && activitiesEnabled,
                     modifier = Modifier.testTag("sharing_menu_games"),
                     onClick = { expanded = false; gamesOpen = true },
                 )
             }
         }
     }
-    LaunchedEffect(enabled, busy) { if (!enabled || busy) expanded = false }
-    if (gamesOpen && enabled) {
+    LaunchedEffect(anyActionEnabled, busy) { if (!anyActionEnabled || busy) expanded = false }
+    LaunchedEffect(enabled, activitiesEnabled) { if (!enabled || !activitiesEnabled) gamesOpen = false }
+    if (gamesOpen && enabled && activitiesEnabled) {
         GameCatalogDialog(
             contactId = contactId,
             onDismiss = { gamesOpen = false },
@@ -258,6 +269,7 @@ private fun FileTransferThumbnail(transfer: FileTransfer) {
 
 @Composable
 internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
+    canAddPhotos: Boolean = true,
     onAccept: (suspend () -> Result<Unit>)? = null,
     onStop: (suspend () -> Result<Unit>)? = null,
     onSelect: (suspend (String) -> Result<Unit>)? = null,
@@ -453,7 +465,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             }
             if (preparing) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(shapes = ButtonDefaults.shapes(), enabled = !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                Button(shapes = ButtonDefaults.shapes(), enabled = canAddPhotos && !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                     Text(if (preparing) "Preparing\u2026" else "Add photos")
                 }
                 DestructiveOutlinedButton(onClick = stop) { Text("Stop sharing") }

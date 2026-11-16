@@ -252,8 +252,14 @@ class VoiceClipInstrumentedTest {
     @Test fun chatComposerKeepsHeldMicrophoneAndKeyboardInPlaceUntilReview() {
         grantMicrophone()
         val draft = mutableStateOf("Message")
-        val peer = org.aralozkaya.msngr.data.Contact("peer", "Alex", "alex@example.test",
-            org.aralozkaya.msngr.enums.Presence.Online)
+        val peer = org.aralozkaya.msngr.data.Contact(
+            "peer",
+            "Alex",
+            "alex@example.test",
+            org.aralozkaya.msngr.enums.Presence.Online,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+        )
         val clip = MsnVoiceClip.parse(nativeWave())!!
         compose.setContent { MaterialTheme {
             ChatScreen(draft.value, { draft.value = it }, peer, messages = listOf(
