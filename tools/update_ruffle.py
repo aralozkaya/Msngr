@@ -7,11 +7,14 @@ import base64
 import hashlib
 import io
 import json
+import os
 import re
 import subprocess
 import tarfile
 from pathlib import Path
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from setup_dependencies import configure_ruffle_checkout
 from ruffle_build import inventory_bytes, INVENTORY, BUILD_INFO
 
@@ -20,21 +23,79 @@ SOURCE = ROOT / "third_party/ruffle"
 ASSETS = ROOT / "app/src/main/assets/ruffle"
 LOCK = ROOT / "third_party/ruffle-runtime.json"
 UPSTREAM = "https://github.com/ruffle-rs/ruffle.git"
+GITHUB_API_HOST = "api.github.com"
+LATEST_RELEASE_API = "https://api.github.com/repos/ruffle-rs/ruffle/releases/latest"
+LATEST_RELEASE_WEB = "https://github.com/ruffle-rs/ruffle/releases/latest"
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 ASSET = re.compile(r"(?:[a-zA-Z0-9_.-]+\.(?:js|wasm)|LICENSE_(?:MIT|APACHE))")
+
+
+class _StripAuthOnRedirectHandler(HTTPRedirectHandler):
+    """Drop GitHub credentials before following a redirect away from api.github.com."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None:
+            parsed = urlparse(redirected.full_url)
+            if parsed.scheme != "https" or parsed.hostname != GITHUB_API_HOST:
+                redirected.remove_header("Authorization")
+        return redirected
+
+
+_OPENER = build_opener(_StripAuthOnRedirectHandler)
 
 
 def git(*args):
     return subprocess.check_output(["git", "-C", str(SOURCE), *args], text=True).strip()
 
 
+def build_request(url, *, method="GET"):
+    headers = {"User-Agent": "Msngr-dependency-updater"}
+    parsed = urlparse(url)
+    if parsed.scheme == "https" and parsed.hostname == GITHUB_API_HOST:
+        headers["Accept"] = "application/vnd.github+json"
+        token = (os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    return Request(url, headers=headers, method=method)
+
+
 def download(url, limit):
-    request = Request(url, headers={"User-Agent": "Msngr-dependency-updater"})
-    with urlopen(request, timeout=60) as response:
+    request = build_request(url)
+    with _OPENER.open(request, timeout=60) as response:
         data = response.read(limit + 1)
     if len(data) > limit:
         raise ValueError("Upstream response exceeds the size limit")
     return data
+
+
+def _is_rate_limit_error(error):
+    if error.code == 429:
+        return True
+    if error.code != 403:
+        return False
+    reason = (error.reason or "").lower()
+    remaining = error.headers.get("X-RateLimit-Remaining") if error.headers else None
+    return "rate limit" in reason or remaining == "0"
+
+
+def latest_release_version():
+    try:
+        release = json.loads(download(LATEST_RELEASE_API, 2_000_000))
+    except HTTPError as error:
+        if not _is_rate_limit_error(error):
+            raise
+        request = build_request(LATEST_RELEASE_WEB, method="HEAD")
+        with _OPENER.open(request, timeout=60) as response:
+            final = urlparse(response.geturl())
+        match = re.fullmatch(r"/ruffle-rs/ruffle/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)", final.path)
+        if final.scheme != "https" or final.hostname != "github.com" or not match:
+            raise ValueError("Expected an official stable Ruffle release") from error
+        return match.group(1)
+    version = release["tag_name"].removeprefix("v")
+    if release["draft"] or release["prerelease"] or not VERSION.fullmatch(version):
+        raise ValueError("Expected an official stable Ruffle release")
+    return version
 
 
 def runtime_files(archive, integrity, version, commit):
@@ -111,10 +172,7 @@ def verify(root=ROOT):
 
 def update():
     configure_ruffle_checkout(SOURCE)
-    release = json.loads(download("https://api.github.com/repos/ruffle-rs/ruffle/releases/latest", 2_000_000))
-    version = release["tag_name"].removeprefix("v")
-    if release["draft"] or release["prerelease"] or not VERSION.fullmatch(version):
-        raise ValueError("Expected an official stable Ruffle release")
+    version = latest_release_version()
     current = json.loads(LOCK.read_text())
     if current.get("sourceBuild") and version == current["version"]:
         verify()
