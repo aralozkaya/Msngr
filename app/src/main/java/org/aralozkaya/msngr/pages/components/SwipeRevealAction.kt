@@ -3,14 +3,13 @@
 
 package org.aralozkaya.msngr.pages.components
 
-import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
-import androidx.compose.foundation.gestures.FlingBehavior
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.ScrollScope
-import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -48,19 +47,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.core.view.ViewCompat
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /** Compose's anchored swipe-to-reveal pattern, with a full-height Material action button. */
 @Composable
@@ -89,20 +96,12 @@ internal fun SwipeRevealAction(
     val density = LocalDensity.current
     val revealWidth = with(density) { (IconButtonDefaults.mediumContainerSize().width + gap).toPx() }
     val motion = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
-    val snapBehavior = AnchoredDraggableDefaults.flingBehavior(state, animationSpec = motion)
-    val releaseBehavior = remember(snapBehavior) {
-        object : FlingBehavior {
-            override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
-                // Distance determines commit; fast short swipes must stop at the revealed button.
-                val scrollScope = this
-                return with(snapBehavior) { scrollScope.performFling(0f) }
-            }
-        }
-    }
     val scope = rememberCoroutineScope()
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val latestAction by rememberUpdatedState(onAction)
     val distance = -(state.offset.takeUnless(Float::isNaN) ?: 0f).coerceAtMost(0f)
     val committing = state.settledValue == SwipeRevealValue.Committed
+    val latestCommitting by rememberUpdatedState(committing)
     val commit: () -> Unit = {
         if (!committing && !state.isAnimationRunning) {
             cancelled = false
@@ -168,13 +167,95 @@ internal fun SwipeRevealAction(
                     SwipeRevealValue.Committed at -measured.width.toFloat()
                 })
             }
-            .anchoredDraggable(
-                state = state,
-                orientation = Orientation.Horizontal,
-                enabled = !committing,
-                interactionSource = interactions,
-                flingBehavior = releaseBehavior,
-            ),
+            .pointerInput(state, isRtl, interactions, motion) {
+                coroutineScope {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        if (latestCommitting) return@awaitEachGesture
+                        val startOffset = state.offset.takeUnless(Float::isNaN) ?: 0f
+                        val touchSlop = viewConfiguration.touchSlop
+                        var pointerId = down.id
+                        var totalDx = 0f
+                        var totalDy = 0f
+                        var initialDelta = 0f
+                        var accepted = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == pointerId }
+                                ?: event.changes.firstOrNull { it.pressed }?.also { pointerId = it.id }
+                                ?: break
+                            if (change.isConsumed || !change.pressed) break
+                            val delta = change.positionChange()
+                            totalDx += delta.x
+                            totalDy += delta.y
+                            if (abs(totalDy) > touchSlop && abs(totalDy) > abs(totalDx)) {
+                                break
+                            }
+                            if (abs(totalDx) > touchSlop) {
+                                val directionalDx = if (isRtl) -totalDx else totalDx
+                                // Pass drags away from the reveal side (right in LTR, left in RTL)
+                                // to parent containers like HorizontalPager when the row is closed.
+                                if (startOffset >= -0.5f && directionalDx > 0f) {
+                                    break
+                                }
+                                accepted = true
+                                initialDelta = directionalDx - sign(directionalDx) * touchSlop
+                                change.consume()
+                                break
+                            }
+                        }
+                        if (!accepted) return@awaitEachGesture
+
+                        val signals = Channel<SwipeRevealSignal>(Channel.UNLIMITED)
+                        signals.trySend(SwipeRevealSignal.Delta(initialDelta))
+                        launch {
+                            val startInteraction = DragInteraction.Start()
+                            interactions.emit(startInteraction)
+                            var wasCancelled = false
+                            try {
+                                state.anchoredDrag(MutatePriority.UserInput) { anchors ->
+                                    val minOffset = anchors.positionOf(SwipeRevealValue.Committed)
+                                    val maxOffset = anchors.positionOf(SwipeRevealValue.Closed)
+                                    for (signal in signals) {
+                                        when (signal) {
+                                            is SwipeRevealSignal.Delta -> {
+                                                val base = state.offset.takeUnless(Float::isNaN) ?: 0f
+                                                dragTo((base + signal.px).coerceIn(minOffset, maxOffset))
+                                            }
+                                            SwipeRevealSignal.End -> break
+                                            SwipeRevealSignal.Cancel -> {
+                                                wasCancelled = true
+                                                break
+                                            }
+                                        }
+                                    }
+                                }
+                            } finally {
+                                interactions.emit(
+                                    if (wasCancelled) DragInteraction.Cancel(startInteraction)
+                                    else DragInteraction.Stop(startInteraction),
+                                )
+                            }
+                            if (wasCancelled) {
+                                state.animateTo(SwipeRevealValue.Closed, motion)
+                            } else {
+                                // Distance determines settle anchor; ignore fling velocity so fast
+                                // short swipes stop cleanly at Revealed without committing.
+                                state.animateTo(state.targetValue, motion)
+                            }
+                        }
+
+                        val completed = horizontalDrag(pointerId) { change ->
+                            val deltaX = change.positionChange().x
+                            val directionalDelta = if (isRtl) -deltaX else deltaX
+                            signals.trySend(SwipeRevealSignal.Delta(directionalDelta))
+                            change.consume()
+                        }
+                        signals.trySend(if (completed) SwipeRevealSignal.End else SwipeRevealSignal.Cancel)
+                        signals.close()
+                    }
+                }
+            },
     ) {
         if (distance > .5f) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
@@ -217,3 +298,9 @@ internal fun SwipeRevealAction(
 }
 
 private enum class SwipeRevealValue { Closed, Revealed, Committed }
+
+private sealed interface SwipeRevealSignal {
+    data class Delta(val px: Float) : SwipeRevealSignal
+    data object End : SwipeRevealSignal
+    data object Cancel : SwipeRevealSignal
+}

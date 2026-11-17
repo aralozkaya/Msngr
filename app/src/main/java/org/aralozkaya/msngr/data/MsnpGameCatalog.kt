@@ -286,25 +286,8 @@ object MsnpGameCatalogService {
         )
     }
 
-    internal fun upgradeKnownHttpsUrl(rawUrl: String): String {
-        val trimmed = rawUrl.trim()
-        if (!trimmed.startsWith("http://", ignoreCase = true)) return trimmed
-        val remainder = trimmed.substring(7)
-        val host = remainder.substringBefore('/').lowercase()
-        return if (
-            host == "static.levelleap.com" ||
-            host.endsWith(".escargot.chat") ||
-            host.endsWith(".nina.chat") ||
-            host.endsWith(".ctsrv.xyz") ||
-            host.endsWith(".ugnet.xyz") ||
-            host.endsWith(".ctsrv.gay") ||
-            host.endsWith(".ugnet.gay")
-        ) {
-            "https://$remainder"
-        } else {
-            trimmed
-        }
-    }
+    internal fun upgradeKnownHttpsUrl(rawUrl: String): String =
+        MsnpClientConfigService.upgradeCommunityHttpsUrl(rawUrl)
 
     private suspend fun getUrl(url: String): String = withContext(Dispatchers.IO) {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {

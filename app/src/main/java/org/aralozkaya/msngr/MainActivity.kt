@@ -8,20 +8,35 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.PluralsRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.plus
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
@@ -45,10 +60,12 @@ import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -58,8 +75,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -67,11 +87,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp as lerpDp
+import kotlin.math.abs
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -81,6 +105,7 @@ import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
+import org.aralozkaya.msngr.pages.PortalPage
 import org.aralozkaya.msngr.pages.UpdateBadge
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
@@ -89,6 +114,7 @@ import org.aralozkaya.msngr.pages.components.DeleteContactDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
 import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.MockServerBanner
+import org.aralozkaya.msngr.pages.components.PortalSitesActionMenu
 import org.aralozkaya.msngr.pages.components.SessionsDialog
 import org.aralozkaya.msngr.pages.components.showActionSnackbar
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -139,6 +165,9 @@ class MainActivity : MsngrActivity() {
                     },
                     onOpenChat = { contactId ->
                         startActivity(ChatActivity.createIntent(this, contactId))
+                    },
+                    onOpenContactProfile = { contactId ->
+                        startActivity(ContactProfileActivity.createIntent(this, contactId))
                     },
                     onSimulateReconnect = {
                         startActivity(ReconnectActivity.createSimulationIntent(this))
@@ -241,15 +270,18 @@ private fun MsngrApp(
     onOpenRequests: () -> Unit,
     onOpenGroup: (String, Boolean) -> Unit,
     onOpenChat: (String) -> Unit,
+    onOpenContactProfile: (String) -> Unit,
     onSimulateReconnect: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val context = LocalContext.current
     val updateState by context.updateManager.state.collectAsState()
+    val appearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
     val resources = LocalResources.current
     val contacts by repository.contacts.collectAsState()
     val drafts by repository.drafts.collectAsState()
     val profile by repository.profile.collectAsState()
+    val portalState by repository.portalState.collectAsState()
     val sessions by repository.sessions.collectAsState()
     val contactRequests by repository.contactRequests.collectAsState()
     val groupInvitations by repository.groupInvitations.collectAsState()
@@ -264,13 +296,18 @@ private fun MsngrApp(
     var createGroupBounds by remember { mutableStateOf<Rect?>(null) }
     var deleteTarget by remember { mutableStateOf<Contact?>(null) }
     var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
+    var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(initialPage = 1) { 2 }
+    var showPagerIndicator by remember { mutableStateOf(true) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val groupInteractionSource = remember { MutableInteractionSource() }
     val contactsListState = rememberLazyListState()
+    val portalListState = rememberLazyListState()
     var topBarHeight by remember { mutableIntStateOf(0) }
     val showProfileButton by remember {
         derivedStateOf {
+            if (pagerState.currentPage != 1) return@derivedStateOf false
             val layout = contactsListState.layoutInfo
             val profileItem = layout.visibleItemsInfo.firstOrNull { it.index == 0 }
             // Convert item offsets to screen coordinates, accounting for the
@@ -279,6 +316,36 @@ private fun MsngrApp(
                 (profileItem == null ||
                     profileItem.offset + profileItem.size - layout.viewportStartOffset <= topBarHeight)
         }
+    }
+
+    LaunchedEffect(appearance.showAds, portalState.config) {
+        if (
+            appearance.showAds &&
+            portalState.bannerAd == null &&
+            portalState.textAd == null &&
+            (portalState.config.bannerAdUrl != null || portalState.config.textAdUrl != null)
+        ) {
+            repository.refreshAds()
+        }
+    }
+
+    LaunchedEffect(pagerState.isScrollInProgress, pagerState.currentPage) {
+        showPagerIndicator = true
+        if (!pagerState.isScrollInProgress) {
+            delay(1500L)
+            showPagerIndicator = false
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val activeList = if (pagerState.currentPage == 0) portalListState else contactsListState
+        if (activeList.firstVisibleItemIndex == 0 && activeList.firstVisibleItemScrollOffset == 0) {
+            scrollBehavior.state.heightOffset = 0f
+        }
+    }
+
+    BackHandler(enabled = pagerState.currentPage == 0 && activeWebTarget == null) {
+        scope.launch { pagerState.animateScrollToPage(1) }
     }
 
     Scaffold(
@@ -410,42 +477,110 @@ private fun MsngrApp(
             }
         },
         floatingActionButton = {
-            ContactsActionMenu(
-                onAddContact = { showAddContact = true },
-                contactInvitationVisible = showAddContact,
-                onAddContactBoundsChanged = { addContactBounds = it },
-                onCreateGroup = { showCreateGroup = true },
-                groupCreationVisible = showCreateGroup,
-                onCreateGroupBoundsChanged = { createGroupBounds = it },
-            )
+            AnimatedContent(
+                targetState = pagerState.currentPage,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                // Counteract FloatingActionButtonMenu's outer bottom margin so the FAB sits at standard 16.dp spacing.
+                modifier = Modifier.offset(y = 16.dp),
+                label = "Main FAB",
+            ) { page ->
+                if (page == 0) {
+                    PortalSitesActionMenu(
+                        config = portalState.config,
+                        onOpenWebTarget = { activeWebTarget = it },
+                    )
+                } else {
+                    ContactsActionMenu(
+                        onAddContact = { showAddContact = true },
+                        contactInvitationVisible = showAddContact,
+                        onAddContactBoundsChanged = { addContactBounds = it },
+                        onCreateGroup = { showCreateGroup = true },
+                        groupCreationVisible = showCreateGroup,
+                        onCreateGroupBoundsChanged = { createGroupBounds = it },
+                    )
+                }
+            }
         },
         snackbarHost = { ActionSnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        ContactsPage(
-            drafts = drafts,
-            listState = contactsListState,
-            // Let the final contact scroll clear of the floating action button.
-            innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
-            scrollBehavior = scrollBehavior,
-            contacts = contacts,
-            profile = profile,
-            onPresenceSelected = { presence ->
-                repository.setPresence(presence)
-                SessionPrefs.saveUserProfile(
-                    context = context,
-                    username = profile.username,
-                    presence = presence,
-                    avatarUri = profile.avatarUri,
-                    statusMessage = profile.statusMessage,
+        Box(modifier = Modifier.fillMaxSize()) {
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 1,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("main_pager"),
+            ) { page ->
+                if (page == 0) {
+                    PortalPage(
+                        listState = portalListState,
+                        // Let the final feed item scroll clear of the floating action button.
+                        innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
+                        scrollBehavior = scrollBehavior,
+                        portalState = portalState,
+                        contacts = contacts,
+                        showAds = appearance.showAds,
+                        isMockServer = SessionPrefs.isMockServerActive(),
+                        onRefresh = {
+                            scope.launch {
+                                repository.refreshPortal(includeAds = appearance.showAds)
+                            }
+                        },
+                        onOpenWebTarget = { activeWebTarget = it },
+                        onOpenContactProfile = onOpenContactProfile,
+                    )
+                } else {
+                    ContactsPage(
+                        drafts = drafts,
+                        listState = contactsListState,
+                        // Let the final contact scroll clear of the floating action button.
+                        innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
+                        scrollBehavior = scrollBehavior,
+                        contacts = contacts,
+                        profile = profile,
+                        onPresenceSelected = { presence ->
+                            repository.setPresence(presence)
+                            SessionPrefs.saveUserProfile(
+                                context = context,
+                                username = profile.username,
+                                presence = presence,
+                                avatarUri = profile.avatarUri,
+                                statusMessage = profile.statusMessage,
+                            )
+                        },
+                        onEditProfile = onOpenProfile,
+                        onOpenChat = { onOpenChat(it.id) },
+                        onBlockContact = { if (it.isGroup) blockGroupTarget = it else repository.blockContact(it.id) },
+                        onDeleteContact = { deleteTarget = it },
+                        onReadStateChange = { contact, unread ->
+                            if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
+                        },
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showPagerIndicator,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = innerPadding.calculateBottomPadding() + 16.dp),
+            ) {
+                HomePagerIndicator(
+                    pagerState = pagerState,
+                    onSelectPage = { targetPage ->
+                        scope.launch { pagerState.animateScrollToPage(targetPage) }
+                    },
                 )
-            },
-            onEditProfile = onOpenProfile,
-            onOpenChat = { onOpenChat(it.id) },
-            onBlockContact = { if (it.isGroup) blockGroupTarget = it else repository.blockContact(it.id) },
-            onDeleteContact = { deleteTarget = it },
-            onReadStateChange = { contact, unread ->
-                if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
-            },
+            }
+        }
+    }
+
+    activeWebTarget?.let { target ->
+        PortalWebViewDialog(
+            target = target,
+            onDismiss = { activeWebTarget = null },
         )
     }
 
@@ -537,6 +672,63 @@ private fun MsngrApp(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun HomePagerIndicator(
+    pagerState: PagerState,
+    onSelectPage: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val homeLabel = stringResource(R.string.portal_pager_home_label)
+    val contactsLabel = stringResource(R.string.portal_pager_contacts_label)
+    val currentPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+        .coerceIn(0f, (pagerState.pageCount - 1).coerceAtLeast(0).toFloat())
+
+    Surface(
+        modifier = modifier.testTag("main_pager_indicator"),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+        tonalElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            for (page in 0 until pagerState.pageCount) {
+                val activeFraction = 1f - abs(currentPosition - page).coerceIn(0f, 1f)
+                val dotWidth = lerpDp(6.dp, 18.dp, activeFraction)
+                val dotColor = lerpColor(
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    MaterialTheme.colorScheme.primary,
+                    activeFraction,
+                )
+                val pageLabel = if (page == 0) homeLabel else contactsLabel
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelectPage(page) }
+                        .padding(horizontal = 3.dp, vertical = 5.dp)
+                        .testTag("main_pager_dot_$page")
+                        .semantics {
+                            selected = pagerState.currentPage == page
+                            contentDescription = pageLabel
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = dotWidth, height = 6.dp)
+                            .background(dotColor, CircleShape),
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -3,3 +3,9 @@
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0192"
 reason = "Informational unmaintained notice, not a vulnerability classification; accepted as a maintenance warning."
+
+# This exact RustSec record is an informational maintenance notice on chrono.
+# Other chrono advisories and all vulnerabilities still block.
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+reason = "Informational unmaintained notice, not a vulnerability classification; accepted as a maintenance warning."

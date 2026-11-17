@@ -597,6 +597,28 @@ fun AppearanceSettingsScreen(
                 }
             }
         }
+        settingsSectionSpacer()
+        settingsSectionHeader("Home")
+        item(key = "show-ads") {
+            SegmentedListItem(
+                checked = appearance.showAds,
+                onCheckedChange = { AppearancePrefs.setShowAds(context, it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                modifier = Modifier
+                    .settingsRow()
+                    .testTag("show_ads_setting"),
+                trailingContent = {
+                    Switch(
+                        checked = appearance.showAds,
+                        onCheckedChange = null,
+                    )
+                },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_show_ads_supporting))
+                },
+                content = { Text(stringResource(R.string.settings_show_ads_title)) },
+            )
+        }
     }
 }
 

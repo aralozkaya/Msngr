@@ -182,6 +182,17 @@ sealed interface MessengerEvent {
     data class OwnPersonalStatusChanged(val account: AccountIdentity, val statusMessage: String) : MessengerEvent
 }
 
+data class PortalState(
+    val config: MsgrClientConfig = MsgrClientConfig(),
+    val bannerAd: MessengerBannerAd? = null,
+    val textAd: MessengerTextAd? = null,
+    val whatsNew: List<WhatsNewActivity> = emptyList(),
+    val isLoadingConfig: Boolean = false,
+    val isLoadingWhatsNew: Boolean = false,
+    val configError: String? = null,
+    val whatsNewError: String? = null,
+)
+
 private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyList()).asStateFlow()
 private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList()).asStateFlow()
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
@@ -189,9 +200,14 @@ private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow(
 private val emptyPhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap()).asStateFlow()
 private val emptyGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap()).asStateFlow()
 private val emptyNudgeCooldowns = MutableStateFlow<Map<String, Long>>(emptyMap()).asStateFlow()
+private val emptyPortalState = MutableStateFlow(PortalState()).asStateFlow()
 
 interface MsnpClient {
     val nudgeCooldowns: StateFlow<Map<String, Long>> get() = emptyNudgeCooldowns
+    val portalState: StateFlow<PortalState> get() = emptyPortalState
+    suspend fun refreshPortal(includeAds: Boolean = true) = Unit
+    suspend fun refreshWhatsNew() = Unit
+    suspend fun refreshAds() = Unit
     val displayPictureStorageIssue: StateFlow<String?> get() = noPictureStorageIssue
     val contacts: StateFlow<List<Contact>>
     val messages: StateFlow<Map<String, List<ChatMessage>>>
@@ -971,6 +987,7 @@ class MessengerRepository(
     val drafts: StateFlow<Map<String, String>> = draftStore.drafts
     val textStyles = styleStore.styles
     val contacts: StateFlow<List<Contact>> = client.contacts
+    val portalState: StateFlow<PortalState> = client.portalState
     internal val liveTransferMessages get() = client.messages
     val nudgeCooldowns: StateFlow<Map<String, Long>> = client.nudgeCooldowns
     private val mutablePendingEmotionSounds = MutableStateFlow<Map<String, ChatMessage>>(emptyMap())
@@ -1576,6 +1593,12 @@ class MessengerRepository(
 
     fun contactSnapshot(contactId: String): Contact? =
         contacts.value.resolveContact(contactId, profile.value)
+
+    suspend fun refreshPortal(includeAds: Boolean = true) = client.refreshPortal(includeAds)
+
+    suspend fun refreshWhatsNew() = client.refreshWhatsNew()
+
+    suspend fun refreshAds() = client.refreshAds()
 
     fun messageSnapshot(contactId: String, messageId: Long): ChatMessage? =
         client.messages.value[contactId]?.firstOrNull { it.id == messageId }
