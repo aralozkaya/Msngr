@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
@@ -161,6 +163,22 @@ class PortalPageInstrumentedTest {
         compose.onNodeWithTag("main_pager_dot_1").assertIsNotSelected()
 
         // Tapping the Contacts pagination dot navigates smoothly back to Contacts.
+        compose.onNodeWithTag("main_pager_dot_1").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
+        compose.onNodeWithTag("main_pager_dot_1").assertIsSelected()
+
+        // Swiping right directly on a closed contact row passes through to the page swiper.
+        compose.onNode(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                hasAnyDescendant(hasTestTag("contacts_search_bar")),
+        ).performScrollToNode(hasTestTag("contact-row-selin"))
+        compose.onNodeWithTag("contact-row-selin").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("portal_page").assertIsDisplayed()
+        compose.onNodeWithTag("main_pager_dot_0").assertIsSelected()
+
+        // Tapping Contacts dot returns to Contacts, then indicator auto-hides after idle.
         compose.onNodeWithTag("main_pager_dot_1").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
