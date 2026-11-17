@@ -157,6 +157,14 @@ internal class LiveMsnp18Client(
     private val fetchAddressBookGroupMembers: suspend (String, String, String) -> List<GroupMember> = MsnpAddressBookService::fetchGroupMembers,
     private val nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter(),
     private val useRoamingProfile: (AccountIdentity) -> Boolean = { true },
+    private val fetchClientConfig: suspend (ServerConfig) -> MsgrClientConfig =
+        MsnpClientConfigService::fetchConfig,
+    private val fetchBannerAd: suspend (String) -> MessengerBannerAd? =
+        MsnpClientConfigService::fetchBannerAd,
+    private val fetchTextAd: suspend (String) -> MessengerTextAd? =
+        MsnpClientConfigService::fetchTextAd,
+    private val fetchWhatsNew: suspend (String, String, Int, String) -> List<WhatsNewActivity> =
+        MsnpWhatsNewService::fetchContactsRecentActivity,
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
     private val mutableContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList())
@@ -235,6 +243,7 @@ internal class LiveMsnp18Client(
     private val personalMessageMutex = Mutex()
     private val personalMessageVersion = AtomicLong(0L)
     private val mutablePictureStorageIssue = MutableStateFlow<String?>(null)
+    private val mutablePortalState = MutableStateFlow(PortalState())
     private val contactStorageIds = ConcurrentHashMap<String, String>()
     private val contactTileThumbnailHashes = ConcurrentHashMap<String, String>()
     private val contactTileHashes = ConcurrentHashMap<String, String>()
@@ -267,6 +276,10 @@ internal class LiveMsnp18Client(
     private var receivedLivePersonalMessage = false
     private var storageServer = ""
     private var storageOwnerCid = "0"
+    private var activeServerConfig: ServerConfig? = null
+    private var socialServer = ""
+    private var socialTicket = ""
+    private var portalRefreshJob: Job? = null
     private var contactTileHosts = emptyList<String>()
     private var notificationServerHost = ""
     private var storageTicket = ""
@@ -296,6 +309,7 @@ internal class LiveMsnp18Client(
     override val events = mutableEvents.asSharedFlow()
     override val sessions = mutableSessions.asStateFlow()
     override val displayPictureStorageIssue = mutablePictureStorageIssue.asStateFlow()
+    override val portalState = mutablePortalState.asStateFlow()
 
     override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> = runCatching {
         val email = request.email.trim()
@@ -477,6 +491,9 @@ internal class LiveMsnp18Client(
         }
         addressBookServer = request.serverConfig.addressBookServer
         addressBookTicket = token.contactsTicket
+        activeServerConfig = request.serverConfig
+        socialServer = request.serverConfig.socialServer
+        socialTicket = token.socialTicket
         currentDisplayName = addressBook.ownerDisplayName?.takeIf(String::isNotBlank)
             ?: storageProfile?.displayName?.takeIf(String::isNotBlank) ?: email.substringBefore('@')
         if (!addressBook.failedBlockedLookup) mutableContactRequests.value = addressBook.contactRequests
@@ -489,6 +506,9 @@ internal class LiveMsnp18Client(
         startContactTilePolling()
 
         check(machineGuid == endpointGuid) { "This session was signed out during sign-in." }
+        if (token.socialTicket.isNotBlank()) {
+            portalRefreshJob = scope.launch { refreshPortal(includeAds = true) }
+        }
 
         UserProfileSnapshot(
             username = addressBook.ownerDisplayName
@@ -545,6 +565,94 @@ internal class LiveMsnp18Client(
             sendCurrentPersonalMessage()
             if (isRoamingProfileEnabled()) {
                 persistStoragePersonalStatusLocked(endpoint, normalized)
+            }
+        }
+    }
+
+    override suspend fun refreshPortal(includeAds: Boolean) {
+        val serverConfig = activeServerConfig ?: return
+        val endpoint = machineGuid
+        if (signedInEmail.isBlank() || endpoint.isBlank()) return
+        coroutineScope {
+            val configJob = launch {
+                refreshClientConfigLocked(serverConfig, endpoint, includeAds)
+            }
+            val whatsNewJob = launch {
+                refreshWhatsNew()
+            }
+            configJob.join()
+            whatsNewJob.join()
+        }
+    }
+
+    override suspend fun refreshWhatsNew() {
+        val host = socialServer
+        val ticket = socialTicket
+        val endpoint = machineGuid
+        if (signedInEmail.isBlank() || endpoint.isBlank() || host.isBlank() || ticket.isBlank()) return
+        mutablePortalState.update { it.copy(isLoadingWhatsNew = true, whatsNewError = null) }
+        val result = runCatching {
+            fetchWhatsNew(host, ticket, 25, "en-us")
+        }
+        if (endpoint != machineGuid) return
+        mutablePortalState.update { current ->
+            current.copy(
+                whatsNew = result.getOrElse { current.whatsNew },
+                isLoadingWhatsNew = false,
+                whatsNewError = result.exceptionOrNull()?.message,
+            )
+        }
+    }
+
+    override suspend fun refreshAds() {
+        val serverConfig = activeServerConfig ?: return
+        val endpoint = machineGuid
+        if (signedInEmail.isBlank() || endpoint.isBlank()) return
+        val config = mutablePortalState.value.config
+        if (config.bannerAdUrl == null && config.textAdUrl == null) {
+            refreshClientConfigLocked(serverConfig, endpoint, includeAds = true)
+            return
+        }
+        fetchAdsForConfig(config, endpoint)
+    }
+
+    private suspend fun refreshClientConfigLocked(
+        serverConfig: ServerConfig,
+        endpoint: String,
+        includeAds: Boolean,
+    ) {
+        mutablePortalState.update { it.copy(isLoadingConfig = true, configError = null) }
+        val configResult = runCatching { fetchClientConfig(serverConfig) }
+        if (endpoint != machineGuid) return
+        val resolvedConfig = configResult.getOrNull()
+        mutablePortalState.update { current ->
+            current.copy(
+                config = resolvedConfig ?: current.config,
+                isLoadingConfig = false,
+                configError = configResult.exceptionOrNull()?.message,
+            )
+        }
+        if (includeAds && resolvedConfig != null) {
+            fetchAdsForConfig(resolvedConfig, endpoint)
+        }
+    }
+
+    private suspend fun fetchAdsForConfig(config: MsgrClientConfig, endpoint: String) {
+        coroutineScope {
+            val bannerDeferred = async {
+                config.bannerAdUrl?.let { url -> runCatching { fetchBannerAd(url) }.getOrNull() }
+            }
+            val textAdDeferred = async {
+                config.textAdUrl?.let { url -> runCatching { fetchTextAd(url) }.getOrNull() }
+            }
+            val banner = bannerDeferred.await()
+            val textAd = textAdDeferred.await()
+            if (endpoint != machineGuid) return@coroutineScope
+            mutablePortalState.update { current ->
+                current.copy(
+                    bannerAd = banner ?: current.bannerAd,
+                    textAd = textAd ?: current.textAd,
+                )
             }
         }
     }
@@ -3654,6 +3762,12 @@ internal class LiveMsnp18Client(
         receiverJob = null
         heartbeatJob?.cancel()
         heartbeatJob = null
+        portalRefreshJob?.cancel()
+        portalRefreshJob = null
+        activeServerConfig = null
+        socialServer = ""
+        socialTicket = ""
+        mutablePortalState.value = PortalState()
         contactTilePollJob?.cancel()
         contactTilePollJob = null
         initialContactPictureRefreshJob?.cancel()
@@ -3808,6 +3922,7 @@ internal data class SsoToken(
     val contactsTicket: String,
     val storageTicket: String,
     val offlineTicket: String = "",
+    val socialTicket: String = "",
 )
 
 /** Windows Live ID RST request and MSNP18 RPS proof generation. */
@@ -3878,6 +3993,9 @@ private object MsnpSsoAuthenticator {
                 offlineTicket = credentials["messenger.msn.com"]?.ticket
                     ?.takeIf(String::isNotBlank)
                     ?: throw LiveMsnpException("The authentication service did not return an offline-message credential."),
+                socialTicket = credentials["sup.live.com"]?.ticket
+                    ?.takeIf(String::isNotBlank)
+                    ?: contactsTicket,
             )
         } catch (error: LiveMsnpException) {
             throw error

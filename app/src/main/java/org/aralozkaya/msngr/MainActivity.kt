@@ -8,12 +8,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.PluralsRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +25,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
@@ -49,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -81,6 +87,7 @@ import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
+import org.aralozkaya.msngr.pages.PortalPage
 import org.aralozkaya.msngr.pages.UpdateBadge
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
@@ -89,6 +96,7 @@ import org.aralozkaya.msngr.pages.components.DeleteContactDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
 import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.MockServerBanner
+import org.aralozkaya.msngr.pages.components.PortalSitesActionMenu
 import org.aralozkaya.msngr.pages.components.SessionsDialog
 import org.aralozkaya.msngr.pages.components.showActionSnackbar
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -139,6 +147,9 @@ class MainActivity : MsngrActivity() {
                     },
                     onOpenChat = { contactId ->
                         startActivity(ChatActivity.createIntent(this, contactId))
+                    },
+                    onOpenContactProfile = { contactId ->
+                        startActivity(ContactProfileActivity.createIntent(this, contactId))
                     },
                     onSimulateReconnect = {
                         startActivity(ReconnectActivity.createSimulationIntent(this))
@@ -241,15 +252,18 @@ private fun MsngrApp(
     onOpenRequests: () -> Unit,
     onOpenGroup: (String, Boolean) -> Unit,
     onOpenChat: (String) -> Unit,
+    onOpenContactProfile: (String) -> Unit,
     onSimulateReconnect: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val context = LocalContext.current
     val updateState by context.updateManager.state.collectAsState()
+    val appearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
     val resources = LocalResources.current
     val contacts by repository.contacts.collectAsState()
     val drafts by repository.drafts.collectAsState()
     val profile by repository.profile.collectAsState()
+    val portalState by repository.portalState.collectAsState()
     val sessions by repository.sessions.collectAsState()
     val contactRequests by repository.contactRequests.collectAsState()
     val groupInvitations by repository.groupInvitations.collectAsState()
@@ -264,13 +278,17 @@ private fun MsngrApp(
     var createGroupBounds by remember { mutableStateOf<Rect?>(null) }
     var deleteTarget by remember { mutableStateOf<Contact?>(null) }
     var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
+    var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(initialPage = 1) { 2 }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val groupInteractionSource = remember { MutableInteractionSource() }
     val contactsListState = rememberLazyListState()
+    val portalListState = rememberLazyListState()
     var topBarHeight by remember { mutableIntStateOf(0) }
     val showProfileButton by remember {
         derivedStateOf {
+            if (pagerState.currentPage != 1) return@derivedStateOf false
             val layout = contactsListState.layoutInfo
             val profileItem = layout.visibleItemsInfo.firstOrNull { it.index == 0 }
             // Convert item offsets to screen coordinates, accounting for the
@@ -279,6 +297,28 @@ private fun MsngrApp(
                 (profileItem == null ||
                     profileItem.offset + profileItem.size - layout.viewportStartOffset <= topBarHeight)
         }
+    }
+
+    LaunchedEffect(appearance.showAds, portalState.config) {
+        if (
+            appearance.showAds &&
+            portalState.bannerAd == null &&
+            portalState.textAd == null &&
+            (portalState.config.bannerAdUrl != null || portalState.config.textAdUrl != null)
+        ) {
+            repository.refreshAds()
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val activeList = if (pagerState.currentPage == 0) portalListState else contactsListState
+        if (activeList.firstVisibleItemIndex == 0 && activeList.firstVisibleItemScrollOffset == 0) {
+            scrollBehavior.state.heightOffset = 0f
+        }
+    }
+
+    BackHandler(enabled = pagerState.currentPage == 0 && activeWebTarget == null) {
+        scope.launch { pagerState.animateScrollToPage(1) }
     }
 
     Scaffold(
@@ -410,42 +450,90 @@ private fun MsngrApp(
             }
         },
         floatingActionButton = {
-            ContactsActionMenu(
-                onAddContact = { showAddContact = true },
-                contactInvitationVisible = showAddContact,
-                onAddContactBoundsChanged = { addContactBounds = it },
-                onCreateGroup = { showCreateGroup = true },
-                groupCreationVisible = showCreateGroup,
-                onCreateGroupBoundsChanged = { createGroupBounds = it },
-            )
+            AnimatedContent(
+                targetState = pagerState.currentPage,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "Main FAB",
+            ) { page ->
+                if (page == 0) {
+                    PortalSitesActionMenu(
+                        config = portalState.config,
+                        onOpenWebTarget = { activeWebTarget = it },
+                    )
+                } else {
+                    ContactsActionMenu(
+                        onAddContact = { showAddContact = true },
+                        contactInvitationVisible = showAddContact,
+                        onAddContactBoundsChanged = { addContactBounds = it },
+                        onCreateGroup = { showCreateGroup = true },
+                        groupCreationVisible = showCreateGroup,
+                        onCreateGroupBoundsChanged = { createGroupBounds = it },
+                    )
+                }
+            }
         },
         snackbarHost = { ActionSnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        ContactsPage(
-            drafts = drafts,
-            listState = contactsListState,
-            // Let the final contact scroll clear of the floating action button.
-            innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
-            scrollBehavior = scrollBehavior,
-            contacts = contacts,
-            profile = profile,
-            onPresenceSelected = { presence ->
-                repository.setPresence(presence)
-                SessionPrefs.saveUserProfile(
-                    context = context,
-                    username = profile.username,
-                    presence = presence,
-                    avatarUri = profile.avatarUri,
-                    statusMessage = profile.statusMessage,
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("main_pager"),
+        ) { page ->
+            if (page == 0) {
+                PortalPage(
+                    listState = portalListState,
+                    // Let the final feed item scroll clear of the floating action button.
+                    innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
+                    scrollBehavior = scrollBehavior,
+                    portalState = portalState,
+                    contacts = contacts,
+                    showAds = appearance.showAds,
+                    isMockServer = SessionPrefs.isMockServerActive(),
+                    onRefresh = {
+                        scope.launch {
+                            repository.refreshPortal(includeAds = appearance.showAds)
+                        }
+                    },
+                    onOpenWebTarget = { activeWebTarget = it },
+                    onOpenContactProfile = onOpenContactProfile,
                 )
-            },
-            onEditProfile = onOpenProfile,
-            onOpenChat = { onOpenChat(it.id) },
-            onBlockContact = { if (it.isGroup) blockGroupTarget = it else repository.blockContact(it.id) },
-            onDeleteContact = { deleteTarget = it },
-            onReadStateChange = { contact, unread ->
-                if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
-            },
+            } else {
+                ContactsPage(
+                    drafts = drafts,
+                    listState = contactsListState,
+                    // Let the final contact scroll clear of the floating action button.
+                    innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
+                    scrollBehavior = scrollBehavior,
+                    contacts = contacts,
+                    profile = profile,
+                    onPresenceSelected = { presence ->
+                        repository.setPresence(presence)
+                        SessionPrefs.saveUserProfile(
+                            context = context,
+                            username = profile.username,
+                            presence = presence,
+                            avatarUri = profile.avatarUri,
+                            statusMessage = profile.statusMessage,
+                        )
+                    },
+                    onEditProfile = onOpenProfile,
+                    onOpenChat = { onOpenChat(it.id) },
+                    onBlockContact = { if (it.isGroup) blockGroupTarget = it else repository.blockContact(it.id) },
+                    onDeleteContact = { deleteTarget = it },
+                    onReadStateChange = { contact, unread ->
+                        if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
+                    },
+                )
+            }
+        }
+    }
+
+    activeWebTarget?.let { target ->
+        PortalWebViewDialog(
+            target = target,
+            onDismiss = { activeWebTarget = null },
         )
     }
 

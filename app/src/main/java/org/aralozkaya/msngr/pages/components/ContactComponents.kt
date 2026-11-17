@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.LocalMessengerScene
@@ -397,11 +398,12 @@ fun Avatar(
     showPresenceIndicator: Boolean = true,
     imageVersion: Int = 0,
     highResolution: Boolean = false,
+    size: Dp = 56.dp,
     shape: Shape = MaterialTheme.shapes.avatar,
 ) {
     val painter = rememberAvatarImage(avatarUri, highResolution, imageVersion).painter
 
-    Box(modifier = modifier.size(56.dp)) {
+    Box(modifier = modifier.size(size)) {
         Surface(
             modifier = Modifier.matchParentSize(),
             shape = shape,
@@ -423,17 +425,18 @@ fun Avatar(
                 ) {
                     Text(
                         text = avatarInitial(name),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = if (size <= 48.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
             }
         }
         if (showPresenceIndicator) {
+            val indicatorSize = if (size == 56.dp) 18.dp else (size * (18f / 56f)).coerceAtLeast(12.dp)
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(18.dp),
+                    .size(indicatorSize),
                 shape = MaterialTheme.shapes.pill,
                 color = MaterialTheme.colorScheme.surface,
             ) {

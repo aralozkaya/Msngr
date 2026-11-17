@@ -26,6 +26,7 @@ data class AppAppearance(
     val sceneColorArgb: Int? = null,
     val showSceneInConversations: Boolean = true,
     val darkenScenesInDarkMode: Boolean = true,
+    val showAds: Boolean = true,
 )
 
 object AppearancePrefs {
@@ -37,6 +38,7 @@ object AppearancePrefs {
     private const val KEY_SCENE_COLOR = "scene_color"
     private const val KEY_SCENE_IN_CONVERSATIONS = "scene_in_conversations"
     private const val KEY_DARKEN_SCENES = "darken_scenes"
+    private const val KEY_SHOW_ADS = "show_ads"
     private val mutableAppearance = MutableStateFlow(AppAppearance())
 
     fun state(context: Context): StateFlow<AppAppearance> {
@@ -84,6 +86,11 @@ object AppearancePrefs {
         update(context, mutableAppearance.value.copy(darkenScenesInDarkMode = enabled))
     }
 
+    fun setShowAds(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(showAds = enabled))
+    }
+
     private fun update(context: Context, appearance: AppAppearance) {
         mutableAppearance.value = appearance
         persist(context, appearance)
@@ -100,6 +107,7 @@ object AppearancePrefs {
             sceneColorArgb = if (prefs.contains(KEY_SCENE_COLOR)) prefs.getInt(KEY_SCENE_COLOR, 0) else null,
             showSceneInConversations = prefs.getBoolean(KEY_SCENE_IN_CONVERSATIONS, true),
             darkenScenesInDarkMode = prefs.getBoolean(KEY_DARKEN_SCENES, true),
+            showAds = prefs.getBoolean(KEY_SHOW_ADS, true),
         )
     }
 
@@ -110,6 +118,7 @@ object AppearancePrefs {
             putString(KEY_SCENE, appearance.sceneId)
             putBoolean(KEY_SCENE_IN_CONVERSATIONS, appearance.showSceneInConversations)
             putBoolean(KEY_DARKEN_SCENES, appearance.darkenScenesInDarkMode)
+            putBoolean(KEY_SHOW_ADS, appearance.showAds)
             appearance.customColorArgb?.let { putInt(KEY_CUSTOM_COLOR, it) } ?: remove(KEY_CUSTOM_COLOR)
             appearance.sceneColorArgb?.let { putInt(KEY_SCENE_COLOR, it) } ?: remove(KEY_SCENE_COLOR)
         }

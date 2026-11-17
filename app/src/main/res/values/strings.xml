@@ -146,4 +146,19 @@
     </plurals>
     <string name="request_optional_message">Message (optional)</string>
     <string name="chat_text_size_local_notice">Text size changes only on this device, for both incoming and outgoing messages.</string>
+    <string name="settings_show_ads_title">Show advertisement card</string>
+    <string name="settings_show_ads_supporting">Display sponsor banners and text ads from your Messenger service on the Home feed.</string>
+    <string name="portal_whats_new_title">What\'s new</string>
+    <string name="portal_whats_new_refresh">Refresh What\'s new</string>
+    <string name="portal_whats_new_empty">No recent updates from your contacts or service.</string>
+    <string name="portal_whats_new_unavailable">Connect to a live Messenger service to see What\'s new, Today, and sites.</string>
+    <string name="portal_ad_label">Advertisement</string>
+    <string name="portal_today_title">Today</string>
+    <string name="portal_sites_open">Open sites and Today</string>
+    <string name="portal_sites_close">Close sites and Today</string>
+    <string name="portal_sites_empty">No sites configured by this server</string>
+    <string name="portal_webview_back">Back</string>
+    <string name="portal_webview_open_in_browser">Open in browser</string>
+    <string name="portal_webview_refresh">Refresh</string>
+    <string name="portal_webview_close">Close</string>
 </resources>
