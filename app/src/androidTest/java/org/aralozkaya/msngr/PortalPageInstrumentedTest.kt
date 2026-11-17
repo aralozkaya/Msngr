@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -28,8 +29,10 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -91,7 +94,8 @@ class PortalPageInstrumentedTest {
     }
 
     @Test
-    fun mainActivityStartsOnContactsAndSwipesRightToPortalPage() = runBlocking {
+    fun mainActivityStartsOnContactsAndSwipesRightToPortalPage() {
+        runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         mockContext = context
@@ -142,6 +146,9 @@ class PortalPageInstrumentedTest {
 
         // Default landing page is Contacts (page 1).
         compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
+        compose.onNodeWithTag("main_pager_indicator").assertIsDisplayed()
+        compose.onNodeWithTag("main_pager_dot_0").assertIsNotSelected()
+        compose.onNodeWithTag("main_pager_dot_1").assertIsSelected()
 
         // Swiping right reveals the Portal page (page 0) with clean empty state in mock mode.
         compose.onNodeWithTag("main_pager").performTouchInput { swipeRight() }
@@ -150,6 +157,21 @@ class PortalPageInstrumentedTest {
         compose.onNodeWithTag("portal_page").assertIsDisplayed()
         compose.onNodeWithText("What's new").assertIsDisplayed()
         compose.onNodeWithTag("portal_ad_card").assertDoesNotExist()
+        compose.onNodeWithTag("main_pager_dot_0").assertIsSelected()
+        compose.onNodeWithTag("main_pager_dot_1").assertIsNotSelected()
+
+        // Tapping the Contacts pagination dot navigates smoothly back to Contacts.
+        compose.onNodeWithTag("main_pager_dot_1").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
+        compose.onNodeWithTag("main_pager_dot_1").assertIsSelected()
+
+        // After movement stops, the launcher pagination indicator auto-hides cleanly.
+        compose.waitUntil(timeoutMillis = 3_000) {
+            compose.onAllNodes(hasTestTag("main_pager_indicator")).fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("main_pager_indicator").assertDoesNotExist()
+        }
     }
 
     @Test
@@ -172,6 +194,7 @@ class PortalPageInstrumentedTest {
             var showSettings by mutableStateOf(true)
             var openedTarget by mutableStateOf<PortalWebTarget?>(null)
             var refreshCount by mutableStateOf(0)
+            lateinit var portalListState: LazyListState
             settingsRule.onActivity { activity ->
                 activity.setContent {
                     val appearance by AppearancePrefs.state(isolated).collectAsState()
@@ -183,7 +206,9 @@ class PortalPageInstrumentedTest {
                                     scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
                                 )
                             } else {
+                                portalListState = androidx.compose.foundation.lazy.rememberLazyListState()
                                 PortalPage(
+                                    listState = portalListState,
                                     innerPadding = PaddingValues(),
                                     scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
                                     portalState = PortalState(
@@ -311,6 +336,8 @@ class PortalPageInstrumentedTest {
 
             AppearancePrefs.setShowAds(isolated, true)
             compose.waitForIdle()
+            assertEquals(0, portalListState.firstVisibleItemIndex)
+            assertEquals(0, portalListState.firstVisibleItemScrollOffset)
             compose.onNodeWithTag("portal_ad_card").assertIsDisplayed()
             compose.onNodeWithText("CrossTalk Test Ad").performClick()
             assertEquals("https://crosstalk.im", openedTarget?.url)

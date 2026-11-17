@@ -163,8 +163,10 @@ fun PortalPage(
                     .testTag("portal_page"),
                 verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
             ) {
-                if (hasBannerOrTextAd) {
-                    item(key = "portal-ad-card") {
+                // Keep index 0's item key stable before the feed header so late-arriving ads
+                // expand downward instead of shifting the initial scroll position below the ad.
+                item(key = "portal-ad-slot") {
+                    if (hasBannerOrTextAd) {
                         AdvertisementCard(
                             bannerAd = portalState.bannerAd,
                             textAd = portalState.textAd,

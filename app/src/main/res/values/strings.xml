@@ -161,4 +161,6 @@
     <string name="portal_webview_open_in_browser">Open in browser</string>
     <string name="portal_webview_refresh">Refresh</string>
     <string name="portal_webview_close">Close</string>
+    <string name="portal_pager_home_label">Home</string>
+    <string name="portal_pager_contacts_label">Contacts</string>
 </resources>
