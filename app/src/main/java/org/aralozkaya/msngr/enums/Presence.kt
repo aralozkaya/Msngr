@@ -22,8 +22,6 @@ enum class Presence(
     val ownStatusLabelRes: Int
         @StringRes get() = if (this == Offline) R.string.presence_appear_offline else labelRes
 
-    fun ownStatusLabel(): String = if (this == Offline) "Appear offline" else label
-
     fun label(context: Context): String = context.getString(labelRes)
 
     fun ownStatusLabel(context: Context): String = context.getString(ownStatusLabelRes)

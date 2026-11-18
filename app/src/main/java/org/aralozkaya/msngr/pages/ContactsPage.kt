@@ -233,7 +233,7 @@ fun ContactsPage(
                 if (groups.isEmpty()) {
                     EmptySectionItem {
                         Text(stringResource(when {
-                            search.isNotEmpty() -> R.string.contacts_groups_empty_search
+                            search.isNotEmpty() -> R.string.contacts_groups_empty_search_you_singular
                             hideOffline -> R.string.contacts_groups_empty_online
                             else -> R.string.contacts_groups_empty
                         }))

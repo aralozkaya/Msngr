@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.pages.UpdateSettingsScreen
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -89,6 +90,10 @@ class UpdateScreenInstrumentedTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("update-interval"))
         compose.onNodeWithTag("update-interval").assertIsEnabled().performClick()
         compose.onNodeWithText("Cancel").performClick()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("include-prereleases"))
+        val expandedGap = compose.onNodeWithTag("include-prereleases").fetchSemanticsNode().boundsInRoot.top -
+            compose.onNodeWithTag("update-interval").fetchSemanticsNode().boundsInRoot.bottom
+        assertEquals(with(compose.density) { 12.dp.toPx() }, expandedGap, 1f)
         File(target.getExternalFilesDir(null), "update-settings-expanded.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
@@ -107,5 +112,9 @@ class UpdateScreenInstrumentedTest {
         compose.onNodeWithTag("check-for-updates").assertIsNotEnabled()
         compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("automatic-updates"))
         compose.onNodeWithTag("automatic-updates").assertIsNotEnabled()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("include-prereleases"))
+        val collapsedGap = compose.onNodeWithTag("include-prereleases").fetchSemanticsNode().boundsInRoot.top -
+            compose.onNodeWithTag("automatic-updates").fetchSemanticsNode().boundsInRoot.bottom
+        assertEquals(with(compose.density) { 12.dp.toPx() }, collapsedGap, 1f)
     }
 }

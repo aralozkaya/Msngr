@@ -149,7 +149,7 @@
     <string name="emoticon_search_empty"></string>
 
     <!-- Presence and enums -->
-    <!-- Reference (en): Online -->
+    <!-- Reference (en): Available -->
     <string name="presence_online"></string>
     <!-- Reference (en): Busy -->
     <string name="presence_busy"></string>
@@ -310,7 +310,7 @@
     <string name="contact_request_decline"></string>
     <!-- Reference (en): Block invitations from this person -->
     <string name="contact_request_block"></string>
-    <!-- Reference (en): Set as default -->
+    <!-- Reference (en): Set default -->
     <string name="contact_request_set_default"></string>
     <!-- Reference (en): Decide later -->
     <string name="contact_request_later"></string>
@@ -451,10 +451,10 @@
     <string name="chat_message_copied"></string>
     <!-- Reference (en): Don\'t include information like passwords or credit card numbers in an instant message -->
     <string name="empty_conversation_warning"></string>
-    <!-- Reference (en): %1$s is %2$s and may not respond -->
+    <!-- Reference (en): %1$s is %2$s and may not reply -->
     <string name="chat_contact_unavailable"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): %1$s is offline. Messages you send will be delivered when they sign in. -->
+    <!-- Reference (en): %1$s appears to be offline. Messages you send will be delivered when they sign in. -->
     <string name="chat_contact_offline_you_singular"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): Your status is set to Appear offline. You can communicate with your contacts but they will know you are appearing offline. -->
@@ -552,19 +552,19 @@
     <!-- Chat system messages -->
     <!-- Reference (en): Handwriting -->
     <string name="chat_handwriting_message"></string>
-    <!-- Reference (en): Voice clip -->
+    <!-- Reference (en): Voice Clip -->
     <string name="chat_voice_clip_message"></string>
     <!-- Reference (en): Wink: %1$s -->
     <string name="chat_wink_message"></string>
     <!-- Reference (en): Sent a sound: %1$s -->
     <string name="chat_emotion_sound_message"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): You sent a nudge. -->
+    <!-- Reference (en): You have just sent a nudge. -->
     <string name="chat_nudge_sent_you_singular"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): You received a nudge! -->
     <string name="chat_nudge_received_you_singular"></string>
-    <!-- Reference (en): %1$s sent a nudge! -->
+    <!-- Reference (en): %1$s has just sent a nudge. -->
     <string name="chat_nudge_received_from"></string>
     <!-- Reference (en): Nudge could not be sent. -->
     <string name="chat_nudge_failed"></string>
@@ -696,8 +696,9 @@
     <string name="contacts_section_other"></string>
     <!-- Reference (en): Block -->
     <string name="contacts_block_action"></string>
-    <!-- Reference (en): No groups found -->
-    <string name="contacts_groups_empty_search"></string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <!-- Reference (en): No groups match your search. -->
+    <string name="contacts_groups_empty_search_you_singular"></string>
     <!-- Reference (en): No online groups to show -->
     <string name="contacts_groups_empty_online"></string>
     <!-- Reference (en): No groups to show -->
@@ -711,7 +712,7 @@
     <!-- Reference (en): Offline contacts are hidden. -->
     <string name="contacts_empty_offline_subtitle"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): Your contact list is empty. -->
+    <!-- Reference (en): You don\'t have anyone in your contact list yet. -->
     <string name="contacts_empty_list_subtitle_you_singular"></string>
     <!-- Reference (en): Expanded -->
     <string name="contacts_section_expanded"></string>
@@ -777,7 +778,7 @@
     <string name="group_search_members_placeholder"></string>
     <!-- Reference (en): Edit profile -->
     <string name="group_edit_profile_action"></string>
-    <!-- Reference (en): No member details available yet. -->
+    <!-- Reference (en): There are no members in this group. -->
     <string name="group_members_empty_none"></string>
     <!-- Reference (en): No members found. -->
     <string name="group_members_empty_search"></string>
@@ -825,7 +826,7 @@
     <string name="group_create_title"></string>
     <!-- Reference (en): Invite members -->
     <string name="group_invite_title"></string>
-    <!-- Reference (en): Choose contacts -->
+    <!-- Reference (en): Select Contacts -->
     <string name="group_choose_contacts_title"></string>
     <!-- Reference (en): No contacts available to invite. -->
     <string name="group_choose_contacts_empty"></string>
@@ -841,7 +842,7 @@
     <!-- Reference (en): Refresh What\'s new -->
     <string name="portal_whats_new_refresh"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): No recent updates from your contacts or service. -->
+    <!-- Reference (en): No new activities from your contacts -->
     <string name="portal_whats_new_empty_you_singular"></string>
     <!-- Reference (en): Connect to a live Messenger service to see What\'s new, Today, and sites. -->
     <string name="portal_whats_new_unavailable"></string>
@@ -888,9 +889,9 @@
     <string name="main_open_menu"></string>
     <!-- Reference (en): Simulate reconnection -->
     <string name="main_simulate_reconnection"></string>
-    <!-- Reference (en): Log out -->
+    <!-- Reference (en): Sign out -->
     <string name="main_log_out"></string>
-    <!-- Reference (en): Log out… -->
+    <!-- Reference (en): Sign out… -->
     <string name="main_log_out_ellipsis"></string>
     <!-- Note: singular text variant -->
     <!-- Reference (en):  -->
@@ -904,7 +905,7 @@
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <!-- Reference (en): active sessions -->
     <string name="main_active_sessions_plural_after_number"></string>
-    <!-- Reference (en): Log out? -->
+    <!-- Reference (en): Sign out? -->
     <string name="main_log_out_dialog_title"></string>
     <!-- Reference (en): This ends the current session. Remembered credentials stay saved on this device. -->
     <string name="main_log_out_dialog_message"></string>
@@ -915,30 +916,30 @@
     <!-- Reference (en): Mock server active · Test data only -->
     <string name="mock_server_banner"></string>
     <!-- Note: singular text variant -->
-    <!-- Reference (en): %1$s was logged out. -->
+    <!-- Reference (en): %1$s was signed out. -->
     <string name="sessions_logged_out_singular"></string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <!-- Reference (en): The other sessions were logged out. -->
+    <!-- Reference (en): The other sessions were signed out. -->
     <string name="sessions_logged_out_plural"></string>
     <!-- Reference (en): Active sessions -->
     <string name="sessions_title"></string>
-    <!-- Reference (en): Choose where to log out. Remembered credentials stay saved on this device. -->
+    <!-- Reference (en): Choose where to sign out. Remembered credentials stay saved on this device. -->
     <string name="sessions_description"></string>
     <!-- Reference (en): %1$s · %2$s -->
     <string name="sessions_meta_separator"></string>
-    <!-- Reference (en): Log out of this device -->
+    <!-- Reference (en): Sign out of this device -->
     <string name="sessions_log_out_this_device"></string>
-    <!-- Reference (en): Log out of %1$s, session %2$s -->
+    <!-- Reference (en): Sign out of %1$s, session %2$s -->
     <string name="sessions_log_out_device_format"></string>
-    <!-- Reference (en): Logging out… -->
+    <!-- Reference (en): Signing out… -->
     <string name="sessions_logging_out"></string>
-    <!-- Reference (en): Log out -->
+    <!-- Reference (en): Sign out -->
     <string name="sessions_log_out_action"></string>
-    <!-- Reference (en): Log out other sessions -->
+    <!-- Reference (en): Sign out other sessions -->
     <string name="sessions_log_out_others"></string>
-    <!-- Reference (en): Log out all sessions -->
+    <!-- Reference (en): Sign out from everywhere -->
     <string name="sessions_log_out_all"></string>
-    <!-- Reference (en): %1$s did not confirm logout. Please try again. -->
+    <!-- Reference (en): %1$s did not confirm sign-out. Please try again. -->
     <string name="sessions_logout_not_confirmed"></string>
     <!-- Reference (en): Escargot -->
     <string name="account_provider_escargot"></string>
@@ -955,7 +956,7 @@
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): The selected community service could not sign you in. -->
     <string name="login_error_service_default_you_singular"></string>
-    <!-- Reference (en): Logged out -->
+    <!-- Reference (en): Signed out -->
     <string name="login_dialog_title_logged_out"></string>
     <!-- Reference (en): Couldn’t sign in -->
     <string name="login_dialog_title_error"></string>
@@ -977,7 +978,7 @@
     <string name="login_auto_sign_in"></string>
     <!-- Reference (en): Sign in as -->
     <string name="login_sign_in_as"></string>
-    <!-- Reference (en): Choose login status -->
+    <!-- Reference (en): Choose sign-in status -->
     <string name="login_choose_status"></string>
     <!-- Reference (en): Use mock server -->
     <string name="login_use_mock_server"></string>
@@ -1182,7 +1183,7 @@
     <!-- In-app notification settings -->
     <!-- Reference (en): Custom notifications -->
     <string name="notification_custom_activity_title"></string>
-    <!-- Reference (en): Silence push notifications when not Online -->
+    <!-- Reference (en): Silence push notifications when not Available -->
     <string name="notification_silence_offline_title"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): Deliver non-chat push notifications silently when your status is Busy, Away, or Appear offline. -->
@@ -1190,7 +1191,7 @@
     <!-- Reference (en): Include contact and group messages -->
     <string name="notification_silence_messages_title"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): Also silence contact and group message push notifications when your status is not Online. -->
+    <!-- Reference (en): Also silence contact and group message push notifications when your status is not Available. -->
     <string name="notification_silence_messages_summary_you_singular"></string>
     <!-- Reference (en): In-app notifications -->
     <string name="notification_in_app_title"></string>
@@ -1447,7 +1448,7 @@
     <string name="appearance_color_mode_dynamic_summary_you_singular"></string>
     <!-- Reference (en): Classic scenes with matching app colors -->
     <string name="appearance_color_mode_scenes_summary"></string>
-    <!-- Reference (en): Choose a scene -->
+    <!-- Reference (en): Select a scene -->
     <string name="appearance_choose_scene"></string>
     <!-- Reference (en): Show scene in chats -->
     <string name="appearance_show_scene_in_chats"></string>
@@ -1737,9 +1738,9 @@
     <string name="ink_eraser_active_label_format"></string>
     <!-- Reference (en): Eraser (%1$s) -->
     <string name="ink_eraser_label_format"></string>
-    <!-- Reference (en): Undo stroke -->
+    <!-- Reference (en): Ink undo -->
     <string name="ink_undo_stroke"></string>
-    <!-- Reference (en): Redo stroke -->
+    <!-- Reference (en): Ink redo -->
     <string name="ink_redo_stroke"></string>
     <!-- Reference (en): Ink color (%1$s) -->
     <string name="ink_color_selected_description"></string>
@@ -1761,11 +1762,11 @@
     <string name="ink_message_strokes_plural_after_number"></string>
 
     <!-- Voice clips -->
-    <!-- Reference (en): Voice clip -->
+    <!-- Reference (en): Voice Clip -->
     <string name="voice_clip_title"></string>
-    <!-- Reference (en): Hold the microphone to record a voice clip. -->
+    <!-- Reference (en): To record a Voice Clip, hold down this button. Release the button to send the message. -->
     <string name="voice_clip_hold_to_record"></string>
-    <!-- Reference (en): Voice clip recording failed. -->
+    <!-- Reference (en): The Voice Clip could not be recorded. -->
     <string name="voice_clip_record_failed"></string>
     <!-- Reference (en): Allow microphone access to record a voice clip. -->
     <string name="voice_clip_mic_permission"></string>
@@ -1819,7 +1820,7 @@
     <string name="voice_clip_mic_recording_failed"></string>
     <!-- Reference (en): Audio playback failed. -->
     <string name="voice_clip_audio_playback_failed"></string>
-    <!-- Reference (en): Voice clip could not be played. -->
+    <!-- Reference (en): There was a problem playing the Voice Clip. -->
     <string name="voice_clip_cant_play"></string>
     <!-- Reference (en): Stop voice clip -->
     <string name="voice_clip_stop_description"></string>
@@ -1874,7 +1875,7 @@
     <string name="emotion_sound_play_failed"></string>
     <!-- Reference (en): The selected account changed. Open the sound picker again. -->
     <string name="emotion_sound_account_changed"></string>
-    <!-- Reference (en): The sound could not be played. -->
+    <!-- Reference (en): Messenger is unable to play the selected sound. -->
     <string name="emotion_sound_generic_play_failed"></string>
     <!-- Reference (en): Online sounds could not be loaded. -->
     <string name="emotion_sound_load_failed"></string>
@@ -2061,7 +2062,7 @@
     <string name="wink_too_many_redirects"></string>
     <!-- Reference (en): This wink is no longer cached. -->
     <string name="wink_not_cached"></string>
-    <!-- Reference (en): This wink could not be played. -->
+    <!-- Reference (en): There was a problem playing the wink. -->
     <string name="wink_play_failed"></string>
     <!-- Reference (en): Close wink -->
     <string name="wink_close_player"></string>
@@ -2106,13 +2107,13 @@
     <string name="wink_builtin_kiss"></string>
     <!-- Reference (en): Knock -->
     <string name="wink_builtin_knock"></string>
-    <!-- Reference (en): Laughing Girl -->
+    <!-- Reference (en): Laugh -->
     <string name="wink_builtin_laughing_girl"></string>
     <!-- Reference (en): Lightbulb -->
     <string name="wink_builtin_lightbulb"></string>
     <!-- Reference (en): Silly Face -->
     <string name="wink_builtin_silly_face"></string>
-    <!-- Reference (en): Ufo -->
+    <!-- Reference (en): UFO -->
     <string name="wink_builtin_ufo"></string>
     <!-- Reference (en): Water Balloon -->
     <string name="wink_builtin_water_balloon"></string>
@@ -2200,7 +2201,7 @@
     <string name="file_sharing_declined"></string>
     <!-- Reference (en): File transfer canceled -->
     <string name="file_sharing_canceled"></string>
-    <!-- Reference (en): File transfer failed -->
+    <!-- Reference (en): Error in Transfer -->
     <string name="file_sharing_failed"></string>
     <!-- Reference (en): Save as -->
     <string name="file_sharing_save_as"></string>
@@ -2605,54 +2606,54 @@
     <!-- Built-in 79 emoticon names -->
     <!-- Reference (en): Smile -->
     <string name="emoticon_smile"></string>
-    <!-- Reference (en): Open-mouthed -->
+    <!-- Reference (en): Open-mouthed smile -->
     <string name="emoticon_open_mouthed"></string>
-    <!-- Reference (en): Surprised -->
+    <!-- Reference (en): Surprised smile -->
     <string name="emoticon_surprised"></string>
-    <!-- Reference (en): Tongue out -->
+    <!-- Reference (en): Smile with tongue out -->
     <string name="emoticon_tongue_out"></string>
     <!-- Note: singular text variant -->
-    <!-- Reference (en): Wink -->
+    <!-- Reference (en): Winking smile -->
     <string name="emoticon_wink_singular"></string>
-    <!-- Reference (en): Sad -->
+    <!-- Reference (en): Sad smile -->
     <string name="emoticon_sad"></string>
-    <!-- Reference (en): Confused -->
+    <!-- Reference (en): Confused smile -->
     <string name="emoticon_confused"></string>
-    <!-- Reference (en): Disappointed -->
+    <!-- Reference (en): Disappointed smile -->
     <string name="emoticon_disappointed"></string>
-    <!-- Reference (en): Crying -->
+    <!-- Reference (en): Crying face -->
     <string name="emoticon_crying"></string>
-    <!-- Reference (en): Embarrassed -->
+    <!-- Reference (en): Embarrassed smile -->
     <string name="emoticon_embarrassed"></string>
-    <!-- Reference (en): Hot -->
+    <!-- Reference (en): Hot smile -->
     <string name="emoticon_hot"></string>
-    <!-- Reference (en): Angry -->
+    <!-- Reference (en): Angry smile -->
     <string name="emoticon_angry"></string>
     <!-- Reference (en): Angel -->
     <string name="emoticon_angel"></string>
     <!-- Reference (en): Devil -->
     <string name="emoticon_devil"></string>
-    <!-- Reference (en): Don\'t tell anyone -->
+    <!-- Reference (en): Don\'t tell anyone smile -->
     <string name="emoticon_dont_tell_anyone"></string>
-    <!-- Reference (en): Baring teeth -->
+    <!-- Reference (en): Baring teeth smile -->
     <string name="emoticon_baring_teeth"></string>
-    <!-- Reference (en): Nerd -->
+    <!-- Reference (en): Nerd smile -->
     <string name="emoticon_nerd"></string>
-    <!-- Reference (en): Sarcastic -->
+    <!-- Reference (en): Sarcastic smile -->
     <string name="emoticon_sarcastic"></string>
-    <!-- Reference (en): Secret telling -->
+    <!-- Reference (en): Secret telling smile -->
     <string name="emoticon_secret_telling"></string>
-    <!-- Reference (en): Sick -->
+    <!-- Reference (en): Sick smile -->
     <string name="emoticon_sick"></string>
-    <!-- Reference (en): I don\'t know -->
+    <!-- Reference (en): I don\'t know smile -->
     <string name="emoticon_i_dont_know"></string>
-    <!-- Reference (en): Thinking -->
+    <!-- Reference (en): Thinking smile -->
     <string name="emoticon_thinking"></string>
-    <!-- Reference (en): Party -->
+    <!-- Reference (en): Party smile -->
     <string name="emoticon_party"></string>
-    <!-- Reference (en): Eye-rolling -->
+    <!-- Reference (en): Eye-rolling smile -->
     <string name="emoticon_eye_rolling"></string>
-    <!-- Reference (en): Sleepy -->
+    <!-- Reference (en): Sleepy smile -->
     <string name="emoticon_sleepy"></string>
     <!-- Reference (en): Coffee cup -->
     <string name="emoticon_coffee_cup"></string>
@@ -2710,11 +2711,11 @@
     <string name="emoticon_email"></string>
     <!-- Reference (en): Clock -->
     <string name="emoticon_clock"></string>
-    <!-- Reference (en): MSN Messenger icon -->
+    <!-- Reference (en): Messenger -->
     <string name="emoticon_msn_icon"></string>
     <!-- Reference (en): Snail -->
     <string name="emoticon_snail"></string>
-    <!-- Reference (en): Black Sheep -->
+    <!-- Reference (en): Black sheep -->
     <string name="emoticon_black_sheep"></string>
     <!-- Reference (en): Plate -->
     <string name="emoticon_plate"></string>
@@ -2734,9 +2735,9 @@
     <string name="emoticon_island"></string>
     <!-- Reference (en): Computer -->
     <string name="emoticon_computer"></string>
-    <!-- Reference (en): Mobile Phone -->
+    <!-- Reference (en): Mobile -->
     <string name="emoticon_mobile_phone"></string>
-    <!-- Reference (en): Stormy cloud -->
+    <!-- Reference (en): Storm cloud -->
     <string name="emoticon_stormy_cloud"></string>
     <!-- Reference (en): Lightning -->
     <string name="emoticon_lightning"></string>
@@ -2764,7 +2765,7 @@
     <string name="emoticon_xbox"></string>
 
     <!-- Built-in scene names -->
-    <!-- Reference (en): Mezmerizing White -->
+    <!-- Reference (en): Mesmerizing White -->
     <string name="scene_name_mezmerizing_white"></string>
     <!-- Reference (en): Daisy Hill -->
     <string name="scene_name_daisy_hill"></string>
@@ -2802,7 +2803,7 @@
     <string name="scene_name_zune_6"></string>
     <!-- Reference (en): Zune 4 -->
     <string name="scene_name_zune_4"></string>
-    <!-- Reference (en): Mezmerizing Brown -->
+    <!-- Reference (en): Mesmerizing Brown -->
     <string name="scene_name_mezmerizing_brown"></string>
     <!-- Reference (en): Zune 3 -->
     <string name="scene_name_zune_3"></string>
@@ -2820,7 +2821,7 @@
     <string name="scene_name_dark_hearts"></string>
     <!-- Reference (en): Desert -->
     <string name="scene_name_desert"></string>
-    <!-- Reference (en): Grafitti -->
+    <!-- Reference (en): Graffiti -->
     <string name="scene_name_grafitti"></string>
     <!-- Reference (en): Hostas -->
     <string name="scene_name_hostas"></string>
@@ -3010,7 +3011,7 @@
     <string name="err_group_pending_invite"></string>
     <!-- Reference (en): This person is already a group member. -->
     <string name="err_group_already_member"></string>
-    <!-- Reference (en): A group can have up to -->
+    <!-- Reference (en): A group in Messenger can have up to -->
     <string name="group_members_max_count_before_number"></string>
     <!-- Reference (en): members. -->
     <string name="group_members_max_count_after_number"></string>
@@ -3049,11 +3050,11 @@
     <string name="err_wink_sender_offline_group"></string>
     <!-- Reference (en): Unblock this contact before retrying. -->
     <string name="err_wink_unblock_before_retry"></string>
-    <!-- Reference (en): Winks require the contact to be online. -->
+    <!-- Reference (en): Contacts who appear offline cannot accept winks. -->
     <string name="err_wink_require_online"></string>
     <!-- Reference (en): All online group members must support winks. -->
     <string name="err_wink_group_unsupported"></string>
-    <!-- Reference (en): This contact\'s client does not support winks. -->
+    <!-- Reference (en): This type of wink can\'t be shown in the version of Messenger that this contact is using. -->
     <string name="err_wink_client_unsupported"></string>
     <!-- Reference (en): Wink data does not match its metadata. -->
     <string name="err_wink_metadata_mismatch"></string>
@@ -3070,7 +3071,7 @@
     <string name="err_photo_original_request_failed"></string>
     <!-- Reference (en): This contact is unavailable for photo sharing. -->
     <string name="err_photo_contact_unavailable"></string>
-    <!-- Reference (en): This contact\'s client does not support photo sharing. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support photo sharing. -->
     <string name="err_photo_client_unsupported"></string>
     <!-- Reference (en): This photo share has ended. -->
     <string name="err_photo_share_ended"></string>
@@ -3078,7 +3079,7 @@
     <string name="err_game_session_ended"></string>
     <!-- Reference (en): This contact is unavailable for games and activities. -->
     <string name="err_game_contact_unavailable"></string>
-    <!-- Reference (en): This contact\'s client does not support games and activities. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support games and activities. -->
     <string name="err_game_client_unsupported"></string>
     <!-- Reference (en): Sign in before sharing files. -->
     <string name="err_file_sign_in_required"></string>
@@ -3086,7 +3087,7 @@
     <string name="err_file_group_unsupported"></string>
     <!-- Reference (en): This contact is unavailable for file transfers. -->
     <string name="err_file_contact_unavailable"></string>
-    <!-- Reference (en): This contact\'s client does not support file transfers. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support File Transfer. -->
     <string name="err_file_client_unsupported"></string>
     <!-- Reference (en): This file offer has ended. -->
     <string name="err_file_offer_ended"></string>
@@ -3096,7 +3097,7 @@
     <string name="err_voice_require_online"></string>
     <!-- Reference (en): Voice clips require an online contact. -->
     <string name="err_voice_require_online_alt"></string>
-    <!-- Reference (en): This contact\'s client does not support voice clips. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support Voice Clips. -->
     <string name="err_voice_client_unsupported"></string>
     <!-- Reference (en): Invalid voice clip. -->
     <string name="err_voice_invalid"></string>
@@ -3112,11 +3113,11 @@
     <string name="err_handwriting_group_unsupported"></string>
     <!-- Reference (en): Handwriting messages require the contact to be online. -->
     <string name="err_handwriting_require_online"></string>
-    <!-- Reference (en): This contact\'s client does not support handwriting. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support handwriting. -->
     <string name="err_handwriting_client_unsupported"></string>
     <!-- Reference (en): Message could not be sent. -->
     <string name="err_message_send_failed"></string>
-    <!-- Reference (en): Nudges cannot be sent to an offline contact. -->
+    <!-- Reference (en): This contact appears to be offline, so a nudge cannot be sent. -->
     <string name="err_nudge_offline"></string>
     <!-- Reference (en): Nudges require an online contact. -->
     <string name="err_nudge_require_online"></string>
@@ -3124,7 +3125,7 @@
     <string name="err_nudge_blocked"></string>
     <!-- Reference (en): All online group members must support nudges. -->
     <string name="err_nudge_group_unsupported"></string>
-    <!-- Reference (en): This contact\'s client does not support nudges. -->
+    <!-- Reference (en): This contact is using a version of Messenger that does not support nudges. -->
     <string name="err_nudge_client_unsupported"></string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): You may not send a nudge that often. Please wait -->
@@ -3231,13 +3232,13 @@
     <string name="err_contact_change_session_ended"></string>
     <!-- Reference (en): The notification server rejected the contact-list change. -->
     <string name="err_ns_rejected_list_change"></string>
-    <!-- Reference (en): Use local logout to end the current session. -->
+    <!-- Reference (en): Use local sign-out to end the current session. -->
     <string name="err_remote_signout_use_local"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): The server could not deliver remote sign-out (MSNP -->
     <string name="remote_sign_out_msnp_error_you_singular_before_number"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): ). If all sessions appear offline, change your status to Online and try again. -->
+    <!-- Reference (en): ). If all sessions appear offline, change your status to Available and try again. -->
     <string name="remote_sign_out_msnp_error_you_singular_after_number"></string>
     <!-- Reference (en): This session has already ended. -->
     <string name="err_session_already_ended"></string>
@@ -3260,7 +3261,7 @@
     <!-- Reference (en): The notification server disconnected. -->
     <string name="err_ns_disconnected"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): You were logged out from another session. -->
+    <!-- Reference (en): You were signed out from another session. -->
     <string name="err_logged_out_other_session_you_singular"></string>
     <!-- Reference (en): The server is restarting. -->
     <string name="err_server_restarting"></string>
@@ -3285,10 +3286,10 @@
     <string name="chat_game_invite_sent"></string>
     <!-- Reference (en): Game invitation received: %1$s. -->
     <string name="chat_game_invite_received"></string>
-    <!-- Reference (en): The other person closed %1$s. -->
+    <!-- Reference (en): The other person stopped %1$s. -->
     <string name="chat_game_stopped_remote"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): You closed %1$s. -->
+    <!-- Reference (en): You stopped %1$s. -->
     <string name="chat_game_stopped_local_you_singular"></string>
     <!-- Reference (en): %1$s invitation declined. -->
     <string name="chat_game_declined"></string>
@@ -3399,7 +3400,7 @@
     <string name="msnp_response_exceeded_bytes_before_number"></string>
     <!-- Reference (en): bytes. -->
     <string name="msnp_response_exceeded_bytes_after_number"></string>
-    <!-- Reference (en): File transfer timed out. -->
+    <!-- Reference (en): Transfer timed out -->
     <string name="err_file_timed_out"></string>
     <!-- Reference (en): The selected file is unavailable. -->
     <string name="err_file_selected_unavailable"></string>

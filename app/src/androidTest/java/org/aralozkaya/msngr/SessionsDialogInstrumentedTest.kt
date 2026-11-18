@@ -45,7 +45,7 @@ class SessionsDialogInstrumentedTest {
         compose.onNodeWithText("This device").assertExists()
         val button = if (label == null) compose.onNodeWithTag(buttonTag) else compose.onNodeWithText(label)
         button.performScrollTo().performClick()
-        compose.onNodeWithText("Logging out…").assertDoesNotExist()
+        compose.onNodeWithText("Signing out…").assertDoesNotExist()
         compose.onNodeWithTag(buttonTag).assertIsEnabled()
         compose.onNodeWithTag(indicatorTag, useUnmergedTree = true).assertIsDisplayed()
             .assert(hasAnyAncestor(hasTestTag(buttonTag)))
@@ -60,11 +60,11 @@ class SessionsDialogInstrumentedTest {
     @Test fun currentSessionCanBeEndedIndividually() = checkAction("logout-session-phone",
         "logout-session-loading-phone", null, setOf("phone"), true)
     @Test fun otherSessionsExcludeCurrent() = checkAction("logout-other-sessions",
-        "logout-other-sessions-loading", "Log out other sessions", setOf("desktop", "laptop"), false)
+        "logout-other-sessions-loading", "Sign out other sessions", setOf("desktop", "laptop"), false)
     @Test fun allSessionsIncludeCurrent() = checkAction("logout-all-sessions",
-        "logout-all-sessions-loading", "Log out all sessions", setOf("phone", "desktop", "laptop"), true)
+        "logout-all-sessions-loading", "Sign out from everywhere", setOf("phone", "desktop", "laptop"), true)
     @Test fun largeTextKeepsBulkActionsReachable() = checkAction("logout-all-sessions",
-        "logout-all-sessions-loading", "Log out all sessions", setOf("phone", "desktop", "laptop"), true, fontScale = 2f)
+        "logout-all-sessions-loading", "Sign out from everywhere", setOf("phone", "desktop", "laptop"), true, fontScale = 2f)
 
     @Test fun failureKeepsDialogOpenAndAllowsRetry() {
         val result = CompletableDeferred<Result<Unit>>()
@@ -73,7 +73,7 @@ class SessionsDialogInstrumentedTest {
             SessionsDialog(active, { result.await() }, {}, {})
         } }
         compose.onNodeWithTag("logout-session-phone").performScrollTo().performClick()
-        compose.onNodeWithText("Logging out…").assertDoesNotExist()
+        compose.onNodeWithText("Signing out…").assertDoesNotExist()
         compose.onNodeWithTag("logout-session-phone").assertIsEnabled()
         compose.onNodeWithTag("logout-session-loading-phone", useUnmergedTree = true).assertIsDisplayed()
             .assert(hasAnyAncestor(hasTestTag("logout-session-phone")))
@@ -89,7 +89,7 @@ class SessionsDialogInstrumentedTest {
         compose.onNodeWithText("Logout rejected").performScrollTo().assertExists()
         compose.onNodeWithText("Close").assertIsEnabled()
         compose.runOnIdle { active = listOf(sessions.first()) }
-        compose.onNodeWithText("Log out all sessions").assertDoesNotExist()
+        compose.onNodeWithText("Sign out from everywhere").assertDoesNotExist()
         compose.onNodeWithTag("logout-session-phone").performScrollTo().assertIsEnabled()
     }
 }

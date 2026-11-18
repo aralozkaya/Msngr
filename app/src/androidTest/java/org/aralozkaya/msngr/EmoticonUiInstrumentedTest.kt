@@ -239,7 +239,7 @@ class EmoticonUiInstrumentedTest {
         }
 
         compose.onNodeWithText("Original :D").assertExists()
-        compose.onNodeWithContentDescription("Open-mouthed").assertExists()
+        compose.onNodeWithContentDescription("Open-mouthed smile").assertExists()
         compose.onNodeWithText("Modern 😀").assertExists()
     }
 

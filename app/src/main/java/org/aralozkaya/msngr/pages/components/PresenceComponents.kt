@@ -81,7 +81,7 @@ fun PresenceLabel(presence: Presence) {
                 .background(presenceColor(presence)),
         )
         Text(
-            text = presence.label,
+            text = presence.displayLabel(),
             style = MaterialTheme.typography.labelLarge,
         )
     }

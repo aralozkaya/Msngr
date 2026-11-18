@@ -90,7 +90,7 @@
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="in_app_notification_type_nudges_plural">Titreşimler</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="in_app_notification_type_contact_requests_plural">Bağlantı istekleri</string>
+    <string name="in_app_notification_type_contact_requests_plural">Kişi istekleri</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="in_app_notification_type_group_invitations_plural">Grup davetleri</string>
     <string name="group_role_owner">Sahip</string>
@@ -116,16 +116,16 @@
     <string name="requests_title">İstekler &amp; davetler</string>
     <string name="requests_empty">Bekleyen istek veya davet yok</string>
     <string name="requests_refresh">Yenile</string>
-    <string name="blocked_contacts_title">Engellenen bağlantılar</string>
-    <string name="blocked_contacts_empty">Engellenmiş bağlantı yok</string>
-    <string name="blocked_contacts_refreshing">Engellenmiş bağlantılar yenileniyor...</string>
-    <string name="blocked_contacts_refresh_failed">Engellenmiş bağlantılar yenilenemedi. Lütfen tekrar deneyin.</string>
+    <string name="blocked_contacts_title">Engellenen kişiler</string>
+    <string name="blocked_contacts_empty">Engellenen kişi yok</string>
+    <string name="blocked_contacts_refreshing">Engellenen kişiler yenileniyor…</string>
+    <string name="blocked_contacts_refresh_failed">Engellenen kişiler yenilenemedi. Lütfen tekrar deneyin.</string>
     <string name="group_block_action">Grubu engelle</string>
     <string name="group_unblock_action">Grubun engellini kaldır</string>
     <string name="group_block_title">Grup engellensin mi?</string>
     <string name="group_unblock_title">Grubun engeli kaldırılsın mı?</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="group_block_message_you_singular">%1$s tarafından mesaj almayı kesmek ister misiniz? Üye olmaya devam edeceksiniz. Sonrasında engellenmiş bağlantılar sayfasından bu grubun engelini kaldırabilirsiniz.</string>
+    <string name="group_block_message_you_singular">%1$s tarafından mesaj almayı kesmek ister misiniz? Üye olmaya devam edeceksiniz. Sonrasında Engellenen kişiler bölümünden bu grubun engelini kaldırabilirsiniz.</string>
     <string name="group_unblock_message">%1$s tarafından mesaj almaya devam etmek ister misiniz?</string>
     <string name="group_block_busy">Grup güncelleniyor...</string>
     <string name="group_block_failed">Engellenmiş gruplar güncellenemedi. Lütfen tekrar deneyin.</string>
@@ -153,7 +153,7 @@
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="pending_items_badge_plural_after_number">bekleyen</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="contact_requests_title_plural">Bağlantı istekleri</string>
+    <string name="contact_requests_title_plural">Kişi istekleri</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="contact_request_message_you_singular">Sizi Messenger\'a eklemek istiyor.</string>
     <string name="contact_request_accept">Kabul et</string>
@@ -162,15 +162,15 @@
     <string name="contact_request_set_default">Varsayılan olarak ayarla</string>
     <string name="contact_request_later">Sonra karar ver</string>
     <string name="contact_request_ok">Tamam</string>
-    <string name="contact_request_busy">İsteğe cevap veriliyor...</string>
-    <string name="contact_request_failed">Bağlantı isteğine cevap verilemedi. Lütfen tekrar deneyin.</string>
+    <string name="contact_request_busy">İsteğe yanıt veriliyor…</string>
+    <string name="contact_request_failed">Kişi isteğine yanıt verilemedi. Lütfen tekrar deneyin.</string>
     <string name="contact_request_mock_hint">Temsili istek · Bir bağlantı kurulmayacak ve hiçbir ağ paketi gönderilmeyecek.</string>
     <string name="request_optional_message">Mesaj (isteğe bağlı)</string>
     <string name="requests_group_invitations_unavailable">Grup davetleri uygun değil.</string>
 
     <!-- Notifications and connection service -->
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="notification_channel_contact_requests_plural">Bağlantı istekleri</string>
+    <string name="notification_channel_contact_requests_plural">Kişi istekleri</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="notification_channel_contact_requests_description_you_singular">Çevrim dışı olduğunuz zamanlar dahil sizi ekleyen kişiler</string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
@@ -370,7 +370,7 @@
     <string name="contact_erase_history_confirm">Sil</string>
     <string name="contact_block_dialog_title">Kişi engellensin mi?</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="contact_block_dialog_message_you_singular">%1$s adlı kişiyi engellemek istediğinizden emin misiniz? Engelini daha sonra Engellenen bağlantılar bölümünden kaldırabilirsiniz.</string>
+    <string name="contact_block_dialog_message_you_singular">%1$s adlı kişiyi engellemek istediğinizden emin misiniz? Engelini daha sonra Engellenen kişiler bölümünden kaldırabilirsiniz.</string>
     <string name="contacts_search_placeholder">Ara</string>
     <string name="contacts_search_clear">Aramayı temizle</string>
     <string name="contacts_sort_action">Sırala</string>
@@ -378,7 +378,8 @@
     <string name="contacts_section_groups_plural">Gruplar</string>
     <string name="contacts_section_other">Diğer Kişiler</string>
     <string name="contacts_block_action">Engelle</string>
-    <string name="contacts_groups_empty_search">Aramanızla eşleşen grup yok.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contacts_groups_empty_search_you_singular">Aramanızla eşleşen grup yok.</string>
     <string name="contacts_groups_empty_online">Gösterilecek çevrim içi grup yok</string>
     <string name="contacts_groups_empty">Gösterilecek grup yok</string>
     <string name="contacts_empty_search">Kişi bulunamadı</string>
@@ -1126,7 +1127,7 @@
     <string name="wink_builtin_heart">Kalp</string>
     <string name="wink_builtin_kiss">Öpücük</string>
     <string name="wink_builtin_knock">Kapı Çalma</string>
-    <string name="wink_builtin_laughing_girl">Gülen Kız</string>
+    <string name="wink_builtin_laughing_girl">Gülme</string>
     <string name="wink_builtin_lightbulb">Ampul</string>
     <string name="wink_builtin_silly_face">Komik Surat</string>
     <string name="wink_builtin_ufo">UFO</string>
@@ -1575,7 +1576,7 @@
     <string name="err_contact_invalid_email">Geçerli bir anlık mesajlaşma e-posta adresi girin.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="err_contact_add_self_you_singular">Kendinizi kişi olarak ekleyemezsiniz.</string>
-    <string name="err_contact_blocked_unblock_first">Bu kişi engelli. Önce Engellenen bağlantılar bölümünden engelini kaldırın.</string>
+    <string name="err_contact_blocked_unblock_first">Bu kişi engelli. Önce Engellenen kişiler bölümünden engelini kaldırın.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="err_contact_already_exists_you_singular">Bu kişi zaten kişilerinizde kayıtlı.</string>
     <string name="err_history_erase_failed">Bu kişinin kayıtlı geçmişi silinemedi. Lütfen tekrar deneyin.</string>
@@ -1637,15 +1638,15 @@
     <string name="err_wink_not_cached_send_you_singular">Bu göz kırpması artık önbellekte değil. Tekrar göndermek için kitaplığınıza ekleyin.</string>
     <string name="err_photo_original_request_failed">Orijinal fotoğraf istenemedi.</string>
     <string name="err_photo_contact_unavailable">Bu kişi fotoğraf paylaşımı için uygun değil.</string>
-    <string name="err_photo_client_unsupported">Bu kişinin istemcisi fotoğraf paylaşımını desteklemiyor.</string>
+    <string name="err_photo_client_unsupported">Bu kişi, Messenger\'ın fotoğraf paylaşımını desteklemeyen bir sürümünü kullanıyor.</string>
     <string name="err_photo_share_ended">Bu fotoğraf paylaşımı sona erdi.</string>
     <string name="err_game_session_ended">Bu oyun oturumu sona erdi.</string>
     <string name="err_game_contact_unavailable">Bu kişi oyunlar ve etkinlikler için uygun değil.</string>
-    <string name="err_game_client_unsupported">Bu kişinin istemcisi oyunları ve etkinlikleri desteklemiyor.</string>
+    <string name="err_game_client_unsupported">Bu kişi, Messenger\'ın oyunları ve etkinlikleri desteklemeyen bir sürümünü kullanıyor.</string>
     <string name="err_file_sign_in_required">Dosya paylaşmadan önce oturum açın.</string>
     <string name="err_file_group_unsupported">Dosya aktarımları yalnızca bire bir sohbetlerde kullanılabilir.</string>
     <string name="err_file_contact_unavailable">Bu kişi dosya aktarımları için uygun değil.</string>
-    <string name="err_file_client_unsupported">Bu kişinin istemcisi dosya aktarımlarını desteklemiyor.</string>
+    <string name="err_file_client_unsupported">Bu kişi, Messenger\'ın Dosya Aktarımını desteklemeyen bir sürümünü kullanıyor.</string>
     <string name="err_file_offer_ended">Bu dosya teklifi sona erdi.</string>
     <string name="err_voice_group_unsupported">Ses klipleri grup sohbetlerinde desteklenmez.</string>
     <string name="err_voice_require_online">Ses klipleri için kişinin çevrim içi olması gerekir.</string>
@@ -1658,13 +1659,13 @@
     <string name="err_message_blocked_contact">Engellenen bir kişiye mesaj gönderilemez.</string>
     <string name="err_handwriting_group_unsupported">Tüm çevrim içi grup üyeleri el yazısını desteklemelidir.</string>
     <string name="err_handwriting_require_online">El yazısı mesajları için kişinin çevrim içi olması gerekir.</string>
-    <string name="err_handwriting_client_unsupported">Bu kişinin istemcisi el yazısını desteklemiyor.</string>
+    <string name="err_handwriting_client_unsupported">Bu kişi, Messenger\'ın el yazısını desteklemeyen bir sürümünü kullanıyor.</string>
     <string name="err_message_send_failed">Mesaj gönderilemedi.</string>
-    <string name="err_nudge_offline">Çevrim dışı bir kişiye titreşim gönderilemez.</string>
+    <string name="err_nudge_offline">Bu kişi çevrimdışı görünüyor, bu durumda ona titreşim gönderilemez.</string>
     <string name="err_nudge_require_online">Titreşim göndermek için çevrim içi bir kişi gerekir.</string>
     <string name="err_nudge_blocked">Engellenen bir kişiye titreşim gönderilemez.</string>
     <string name="err_nudge_group_unsupported">Tüm çevrim içi grup üyeleri titreşimleri desteklemelidir.</string>
-    <string name="err_nudge_client_unsupported">Bu kişinin istemcisi titreşimleri desteklemiyor.</string>
+    <string name="err_nudge_client_unsupported">Bu kişi, Messenger\'ın bu özelliği desteklemeyen bir sürümünü kullanıyor.</string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="nudge_rate_limit_singular_you_singular_before_number">Bu kadar sık titreşim gönderemezsiniz. Lütfen</string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
@@ -1711,8 +1712,8 @@
     <string name="err_group_update_session_ended">Grup güncellenirken bu oturum sona erdi.</string>
     <string name="err_requests_sign_in">Kişi isteklerini yüklemek için oturum açın.</string>
     <string name="err_requests_session_ended">İstekler yüklenirken bu oturum sona erdi.</string>
-    <string name="err_blocked_sign_in">Engellenen bağlantıları yüklemek için oturum açın.</string>
-    <string name="err_blocked_session_ended">Engellenen bağlantılar yüklenirken bu oturum sona erdi.</string>
+    <string name="err_blocked_sign_in">Engellenen kişileri yüklemek için oturum açın.</string>
+    <string name="err_blocked_session_ended">Engellenen kişiler yüklenirken bu oturum sona erdi.</string>
     <string name="err_request_respond_sign_in">Bir kişi isteğine yanıt vermeden önce oturum açın.</string>
     <string name="err_request_accept_cannot_block">Kabul edilen bir kişi engellenemez.</string>
     <string name="err_request_respond_session_ended">İsteğe yanıt verilirken bu oturum sona erdi.</string>
@@ -1753,9 +1754,9 @@
     <string name="chat_photo_invite_received">Fotoğraf paylaşımı daveti alındı.</string>
     <string name="chat_game_invite_sent">Oyun daveti gönderildi: %1$s.</string>
     <string name="chat_game_invite_received">Oyun daveti alındı: %1$s.</string>
-    <string name="chat_game_stopped_remote">Diğer kişi %1$s oyununu kapattı.</string>
+    <string name="chat_game_stopped_remote">Diğer kişi %1$s etkinliğini durdurdu.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="chat_game_stopped_local_you_singular">%1$s oyununu kapattınız.</string>
+    <string name="chat_game_stopped_local_you_singular">%1$s etkinliğini durdurdunuz.</string>
     <string name="chat_game_declined">%1$s daveti reddedildi.</string>
     <string name="chat_game_failed">%1$s başarısız oldu.</string>
     <string name="err_msnp_rejected_credentials">Topluluk sunucusu bu kimlik bilgilerini reddetti.</string>

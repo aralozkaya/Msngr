@@ -163,7 +163,7 @@ fun LoggedInUserProfileCard(
                             ) {
                                 Presence.entries.forEachIndexed { index, presence ->
                                     DropdownMenuItem(
-                                        text = { Text(presence.ownStatusLabel()) },
+                                        text = { Text(presence.displayOwnStatusLabel()) },
                                         onClick = {
                                             presenceMenuExpanded = false
                                             onPresenceSelected(presence)

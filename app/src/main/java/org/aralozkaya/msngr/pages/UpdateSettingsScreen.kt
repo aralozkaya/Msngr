@@ -249,29 +249,29 @@ fun UpdateSettingsScreen(
             }
         }
         item("preferences") {
-            Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                ExpandableSettingsGroup(expanded = state.supported && settings.enabled, master = { shapes ->
-                    SegmentedListItem(checked = settings.enabled,
-                        onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
-                        shapes = shapes,
-                        trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
-                        supportingContent = { Text(stringResource(R.string.update_automatic_description_you_singular)) },
-                        modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
-                }) { shapes, colors ->
-                    SegmentedListItem(onClick = { intervalDialog = true },
-                        shapes = shapes, colors = colors,
-                        supportingContent = { Text(settings.interval.displayLabel()) },
-                        modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
-                }
-                SegmentedListItem(checked = settings.includePrereleases,
-                    onCheckedChange = { manager.configure(settings.copy(includePrereleases = it)); manager.checkManually() },
-                    enabled = state.supported && !state.checking && !state.downloading,
-                    shapes = ListItemDefaults.segmentedShapes(0, 1),
-                    trailingContent = { Switch(checked = settings.includePrereleases, onCheckedChange = null,
-                        enabled = state.supported && !state.checking && !state.downloading) },
-                    supportingContent = { Text(stringResource(R.string.update_prerelease_description)) },
-                    modifier = Modifier.testTag("include-prereleases"), content = { Text(stringResource(R.string.update_include_prereleases)) })
+            ExpandableSettingsGroup(expanded = state.supported && settings.enabled, master = { shapes ->
+                SegmentedListItem(checked = settings.enabled,
+                    onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
+                    shapes = shapes,
+                    trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
+                    supportingContent = { Text(stringResource(R.string.update_automatic_description_you_singular)) },
+                    modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
+            }) { shapes, colors ->
+                SegmentedListItem(onClick = { intervalDialog = true },
+                    shapes = shapes, colors = colors,
+                    supportingContent = { Text(settings.interval.displayLabel()) },
+                    modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
             }
+        }
+        item("include-prereleases") {
+            SegmentedListItem(checked = settings.includePrereleases,
+                onCheckedChange = { manager.configure(settings.copy(includePrereleases = it)); manager.checkManually() },
+                enabled = state.supported && !state.checking && !state.downloading,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                trailingContent = { Switch(checked = settings.includePrereleases, onCheckedChange = null,
+                    enabled = state.supported && !state.checking && !state.downloading) },
+                supportingContent = { Text(stringResource(R.string.update_prerelease_description)) },
+                modifier = Modifier.testTag("include-prereleases"), content = { Text(stringResource(R.string.update_include_prereleases)) })
         }
         item("schedule-note") { Text(stringResource(R.string.update_schedule_note), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall) }
         item("releases-link") {

@@ -5,12 +5,31 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
+import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.pages.components.LoggedInUserProfileCard
+import org.aralozkaya.msngr.pages.components.PresenceLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 class LocaleSupportInstrumentedTest {
+
+    @get:Rule
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val baseContext: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -59,6 +78,43 @@ class LocaleSupportInstrumentedTest {
         assertEquals("İptal", tr.getString(R.string.common_cancel))
         assertEquals("Siz", tr.getString(R.string.common_you_singular))
         assertEquals("?", tr.getString(R.string.shortcut_avatar_fallback_initial))
+        assertEquals("Kişi", tr.getString(R.string.common_contact_singular))
+        assertEquals("Engellenen kişiler", tr.getString(R.string.blocked_contacts_title))
+        assertEquals("Kişi istekleri", tr.getString(R.string.contact_requests_title_plural))
+    }
+
+    @Test fun mainScreenStatusDropdownAndPresenceLabelAreTranslatedInTurkish() {
+        val tr = localizedContext("tr")
+        compose.setContent {
+            CompositionLocalProvider(
+                LocalContext provides tr,
+                LocalConfiguration provides tr.resources.configuration,
+                LocalResources provides tr.resources,
+            ) {
+                MaterialTheme {
+                    Column {
+                        LoggedInUserProfileCard(
+                            profile = UserProfileSnapshot(
+                                username = "Tester",
+                                email = "user@example.test",
+                                presence = Presence.Online,
+                                statusMessage = "",
+                            ),
+                            onPresenceSelected = {},
+                            onEditProfile = {},
+                        )
+                        PresenceLabel(Presence.Offline)
+                    }
+                }
+            }
+        }
+
+        compose.onNodeWithText("Uygun").assertIsDisplayed().performClick()
+        assertEquals(2, compose.onAllNodesWithText("Uygun").fetchSemanticsNodes().size)
+        compose.onNodeWithText("Meşgul").assertIsDisplayed()
+        compose.onNodeWithText("Uzakta").assertIsDisplayed()
+        compose.onNodeWithText("Çevrim dışı görün").assertIsDisplayed()
+        compose.onNodeWithText("Çevrim dışı").assertIsDisplayed()
     }
 
     @Test fun splitNumberSentencesAssembleCleanlyAcrossLocales() {

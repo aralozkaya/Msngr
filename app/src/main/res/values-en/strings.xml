@@ -69,7 +69,7 @@
     <string name="emoticon_search_empty">No emoticons found</string>
 
     <!-- Presence and enums -->
-    <string name="presence_online">Online</string>
+    <string name="presence_online">Available</string>
     <string name="presence_busy">Busy</string>
     <string name="presence_away">Away</string>
     <string name="presence_offline">Offline</string>
@@ -159,7 +159,7 @@
     <string name="contact_request_accept">Accept</string>
     <string name="contact_request_decline">Decline</string>
     <string name="contact_request_block">Block invitations from this person</string>
-    <string name="contact_request_set_default">Set as default</string>
+    <string name="contact_request_set_default">Set default</string>
     <string name="contact_request_later">Decide later</string>
     <string name="contact_request_ok">OK</string>
     <string name="contact_request_busy">Responding to request…</string>
@@ -242,9 +242,9 @@
     <string name="chat_message_clip_label_singular">Message</string>
     <string name="chat_message_copied">Message copied</string>
     <string name="empty_conversation_warning">Don\'t include information like passwords or credit card numbers in an instant message</string>
-    <string name="chat_contact_unavailable">%1$s is %2$s and may not respond</string>
+    <string name="chat_contact_unavailable">%1$s is %2$s and may not reply</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="chat_contact_offline_you_singular">%1$s is offline. Messages you send will be delivered when they sign in.</string>
+    <string name="chat_contact_offline_you_singular">%1$s appears to be offline. Messages you send will be delivered when they sign in.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="chat_appear_offline_you_singular">Your status is set to Appear offline. You can communicate with your contacts but they will know you are appearing offline.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
@@ -301,14 +301,14 @@
 
     <!-- Chat system messages -->
     <string name="chat_handwriting_message">Handwriting</string>
-    <string name="chat_voice_clip_message">Voice clip</string>
+    <string name="chat_voice_clip_message">Voice Clip</string>
     <string name="chat_wink_message">Wink: %1$s</string>
     <string name="chat_emotion_sound_message">Sent a sound: %1$s</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="chat_nudge_sent_you_singular">You sent a nudge.</string>
+    <string name="chat_nudge_sent_you_singular">You have just sent a nudge.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="chat_nudge_received_you_singular">You received a nudge!</string>
-    <string name="chat_nudge_received_from">%1$s sent a nudge!</string>
+    <string name="chat_nudge_received_from">%1$s has just sent a nudge.</string>
     <string name="chat_nudge_failed">Nudge could not be sent.</string>
     <string name="chat_nudge_failed_with_reason">Nudge could not be sent: %1$s</string>
     <string name="chat_file_message">File: %1$s</string>
@@ -378,7 +378,8 @@
     <string name="contacts_section_groups_plural">Groups</string>
     <string name="contacts_section_other">Other Contacts</string>
     <string name="contacts_block_action">Block</string>
-    <string name="contacts_groups_empty_search">No groups found</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contacts_groups_empty_search_you_singular">No groups match your search.</string>
     <string name="contacts_groups_empty_online">No online groups to show</string>
     <string name="contacts_groups_empty">No groups to show</string>
     <string name="contacts_empty_search">No contacts found</string>
@@ -386,7 +387,7 @@
     <string name="contacts_empty_search_subtitle">Try a different name or email.</string>
     <string name="contacts_empty_offline_subtitle">Offline contacts are hidden.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="contacts_empty_list_subtitle_you_singular">Your contact list is empty.</string>
+    <string name="contacts_empty_list_subtitle_you_singular">You don\'t have anyone in your contact list yet.</string>
     <string name="contacts_section_expanded">Expanded</string>
     <string name="contacts_section_collapsed">Collapsed</string>
     <string name="contacts_section_collapse">Collapse %1$s</string>
@@ -421,7 +422,7 @@
     <string name="group_count_separator">%1$s · %2$s</string>
     <string name="group_search_members_placeholder">Search members</string>
     <string name="group_edit_profile_action">Edit profile</string>
-    <string name="group_members_empty_none">No member details available yet.</string>
+    <string name="group_members_empty_none">There are no members in this group.</string>
     <string name="group_members_empty_search">No members found.</string>
     <string name="group_options_description">Group options</string>
     <string name="group_invite_contacts">Invite contacts</string>
@@ -446,7 +447,7 @@
     <string name="group_create_action">Create</string>
     <string name="group_create_title">Create a group</string>
     <string name="group_invite_title">Invite members</string>
-    <string name="group_choose_contacts_title">Choose contacts</string>
+    <string name="group_choose_contacts_title">Select Contacts</string>
     <string name="group_choose_contacts_empty">No contacts available to invite.</string>
 
     <!-- Portal and home feed -->
@@ -456,7 +457,7 @@
     <string name="portal_whats_new_title">What\'s new</string>
     <string name="portal_whats_new_refresh">Refresh What\'s new</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="portal_whats_new_empty_you_singular">No recent updates from your contacts or service.</string>
+    <string name="portal_whats_new_empty_you_singular">No new activities from your contacts</string>
     <string name="portal_whats_new_unavailable">Connect to a live Messenger service to see What\'s new, Today, and sites.</string>
     <string name="portal_ad_label">Advertisement</string>
     <string name="portal_today_title">Today</string>
@@ -481,8 +482,8 @@
     <string name="main_open_profile">Open profile</string>
     <string name="main_open_menu">Open menu</string>
     <string name="main_simulate_reconnection">Simulate reconnection</string>
-    <string name="main_log_out">Log out</string>
-    <string name="main_log_out_ellipsis">Log out…</string>
+    <string name="main_log_out">Sign out</string>
+    <string name="main_log_out_ellipsis">Sign out…</string>
     <!-- Note: singular text variant -->
     <string name="main_active_sessions_singular_before_number"></string>
     <!-- Note: singular text variant -->
@@ -491,25 +492,25 @@
     <string name="main_active_sessions_plural_before_number"></string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="main_active_sessions_plural_after_number">active sessions</string>
-    <string name="main_log_out_dialog_title">Log out?</string>
+    <string name="main_log_out_dialog_title">Sign out?</string>
     <string name="main_log_out_dialog_message">This ends the current session. Remembered credentials stay saved on this device.</string>
     <string name="main_count_badge_cap_before_number"></string>
     <string name="main_count_badge_cap_after_number">+</string>
     <string name="mock_server_banner">Mock server active · Test data only</string>
     <!-- Note: singular text variant -->
-    <string name="sessions_logged_out_singular">%1$s was logged out.</string>
+    <string name="sessions_logged_out_singular">%1$s was signed out.</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="sessions_logged_out_plural">The other sessions were logged out.</string>
+    <string name="sessions_logged_out_plural">The other sessions were signed out.</string>
     <string name="sessions_title">Active sessions</string>
-    <string name="sessions_description">Choose where to log out. Remembered credentials stay saved on this device.</string>
+    <string name="sessions_description">Choose where to sign out. Remembered credentials stay saved on this device.</string>
     <string name="sessions_meta_separator">%1$s · %2$s</string>
-    <string name="sessions_log_out_this_device">Log out of this device</string>
-    <string name="sessions_log_out_device_format">Log out of %1$s, session %2$s</string>
-    <string name="sessions_logging_out">Logging out…</string>
-    <string name="sessions_log_out_action">Log out</string>
-    <string name="sessions_log_out_others">Log out other sessions</string>
-    <string name="sessions_log_out_all">Log out all sessions</string>
-    <string name="sessions_logout_not_confirmed">%1$s did not confirm logout. Please try again.</string>
+    <string name="sessions_log_out_this_device">Sign out of this device</string>
+    <string name="sessions_log_out_device_format">Sign out of %1$s, session %2$s</string>
+    <string name="sessions_logging_out">Signing out…</string>
+    <string name="sessions_log_out_action">Sign out</string>
+    <string name="sessions_log_out_others">Sign out other sessions</string>
+    <string name="sessions_log_out_all">Sign out from everywhere</string>
+    <string name="sessions_logout_not_confirmed">%1$s did not confirm sign-out. Please try again.</string>
     <string name="account_provider_escargot">Escargot</string>
     <string name="account_provider_crosstalk">CrossTalk</string>
     <string name="account_provider_custom">Custom</string>
@@ -518,7 +519,7 @@
     <string name="login_loading_storage">Opening secure storage…</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="login_error_service_default_you_singular">The selected community service could not sign you in.</string>
-    <string name="login_dialog_title_logged_out">Logged out</string>
+    <string name="login_dialog_title_logged_out">Signed out</string>
     <string name="login_dialog_title_error">Couldn’t sign in</string>
     <string name="login_welcome_headline">Welcome to Msngr</string>
     <string name="login_welcome_subtitle_before_number">Re-live the</string>
@@ -529,7 +530,7 @@
     <string name="login_remember_me">Remember me</string>
     <string name="login_auto_sign_in">Sign me in automatically</string>
     <string name="login_sign_in_as">Sign in as</string>
-    <string name="login_choose_status">Choose login status</string>
+    <string name="login_choose_status">Choose sign-in status</string>
     <string name="login_use_mock_server">Use mock server</string>
     <string name="login_signing_in">Signing in</string>
     <string name="login_sign_in">Sign in</string>
@@ -638,12 +639,12 @@
 
     <!-- In-app notification settings -->
     <string name="notification_custom_activity_title">Custom notifications</string>
-    <string name="notification_silence_offline_title">Silence push notifications when not Online</string>
+    <string name="notification_silence_offline_title">Silence push notifications when not Available</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="notification_silence_offline_summary_you_singular">Deliver non-chat push notifications silently when your status is Busy, Away, or Appear offline.</string>
     <string name="notification_silence_messages_title">Include contact and group messages</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="notification_silence_messages_summary_you_singular">Also silence contact and group message push notifications when your status is not Online.</string>
+    <string name="notification_silence_messages_summary_you_singular">Also silence contact and group message push notifications when your status is not Available.</string>
     <string name="notification_in_app_title">In-app notifications</string>
     <string name="notification_in_app_summary">Banners and vibration while Msngr is open.</string>
     <string name="notification_options_description">Notification options</string>
@@ -779,7 +780,7 @@
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="appearance_color_mode_dynamic_summary_you_singular">Colors from your device wallpaper</string>
     <string name="appearance_color_mode_scenes_summary">Classic scenes with matching app colors</string>
-    <string name="appearance_choose_scene">Choose a scene</string>
+    <string name="appearance_choose_scene">Select a scene</string>
     <string name="appearance_show_scene_in_chats">Show scene in chats</string>
     <string name="appearance_show_scene_in_chats_summary">Show the scene behind the name at the top of each chat.</string>
     <string name="appearance_dark_mode_tint">Dark mode tint</string>
@@ -931,8 +932,8 @@
     <string name="ink_pen_label_format">Pen (%1$s)</string>
     <string name="ink_eraser_active_label_format">Eraser (%1$s, active)</string>
     <string name="ink_eraser_label_format">Eraser (%1$s)</string>
-    <string name="ink_undo_stroke">Undo stroke</string>
-    <string name="ink_redo_stroke">Redo stroke</string>
+    <string name="ink_undo_stroke">Ink undo</string>
+    <string name="ink_redo_stroke">Ink redo</string>
     <string name="ink_color_selected_description">Ink color (%1$s)</string>
     <string name="ink_grid_label_format">Grid (%1$s)</string>
     <string name="ink_more_tools_description">More handwriting tools</string>
@@ -946,9 +947,9 @@
     <string name="ink_message_strokes_plural_after_number">strokes)</string>
 
     <!-- Voice clips -->
-    <string name="voice_clip_title">Voice clip</string>
-    <string name="voice_clip_hold_to_record">Hold the microphone to record a voice clip.</string>
-    <string name="voice_clip_record_failed">Voice clip recording failed.</string>
+    <string name="voice_clip_title">Voice Clip</string>
+    <string name="voice_clip_hold_to_record">To record a Voice Clip, hold down this button. Release the button to send the message.</string>
+    <string name="voice_clip_record_failed">The Voice Clip could not be recorded.</string>
     <string name="voice_clip_mic_permission">Allow microphone access to record a voice clip.</string>
     <string name="voice_clip_send_failed">Voice clip could not be sent.</string>
     <string name="voice_clip_send_action">Send voice clip</string>
@@ -975,7 +976,7 @@
     <string name="voice_clip_mic_start_failed">Microphone could not be started.</string>
     <string name="voice_clip_mic_recording_failed">Microphone recording failed.</string>
     <string name="voice_clip_audio_playback_failed">Audio playback failed.</string>
-    <string name="voice_clip_cant_play">Voice clip could not be played.</string>
+    <string name="voice_clip_cant_play">There was a problem playing the Voice Clip.</string>
     <string name="voice_clip_stop_description">Stop voice clip</string>
     <string name="voice_clip_play_description">Play voice clip</string>
     <string name="voice_clip_downloading">Downloading voice clip…</string>
@@ -1005,7 +1006,7 @@
     <string name="emotion_sound_too_long">The emotion sound is too long.</string>
     <string name="emotion_sound_play_failed">The emotion sound could not be played.</string>
     <string name="emotion_sound_account_changed">The selected account changed. Open the sound picker again.</string>
-    <string name="emotion_sound_generic_play_failed">The sound could not be played.</string>
+    <string name="emotion_sound_generic_play_failed">Messenger is unable to play the selected sound.</string>
     <string name="emotion_sound_load_failed">Online sounds could not be loaded.</string>
     <string name="emotion_sound_search_hint">Search sounds</string>
     <string name="emotion_sound_search_clear">Clear sound search</string>
@@ -1103,7 +1104,7 @@
     <string name="wink_too_large">Wink package is too large.</string>
     <string name="wink_too_many_redirects">Too many download redirects.</string>
     <string name="wink_not_cached">This wink is no longer cached.</string>
-    <string name="wink_play_failed">This wink could not be played.</string>
+    <string name="wink_play_failed">There was a problem playing the wink.</string>
     <string name="wink_close_player">Close wink</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="wink_title_plural">Winks</string>
@@ -1126,10 +1127,10 @@
     <string name="wink_builtin_heart">Heart</string>
     <string name="wink_builtin_kiss">Kiss</string>
     <string name="wink_builtin_knock">Knock</string>
-    <string name="wink_builtin_laughing_girl">Laughing Girl</string>
+    <string name="wink_builtin_laughing_girl">Laugh</string>
     <string name="wink_builtin_lightbulb">Lightbulb</string>
     <string name="wink_builtin_silly_face">Silly Face</string>
-    <string name="wink_builtin_ufo">Ufo</string>
+    <string name="wink_builtin_ufo">UFO</string>
     <string name="wink_builtin_water_balloon">Water Balloon</string>
 
     <!-- File transfers, photo sharing, and storage -->
@@ -1176,7 +1177,7 @@
     <string name="file_sharing_receive_complete">Receive complete</string>
     <string name="file_sharing_declined">File declined</string>
     <string name="file_sharing_canceled">File transfer canceled</string>
-    <string name="file_sharing_failed">File transfer failed</string>
+    <string name="file_sharing_failed">Error in Transfer</string>
     <string name="file_sharing_save_as">Save as</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="file_sharing_no_open_app_you_singular">No app could open this file. You can save it first.</string>
@@ -1397,31 +1398,31 @@
 
     <!-- Built-in 79 emoticon names -->
     <string name="emoticon_smile">Smile</string>
-    <string name="emoticon_open_mouthed">Open-mouthed</string>
-    <string name="emoticon_surprised">Surprised</string>
-    <string name="emoticon_tongue_out">Tongue out</string>
+    <string name="emoticon_open_mouthed">Open-mouthed smile</string>
+    <string name="emoticon_surprised">Surprised smile</string>
+    <string name="emoticon_tongue_out">Smile with tongue out</string>
     <!-- Note: singular text variant -->
-    <string name="emoticon_wink_singular">Wink</string>
-    <string name="emoticon_sad">Sad</string>
-    <string name="emoticon_confused">Confused</string>
-    <string name="emoticon_disappointed">Disappointed</string>
-    <string name="emoticon_crying">Crying</string>
-    <string name="emoticon_embarrassed">Embarrassed</string>
-    <string name="emoticon_hot">Hot</string>
-    <string name="emoticon_angry">Angry</string>
+    <string name="emoticon_wink_singular">Winking smile</string>
+    <string name="emoticon_sad">Sad smile</string>
+    <string name="emoticon_confused">Confused smile</string>
+    <string name="emoticon_disappointed">Disappointed smile</string>
+    <string name="emoticon_crying">Crying face</string>
+    <string name="emoticon_embarrassed">Embarrassed smile</string>
+    <string name="emoticon_hot">Hot smile</string>
+    <string name="emoticon_angry">Angry smile</string>
     <string name="emoticon_angel">Angel</string>
     <string name="emoticon_devil">Devil</string>
-    <string name="emoticon_dont_tell_anyone">Don\'t tell anyone</string>
-    <string name="emoticon_baring_teeth">Baring teeth</string>
-    <string name="emoticon_nerd">Nerd</string>
-    <string name="emoticon_sarcastic">Sarcastic</string>
-    <string name="emoticon_secret_telling">Secret telling</string>
-    <string name="emoticon_sick">Sick</string>
-    <string name="emoticon_i_dont_know">I don\'t know</string>
-    <string name="emoticon_thinking">Thinking</string>
-    <string name="emoticon_party">Party</string>
-    <string name="emoticon_eye_rolling">Eye-rolling</string>
-    <string name="emoticon_sleepy">Sleepy</string>
+    <string name="emoticon_dont_tell_anyone">Don\'t tell anyone smile</string>
+    <string name="emoticon_baring_teeth">Baring teeth smile</string>
+    <string name="emoticon_nerd">Nerd smile</string>
+    <string name="emoticon_sarcastic">Sarcastic smile</string>
+    <string name="emoticon_secret_telling">Secret telling smile</string>
+    <string name="emoticon_sick">Sick smile</string>
+    <string name="emoticon_i_dont_know">I don\'t know smile</string>
+    <string name="emoticon_thinking">Thinking smile</string>
+    <string name="emoticon_party">Party smile</string>
+    <string name="emoticon_eye_rolling">Eye-rolling smile</string>
+    <string name="emoticon_sleepy">Sleepy smile</string>
     <string name="emoticon_coffee_cup">Coffee cup</string>
     <string name="emoticon_thumbs_up">Thumbs up</string>
     <string name="emoticon_thumbs_down">Thumbs down</string>
@@ -1450,9 +1451,9 @@
     <string name="emoticon_star">Star</string>
     <string name="emoticon_email">E-mail</string>
     <string name="emoticon_clock">Clock</string>
-    <string name="emoticon_msn_icon">MSN Messenger icon</string>
+    <string name="emoticon_msn_icon">Messenger</string>
     <string name="emoticon_snail">Snail</string>
-    <string name="emoticon_black_sheep">Black Sheep</string>
+    <string name="emoticon_black_sheep">Black sheep</string>
     <string name="emoticon_plate">Plate</string>
     <string name="emoticon_bowl">Bowl</string>
     <string name="emoticon_pizza">Pizza</string>
@@ -1462,8 +1463,8 @@
     <string name="emoticon_umbrella">Umbrella</string>
     <string name="emoticon_island">Island with a palm tree</string>
     <string name="emoticon_computer">Computer</string>
-    <string name="emoticon_mobile_phone">Mobile Phone</string>
-    <string name="emoticon_stormy_cloud">Stormy cloud</string>
+    <string name="emoticon_mobile_phone">Mobile</string>
+    <string name="emoticon_stormy_cloud">Storm cloud</string>
     <string name="emoticon_lightning">Lightning</string>
     <string name="emoticon_money">Money</string>
     <string name="emoticon_goat">Goat</string>
@@ -1478,7 +1479,7 @@
     <string name="emoticon_xbox">Xbox</string>
 
     <!-- Built-in scene names -->
-    <string name="scene_name_mezmerizing_white">Mezmerizing White</string>
+    <string name="scene_name_mezmerizing_white">Mesmerizing White</string>
     <string name="scene_name_daisy_hill">Daisy Hill</string>
     <string name="scene_name_field">Field</string>
     <string name="scene_name_silhouette">Silhouette</string>
@@ -1497,7 +1498,7 @@
     <string name="scene_name_bamboo">Bamboo</string>
     <string name="scene_name_zune_6">Zune 6</string>
     <string name="scene_name_zune_4">Zune 4</string>
-    <string name="scene_name_mezmerizing_brown">Mezmerizing Brown</string>
+    <string name="scene_name_mezmerizing_brown">Mesmerizing Brown</string>
     <string name="scene_name_zune_3">Zune 3</string>
     <string name="scene_name_butterfly_pattern">Butterfly Pattern</string>
     <string name="scene_name_bird_man">Bird Man</string>
@@ -1506,7 +1507,7 @@
     <string name="scene_name_dahlias">Dahlias</string>
     <string name="scene_name_dark_hearts">Dark Hearts</string>
     <string name="scene_name_desert">Desert</string>
-    <string name="scene_name_grafitti">Grafitti</string>
+    <string name="scene_name_grafitti">Graffiti</string>
     <string name="scene_name_hostas">Hostas</string>
     <string name="scene_name_metalwork">Metalwork</string>
     <string name="scene_name_misty_hills">Misty Hills</string>
@@ -1605,7 +1606,7 @@
     <string name="err_group_name_control_chars">Enter a group name without control characters.</string>
     <string name="err_group_pending_invite">This person already has a pending group invitation.</string>
     <string name="err_group_already_member">This person is already a group member.</string>
-    <string name="group_members_max_count_before_number">A group can have up to</string>
+    <string name="group_members_max_count_before_number">A group in Messenger can have up to</string>
     <string name="group_members_max_count_after_number">members.</string>
     <string name="err_auth_email_password_required">Email and password are required.</string>
     <string name="err_auth_server_rejected_signin">The community server did not accept this sign-in.</string>
@@ -1626,9 +1627,9 @@
     <string name="err_wink_retry_sign_in">Sign in before retrying this wink.</string>
     <string name="err_wink_sender_offline_group">The wink sender is no longer online in this group.</string>
     <string name="err_wink_unblock_before_retry">Unblock this contact before retrying.</string>
-    <string name="err_wink_require_online">Winks require the contact to be online.</string>
+    <string name="err_wink_require_online">Contacts who appear offline cannot accept winks.</string>
     <string name="err_wink_group_unsupported">All online group members must support winks.</string>
-    <string name="err_wink_client_unsupported">This contact\'s client does not support winks.</string>
+    <string name="err_wink_client_unsupported">This type of wink can\'t be shown in the version of Messenger that this contact is using.</string>
     <string name="err_wink_metadata_mismatch">Wink data does not match its metadata.</string>
     <string name="err_wink_invalid_package">Invalid wink package.</string>
     <string name="err_wink_unsupported_or_invalid">Unsupported or invalid wink package.</string>
@@ -1637,20 +1638,20 @@
     <string name="err_wink_not_cached_send_you_singular">This wink is no longer cached. Add it to your library to send it again.</string>
     <string name="err_photo_original_request_failed">The original photo could not be requested.</string>
     <string name="err_photo_contact_unavailable">This contact is unavailable for photo sharing.</string>
-    <string name="err_photo_client_unsupported">This contact\'s client does not support photo sharing.</string>
+    <string name="err_photo_client_unsupported">This contact is using a version of Messenger that does not support photo sharing.</string>
     <string name="err_photo_share_ended">This photo share has ended.</string>
     <string name="err_game_session_ended">This game session has ended.</string>
     <string name="err_game_contact_unavailable">This contact is unavailable for games and activities.</string>
-    <string name="err_game_client_unsupported">This contact\'s client does not support games and activities.</string>
+    <string name="err_game_client_unsupported">This contact is using a version of Messenger that does not support games and activities.</string>
     <string name="err_file_sign_in_required">Sign in before sharing files.</string>
     <string name="err_file_group_unsupported">File transfers are only available in one-to-one chats.</string>
     <string name="err_file_contact_unavailable">This contact is unavailable for file transfers.</string>
-    <string name="err_file_client_unsupported">This contact\'s client does not support file transfers.</string>
+    <string name="err_file_client_unsupported">This contact is using a version of Messenger that does not support File Transfer.</string>
     <string name="err_file_offer_ended">This file offer has ended.</string>
     <string name="err_voice_group_unsupported">Voice clips are not supported in group chats.</string>
     <string name="err_voice_require_online">Voice clips require the contact to be online.</string>
     <string name="err_voice_require_online_alt">Voice clips require an online contact.</string>
-    <string name="err_voice_client_unsupported">This contact\'s client does not support voice clips.</string>
+    <string name="err_voice_client_unsupported">This contact is using a version of Messenger that does not support Voice Clips.</string>
     <string name="err_voice_invalid">Invalid voice clip.</string>
     <string name="err_voice_download_failed">Voice clip could not be downloaded.</string>
     <string name="err_voice_encode_failed">Voice clip could not be encoded.</string>
@@ -1658,13 +1659,13 @@
     <string name="err_message_blocked_contact">Messages cannot be sent to a blocked contact.</string>
     <string name="err_handwriting_group_unsupported">All online group members must support handwriting.</string>
     <string name="err_handwriting_require_online">Handwriting messages require the contact to be online.</string>
-    <string name="err_handwriting_client_unsupported">This contact\'s client does not support handwriting.</string>
+    <string name="err_handwriting_client_unsupported">This contact is using a version of Messenger that does not support handwriting.</string>
     <string name="err_message_send_failed">Message could not be sent.</string>
-    <string name="err_nudge_offline">Nudges cannot be sent to an offline contact.</string>
+    <string name="err_nudge_offline">This contact appears to be offline, so a nudge cannot be sent.</string>
     <string name="err_nudge_require_online">Nudges require an online contact.</string>
     <string name="err_nudge_blocked">Nudges cannot be sent to a blocked contact.</string>
     <string name="err_nudge_group_unsupported">All online group members must support nudges.</string>
-    <string name="err_nudge_client_unsupported">This contact\'s client does not support nudges.</string>
+    <string name="err_nudge_client_unsupported">This contact is using a version of Messenger that does not support nudges.</string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="nudge_rate_limit_singular_you_singular_before_number">You may not send a nudge that often. Please wait</string>
     <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
@@ -1724,11 +1725,11 @@
     <string name="err_group_blocking_sign_in">Sign in before changing group blocking.</string>
     <string name="err_contact_change_session_ended">This session ended while changing the contact.</string>
     <string name="err_ns_rejected_list_change">The notification server rejected the contact-list change.</string>
-    <string name="err_remote_signout_use_local">Use local logout to end the current session.</string>
+    <string name="err_remote_signout_use_local">Use local sign-out to end the current session.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="remote_sign_out_msnp_error_you_singular_before_number">The server could not deliver remote sign-out (MSNP</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="remote_sign_out_msnp_error_you_singular_after_number">). If all sessions appear offline, change your status to Online and try again.</string>
+    <string name="remote_sign_out_msnp_error_you_singular_after_number">). If all sessions appear offline, change your status to Available and try again.</string>
     <string name="err_session_already_ended">This session has already ended.</string>
     <string name="err_sessions_unavailable">The server did not provide the active sessions. Please try again.</string>
     <string name="err_server_no_msnp18">The selected server does not support MSNP18.</string>
@@ -1740,7 +1741,7 @@
     <string name="err_server_too_many_redirects">The community server redirected too many times.</string>
     <string name="err_ns_disconnected">The notification server disconnected.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="err_logged_out_other_session_you_singular">You were logged out from another session.</string>
+    <string name="err_logged_out_other_session_you_singular">You were signed out from another session.</string>
     <string name="err_server_restarting">The server is restarting.</string>
     <string name="err_server_ended_session">The server ended this session. Please sign in again.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
@@ -1753,9 +1754,9 @@
     <string name="chat_photo_invite_received">Photo sharing invitation received.</string>
     <string name="chat_game_invite_sent">Game invitation sent: %1$s.</string>
     <string name="chat_game_invite_received">Game invitation received: %1$s.</string>
-    <string name="chat_game_stopped_remote">The other person closed %1$s.</string>
+    <string name="chat_game_stopped_remote">The other person stopped %1$s.</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="chat_game_stopped_local_you_singular">You closed %1$s.</string>
+    <string name="chat_game_stopped_local_you_singular">You stopped %1$s.</string>
     <string name="chat_game_declined">%1$s invitation declined.</string>
     <string name="chat_game_failed">%1$s failed.</string>
     <string name="err_msnp_rejected_credentials">The community server rejected these credentials.</string>
@@ -1811,7 +1812,7 @@
     <string name="msnp_get_client_config_http_error_after_number">.</string>
     <string name="msnp_response_exceeded_bytes_before_number">Response exceeded</string>
     <string name="msnp_response_exceeded_bytes_after_number">bytes.</string>
-    <string name="err_file_timed_out">File transfer timed out.</string>
+    <string name="err_file_timed_out">Transfer timed out</string>
     <string name="err_file_selected_unavailable">The selected file is unavailable.</string>
     <string name="err_file_too_many_active">Too many active file transfers.</string>
     <string name="err_file_invite_send_failed">File invitation could not be sent.</string>
