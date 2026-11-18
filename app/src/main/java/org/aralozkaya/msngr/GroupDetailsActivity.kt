@@ -55,7 +55,7 @@ class GroupDetailsActivity : MsngrActivity() {
             }
             MsngrTheme {
                 SecondaryPageScaffold(
-                    title = "Group details",
+                    title = androidx.compose.ui.res.stringResource(R.string.group_details_title),
                     onBack = ::finish,
                     actions = {
                         GroupDetailsMenu(

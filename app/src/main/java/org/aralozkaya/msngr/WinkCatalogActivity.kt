@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
@@ -42,8 +43,8 @@ class WinkCatalogActivity : MsngrActivity() {
         val uri = intent.data
         if (uri != null) {
             when {
-                uri.scheme == "msngr" && uri.host == "winks" -> uri.getQueryParameter("url")?.let { prepareImport(Uri.parse(it), "Wink") }
-                else -> prepareImport(uri, "Wink")
+                uri.scheme == "msngr" && uri.host == "winks" -> uri.getQueryParameter("url")?.let { prepareImport(Uri.parse(it), getString(R.string.wink_fallback_name_singular)) }
+                else -> prepareImport(uri, getString(R.string.wink_fallback_name_singular))
             }
         }
     }
@@ -51,10 +52,10 @@ class WinkCatalogActivity : MsngrActivity() {
     private fun prepareImport(uri: Uri, name: String) {
         if (loading || pending != null) return
         val account = winkAccount()
-        if (account == null) { status = "Sign in before adding winks."; return }
+        if (account == null) { status = getString(R.string.wink_sign_in_required); return }
         val catalogUrl = SessionPrefs.readServerConfig(this).winkCatalogServer
         if (WinkDownloads.catalogUrl(catalogUrl) == null) {
-            status = "Third-party winks are not configured for this service."
+            status = getString(R.string.wink_not_configured)
             return
         }
         importAccount = account
@@ -66,7 +67,7 @@ class WinkCatalogActivity : MsngrActivity() {
                     MsnWinkPackage.install(bytes, name)
                 }
             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-            catch (e: Exception) { status = e.message ?: "Could not download wink." }
+            catch (e: Exception) { status = e.message?.let(::localizeUserMessage) ?: getString(R.string.wink_download_failed_generic) }
             finally { loading = false }
         }
     }
@@ -77,15 +78,15 @@ class WinkCatalogActivity : MsngrActivity() {
         val catalogUrl = WinkDownloads.catalogUrl(SessionPrefs.readServerConfig(this).winkCatalogServer)
         val catalogUri = remember(catalogUrl) { catalogUrl?.let(Uri::parse) }
         BackHandler { if (browser?.canGoBack() == true) browser?.goBack() else finish() }
-        Scaffold(topBar = { TopAppBar(title = { Text("Get more winks") }, navigationIcon = {
-            IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.wink_get_more)) }, navigationIcon = {
+            IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.common_back)) }
         }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                status?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary) }
+                status?.let { Text(localizeUserMessage(it), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary) }
                 if (catalogUrl == null || catalogUri == null) {
                     if (status == null) {
                         Text(
-                            "Third-party winks are not configured for this service.",
+                            stringResource(R.string.wink_not_configured),
                             Modifier.padding(16.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -111,7 +112,7 @@ class WinkCatalogActivity : MsngrActivity() {
                             val packageUrl = if (url.scheme in listOf("https", catalogUri.scheme) && url.host == catalogHost &&
                                 url.path.orEmpty().startsWith(catalogBasePath)) url.getQueryParameter("msngr-install") else null
                             if (packageUrl != null) {
-                                view.post { prepareImport(Uri.parse(packageUrl), url.getQueryParameter("name") ?: "Wink") }
+                                view.post { prepareImport(Uri.parse(packageUrl), url.getQueryParameter("name") ?: getString(R.string.wink_fallback_name_singular)) }
                                 return WebResourceResponse("text/plain", "UTF-8", java.io.ByteArrayInputStream(byteArrayOf()))
                             }
                             return null
@@ -119,10 +120,10 @@ class WinkCatalogActivity : MsngrActivity() {
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val url = request.url
                             if (url.scheme in listOf("https", catalogUri.scheme) && url.host == catalogHost && url.getQueryParameter("msngr-install") != null) {
-                                url.getQueryParameter("msngr-install")?.let { prepareImport(Uri.parse(it), url.getQueryParameter("name") ?: "Wink") }; return true
+                                url.getQueryParameter("msngr-install")?.let { prepareImport(Uri.parse(it), url.getQueryParameter("name") ?: getString(R.string.wink_fallback_name_singular)) }; return true
                             }
                             val trusted = WinkDownloads.trustedPackageUrl(url.toString(), catalogUrl)
-                            if (trusted != null) { prepareImport(Uri.parse(trusted), view.title?.removePrefix("Wink - ") ?: "Wink"); return true }
+                            if (trusted != null) { prepareImport(Uri.parse(trusted), view.title?.removePrefix("Wink - ") ?: getString(R.string.wink_fallback_name_singular)); return true }
                             if (url.host == catalogHost && url.path.orEmpty().startsWith(catalogBasePath)) {
                                 if (url.scheme == "http" && catalogUri.scheme == "https") {
                                     view.loadUrl(url.buildUpon().scheme("https").build().toString()); return true
@@ -139,29 +140,35 @@ class WinkCatalogActivity : MsngrActivity() {
                             view.evaluateJavascript("window.InstallContent=function(u){fetch($quotedBase+'?msngr-install='+encodeURIComponent(u)+'&name='+encodeURIComponent(document.title.replace(/^Wink - /,'')),{cache:'no-store'});};", null)
                         }
                         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-                            status = "The catalog stopped. Close it and try again."; view.destroy(); browser = null; return true
+                            status = getString(R.string.wink_catalog_stopped); view.destroy(); browser = null; return true
                         }
                     }
-                    setDownloadListener { url, _, _, _, _ -> prepareImport(Uri.parse(url), title?.removePrefix("Wink - ") ?: "Wink") }
+                    setDownloadListener { url, _, _, _, _ -> prepareImport(Uri.parse(url), title?.removePrefix("Wink - ") ?: getString(R.string.wink_fallback_name_singular)) }
                     loadUrl(catalogUrl)
                 } }, modifier = Modifier.fillMaxSize(), onRelease = { it.stopLoading(); it.destroy(); browser = null })
             }
         }
         pending?.let { items ->
-            AlertDialog(onDismissRequest = { pending = null }, title = { Text("Add winks") },
-                text = { Text(items.joinToString("\n") { it.first.name }) },
+            AlertDialog(onDismissRequest = { pending = null }, title = { Text(stringResource(R.string.wink_add_dialog_title)) },
+                text = { Text(items.joinToString("\n") { localizeWinkName(it.first.name) }) },
                 confirmButton = { Button(shapes = ButtonDefaults.shapes(), onClick = {
                     pending = null
                     lifecycleScope.launch {
                         status = withContext(Dispatchers.IO) { runCatching {
-                            val account = importAccount ?: error("Sign in before adding winks.")
-                            check(winkAccount() == account) { "The selected account changed. Try again." }
+                            val account = importAccount ?: error(getString(R.string.wink_sign_in_required))
+                            check(winkAccount() == account) { getString(R.string.wink_account_changed) }
                             for ((reference, cab) in items) winkStore().install(account, reference, cab)
-                            "Added ${items.size} ${if (items.size == 1) "wink" else "winks"} to your library."
-                        }.getOrElse { it.message ?: "Could not add winks." } }
+                            getQuantityNumberSentence(
+                                count = items.size,
+                                oneBeforeRes = R.string.wink_added_count_singular_you_singular_before_number,
+                                oneAfterRes = R.string.wink_added_count_singular_you_singular_after_number,
+                                otherBeforeRes = R.string.wink_added_count_plural_you_singular_before_number,
+                                otherAfterRes = R.string.wink_added_count_plural_you_singular_after_number,
+                            )
+                        }.getOrElse { it.message?.let(::localizeUserMessage) ?: getString(R.string.wink_add_failed) } }
                     }
-                }) { Text("Add to my winks") } },
-                dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancel") } })
+                }) { Text(stringResource(R.string.wink_add_to_library)) } },
+                dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.common_cancel)) } })
         }
     }
     override fun onDestroy() { importJob?.cancel(); browser?.stopLoading(); super.onDestroy() }

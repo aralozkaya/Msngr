@@ -1,5 +1,8 @@
 package org.aralozkaya.msngr
 
+import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import java.security.MessageDigest
 import java.util.Locale
 
@@ -37,3 +40,22 @@ val LoginSnapshot.accountIdentity: AccountIdentity
 
 internal val LoginSnapshot.accountLabel: String
     get() = "$email · ${if (useMockServer) "Mock" else if (provider == ProviderOptions.CUSTOM) resolvedServers.mainServer else provider}"
+
+internal fun LoginSnapshot.displayAccountLabel(context: Context): String {
+    val service = when {
+        useMockServer -> context.getString(R.string.account_provider_mock)
+        provider == ProviderOptions.CUSTOM -> resolvedServers.mainServer
+        else -> context.providerDisplayName(provider)
+    }
+    return context.getString(R.string.account_dropdown_label_format, email, service)
+}
+
+@Composable
+internal fun LoginSnapshot.displayAccountLabel(): String {
+    val service = when {
+        useMockServer -> stringResource(R.string.account_provider_mock)
+        provider == ProviderOptions.CUSTOM -> resolvedServers.mainServer
+        else -> providerDisplayName(provider)
+    }
+    return stringResource(R.string.account_dropdown_label_format, email, service)
+}

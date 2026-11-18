@@ -30,7 +30,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -38,7 +40,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.AccountSession
+import org.aralozkaya.msngr.localizeUserMessage
 
 /** Standard modal focus and labeled controls work with TalkBack, keyboards, and touch. */
 @Composable
@@ -48,6 +52,7 @@ internal fun SessionsDialog(
     onCurrentSessionLoggedOut: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var busyTarget by remember { mutableStateOf<String?>(null) }
     val busy = busyTarget != null
@@ -69,9 +74,15 @@ internal fun SessionsDialog(
             if (result.isSuccess && selected.any(AccountSession::isCurrent)) {
                 onCurrentSessionLoggedOut()
             } else {
-                feedback = result.exceptionOrNull()?.message
-                    ?: if (selected.size == 1) "${selected.single().deviceName} was logged out."
-                    else "The other sessions were logged out."
+                feedback = result.exceptionOrNull()?.message?.let(context::localizeUserMessage)
+                    ?: if (selected.size == 1) {
+                        context.getString(
+                            R.string.sessions_logged_out_singular,
+                            context.localizeUserMessage(selected.single().deviceName),
+                        )
+                    } else {
+                        context.getString(R.string.sessions_logged_out_plural)
+                    }
             }
         }
     }
@@ -79,11 +90,11 @@ internal fun SessionsDialog(
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         icon = { Icon(Icons.Default.Devices, contentDescription = null) },
-        title = { Text("Active sessions") },
+        title = { Text(stringResource(R.string.sessions_title)) },
         text = {
             Column(modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Choose where to log out. Remembered credentials stay saved on this device.")
+                Text(stringResource(R.string.sessions_description))
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp).testTag("active-sessions-list"),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -91,15 +102,27 @@ internal fun SessionsDialog(
                     items(sessions.sortedBy { !it.isCurrent }, key = AccountSession::id) { session ->
                         val sessionTarget = "session:${session.id}"
                         val sessionBusy = busyTarget == sessionTarget
+                        val deviceLabel = localizeUserMessage(session.deviceName)
+                        val sessionActionDesc = if (session.isCurrent) {
+                            stringResource(R.string.sessions_log_out_this_device)
+                        } else {
+                            stringResource(R.string.sessions_log_out_device_format, deviceLabel, session.id.take(8))
+                        }
                         Card(Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(Modifier.weight(1f).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(session.deviceName, style = MaterialTheme.typography.titleSmall, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        listOfNotNull(if (session.isCurrent) "This device" else null,
-                                            session.presence?.ownStatusLabel()).joinToString(" · "),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    Text(deviceLabel, style = MaterialTheme.typography.titleSmall, overflow = TextOverflow.Ellipsis)
+                                    val presenceText = session.presence?.displayOwnStatusLabel()
+                                    val metaText = when {
+                                        session.isCurrent && presenceText != null -> stringResource(
+                                            R.string.sessions_meta_separator,
+                                            stringResource(R.string.common_device_this),
+                                            presenceText,
+                                        )
+                                        session.isCurrent -> stringResource(R.string.common_device_this)
+                                        else -> presenceText.orEmpty()
+                                    }
+                                    Text(metaText, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 TextButton(
                                     onClick = { logOut(sessionTarget, listOf(session)) },
@@ -109,16 +132,15 @@ internal fun SessionsDialog(
                                         .padding(end = 12.dp)
                                         .testTag("logout-session-${session.id}")
                                         .semantics {
-                                            contentDescription = if (session.isCurrent) "Log out of this device"
-                                            else "Log out of ${session.deviceName}, session ${session.id.take(8)}"
+                                            contentDescription = sessionActionDesc
                                         },
                                 ) {
                                     LoadingButtonContent(
                                         loading = sessionBusy,
-                                        label = "Logging out\u2026",
+                                        label = stringResource(R.string.sessions_logging_out),
                                         indicatorModifier = Modifier.testTag("logout-session-loading-${session.id}"),
                                     ) {
-                                        Text("Log out")
+                                        Text(stringResource(R.string.sessions_log_out_action))
                                     }
                                 }
                             }
@@ -136,10 +158,10 @@ internal fun SessionsDialog(
                         ) {
                             LoadingButtonContent(
                                 loading = otherBusy,
-                                label = "Logging out\u2026",
+                                label = stringResource(R.string.sessions_logging_out),
                                 indicatorModifier = Modifier.testTag("logout-other-sessions-loading"),
                             ) {
-                                Text("Log out other sessions")
+                                Text(stringResource(R.string.sessions_log_out_others))
                             }
                         }
                         Button(
@@ -154,10 +176,10 @@ internal fun SessionsDialog(
                         ) {
                             LoadingButtonContent(
                                 loading = allBusy,
-                                label = "Logging out\u2026",
+                                label = stringResource(R.string.sessions_logging_out),
                                 indicatorModifier = Modifier.testTag("logout-all-sessions-loading"),
                             ) {
-                                Text("Log out all sessions")
+                                Text(stringResource(R.string.sessions_log_out_all))
                             }
                         }
                     }
@@ -170,7 +192,7 @@ internal fun SessionsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(R.string.common_close)) }
         },
     )
 }

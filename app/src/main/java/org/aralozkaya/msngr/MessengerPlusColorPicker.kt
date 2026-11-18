@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -76,7 +77,7 @@ internal fun MessengerPlusCustomColorDialog(
     AlertDialog(
         onDismissRequest = onDismissRequest,
         modifier = Modifier.testTag(MESSENGER_PLUS_CUSTOM_COLOR_DIALOG_TAG),
-        title = { Text("Custom color") },
+        title = { Text(stringResource(R.string.color_picker_title)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -89,14 +90,15 @@ internal fun MessengerPlusCustomColorDialog(
                     onColorChanged = ::updateWheel,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                Text("Brightness", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.appearance_brightness), style = MaterialTheme.typography.labelMedium)
+                val brightnessDescription = stringResource(R.string.appearance_brightness)
                 Slider(
                     state = rememberSliderState(brightness).apply { value = brightness },
                     onValueChange = {
                         brightness = it
                         colorInput = hsvColorToken(hue, saturation, it)
                     },
-                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Brightness" },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = brightnessDescription },
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -118,11 +120,26 @@ internal fun MessengerPlusCustomColorDialog(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Color code") },
+                        label = { Text(stringResource(R.string.color_picker_code_label)) },
                         supportingText = {
                             Text(
-                                if (color == null) "Enter a valid color: #RRGGBB, 00–67, or name."
-                                else "#RRGGBB, 00–67, or name",
+                                if (color == null) {
+                                    twoNumbersSentenceResource(
+                                        R.string.color_picker_code_error_before_first_number,
+                                        "00",
+                                        R.string.color_picker_code_error_between_numbers,
+                                        67,
+                                        R.string.color_picker_code_error_after_second_number,
+                                    )
+                                } else {
+                                    twoNumbersSentenceResource(
+                                        R.string.color_picker_code_hint_before_first_number,
+                                        "00",
+                                        R.string.color_picker_code_hint_between_numbers,
+                                        67,
+                                        R.string.color_picker_code_hint_after_second_number,
+                                    )
+                                },
                             )
                         },
                         singleLine = true,
@@ -142,7 +159,7 @@ internal fun MessengerPlusCustomColorDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_cancel))
             }
         },
     )
@@ -164,27 +181,41 @@ internal fun ColorWheel(
         modifier = modifier
             .size(200.dp)
             .testTag(testTag)
-            .semantics {
-                contentDescription = "Color wheel"
-                stateDescription = "Hue ${hue.toInt()} degrees, saturation ${(saturation * 100).toInt()} percent"
-                customActions = listOf(
-                    CustomAccessibilityAction("Next hue") {
-                        onColorChanged((hue + 15f) % 360f, saturation)
-                        true
-                    },
-                    CustomAccessibilityAction("Previous hue") {
-                        onColorChanged((hue + 345f) % 360f, saturation)
-                        true
-                    },
-                    CustomAccessibilityAction("Increase saturation") {
-                        onColorChanged(hue, (saturation + 0.1f).coerceAtMost(1f))
-                        true
-                    },
-                    CustomAccessibilityAction("Decrease saturation") {
-                        onColorChanged(hue, (saturation - 0.1f).coerceAtLeast(0f))
-                        true
-                    },
+            .let { baseModifier ->
+                val wheelDesc = stringResource(R.string.color_wheel_description)
+                val wheelState = twoNumbersSentenceResource(
+                    R.string.color_wheel_state_before_first_number,
+                    hue.toInt(),
+                    R.string.color_wheel_state_between_numbers,
+                    (saturation * 100).toInt(),
+                    R.string.color_wheel_state_after_second_number,
                 )
+                val nextHue = stringResource(R.string.color_wheel_next_hue)
+                val prevHue = stringResource(R.string.color_wheel_prev_hue)
+                val incSat = stringResource(R.string.color_wheel_inc_sat)
+                val decSat = stringResource(R.string.color_wheel_dec_sat)
+                baseModifier.semantics {
+                    contentDescription = wheelDesc
+                    stateDescription = wheelState
+                    customActions = listOf(
+                        CustomAccessibilityAction(nextHue) {
+                            onColorChanged((hue + 15f) % 360f, saturation)
+                            true
+                        },
+                        CustomAccessibilityAction(prevHue) {
+                            onColorChanged((hue + 345f) % 360f, saturation)
+                            true
+                        },
+                        CustomAccessibilityAction(incSat) {
+                            onColorChanged(hue, (saturation + 0.1f).coerceAtMost(1f))
+                            true
+                        },
+                        CustomAccessibilityAction(decSat) {
+                            onColorChanged(hue, (saturation - 0.1f).coerceAtLeast(0f))
+                            true
+                        },
+                    )
+                }
             }
             .pointerInput(Unit) {
                 val radius = minOf(size.width, size.height) / 2f - 8.dp.toPx()

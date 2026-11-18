@@ -11,6 +11,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.localizeUserMessage
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -21,7 +23,7 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val manager = applicationContext.updateManager
         val release = manager.state.value.release?.takeIf { it.version.code == inputData.getInt("release", -1) }
-            ?: return@withContext Result.failure(workDataOf("error" to "The release changed. Please check for updates again."))
+            ?: return@withContext Result.failure(workDataOf("error" to applicationContext.getString(R.string.update_worker_release_changed)))
         if (!manager.state.value.supported || !isReleaseApkUrl(release.apkUrl.orEmpty())) return@withContext Result.failure()
         val destination = manager.apkFile(release.version.code)
         val partial = File(destination.parentFile, "${release.version.code}.$id.partial.apk")
@@ -34,7 +36,7 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
             val connection = openApkConnection(checkNotNull(release.apkUrl))
             try {
                 val expectedSize = release.apkSize
-                if (expectedSize <= 0 || expectedSize > MAX_APK_SIZE) throw IOException("The APK size is invalid.")
+                if (expectedSize <= 0 || expectedSize > MAX_APK_SIZE) throw IOException(applicationContext.getString(R.string.update_apk_invalid_size))
                 connection.inputStream.use { input ->
                     partial.outputStream().use { output ->
                         val buffer = ByteArray(64 * 1024)
@@ -45,7 +47,7 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
                             val count = input.read(buffer)
                             if (count < 0) break
                             received += count
-                            if (received > expectedSize) throw IOException("The downloaded APK has an unexpected size.")
+                            if (received > expectedSize) throw IOException(applicationContext.getString(R.string.update_apk_unexpected_size))
                             output.write(buffer, 0, count)
                             val percent = (received * 100 / expectedSize).toInt()
                             if (percent != previousPercent) {
@@ -53,7 +55,7 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
                                 previousPercent = percent
                             }
                         }
-                        if (received != expectedSize) throw IOException("The APK download was incomplete. Please try again.")
+                        if (received != expectedSize) throw IOException(applicationContext.getString(R.string.update_apk_incomplete))
                     }
                 }
             } finally {
@@ -61,13 +63,13 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
             }
             verifyUpdateApk(applicationContext, partial, release)
             coroutineContext.ensureActive()
-            if (!partial.renameTo(destination)) throw IOException("The APK could not be saved in temporary storage.")
+            if (!partial.renameTo(destination)) throw IOException(applicationContext.getString(R.string.update_apk_temp_save_failed))
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
             destination.delete()
-            Result.failure(workDataOf("error" to (error.message ?: "The update could not be downloaded.")))
+            Result.failure(workDataOf("error" to (error.message?.let(applicationContext::localizeUserMessage) ?: applicationContext.getString(R.string.update_download_failed_generic))))
         } finally {
             partial.delete()
         }

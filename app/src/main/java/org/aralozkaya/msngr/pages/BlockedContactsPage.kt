@@ -107,7 +107,7 @@ private fun LazyListScope.blockedContactsContent(
                 count = blocked.size,
                 contact = contact,
                 onClick = {},
-                contextActionLabel = "Unblock",
+                contextActionLabel = stringResource(R.string.contact_unblock_action),
                 onContextAction = { onUnblockContact(contact) },
                 onDeleteContact = if (contact.isForwardListContact && !contact.isGroup) {
                     onDeleteContact?.let { delete -> { delete(contact) } }

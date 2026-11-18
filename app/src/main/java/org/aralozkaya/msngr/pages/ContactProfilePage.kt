@@ -94,9 +94,10 @@ fun ContactProfilePage(
     PageContentList(innerPadding = innerPadding, scrollBehavior = scrollBehavior) {
         item {
             if (contact == null) {
-                Text("Contact is no longer available.", Modifier.padding(24.dp))
+                Text(stringResource(R.string.contact_profile_unavailable), Modifier.padding(24.dp))
             } else {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    val viewPictureDesc = stringResource(R.string.contact_profile_view_picture)
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -107,7 +108,7 @@ fun ContactProfilePage(
                             enabled = !contact.avatarUri.isNullOrBlank(),
                             shape = MaterialTheme.shapes.avatar,
                             modifier = Modifier.size(144.dp).semantics {
-                                contentDescription = "View display picture"
+                                contentDescription = viewPictureDesc
                                 role = Role.Button
                             },
                         ) {
@@ -122,7 +123,7 @@ fun ContactProfilePage(
                         }
                         if (contact.avatarUri.isNullOrBlank()) {
                             Text(
-                                "No display picture",
+                                stringResource(R.string.contact_profile_no_picture),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -140,7 +141,7 @@ fun ContactProfilePage(
                         ) {
                             Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                                 if (contact.isBlocked) {
-                                    Text("Blocked")
+                                    Text(stringResource(R.string.common_blocked))
                                 } else {
                                     PresenceLabel(contact.presence)
                                 }
@@ -151,14 +152,14 @@ fun ContactProfilePage(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        ProfileDetailCard(Icons.Default.Email, "Email address") {
+                        ProfileDetailCard(Icons.Default.Email, stringResource(R.string.contact_profile_email_label)) {
                             Text(contact.email, style = MaterialTheme.typography.bodyLarge)
                         }
-                        ProfileDetailCard(Icons.AutoMirrored.Filled.Chat, "Status message") {
+                        ProfileDetailCard(Icons.AutoMirrored.Filled.Chat, stringResource(R.string.contact_profile_status_label)) {
                             MsnEmoticonText(
                                 text = contact.statusMessage.takeIf {
                                     it.messengerPlusPlainText().isNotBlank()
-                                } ?: "No status message",
+                                } ?: stringResource(R.string.contact_profile_no_status),
                                 useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                                 style = MaterialTheme.typography.bodyLarge,
                             )
@@ -172,7 +173,7 @@ fun ContactProfilePage(
                 FilledTonalButton(onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
                     context, contact.id, contact.displayName.messengerPlusPlainText(), false)) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("contact_notification_settings"),
-                    shapes = ButtonDefaults.shapes()) { Text("Customize Notifications") }
+                    shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.contact_customize_notifications)) }
             }
             item {
                 FlowRow(
@@ -187,7 +188,7 @@ fun ContactProfilePage(
                     ) {
                         Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(if (contact.isBlocked) "Blocked" else "Block")
+                        Text(stringResource(if (contact.isBlocked) R.string.common_blocked else R.string.common_block))
                     }
                     DestructiveOutlinedButton(
                         onClick = {
@@ -198,7 +199,7 @@ fun ContactProfilePage(
                     ) {
                         Icon(Icons.Outlined.DeleteSweep, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text("Erase history")
+                        Text(stringResource(R.string.contact_erase_history_action))
                     }
                     if (onDeleteContact != null && contact.isForwardListContact && !contact.isGroup) {
                         DestructiveOutlinedButton(
@@ -238,13 +239,14 @@ fun ContactProfilePage(
     if (showEraseConfirmation && contact != null) {
         AlertDialog(
             onDismissRequest = { if (!isErasing) showEraseConfirmation = false },
-            title = { Text("Erase chat history?") },
+            title = { Text(stringResource(R.string.contact_erase_history_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "This permanently erases your saved conversation with " +
-                            contact.displayName.messengerPlusPlainText() +
-                            " from this device. This cannot be undone.",
+                        stringResource(
+                            R.string.contact_erase_history_message_you_singular,
+                            contact.displayName.messengerPlusPlainText(),
+                        ),
                     )
                     eraseError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
@@ -262,7 +264,7 @@ fun ContactProfilePage(
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
-                                eraseError = "Could not erase history. Please try again."
+                                eraseError = context.getString(R.string.contact_erase_history_failed)
                             } finally {
                                 isErasing = false
                             }
@@ -279,7 +281,7 @@ fun ContactProfilePage(
                         label = stringResource(R.string.chat_history_erase_busy),
                         indicatorModifier = Modifier.testTag("chat-history-erase-loading"),
                     ) {
-                        Text("Erase")
+                        Text(stringResource(R.string.contact_erase_history_confirm))
                     }
                 }
             },
@@ -288,7 +290,7 @@ fun ContactProfilePage(
                     onClick = { showEraseConfirmation = false },
                     enabled = !isErasing,
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -296,12 +298,13 @@ fun ContactProfilePage(
     if (showBlockConfirmation && contact != null && !contact.isBlocked) {
         AlertDialog(
             onDismissRequest = { showBlockConfirmation = false },
-            title = { Text("Block contact?") },
+            title = { Text(stringResource(R.string.contact_block_dialog_title)) },
             text = {
                 Text(
-                    "Are you sure you want to block " +
-                        contact.displayName.messengerPlusPlainText() +
-                        "? You can unblock them later from Blocked contacts.",
+                    stringResource(
+                        R.string.contact_block_dialog_message_you_singular,
+                        contact.displayName.messengerPlusPlainText(),
+                    ),
                 )
             },
             confirmButton = {
@@ -316,14 +319,14 @@ fun ContactProfilePage(
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
                 ) {
-                    Text("Block")
+                    Text(stringResource(R.string.common_block))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showBlockConfirmation = false },
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -331,7 +334,7 @@ fun ContactProfilePage(
     expandedPictureUri?.let { uri ->
         ContactPictureViewer(
             pictureUri = uri,
-            name = contact?.displayName?.messengerPlusPlainText() ?: "Contact",
+            name = contact?.displayName?.messengerPlusPlainText() ?: stringResource(R.string.common_contact_singular),
             onDismiss = { expandedPictureUri = null },
         )
     }

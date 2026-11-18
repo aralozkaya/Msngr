@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -138,11 +139,11 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
                     enabled = state.hasSelection && gradientStart != null && gradientEnd != null,
                     shapes = ButtonDefaults.shapes(),
                 ) {
-                    Text("Apply gradient to selection")
+                    Text(stringResource(R.string.plus_apply_gradient))
                 }
                 if (!state.hasSelection) {
                     Text(
-                        "Select text to apply a gradient.",
+                        stringResource(R.string.plus_select_text_gradient),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -158,7 +159,8 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MessengerPlusDecorationButtons(state, modifier = Modifier.weight(1f))
-            MessengerPlusFormattingTooltip("Clear formatting") {
+            val clearFormattingLabel = stringResource(R.string.plus_clear_formatting)
+            MessengerPlusFormattingTooltip(clearFormattingLabel) {
                 FilledIconButton(
                     onClick = state::clearFormatting,
                     shapes = IconButtonDefaults.shapes(),
@@ -167,7 +169,7 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     ),
                 ) {
-                    Icon(Icons.Default.FormatClear, contentDescription = "Clear formatting")
+                    Icon(Icons.Default.FormatClear, contentDescription = clearFormattingLabel)
                 }
             }
         }
@@ -197,7 +199,7 @@ internal fun MessengerPlusColorSheet(state: MessengerPlusColorSheetState) {
         KeyboardPickerSheet(
             visible = state.visible,
             onDismissRequest = state::dismiss,
-            paneTitle = "Plus! Formatting",
+            paneTitle = stringResource(R.string.format_plus),
             testTag = MESSENGER_PLUS_COLOR_SHEET_TAG,
             expandable = true,
             keepOpenOnInputTap = true,
@@ -224,10 +226,10 @@ private fun MessengerPlusDecorationButtons(
     modifier: Modifier = Modifier,
 ) {
     val decorations = listOf(
-        Triple("Bold", MessengerPlusTextCodec.BOLD_CONTROL, state.initialStyle.bold),
-        Triple("Italic", MessengerPlusTextCodec.ITALIC_CONTROL, state.initialStyle.italic),
-        Triple("Strikeout", MessengerPlusTextCodec.STRIKEOUT_CONTROL, state.initialStyle.strikeout),
-        Triple("Underline", MessengerPlusTextCodec.UNDERLINE_CONTROL, state.initialStyle.underline),
+        Triple(stringResource(R.string.format_bold), MessengerPlusTextCodec.BOLD_CONTROL, state.initialStyle.bold),
+        Triple(stringResource(R.string.format_italic), MessengerPlusTextCodec.ITALIC_CONTROL, state.initialStyle.italic),
+        Triple(stringResource(R.string.format_strikethrough), MessengerPlusTextCodec.STRIKEOUT_CONTROL, state.initialStyle.strikeout),
+        Triple(stringResource(R.string.format_underline), MessengerPlusTextCodec.UNDERLINE_CONTROL, state.initialStyle.underline),
     )
     val icons = listOf(
         Icons.Default.FormatBold,
@@ -263,7 +265,7 @@ private fun MessengerPlusDecorationButtons(
                         text = { Text(label) },
                         leadingIcon = { Icon(icons[index], contentDescription = null) },
                         trailingIcon = if (active) {
-                            { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                            { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                         } else null,
                         onClick = {
                             state.toggle(control)
@@ -324,14 +326,14 @@ private fun MessengerPlusColorOptions(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Colors",
+            stringResource(R.string.plus_colors_plural),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         FilterChip(
             selected = gradient,
             onClick = { onGradientChange(!gradient) },
-            label = { Text("Gradient") },
+            label = { Text(stringResource(R.string.plus_gradient)) },
         )
     }
     Row(
@@ -344,7 +346,7 @@ private fun MessengerPlusColorOptions(
             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
             modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
         ) {
-            Text("Text")
+            Text(stringResource(R.string.plus_target_text))
         }
         ToggleButton(
             checked = background,
@@ -352,20 +354,20 @@ private fun MessengerPlusColorOptions(
             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
             modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
         ) {
-            Text("Background")
+            Text(stringResource(R.string.plus_target_background))
         }
     }
     if (gradient) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MessengerPlusGradientEndpoint(
-                label = "Start",
+                label = stringResource(R.string.plus_gradient_start),
                 color = gradientStart,
                 selected = !selectingGradientEnd,
                 onClick = { selectingGradientEnd = false },
                 modifier = Modifier.weight(1f).testTag(MESSENGER_PLUS_GRADIENT_START_TAG),
             )
             MessengerPlusGradientEndpoint(
-                label = "End",
+                label = stringResource(R.string.plus_gradient_end),
                 color = gradientEnd,
                 selected = selectingGradientEnd,
                 onClick = { selectingGradientEnd = true },
@@ -381,9 +383,13 @@ private fun MessengerPlusColorOptions(
     if (customColor) {
         MessengerPlusCustomColorDialog(
             initialColor = selectedColor ?: checkNotNull(MessengerPlusTextCodec.paletteColor(4)),
-            applyLabel = if (gradient) {
-                if (selectingGradientEnd) "Use for end" else "Use for start"
-            } else "Apply color",
+            applyLabel = stringResource(
+                if (gradient) {
+                    if (selectingGradientEnd) R.string.plus_use_for_end else R.string.plus_use_for_start
+                } else {
+                    R.string.plus_apply_color
+                },
+            ),
             onColorSelected = {
                 chooseColor(it)
                 customColor = false
@@ -404,7 +410,7 @@ private fun MessengerPlusGradientEndpoint(
     FilterChip(
         selected = selected,
         onClick = onClick,
-        label = { Text("$label: ${color?.wireToken.orEmpty()}") },
+        label = { Text(stringResource(R.string.plus_gradient_chip_label, label, color?.wireToken.orEmpty())) },
         leadingIcon = {
             Box(
                 Modifier.size(20.dp)
@@ -425,13 +431,19 @@ private fun MessengerPlusPaletteGrid(
     val tiles = listOf<MessengerPlusPaletteColor?>(null) + MessengerPlusTextCodec.palette
     val customSelected = selectedColor != null &&
         MessengerPlusTextCodec.palette.none { it.argb == selectedColor.argb }
+    val customColorLabel = stringResource(R.string.plus_custom_color)
+    val customShortLabel = stringResource(R.string.plus_custom_short)
     KeyboardSheetTileGrid(items = tiles) { color ->
         val swatch = color?.let { Color(it.argb) }
             ?: if (customSelected) Color(checkNotNull(selectedColor).argb)
             else MaterialTheme.colorScheme.secondaryContainer
         val isSelected = if (color == null) customSelected else selectedColor?.argb == color.argb
+        val tileDesc = color?.let {
+            val labelText = it.labelRes?.let { res -> stringResource(res) } ?: it.label
+            stringResource(R.string.plus_palette_tile_desc, it.wireToken, labelText)
+        } ?: customColorLabel
         KeyboardSheetTile(
-            description = color?.let { "${it.wireToken} ${it.label}" } ?: "Custom color",
+            description = tileDesc,
             isSelected = isSelected,
             color = swatch,
             contentColor = if (swatch.luminance() > 0.45f) Color.Black else Color.White,
@@ -441,7 +453,7 @@ private fun MessengerPlusPaletteGrid(
             ),
             onClick = { if (color == null) onCustomColor() else onColorSelected(color) },
         ) {
-            Text(color?.wireToken ?: "Custom", style = MaterialTheme.typography.labelSmall)
+            Text(color?.wireToken ?: customShortLabel, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

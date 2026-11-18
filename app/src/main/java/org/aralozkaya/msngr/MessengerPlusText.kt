@@ -1,11 +1,13 @@
 package org.aralozkaya.msngr
 
+import androidx.annotation.StringRes
 import java.util.Locale
 
 internal data class MessengerPlusPaletteColor(
     val index: Int,
     val label: String,
     val argb: Int,
+    @param:StringRes val labelRes: Int? = null,
 ) {
     val wireToken: String = index.toString().padStart(2, '0')
 }
@@ -138,7 +140,30 @@ internal object MessengerPlusTextCodec {
             "White", "Black", "Dark blue", "Dark green", "Red", "Dark red", "Purple", "Orange",
             "Yellow", "Light green", "Teal", "Cyan", "Blue", "Magenta", "Gray", "Light gray",
         )
-        MessengerPlusPaletteColor(index, names.getOrNull(index) ?: "#$rgb", (OPAQUE_ALPHA or rgb.toLong(16)).toInt())
+        val labelResIds = listOf(
+            R.string.plus_color_white,
+            R.string.plus_color_black,
+            R.string.plus_color_dark_blue,
+            R.string.plus_color_dark_green,
+            R.string.plus_color_red,
+            R.string.plus_color_dark_red,
+            R.string.plus_color_purple,
+            R.string.plus_color_orange,
+            R.string.plus_color_yellow,
+            R.string.plus_color_light_green,
+            R.string.plus_color_teal,
+            R.string.plus_color_cyan,
+            R.string.plus_color_blue,
+            R.string.plus_color_magenta,
+            R.string.plus_color_gray,
+            R.string.plus_color_light_gray,
+        )
+        MessengerPlusPaletteColor(
+            index = index,
+            label = names.getOrNull(index) ?: "#$rgb",
+            argb = (OPAQUE_ALPHA or rgb.toLong(16)).toInt(),
+            labelRes = labelResIds.getOrNull(index),
+        )
     }
 
     fun parse(source: String, adaptiveColor: Int = 0xFF000000.toInt()): MessengerPlusParsedText =

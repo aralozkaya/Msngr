@@ -1,9 +1,9 @@
 package org.aralozkaya.msngr.pages
 
 import org.aralozkaya.msngr.ProviderOptions
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.ServerOverrides
 import org.aralozkaya.msngr.ServerPresets
-import org.aralozkaya.msngr.WinkCatalogActivity
 import org.aralozkaya.msngr.protocol.MsnEmotionSound
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -20,10 +20,10 @@ class ConnectionInformationTest {
 
         assertEquals(
             listOf(
-                "Winks" to "https://winks.example/catalog/",
-                "Emotion sounds" to "https://sounds.example/custom/",
+                R.string.connection_winks_plural to "https://winks.example/catalog/",
+                R.string.connection_emotion_sounds_plural to "https://sounds.example/custom/",
             ),
-            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
+            messengerPlusConnectionDetailItems(servers.winkCatalogServer, servers.emotionSoundServer),
         )
     }
 
@@ -37,10 +37,10 @@ class ConnectionInformationTest {
 
         assertEquals(
             listOf(
-                "Winks" to "Not configured",
-                "Emotion sounds" to "Not configured",
+                R.string.connection_winks_plural to null,
+                R.string.connection_emotion_sounds_plural to null,
             ),
-            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
+            messengerPlusConnectionDetailItems(servers.winkCatalogServer, servers.emotionSoundServer),
         )
     }
 
@@ -49,18 +49,18 @@ class ConnectionInformationTest {
 
         assertEquals(
             listOf(
-                "Winks" to "Not configured",
-                "Emotion sounds" to MsnEmotionSound.CROSSTALK_SERVER,
+                R.string.connection_winks_plural to null,
+                R.string.connection_emotion_sounds_plural to MsnEmotionSound.CROSSTALK_SERVER,
             ),
-            messengerPlusConnectionDetails(servers.winkCatalogServer, servers.emotionSoundServer),
+            messengerPlusConnectionDetailItems(servers.winkCatalogServer, servers.emotionSoundServer),
         )
     }
 
     @Test fun missingAndBlankUrlsHaveAReadableFallback() {
         for (missing in listOf(null, "", " \t\n")) {
             assertEquals(
-                listOf("Winks" to "Not configured", "Emotion sounds" to "Not configured"),
-                messengerPlusConnectionDetails(missing, missing),
+                listOf(R.string.connection_winks_plural to null, R.string.connection_emotion_sounds_plural to null),
+                messengerPlusConnectionDetailItems(missing, missing),
             )
         }
     }

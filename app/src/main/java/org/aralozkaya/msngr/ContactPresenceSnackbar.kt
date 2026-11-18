@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
 import java.util.Locale
@@ -22,6 +23,7 @@ internal fun ContactPresenceSnackbar(
     isConversationAvailable: Boolean = true,
     ownPresence: Presence = Presence.Online,
 ) {
+    val context = LocalContext.current
     val hostState = remember { SnackbarHostState() }
     val showAppearOfflineNotice = contact?.isGroup == false &&
         contact.presence.isOnline && ownPresence == Presence.Offline
@@ -30,18 +32,18 @@ internal fun ContactPresenceSnackbar(
     ) { mutableStateOf(false) }
     val name = contact?.displayName?.messengerPlusPlainText().orEmpty()
     val message = if (contact?.isGroup == true) when {
-        !isConversationAvailable -> stringResource(R.string.chat_group_removed, name)
-        !contact.presence.isOnline -> stringResource(R.string.chat_group_offline, name)
+        !isConversationAvailable -> stringResource(R.string.chat_group_removed_you_singular, name)
+        !contact.presence.isOnline -> stringResource(R.string.chat_group_offline_you_singular, name)
         else -> null
     } else if (showAppearOfflineNotice) {
-        stringResource(R.string.chat_appear_offline)
+        stringResource(R.string.chat_appear_offline_you_singular)
     } else when (contact?.presence) {
         Presence.Busy, Presence.Away -> stringResource(
             R.string.chat_contact_unavailable,
             name,
-            contact.presence.label.lowercase(Locale.ROOT),
+            context.getString(contact.presence.labelRes).lowercase(context.currentAppLocale()),
         )
-        Presence.Offline -> stringResource(R.string.chat_contact_offline, name)
+        Presence.Offline -> stringResource(R.string.chat_contact_offline_you_singular, name)
         Presence.Online, null -> null
     }
     val dismissLabel = stringResource(R.string.chat_dismiss_status)

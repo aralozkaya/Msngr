@@ -66,6 +66,7 @@ import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.inspectCapturedDisplayPicture
 import org.aralozkaya.msngr.inspectDisplayPicture
 import org.aralozkaya.msngr.loadDisplayPictureBytes
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
@@ -160,7 +161,7 @@ fun ProfilePage(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                profileSaveError = error.message ?: "That image could not be read."
+                profileSaveError = error.message ?: context.getString(R.string.profile_error_read_image)
             } finally {
                 if (captured) context.deleteDisplayPictureCapture(Uri.parse(uri))
                 processingDisplayPicture = false
@@ -192,7 +193,7 @@ fun ProfilePage(
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
-                        profileSaveError = error.message ?: "This picture could not be resized."
+                        profileSaveError = error.message?.let(context::localizeUserMessage) ?: context.getString(R.string.profile_error_resize_picture)
                     } finally {
                         processingDisplayPicture = false
                     }
@@ -215,7 +216,7 @@ fun ProfilePage(
                 } catch (_: Exception) {
                     pendingCameraUri?.let { context.deleteDisplayPictureCapture(Uri.parse(it)) }
                     pendingCameraUri = null
-                    profileSaveError = "The camera could not be opened. Try selecting a photo instead."
+                    profileSaveError = context.getString(R.string.profile_error_open_camera)
                 }
             },
             onSelectPhoto = {
@@ -225,7 +226,7 @@ fun ProfilePage(
                     // ImageOnly includes image/gif; do not limit this to JPEG/PNG.
                     imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 } catch (_: Exception) {
-                    profileSaveError = "The photo picker could not be opened. Please try again."
+                    profileSaveError = context.getString(R.string.profile_error_open_picker)
                 }
             },
             onDefaultPhoto = { showDisplayPictureOptions = false; showDefaultDisplayPictures = true },
@@ -292,7 +293,7 @@ fun ProfilePage(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
-                                    contentDescription = "Change display picture",
+                                    contentDescription = stringResource(R.string.profile_change_display_picture),
                                 )
                             }
                         }
@@ -312,7 +313,7 @@ fun ProfilePage(
                             },
                             controller = usernameEditorController,
                             modifier = Modifier.fillMaxWidth(),
-                            label = "Display name",
+                            label = stringResource(R.string.profile_display_name_label),
                             enabled = !savingProfile,
                             emoticonSettings = emoticonSettings,
                             messengerPlusEnabled = messengerPlusEnabled,
@@ -332,10 +333,10 @@ fun ProfilePage(
                             },
                             controller = statusMessageEditorController,
                             modifier = Modifier.fillMaxWidth(),
-                            label = "Personal message",
+                            label = stringResource(R.string.profile_personal_message_label),
                             enabled = !savingProfile,
-                            placeholder = "Share what you're up to",
-                            supportingText = "Visible to your Messenger contacts",
+                            placeholder = stringResource(R.string.profile_personal_message_placeholder_you_singular),
+                            supportingText = stringResource(R.string.profile_personal_message_supporting_you_singular),
                             emoticonSettings = emoticonSettings,
                             messengerPlusEnabled = messengerPlusEnabled,
                             trailingIcon = if (statusMessageDraft.isNotEmpty()) {
@@ -351,7 +352,7 @@ fun ProfilePage(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Clear,
-                                            contentDescription = "Clear personal message",
+                                            contentDescription = stringResource(R.string.profile_clear_personal_message),
                                         )
                                     }
                                 }
@@ -384,7 +385,7 @@ fun ProfilePage(
                                         null
                                     }
                                     if (displayPictureChanged && avatarUri != null && bytesToUpload == null) {
-                                        profileSaveError = "That image could not be read."
+                                        profileSaveError = context.getString(R.string.profile_error_read_image)
                                         savingProfile = false
                                         return@launch
                                     }
@@ -400,7 +401,7 @@ fun ProfilePage(
                                         onProfileSaved()
                                     }.onFailure { error ->
                                         profileSaveError = error.message
-                                            ?: "The display picture could not be saved to the server."
+                                            ?: context.getString(R.string.profile_error_save_picture_server)
                                         savingProfile = false
                                     }
                                 }
@@ -412,20 +413,20 @@ fun ProfilePage(
                                 label = stringResource(R.string.profile_save_busy),
                                 indicatorModifier = Modifier.testTag("profile-save-loading"),
                             ) {
-                                Text("Save profile")
+                                Text(stringResource(R.string.profile_save_button))
                             }
                         }
                         profileSaveError?.let { message ->
-                            Text(message, color = MaterialTheme.colorScheme.error)
+                            Text(localizeUserMessage(message), color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
                 item(key = "account") {
                     ProfileDetailCard(
                         icon = Icons.Default.Email,
-                        label = "Sign-in address",
+                        label = stringResource(R.string.profile_sign_in_address_label),
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        supportingText = "Managed by your selected community service",
+                        supportingText = stringResource(R.string.profile_sign_in_address_supporting_you_singular),
                     ) {
                         Text(initial.email, style = MaterialTheme.typography.bodyLarge)
                     }

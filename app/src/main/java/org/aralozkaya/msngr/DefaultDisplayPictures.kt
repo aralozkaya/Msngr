@@ -6,6 +6,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 internal const val DEFAULT_DISPLAY_PICTURE_URI_PREFIX = "file:///android_asset/display_pictures/"
+internal const val DEFAULT_DP_VERSION_CLASSIC = "6.1\u20138.5"
+internal const val DEFAULT_DP_VERSION_2009 = "2009"
+internal const val DEFAULT_DP_VERSION_2011_2012 = "2011\u20132012"
 
 internal data class DefaultDisplayPicture(
     val id: String,
@@ -16,9 +19,9 @@ internal data class DefaultDisplayPicture(
 ) {
     val uri: String get() = DEFAULT_DISPLAY_PICTURE_URI_PREFIX + file
     val version: String get() = when (group) {
-        "MSN/Windows Live Messenger 6.1 to 8.5" -> "6.1–8.5"
-        "Windows Live Messenger 2009" -> "2009"
-        "Windows Live Messenger 2011 and 2012" -> "2011–2012"
+        "MSN/Windows Live Messenger 6.1 to 8.5" -> DEFAULT_DP_VERSION_CLASSIC
+        "Windows Live Messenger 2009" -> DEFAULT_DP_VERSION_2009
+        "Windows Live Messenger 2011 and 2012" -> DEFAULT_DP_VERSION_2011_2012
         else -> group
     }
 }

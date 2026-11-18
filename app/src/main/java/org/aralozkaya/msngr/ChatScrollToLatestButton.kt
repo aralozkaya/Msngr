@@ -100,7 +100,7 @@ internal fun ChatScrollToLatestButton(
             ),
             modifier = Modifier.testTag(CHAT_SCROLL_TO_LATEST_TAG),
         ) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Scroll to latest message")
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = androidx.compose.ui.res.stringResource(R.string.chat_scroll_to_latest))
         }
     }
 }

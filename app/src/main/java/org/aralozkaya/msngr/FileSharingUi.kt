@@ -31,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -80,7 +81,7 @@ internal fun SharingMenu(
                 val result = context.sharingRepository().sendFile(contactId, selected.first, selected.second)
                 error = result.exceptionOrNull()?.message
                 if (result.isFailure) selected.first.delete()
-            } catch (failure: Exception) { error = failure.message ?: "The selected file could not be opened." }
+            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.file_sharing_open_selected_file_failed) }
             finally { busy = false }
         }
     }
@@ -88,10 +89,10 @@ internal fun SharingMenu(
         if (uris.isNotEmpty()) scope.launch {
             busy = true
             try {
-                require(uris.size <= 32) { "Choose up to 32 photos at once." }
+                require(uris.size <= 32) { context.getNumberSentence(R.string.photo_sharing_limit_before_number, 32, R.string.photo_sharing_limit_after_number) }
                 val prepared = withContext(Dispatchers.IO) { prepareSharedPhotos(context, uris) }
                 error = context.sharingRepository().sharePhotos(contactId, prepared).exceptionOrNull()?.message
-            } catch (failure: Exception) { error = failure.message ?: "The selected photos could not be opened." }
+            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_open_selected_failed) }
             finally { busy = false }
         }
     }
@@ -100,7 +101,7 @@ internal fun SharingMenu(
         else IconButton(onClick = { expanded = true }, enabled = anyActionEnabled) {
             Icon(
                 Icons.Rounded.DashboardCustomize,
-                contentDescription = "Share or start an activity",
+                contentDescription = stringResource(R.string.chat_share_menu_description),
             )
         }
         DropdownMenuPopup(
@@ -113,7 +114,7 @@ internal fun SharingMenu(
                 modifier = Modifier.testTag("sharing_menu_transfers"),
             ) {
                 DropdownMenuItem(
-                    text = { Text("Photos") },
+                    text = { Text(stringResource(R.string.chat_share_menu_photos)) },
                     leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
                     shape = MenuDefaults.leadingItemShape,
                     enabled = enabled && photosEnabled,
@@ -121,7 +122,7 @@ internal fun SharingMenu(
                     onClick = { expanded = false; photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 )
                 DropdownMenuItem(
-                    text = { Text("Files") },
+                    text = { Text(stringResource(R.string.chat_share_menu_files_plural)) },
                     leadingIcon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
                     shape = MenuDefaults.middleItemShape,
                     enabled = enabled && filesEnabled,
@@ -135,7 +136,7 @@ internal fun SharingMenu(
                 modifier = Modifier.testTag("sharing_menu_activities"),
             ) {
                 DropdownMenuItem(
-                    text = { Text("Games & activities") },
+                    text = { Text(stringResource(R.string.chat_share_menu_games)) },
                     leadingIcon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
                     shape = MenuDefaults.trailingItemShape,
                     enabled = enabled && activitiesEnabled,
@@ -153,8 +154,8 @@ internal fun SharingMenu(
             onDismiss = { gamesOpen = false },
         )
     }
-    error?.let { message -> AlertDialog(onDismissRequest = { error = null }, title = { Text("Could not share") },
-        text = { Text(message) }, confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } }) }
+    error?.let { message -> AlertDialog(onDismissRequest = { error = null }, title = { Text(stringResource(R.string.file_sharing_error_title)) },
+        text = { Text(localizeUserMessage(message)) }, confirmButton = { TextButton(onClick = { error = null }) { Text(stringResource(R.string.common_ok)) } }) }
 }
 
 @Composable
@@ -187,7 +188,7 @@ internal fun FileTransferMessage(message: ChatMessage,
             }
             saved = true
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: Exception) { error = "The file could not be saved." }
+        catch (_: Exception) { error = context.getString(R.string.file_sharing_save_failed) }
         finally { busy = false }
     }
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -211,29 +212,36 @@ internal fun FileTransferMessage(message: ChatMessage,
             }
         }
         Text(when (transfer.status) {
-            FileTransferStatus.Offered -> if (transfer.outgoing) "Waiting for acceptance" else "Wants to send you a file"
-            FileTransferStatus.Transferring -> "${if (transfer.outgoing) "Sending" else "Receiving"} ${android.text.format.Formatter.formatFileSize(context, transfer.transferred)}"
-            FileTransferStatus.Complete -> if (saved || saveState.uri != null) "Saved" else if (transfer.outgoing) "Send complete" else "Receive complete"
-            FileTransferStatus.Declined -> "File declined"
-            FileTransferStatus.Cancelled -> "File transfer cancelled"
-            FileTransferStatus.Failed -> transfer.error ?: "File transfer failed"
+            FileTransferStatus.Offered -> stringResource(if (transfer.outgoing) R.string.file_sharing_waiting_acceptance else R.string.file_sharing_wants_to_send_you_singular)
+            FileTransferStatus.Transferring -> stringResource(
+                if (transfer.outgoing) R.string.file_sharing_sending else R.string.file_sharing_receiving,
+                android.text.format.Formatter.formatFileSize(context, transfer.transferred),
+            )
+            FileTransferStatus.Complete -> stringResource(
+                if (saved || saveState.uri != null) R.string.file_sharing_saved
+                else if (transfer.outgoing) R.string.file_sharing_send_complete
+                else R.string.file_sharing_receive_complete,
+            )
+            FileTransferStatus.Declined -> stringResource(R.string.file_sharing_declined)
+            FileTransferStatus.Cancelled -> stringResource(R.string.file_sharing_canceled)
+            FileTransferStatus.Failed -> transfer.error?.let { localizeUserMessage(it) } ?: stringResource(R.string.file_sharing_failed)
         }, style = MaterialTheme.typography.bodySmall)
         if (transfer.status == FileTransferStatus.Transferring) MsngrLinearWavyProgressIndicator(
             progress = { if (transfer.size == 0L) 0f else (transfer.transferred.toDouble() / transfer.size).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
         else if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        saveState.error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = {
                 scope.launch { accept() }
-            }) { Text("Accept") }
+            }) { Text(stringResource(R.string.common_accept)) }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered)
-                OutlinedButton(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
+                OutlinedButton(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text(stringResource(R.string.file_sharing_save_as)) }
             if (transfer.active) DestructiveOutlinedButton(enabled = !busy, onClick = {
                 scope.launch { error = (onCancel?.invoke() ?: context.sharingRepository().cancelFile(message.contactId, transfer.id)).exceptionOrNull()?.message }
-            }) { Text(if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) "Decline" else "Cancel") }
+            }) { Text(stringResource(if (!transfer.outgoing && transfer.status == FileTransferStatus.Offered) R.string.common_decline else R.string.common_cancel)) }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete && transfer.localPath != null)
-                Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text("Save as") }
+                Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { save.launch(transfer.name) }) { Text(stringResource(R.string.file_sharing_save_as)) }
             if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete && transfer.localPath != null)
                 OutlinedButton(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = {
                     try {
@@ -241,8 +249,8 @@ internal fun FileTransferMessage(message: ChatMessage,
                         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW)
                             .setDataAndType(uri, FileSharingProvider.mime(transfer.name))
                             .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                    } catch (_: Exception) { error = "No app could open this file. You can save it first." }
-                }) { Text("Open") }
+                    } catch (_: Exception) { error = context.getString(R.string.file_sharing_no_open_app_you_singular) }
+                }) { Text(stringResource(R.string.common_open)) }
         }
     }
 }
@@ -261,7 +269,7 @@ private fun FileTransferThumbnail(transfer: FileTransfer) {
         Box(contentAlignment = Alignment.Center) {
             if (imageFile && bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = null,
                 modifier = Modifier.fillMaxSize().testTag("file_thumbnail_${transfer.id}"), contentScale = ContentScale.Fit)
-            else Icon(Icons.Default.InsertDriveFile, contentDescription = "File",
+            else Icon(Icons.Default.InsertDriveFile, contentDescription = stringResource(R.string.file_sharing_file_icon_desc_singular),
                 modifier = Modifier.size(32.dp).testTag("file_icon_${transfer.id}"))
         }
     }
@@ -294,7 +302,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             try {
                 val prepared = withContext(Dispatchers.IO) { prepareSharedPhotos(context, uris) }
                 error = context.sharingRepository().sharePhotos(contactId, prepared).exceptionOrNull()?.message
-            } catch (failure: Exception) { error = failure.message ?: "The selected photos could not be opened." }
+            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_open_selected_failed) }
             finally { preparing = false }
         }
     }
@@ -313,7 +321,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
         }
     }
     val savePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        if (allowed) requestSave() else error = "Storage access is needed to save photos to DCIM/Msngr on Android 9 and earlier."
+        if (allowed) requestSave() else error = context.getNumberSentence(R.string.transfer_storage_access_photos_before_number, 9, R.string.transfer_storage_access_photos_after_number)
     }
     val requestedOriginal = share?.photos?.firstOrNull { it.id == savePhotoId }
     LaunchedEffect(requestedOriginal?.originalPath, requestedOriginal?.originalError, requestedOriginal?.originalPending, saveRequested, requestingOriginal) {
@@ -324,7 +332,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 context.receivedTransferStorage.savePhoto(SessionPrefs.preferenceAccount(context), share.id, requestedOriginal).getOrThrow()
                 savedPhotoId = savePhotoId
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "The photo could not be saved." }
+            catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_save_failed) }
             finally { saveRequested = false }
         }
     }
@@ -338,7 +346,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
     // Keep the FAB composed behind the sheet so Material can animate both directions.
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = { PlainTooltip { Text("View photos") } },
+        tooltip = { PlainTooltip { Text(stringResource(R.string.photo_sharing_view_photos)) } },
         state = rememberTooltipState(),
     ) {
         FloatingActionButton(
@@ -348,18 +356,27 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 visible = !visible,
                 alignment = Alignment.BottomEnd,
             ).then(if (visible) Modifier.clearAndSetSemantics {} else
-                Modifier.testTag("reopen_photo_share").semantics {
-                    stateDescription = when (share.status) {
-                        PhotoShareStatus.Invited -> "Photo sharing invitation"
-                        PhotoShareStatus.Active -> "Sharing ${share.photos.size} photos"
-                        else -> "Photo sharing ended"
+                Modifier.let { baseModifier ->
+                    val fabState = when (share.status) {
+                        PhotoShareStatus.Invited -> stringResource(R.string.photo_sharing_invitation_state)
+                        PhotoShareStatus.Active -> quantityNumberSentenceResource(
+                            count = share.photos.size,
+                            oneBeforeRes = R.string.photo_sharing_count_singular_before_number,
+                            oneAfterRes = R.string.photo_sharing_count_singular_after_number,
+                            otherBeforeRes = R.string.photo_sharing_count_plural_before_number,
+                            otherAfterRes = R.string.photo_sharing_count_plural_after_number,
+                        )
+                        else -> stringResource(R.string.photo_sharing_ended_state)
+                    }
+                    baseModifier.testTag("reopen_photo_share").semantics {
+                        stateDescription = fabState
                     }
                 }),
         ) {
             BadgedBox(badge = {
                 if (share.photos.isNotEmpty()) Badge { Text(share.photos.size.toString()) }
             }) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = "View photos")
+                Icon(Icons.Default.PhotoLibrary, contentDescription = stringResource(R.string.photo_sharing_view_photos))
             }
         }
     }
@@ -368,23 +385,23 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 28.dp).testTag("photo_share"),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Photos", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.chat_share_menu_photos), style = MaterialTheme.typography.headlineSmall)
             when (share.status) {
                 PhotoShareStatus.Invited -> {
-                    Text(if (share.outgoing) "Waiting for the other person to accept\u2026" else "You are invited to share photos.")
+                    Text(stringResource(if (share.outgoing) R.string.photo_sharing_waiting_peer else R.string.photo_sharing_invited_you_singular))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!share.outgoing) Button(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                             error = (onAccept?.invoke() ?: context.sharingRepository().acceptPhotos(contactId, share.id)).exceptionOrNull()?.message
-                        } }) { Text("Accept") }
-                        DestructiveOutlinedButton(onClick = stop) { Text(if (share.outgoing) "Cancel" else "Decline") }
+                        } }) { Text(stringResource(R.string.common_accept)) }
+                        DestructiveOutlinedButton(onClick = stop) { Text(stringResource(if (share.outgoing) R.string.common_cancel else R.string.common_decline)) }
                     }
                 }
-                PhotoShareStatus.Stopped -> Text(if (share.remoteStopped) "The other person stopped sharing photos." else "You stopped sharing photos.")
-                PhotoShareStatus.Declined -> Text("Photo sharing invitation declined.")
-                PhotoShareStatus.Failed -> Text(share.error ?: "Photo sharing failed.")
-                PhotoShareStatus.Active -> Text("Sharing photos", style = MaterialTheme.typography.labelMedium)
+                PhotoShareStatus.Stopped -> Text(stringResource(if (share.remoteStopped) R.string.photo_sharing_stopped_remote else R.string.photo_sharing_stopped_local_you_singular))
+                PhotoShareStatus.Declined -> Text(stringResource(R.string.photo_sharing_declined))
+                PhotoShareStatus.Failed -> Text(share.error?.let { localizeUserMessage(it) } ?: stringResource(R.string.photo_sharing_failed))
+                PhotoShareStatus.Active -> Text(stringResource(R.string.photo_sharing_active), style = MaterialTheme.typography.labelMedium)
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error) }
             if (share.photos.isNotEmpty()) key(share.id) {
                 val selectedIndex = share.photos.indexOfFirst { it.id.equals(share.selectedId, true) }.coerceAtLeast(0)
                 val carousel = rememberCarouselState(initialItem = selectedIndex) { share.photos.size }
@@ -439,38 +456,47 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                             else Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 when {
-                                    photo.previewError != null -> Text(photo.previewError, color = MaterialTheme.colorScheme.error)
-                                    photo.localPath != null -> Text("Preview unavailable.")
-                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text("Receiving photo\u2026") }
+                                    photo.previewError != null -> Text(localizeUserMessage(photo.previewError), color = MaterialTheme.colorScheme.error)
+                                    photo.localPath != null -> Text(stringResource(R.string.photo_sharing_preview_unavailable))
+                                    else -> { MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth()); Text(stringResource(R.string.photo_sharing_receiving_photo)) }
                                 }
                             }
                         }
                     }
                 }
                 Text(selected.name, style = MaterialTheme.typography.bodyMedium)
-                Text("${index + 1} / ${share.photos.size}", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    twoNumbersSentenceResource(
+                        R.string.photo_sharing_counter_before_first_number,
+                        index + 1,
+                        R.string.photo_sharing_counter_between_numbers,
+                        share.photos.size,
+                        R.string.photo_sharing_counter_after_second_number,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                )
                 if (selected.previewError != null && share.status == PhotoShareStatus.Active) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { scope.launch {
                     error = (onSelect?.invoke(selected.id) ?: context.sharingRepository().selectPhoto(contactId, share.id, selected.id)).exceptionOrNull()?.message
-                } }) { Text("Retry photo") }
+                } }) { Text(stringResource(R.string.photo_sharing_retry_photo)) }
                 if (selected.originalPending) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 if (selected.localPath != null) FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {
                     savePhotoId = selected.id; savedPhotoId = null
                     if (TransferPrefs.read(context).photoTree != null || hasDefaultTransferStorageAccess(context)) requestSave()
                     else savePermission.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }, enabled = !selected.originalPending && !saveRequested) {
-                    Text(if (selected.originalPending || saveRequested) "Saving\u2026" else if (savedPhotoId == selected.id || saveState.uri != null) "Saved" else "Save photo")
+                    Text(stringResource(if (selected.originalPending || saveRequested) R.string.photo_sharing_saving else if (savedPhotoId == selected.id || saveState.uri != null) R.string.file_sharing_saved else R.string.photo_sharing_save_photo))
                 }
-                selected.originalError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                saveState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                selected.originalError?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                saveState.error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
             if (preparing) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
             if (share.status == PhotoShareStatus.Active) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(shapes = ButtonDefaults.shapes(), enabled = canAddPhotos && !preparing && share.photos.size < 32, onClick = { addPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text(if (preparing) "Preparing\u2026" else "Add photos")
+                    Text(stringResource(if (preparing) R.string.photo_sharing_preparing else R.string.photo_sharing_add_photos))
                 }
-                DestructiveOutlinedButton(onClick = stop) { Text("Stop sharing") }
+                DestructiveOutlinedButton(onClick = stop) { Text(stringResource(R.string.photo_sharing_stop_sharing)) }
             }
-            if (!ongoing) TextButton(onClick = dismiss) { Text("Close") }
+            if (!ongoing) TextButton(onClick = dismiss) { Text(stringResource(R.string.common_close)) }
         }
     }
 }
@@ -492,7 +518,7 @@ internal fun decodeFileTransferThumbnail(path: String): Bitmap? {
 }
 
 private fun prepareSharedPhotos(context: Context, uris: List<Uri>): List<PhotoToShare> {
-    require(uris.size in 1..32) { "Choose up to 32 photos at once." }
+    require(uris.size in 1..32) { context.getNumberSentence(R.string.photo_sharing_limit_before_number, 32, R.string.photo_sharing_limit_after_number) }
     val prepared = mutableListOf<PhotoToShare>()
     try {
         for (uri in uris) prepared += prepareSharedPhoto(context, uri)
@@ -507,8 +533,8 @@ private fun stageSharedFile(context: Context, uri: Uri): Pair<File, String> {
     val name = runCatching { context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0) else null
     } }.getOrNull() ?: uri.lastPathSegment ?: "shared-file"
-    require(MsnFileContext.validName(name)) { "The file name is unsupported." }
-    require(!MsnFileContext.isExecutable(name)) { "Executable files cannot be shared." }
+    require(MsnFileContext.validName(name)) { context.getString(R.string.file_sharing_unsupported_name) }
+    require(!MsnFileContext.isExecutable(name)) { context.getString(R.string.file_sharing_executable_unsupported) }
     val area = File(context.cacheDir, "outgoing-files").apply { mkdirs() }
     val target = File.createTempFile("send-", ".bin", area)
     try {
@@ -517,7 +543,7 @@ private fun stageSharedFile(context: Context, uri: Uri): Pair<File, String> {
             while (true) {
                 val count = input.read(buffer); if (count < 0) break
                 total += count
-                require(total <= MsnFileContext.MAX_FILE_BYTES) { "Files larger than 2 GB are unsupported." }
+                require(total <= MsnFileContext.MAX_FILE_BYTES) { context.getNumberSentence(R.string.file_sharing_size_limit_before_number, 2, R.string.file_sharing_size_limit_after_number) }
                 output.write(buffer, 0, count)
             }
         } }
@@ -531,7 +557,7 @@ internal fun prepareSharedPhoto(context: Context, uri: Uri): PhotoToShare {
     try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Choose a supported image." }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { context.getString(R.string.photo_sharing_unsupported_image) }
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
         val decoded = requireNotNull(BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample }))

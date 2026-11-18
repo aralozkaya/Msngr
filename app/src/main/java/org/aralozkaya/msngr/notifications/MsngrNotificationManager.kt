@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import org.aralozkaya.msngr.LoginActivity
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.getQuantityNumberSentence
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.cachedAvatarBitmap
@@ -35,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 internal class MsngrNotificationManager(
-    private val context: Context,
+    internal val context: Context,
     private val isForeground: () -> Boolean = {
         (context.applicationContext as? MsngrApplication)?.visibilityTracker?.isForeground == true
     },
@@ -69,7 +70,13 @@ internal class MsngrNotificationManager(
         val isNew = groupInvitationAccount != inbox.accountId || (keys - groupInvitationKeys).isNotEmpty()
         if (groupInvitationAccount != inbox.accountId) dismiss(GROUP_INVITATIONS_NOTIFICATION_ID)
         val count = inbox.invitations.size
-        val text = context.resources.getQuantityString(R.plurals.notification_group_invitations, count, count)
+        val text = context.getQuantityNumberSentence(
+            count = count,
+            oneBeforeRes = R.string.notification_group_invitations_singular_you_singular_before_number,
+            oneAfterRes = R.string.notification_group_invitations_singular_you_singular_after_number,
+            otherBeforeRes = R.string.notification_group_invitations_plural_you_singular_before_number,
+            otherAfterRes = R.string.notification_group_invitations_plural_you_singular_after_number,
+        )
         val open = PendingIntent.getActivity(context, GROUP_INVITATIONS_NOTIFICATION_ID,
             LoginActivity.createGroupInvitationsNotificationIntent(context, inbox.accountId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -77,7 +84,7 @@ internal class MsngrNotificationManager(
             .setSilent(isSilentForGeneralNonChat())
             .setSmallIcon(R.drawable.ic_notification_msngr)
             .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
-            .setContentTitle(context.getString(R.string.group_invitations_title)).setContentText(text)
+            .setContentTitle(context.getString(R.string.group_invitations_title_plural)).setContentText(text)
             .setStyle(NotificationCompat.InboxStyle().also { style ->
                 inbox.invitations.take(5).forEach { style.addLine(it.groupName.messengerPlusPlainText()) }
             })
@@ -108,8 +115,14 @@ internal class MsngrNotificationManager(
         val newRequests = requestAccount != inbox.accountId || (keys - requestKeys).isNotEmpty()
         if (requestAccount != inbox.accountId) dismiss(CONTACT_REQUESTS_NOTIFICATION_ID)
         val count = inbox.requests.size
-        val title = context.getString(R.string.contact_requests_title)
-        val text = context.resources.getQuantityString(R.plurals.notification_contact_requests, count, count)
+        val title = context.getString(R.string.contact_requests_title_plural)
+        val text = context.getQuantityNumberSentence(
+            count = count,
+            oneBeforeRes = R.string.notification_contact_requests_singular_you_singular_before_number,
+            oneAfterRes = R.string.notification_contact_requests_singular_you_singular_after_number,
+            otherBeforeRes = R.string.notification_contact_requests_plural_you_singular_before_number,
+            otherAfterRes = R.string.notification_contact_requests_plural_you_singular_after_number,
+        )
         val openRequests = PendingIntent.getActivity(context, CONTACT_REQUESTS_NOTIFICATION_ID,
             LoginActivity.createContactRequestsNotificationIntent(context, inbox.accountId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -133,7 +146,7 @@ internal class MsngrNotificationManager(
 
     fun showOfflineMessagesReceived() {
         if (!canPostNotifications()) return
-        val text = context.getString(R.string.notification_offline_messages_received)
+        val text = context.getString(R.string.notification_offline_messages_received_you_singular)
         val openApp = PendingIntent.getActivity(
             context,
             OFFLINE_MESSAGES_NOTIFICATION_ID,
@@ -290,7 +303,7 @@ internal class MsngrNotificationManager(
         notify(
             notificationId,
             actionStatusBuilder(
-                NotificationChannels.MESSAGES, contactId, contactName, STATUS_SENDING_REPLY,
+                NotificationChannels.MESSAGES, contactId, contactName, context.getString(R.string.notification_sending_reply),
                 previousNotification,
             )
                 .setProgress(0, 0, true)
@@ -306,7 +319,7 @@ internal class MsngrNotificationManager(
             notificationId,
             actionStatusBuilder(
                 NotificationChannels.MESSAGES, contactId, contactName,
-                STATUS_REPLY_FAILED,
+                context.getString(R.string.notification_reply_failed),
                 activeNotification(notificationId),
             )
                 .setOnlyAlertOnce(true)
@@ -348,8 +361,10 @@ internal class MsngrNotificationManager(
             notificationId,
             actionStatusBuilder(
                 channelId, contactId, contactName,
-                "${context.getString(R.string.notification_nudge_failed_title)}. " +
-                    "Open Msngr to reconnect and try again.",
+                context.getString(
+                    R.string.notification_nudge_failed_text,
+                    context.getString(R.string.notification_nudge_failed_title),
+                ),
                 activeNotification(notificationId),
             )
                 .setOnlyAlertOnce(true)
@@ -434,9 +449,10 @@ internal class MsngrNotificationManager(
     }
 
     private suspend fun groupSenderPerson(event: NotificationEvent): Person {
-        val senderLabel = (event.senderName ?: event.senderEmail ?: "Member")
+        val memberFallback = context.getString(R.string.common_member_fallback_singular)
+        val senderLabel = (event.senderName ?: event.senderEmail ?: memberFallback)
             .messengerPlusPlainText()
-            .ifBlank { "Member" }
+            .ifBlank { memberFallback }
         val senderBitmap = context.loadAvatarBitmap(event.senderAvatarUri)
             ?: context.shortcutAvatarBitmap(senderLabel, null)
         return Person.Builder()
@@ -466,13 +482,13 @@ internal class MsngrNotificationManager(
             event = event,
             notificationId = notificationId,
             channelId = NotificationChannels.MESSAGES,
-            label = context.getString(R.string.notification_nudge_label),
+            label = context.getString(R.string.notification_nudge_label_singular),
         )
         val publicVersion = NotificationCompat.Builder(context, NotificationChannels.MESSAGES)
             .setSmallIcon(R.drawable.ic_notification_msngr)
             .setColor(ContextCompat.getColor(context, R.color.msngr_brand_primary))
             .setContentTitle(context.getString(R.string.app_name))
-            .setContentText("New message")
+            .setContentText(context.getString(R.string.notification_public_new_message))
             .build()
 
         return baseBuilder(
@@ -507,7 +523,7 @@ internal class MsngrNotificationManager(
         val style = messagingStyle()
             .setGroupConversation(event.isGroup)
             .also { if (event.isGroup) it.setConversationTitle(event.contactName) }
-            .addMessage("You received a nudge!", event.sentAtMillis, contact)
+            .addMessage(context.getString(R.string.chat_nudge_received_you_singular), event.sentAtMillis, contact)
         val notification = baseBuilder(
             NotificationChannels.NUDGES,
             event.contactId,
@@ -562,7 +578,7 @@ internal class MsngrNotificationManager(
                     event = event,
                     notificationId = notificationId,
                     channelId = NotificationChannels.CONTACT_SIGNED_IN,
-                    label = context.getString(R.string.notification_nudge_label),
+                    label = context.getString(R.string.notification_nudge_label_singular),
                 ),
             )
             .setAutoCancel(true)
@@ -572,7 +588,7 @@ internal class MsngrNotificationManager(
 
     private fun messagingStyle(): NotificationCompat.MessagingStyle = NotificationCompat.MessagingStyle(
         Person.Builder()
-            .setName(context.getString(R.string.notification_self_name))
+            .setName(context.getString(R.string.notification_self_name_you_singular))
             .setKey(SELF_PERSON_KEY)
             .build(),
     )
@@ -661,8 +677,8 @@ internal class MsngrNotificationManager(
 
     private fun isActionStatusMessage(message: NotificationCompat.MessagingStyle.Message): Boolean {
         val text = message.text?.toString() ?: return false
-        return text == STATUS_SENDING_REPLY ||
-            text == STATUS_REPLY_FAILED ||
+        return text == context.getString(R.string.notification_sending_reply) ||
+            text == context.getString(R.string.notification_reply_failed) ||
             text == context.getString(R.string.notification_sending_nudge) ||
             text.startsWith(context.getString(R.string.notification_nudge_failed_title))
     }
@@ -885,9 +901,6 @@ internal class MsngrNotificationManager(
         private const val EVENT_NOTIFICATION_ID_COUNT = 90_000
         private const val NUDGE_REQUEST_CODE_OFFSET = 400_000
         private const val SELF_PERSON_KEY = "me"
-        private const val STATUS_SENDING_REPLY = "Sending reply\u2026"
-        private const val STATUS_REPLY_FAILED =
-            "Reply not sent. Open Msngr to reconnect and try again."
         private const val EXTRA_IS_ACTION_STATUS = "msngr_is_action_status"
         private const val EXTRA_POST_SEQUENCE = "msngr_post_sequence"
         private val nextPostSequence = AtomicLong(0L)

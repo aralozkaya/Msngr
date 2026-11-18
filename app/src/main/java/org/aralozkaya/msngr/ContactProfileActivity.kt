@@ -42,7 +42,7 @@ class ContactProfileActivity : MsngrActivity() {
             val scope = rememberCoroutineScope()
             MsngrTheme {
                 SecondaryPageScaffold(
-                    title = "Contact profile",
+                    title = androidx.compose.ui.res.stringResource(R.string.contact_profile_title),
                     onBack = ::finish,
                     snackbarHost = { ActionSnackbarHost(snackbarHostState) },
                 ) { padding, scroll ->

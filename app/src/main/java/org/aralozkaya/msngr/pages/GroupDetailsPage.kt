@@ -22,15 +22,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.CompactSearchField
 import org.aralozkaya.msngr.MessengerPlusText
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMemberRole
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.numberSentenceResource
 import org.aralozkaya.msngr.pages.components.ContactRow
 import org.aralozkaya.msngr.pages.components.PageContentList
+import org.aralozkaya.msngr.quantityNumberSentenceResource
 import org.aralozkaya.msngr.withExpandedMsnMenuTokens
 
 @Composable
@@ -66,7 +70,7 @@ fun GroupDetailsPage(
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
     ) {
         if (group == null) {
-            Text("Group is no longer available.", Modifier.padding(24.dp))
+            Text(stringResource(R.string.group_details_unavailable), Modifier.padding(24.dp))
             return@Column
         }
         Column(
@@ -77,16 +81,30 @@ fun GroupDetailsPage(
                 Modifier.fillMaxWidth()
             ) {
                 MessengerPlusText(text = group.displayName, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(buildString {
-                    append("$memberCount ${if (memberCount == 1) "member" else "members"}")
-                    if (pendingCount > 0) append(" · $pendingCount pending")
-                }, style = MaterialTheme.typography.bodyMedium)
+                val memberText = quantityNumberSentenceResource(
+                    memberCount,
+                    R.string.group_members_count_singular_before_number,
+                    R.string.group_members_count_singular_after_number,
+                    R.string.group_members_count_plural_before_number,
+                    R.string.group_members_count_plural_after_number,
+                )
+                val summaryText = if (pendingCount > 0) {
+                    val pendingText = numberSentenceResource(
+                        R.string.group_pending_count_before_number,
+                        pendingCount,
+                        R.string.group_pending_count_after_number,
+                    )
+                    stringResource(R.string.group_count_separator, memberText, pendingText)
+                } else {
+                    memberText
+                }
+                Text(summaryText, style = MaterialTheme.typography.bodyMedium)
             }
             CompactSearchField(
                 state = searchFieldState,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = "Search members",
-                clearContentDescription = "Clear search",
+                placeholder = stringResource(R.string.group_search_members_placeholder),
+                clearContentDescription = stringResource(R.string.contacts_search_clear),
             )
         }
         PageContentList(
@@ -107,19 +125,19 @@ fun GroupDetailsPage(
                     count = visible.size,
                     contact = member,
                     supportingText = member.email,
-                    accessLevel = if (isPending) null else (groupMember?.role ?: GroupMemberRole.Unknown).label,
+                    accessLevel = if (isPending) null else (groupMember?.role ?: GroupMemberRole.Unknown).displayLabel(),
                     isPendingMember = isPending,
                     onClick = if (isOwnContact) null else { {
                         if (member.isForwardListContact) onOpenChat(member) else onAddContact(member)
                     } },
                     onOpenProfile = { if (isOwnContact) onEditProfile() else onOpenProfile(member) },
-                    profileActionLabel = if (isOwnContact) "Edit profile" else null,
+                    profileActionLabel = if (isOwnContact) stringResource(R.string.group_edit_profile_action) else null,
                     isOwnContact = isOwnContact,
                 )
             }
             if (visible.isEmpty()) item {
                 Text(
-                    if (members.isEmpty()) "No member details available yet." else "No members found.",
+                    stringResource(if (members.isEmpty()) R.string.group_members_empty_none else R.string.group_members_empty_search),
                     modifier = Modifier.padding(vertical = 16.dp),
                 )
             }

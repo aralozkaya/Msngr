@@ -155,16 +155,16 @@ private fun ReconnectScreen(
                     .testTag("reconnect_progress"),
             )
             Text(
-                text = "Restoring connection",
+                text = androidx.compose.ui.res.stringResource(R.string.reconnect_title),
                 modifier = Modifier.padding(top = 28.dp),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = if (attempt == 1) {
-                    "The Messenger connection was interrupted. Signing you back in\u2026"
+                    androidx.compose.ui.res.stringResource(R.string.reconnect_interrupted_you_singular)
                 } else {
-                    "The service is not responding yet. Retrying automatically\u2026"
+                    androidx.compose.ui.res.stringResource(R.string.reconnect_retrying)
                 },
                 modifier = Modifier
                     .padding(top = 12.dp)

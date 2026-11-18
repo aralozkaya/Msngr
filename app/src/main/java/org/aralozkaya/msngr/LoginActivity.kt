@@ -64,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -222,7 +223,7 @@ private fun LoginRoute(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 MsngrCircularWavyProgressIndicator()
-                Text("Opening secure storage\u2026", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.login_loading_storage), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         return
@@ -355,7 +356,7 @@ private fun LoginReadyRoute(
                     automaticSignInEnabled = false
                 }
                 errorMessage =
-                    error.message ?: "The selected community service could not sign you in."
+                    error.message ?: context.getString(R.string.login_error_service_default_you_singular)
             }
             submitting = false
         }
@@ -433,13 +434,23 @@ private fun LoginReadyRoute(
     errorMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { errorMessage = null },
-            title = { Text(if (signOutReason != null && message == signOutReason) "Logged out" else "Couldn’t sign in") },
-            text = { Text(message) },
+            title = {
+                Text(
+                    stringResource(
+                        if (signOutReason != null && message == signOutReason) {
+                            R.string.login_dialog_title_logged_out
+                        } else {
+                            R.string.login_dialog_title_error
+                        },
+                    ),
+                )
+            },
+            text = { Text(localizeUserMessage(message)) },
             confirmButton = {
                 TextButton(
                     onClick = { errorMessage = null },
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.common_ok))
                 }
             },
         )
@@ -502,12 +513,16 @@ private fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "Welcome to Msngr",
+                    text = stringResource(R.string.login_welcome_headline),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Re-live the 2000's through a community service.",
+                    text = numberSentenceResource(
+                        R.string.login_welcome_subtitle_before_number,
+                        2000,
+                        R.string.login_welcome_subtitle_after_number,
+                    ),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -525,7 +540,7 @@ private fun LoginScreen(
                         value = email,
                         onValueChange = { onEmailChange(it.withoutUnicodeEmoji()) },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Email address") },
+                        label = { Text(stringResource(R.string.contact_profile_email_label)) },
                         leadingIcon = { Icon(Icons.Default.Mail, contentDescription = null) },
                         trailingIcon = if (rememberedAccounts.isNotEmpty()) {
                             {
@@ -534,7 +549,7 @@ private fun LoginScreen(
                                         onClick = { accountMenuOpen = true },
                                         enabled = !submitting,
                                     ) {
-                                        Icon(Icons.Default.ArrowDropDown, "Choose saved account")
+                                        Icon(Icons.Default.ArrowDropDown, stringResource(R.string.login_choose_saved_account))
                                     }
                                     DropdownMenuPopup(
                                         expanded = accountMenuOpen,
@@ -546,7 +561,7 @@ private fun LoginScreen(
                                         ) {
                                             rememberedAccounts.forEachIndexed { index, account ->
                                                 DropdownMenuItem(
-                                                    text = { Text(account.accountLabel) },
+                                                    text = { Text(account.displayAccountLabel()) },
                                                     shape = MenuDefaults.itemShape(index, rememberedAccounts.size).shape,
                                                     onClick = {
                                                         accountMenuOpen = false
@@ -565,7 +580,7 @@ private fun LoginScreen(
                         singleLine = true,
                         isError = email.isNotBlank() && !validEmail,
                         supportingText = if (email.isNotBlank() && !validEmail) {
-                            { Text("Enter a valid email address.") }
+                            { Text(stringResource(R.string.login_invalid_email)) }
                         } else null,
                     )
                     OutlinedSecureTextField(
@@ -576,7 +591,7 @@ private fun LoginScreen(
                             if (filtered != text) replace(0, length, filtered)
                         },
                         modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
-                        label = { Text("Password") },
+                        label = { Text(stringResource(R.string.login_password_label)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {
                             IconButton(
@@ -615,7 +630,7 @@ private fun LoginScreen(
                                 onCheckedChange = onRememberChange,
                                 enabled = !submitting,
                             )
-                            Text("Remember me")
+                            Text(stringResource(R.string.login_remember_me))
                         }
                         Row(
                             modifier = Modifier
@@ -629,12 +644,12 @@ private fun LoginScreen(
                                 onCheckedChange = onAutomaticSignInChange,
                                 enabled = rememberCredentials && !submitting,
                             )
-                            Text("Sign me in automatically")
+                            Text(stringResource(R.string.login_auto_sign_in))
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Sign in as",
+                            text = stringResource(R.string.login_sign_in_as),
                             style = MaterialTheme.typography.labelLarge,
                         )
                         Box {
@@ -645,12 +660,12 @@ private fun LoginScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(
-                                    text = loginPresence.ownStatusLabel(),
+                                    text = loginPresence.displayOwnStatusLabel(),
                                     modifier = Modifier.weight(1f),
                                 )
                                 Icon(
                                     Icons.Default.ArrowDropDown,
-                                    contentDescription = "Choose login status",
+                                    contentDescription = stringResource(R.string.login_choose_status),
                                 )
                             }
                             DropdownMenuPopup(
@@ -663,7 +678,7 @@ private fun LoginScreen(
                                 ) {
                                     Presence.entries.forEachIndexed { index, presence ->
                                         DropdownMenuItem(
-                                            text = { Text(presence.ownStatusLabel()) },
+                                            text = { Text(presence.displayOwnStatusLabel()) },
                                             shape = MenuDefaults.itemShape(index, Presence.entries.size).shape,
                                             onClick = {
                                                 presenceMenuOpen = false
@@ -686,7 +701,7 @@ private fun LoginScreen(
                                 onCheckedChange = onUseMockServerChange,
                                 enabled = !submitting,
                             )
-                            Text("Use mock server")
+                            Text(stringResource(R.string.login_use_mock_server))
                         }
                     }
                     Button(
@@ -697,10 +712,10 @@ private fun LoginScreen(
                     ) {
                         LoadingButtonContent(
                             loading = submitting,
-                            label = "Signing in",
+                            label = stringResource(R.string.login_signing_in),
                             indicatorModifier = Modifier.testTag("login_progress"),
                         ) {
-                            Text("Sign in")
+                            Text(stringResource(R.string.login_sign_in))
                         }
                     }
                 }
@@ -715,7 +730,7 @@ private fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        text = "Service",
+                        text = stringResource(R.string.login_service_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -728,9 +743,10 @@ private fun LoginScreen(
                         ) {
                             Icon(Icons.Default.Public, contentDescription = null)
                             Spacer(Modifier.width(10.dp))
-                            Text(provider, modifier = Modifier.weight(1f))
+                            Text(providerDisplayName(provider), modifier = Modifier.weight(1f))
                             Icon(
-                                Icons.Default.ArrowDropDown, contentDescription = "Choose service"
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = stringResource(R.string.login_choose_service),
                             )
                         }
                         DropdownMenuPopup(
@@ -743,7 +759,7 @@ private fun LoginScreen(
                             ) {
                                 ServerPresets.providerOptions.forEachIndexed { index, option ->
                                     DropdownMenuItem(
-                                        text = { Text(option) },
+                                        text = { Text(providerDisplayName(option)) },
                                         shape = MenuDefaults.itemShape(index, ServerPresets.providerOptions.size).shape,
                                         onClick = {
                                             providerMenuOpen = false
@@ -755,7 +771,7 @@ private fun LoginScreen(
                         }
                     }
                     Text(
-                        text = "${serverConfig.mainServer}:${serverConfig.mainPort} · ${serverConfig.configServer}",
+                        text = stringResource(R.string.login_server_summary, serverConfig.mainServer, serverConfig.mainPort.toString(), serverConfig.configServer),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

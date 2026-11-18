@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -59,6 +60,7 @@ import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.isValidContactEmail
 import org.aralozkaya.msngr.data.validateContactAddress
+import org.aralozkaya.msngr.localizeUserMessage
 
 @Composable
 internal fun AddContactDialog(
@@ -78,6 +80,7 @@ internal fun AddContactDialog(
     val busy = submitting || closingAction != null
     var error by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val fallbackError = stringResource(R.string.contact_add_failed)
     var focusManager by remember { mutableStateOf<FocusManager?>(null) }
@@ -97,7 +100,7 @@ internal fun AddContactDialog(
         val address = try {
             validateContactAddress(email, ownEmail, contacts)
         } catch (failure: IllegalArgumentException) {
-            error = failure.message
+            error = failure.message?.let(context::localizeUserMessage)
             return
         }
         submitting = true
@@ -109,7 +112,8 @@ internal fun AddContactDialog(
                 val result = onAddContact(address, message)
                 if (result.isSuccess) close(onAdded)
                 else scope.launch {
-                    snackbarHostState.showActionSnackbar(result.exceptionOrNull()?.message ?: fallbackError, isError = true)
+                    val localizedMsg = result.exceptionOrNull()?.message?.let(context::localizeUserMessage) ?: fallbackError
+                    snackbarHostState.showActionSnackbar(localizedMsg, isError = true)
                 }
             } catch (failure: CancellationException) {
                 throw failure
@@ -147,7 +151,7 @@ internal fun AddContactDialog(
                         navigationIcon = {
                             IconButton(onClick = ::dismiss, enabled = !busy,
                                 modifier = Modifier.testTag("add-contact-dismiss")) {
-                                Icon(Icons.Default.Close, contentDescription = "Close")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                             }
                         },
                         actions = {
@@ -191,7 +195,7 @@ internal fun AddContactDialog(
                         modifier = Modifier.fillMaxWidth().testTag("add-contact-message"),
                     )
                     error?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error,
+                        Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.testTag("add-contact-error")
                                 .semantics { liveRegion = LiveRegionMode.Polite })
                     }

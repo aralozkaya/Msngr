@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.editableText
@@ -218,8 +219,8 @@ internal fun MsnEmoticonEditor(
     controller: MessengerPlusEditorController = remember { MessengerPlusEditorController() },
     initialSelection: TextRange? = null,
     singleLine: Boolean = false,
-    hint: String = "Message",
-    contentDescription: String = "Message input",
+    hint: String = stringResource(R.string.chat_message_hint_singular),
+    contentDescription: String = stringResource(R.string.chat_message_input_desc),
     contentPadding: PaddingValues = PaddingValues(start = 4.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
     onFocusChanged: (Boolean) -> Unit = {},
     onTap: () -> Unit = {},
@@ -809,8 +810,8 @@ internal class MsnEditText(context: Context) : EditText(context) {
             (12 * density).roundToInt(),
             (12 * density).roundToInt(),
         )
-        hint = "Message"
-        contentDescription = "Message input"
+        hint = context.getString(R.string.chat_message_hint_singular)
+        contentDescription = context.getString(R.string.chat_message_input_desc)
         addTextChangedListener(
             object : TextWatcher {
                 override fun beforeTextChanged(

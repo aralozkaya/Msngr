@@ -63,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -84,13 +85,13 @@ import org.aralozkaya.msngr.ui.theme.seededColorScheme
 import java.util.Locale
 
 internal val MessengerMainColors = listOf(
-    "Messenger blue" to 0xFF74B4EF, "Ice blue" to 0xFF8BC9E8,
-    "Lavender" to 0xFFABA0DF, "Aqua" to 0xFF73C7C7,
-    "Green" to 0xFF8DCA83, "Yellow" to 0xFFE3C970,
-    "Peach" to 0xFFE9B087, "Orange" to 0xFFE59A6A,
-    "Rose" to 0xFFD98F9D, "Coral" to 0xFFDB7D8C,
-    "Pink" to 0xFFD69ACE, "Purple" to 0xFFB88DD9,
-    "Mauve" to 0xFFBC9EBF, "Silver" to 0xFF8A929B,
+    R.string.color_swatch_messenger_blue to 0xFF74B4EF, R.string.color_swatch_ice_blue to 0xFF8BC9E8,
+    R.string.color_swatch_lavender to 0xFFABA0DF, R.string.color_swatch_aqua to 0xFF73C7C7,
+    R.string.color_swatch_green to 0xFF8DCA83, R.string.color_swatch_yellow to 0xFFE3C970,
+    R.string.color_swatch_peach to 0xFFE9B087, R.string.color_swatch_orange to 0xFFE59A6A,
+    R.string.color_swatch_rose to 0xFFD98F9D, R.string.color_swatch_coral to 0xFFDB7D8C,
+    R.string.color_swatch_pink to 0xFFD69ACE, R.string.color_swatch_purple to 0xFFB88DD9,
+    R.string.color_swatch_mauve to 0xFFBC9EBF, R.string.color_swatch_silver to 0xFF8A929B,
 )
 
 /** The selected option owns its expanding surface; AnimatedVisibility uses its defaults. */
@@ -107,13 +108,13 @@ internal fun AppearanceColorOption(mode: ColorMode, index: Int, count: Int, appe
             ) else ListItemDefaults.segmentedShapes(index, count),
             colors = ListItemDefaults.segmentedColors(),
             modifier = Modifier.fillMaxWidth().testTag("color_mode_${mode.name}"),
-            supportingContent = { Text(when (mode) {
-                ColorMode.Default -> "Messenger colors or a custom main color"
-                ColorMode.Dynamic -> "Colors from your device wallpaper"
-                ColorMode.Scenes -> "Classic scenes with matching app colors"
-            }) },
+            supportingContent = { Text(stringResource(when (mode) {
+                ColorMode.Default -> R.string.appearance_color_mode_default_summary
+                ColorMode.Dynamic -> R.string.appearance_color_mode_dynamic_summary_you_singular
+                ColorMode.Scenes -> R.string.appearance_color_mode_scenes_summary
+            })) },
             trailingContent = { RadioButton(selected = selected, onClick = null) },
-            content = { Text(mode.label) },
+            content = { Text(mode.displayLabel()) },
         )
         if (selected && mode != ColorMode.Dynamic) {
             Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
@@ -152,13 +153,13 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                 SceneBackdrop(scene, Modifier.fillMaxWidth().height(128.dp)) {
                     Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                        SceneText(scene.name, style = MaterialTheme.typography.titleLarge, color = sceneInk)
-                        SceneText(scene.collectionName, style = MaterialTheme.typography.labelMedium, color = sceneInk)
+                        SceneText(scene.localizedName(), style = MaterialTheme.typography.titleLarge, color = sceneInk)
+                        SceneText(scene.localizedGroupName(), style = MaterialTheme.typography.labelMedium, color = sceneInk)
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Choose a scene", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.appearance_choose_scene), modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null)
                 }
             }
@@ -167,25 +168,31 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
                     checked = appearance.showSceneInConversations,
                     onCheckedChange = { AppearancePrefs.setShowSceneInConversations(context, it) },
                     modifier = Modifier.testTag("scene_in_conversations"),
-                    title = "Show scene in chats",
-                    description = "Show the scene behind the name at the top of each chat.",
+                    title = stringResource(R.string.appearance_show_scene_in_chats),
+                    description = stringResource(R.string.appearance_show_scene_in_chats_summary),
                 )
                 SceneOptionSwitch(
                     checked = appearance.darkenScenesInDarkMode,
                     onCheckedChange = { AppearancePrefs.setDarkenScenesInDarkMode(context, it) },
                     modifier = Modifier.testTag("darken_scenes"),
-                    title = "Dark mode tint",
-                    description = "Darken scene images on both screens in dark mode.",
+                    title = stringResource(R.string.appearance_dark_mode_tint),
+                    description = stringResource(R.string.appearance_dark_mode_tint_summary),
                 )
             }
         }
-        Text("Main color", style = MaterialTheme.typography.titleMedium,
+        Text(stringResource(R.string.appearance_main_color), style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading() })
-        Text(if (isScene && override == null) "Colors from ${scene.name}"
-            else "Applied throughout the app in light and dark themes.",
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            if (isScene && override == null) {
+                stringResource(R.string.appearance_colors_from_scene, scene.localizedName())
+            } else {
+                stringResource(R.string.appearance_main_color_summary)
+            },
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            MessengerMainColors.forEach { (name, argb) ->
+            MessengerMainColors.forEach { (nameRes, argb) ->
+                val name = stringResource(nameRes)
                 val selected = override == argb.toInt()
                 Box(Modifier.size(48.dp).selectable(selected, role = Role.RadioButton,
                     onClick = { AppearancePrefs.setMainColor(context, argb.toInt()) })
@@ -202,8 +209,10 @@ internal fun AppearanceColorControls(appearance: AppAppearance) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
             itemVerticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { showColor = true },
-                modifier = Modifier.testTag("custom_main_color")) { Text("Custom color") }
-            if (override != null) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { AppearancePrefs.setMainColor(context, null) }) { Text(if (isScene) "Use scene colors" else "Reset color") }
+                modifier = Modifier.testTag("custom_main_color")) { Text(stringResource(R.string.appearance_custom_color)) }
+            if (override != null) OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { AppearancePrefs.setMainColor(context, null) }) {
+                Text(stringResource(if (isScene) R.string.appearance_use_scene_colors else R.string.appearance_reset_color))
+            }
         }
     }
     if (showScenes) ScenePickerDialog(appearance.sceneId,
@@ -242,9 +251,15 @@ private fun SceneOptionSwitch(
 @Composable
 internal fun ScenePickerDialog(selectedId: String, onSelect: (MessengerScene) -> Unit, onDismiss: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
-    val groups = remember(query) {
-        MessengerScenes.filter { it.name.contains(query, true) || it.group.contains(query, true) ||
-            it.collectionName.contains(query, true) }.groupBy { it.collectionName }
+    val localizedEntries = MessengerScenes.map { scene ->
+        Triple(scene, scene.localizedName(), scene.localizedGroupName())
+    }
+    val groups = remember(query, localizedEntries) {
+        localizedEntries.filter { (scene, localizedName, localizedGroup) ->
+            localizedName.contains(query, true) || localizedGroup.contains(query, true) ||
+                scene.name.contains(query, true) || scene.group.contains(query, true) ||
+                scene.collectionName.contains(query, true)
+        }.groupBy { (_, _, localizedGroup) -> localizedGroup }
     }
     Dialog(onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
@@ -260,27 +275,32 @@ internal fun ScenePickerDialog(selectedId: String, onSelect: (MessengerScene) ->
         }
         Surface(Modifier.fillMaxSize().testTag("scene_picker_surface"), color = MaterialTheme.colorScheme.surface) {
             Scaffold(topBar = {
-                TopAppBar(title = { Text("Scenes") }, navigationIcon = {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close scenes") }
+                TopAppBar(title = { Text(stringResource(R.string.appearance_scenes_title)) }, navigationIcon = {
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, stringResource(R.string.appearance_close_scenes)) }
                 })
             }) { padding ->
                 LazyColumn(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
                     .imePadding().testTag("scene_gallery"),
                     contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item {
-                        OutlinedTextField(query, { query = it }, label = { Text("Search scenes") },
+                        OutlinedTextField(query, { query = it }, label = { Text(stringResource(R.string.appearance_search_scenes)) },
                             singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
-                    groups.forEach { (group, scenes) ->
+                    groups.forEach { (group, entries) ->
                         item(key = "group-$group") {
                             Text(group, style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(top = 8.dp).semantics { heading() })
                         }
-                        items(scenes, key = { it.id }) { scene ->
+                        items(entries, key = { it.first.id }) { (scene, localizedName, localizedGroup) ->
                             val selected = scene.id == selectedId
+                            val cardDescription = stringResource(
+                                if (scene.animated) R.string.appearance_scene_card_desc_animated else R.string.appearance_scene_card_desc_static,
+                                localizedName,
+                                localizedGroup,
+                            )
                             Card(onClick = { onSelect(scene) }, modifier = Modifier.fillMaxWidth()
                                 .testTag("scene_${scene.id}")
-                                .semantics { contentDescription = "${scene.name}, ${scene.group}${if (scene.animated) ", animated" else ""}" },
+                                .semantics { contentDescription = cardDescription },
                                 border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                                 Box(Modifier.fillMaxWidth().height(104.dp)) {
@@ -289,16 +309,16 @@ internal fun ScenePickerDialog(selectedId: String, onSelect: (MessengerScene) ->
                                 Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(scene.name, style = MaterialTheme.typography.titleSmall)
-                                        if (scene.animated) Text("Animated", style = MaterialTheme.typography.labelSmall)
+                                        Text(localizedName, style = MaterialTheme.typography.titleSmall)
+                                        if (scene.animated) Text(stringResource(R.string.common_animated), style = MaterialTheme.typography.labelSmall)
                                     }
                                     Box(Modifier.size(24.dp).background(Color(scene.seedArgb), CircleShape))
-                                    if (selected) Icon(Icons.Default.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+                                    if (selected) Icon(Icons.Default.Check, stringResource(R.string.common_selected), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
                     }
-                    if (groups.isEmpty()) item { Text("No scenes match your search.") }
+                    if (groups.isEmpty()) item { Text(stringResource(R.string.appearance_scenes_empty_you_singular)) }
                 }
             }
         }
@@ -320,25 +340,26 @@ internal fun MainColorDialog(initialArgb: Int, onSelect: (Int) -> Unit, onDismis
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val preview = remember(argb, isDark) { seededColorScheme(argb ?: initialArgb, isDark) }
     AlertDialog(onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("main_color_dialog"), title = { Text("Main color") },
+        modifier = Modifier.testTag("main_color_dialog"), title = { Text(stringResource(R.string.appearance_main_color)) },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ColorWheel(hue, saturation, brightness, { h, s -> update(h, s, brightness) },
                     Modifier.align(Alignment.CenterHorizontally), testTag = "main_color_wheel")
-                Text("Brightness", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.appearance_brightness), style = MaterialTheme.typography.labelMedium)
+                val brightnessDesc = stringResource(R.string.appearance_brightness)
                 Slider(rememberSliderState(brightness).apply { value = brightness }, { update(hue, saturation, it) },
-                    modifier = Modifier.semantics { contentDescription = "Brightness" })
+                    modifier = Modifier.semantics { contentDescription = brightnessDesc })
                 OutlinedTextField(input, {
                     input = it.take(7)
                     MessengerPlusColorValue.fromHex(input)?.let { value ->
                         val next = FloatArray(3).also { values -> android.graphics.Color.colorToHSV(value.argb, values) }
                         hue = next[0]; saturation = next[1]; brightness = next[2]
                     }
-                }, label = { Text("Hex color") }, supportingText = { Text("#RRGGBB") },
+                }, label = { Text(stringResource(R.string.appearance_hex_color)) }, supportingText = { Text(stringResource(R.string.appearance_hex_format_hint)) },
                     isError = argb == null, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("main_color_hex"))
                 Surface(color = preview.surfaceContainer, shape = MaterialTheme.shapes.medium) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Palette preview", color = preview.onSurface, style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.appearance_palette_preview), color = preview.onSurface, style = MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(preview.primary, preview.secondary, preview.tertiary, preview.primaryContainer).forEach {
                                 Box(Modifier.size(32.dp).background(it, CircleShape))
@@ -349,6 +370,6 @@ internal fun MainColorDialog(initialArgb: Int, onSelect: (Int) -> Unit, onDismis
             }
         },
         confirmButton = { Button(onClick = { argb?.let(onSelect) }, enabled = argb != null,
-            shapes = ButtonDefaults.shapes()) { Text("Apply") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+            shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.common_apply)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } })
 }

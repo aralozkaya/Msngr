@@ -33,7 +33,7 @@ object NotificationChannels {
                 },
                 NotificationChannel(
                     MESSAGES,
-                    context.getString(R.string.notification_channel_messages),
+                    context.getString(R.string.notification_channel_messages_plural),
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
                     description = context.getString(
@@ -42,7 +42,7 @@ object NotificationChannels {
                 },
                 NotificationChannel(
                     NUDGES,
-                    context.getString(R.string.notification_channel_nudges),
+                    context.getString(R.string.notification_channel_nudges_plural),
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
                     description = context.getString(
@@ -66,20 +66,20 @@ object NotificationChannels {
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
                     description = context.getString(
-                        R.string.notification_channel_offline_messages_description,
+                        R.string.notification_channel_offline_messages_description_you_singular,
                     )
                 },
                 NotificationChannel(
                     CONTACT_REQUESTS,
-                    context.getString(R.string.notification_channel_contact_requests),
+                    context.getString(R.string.notification_channel_contact_requests_plural),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
-                    description = context.getString(R.string.notification_channel_contact_requests_description)
+                    description = context.getString(R.string.notification_channel_contact_requests_description_you_singular)
                     setShowBadge(true)
                 },
                 NotificationChannel(
                     GROUP_INVITATIONS,
-                    context.getString(R.string.group_invitations_title),
+                    context.getString(R.string.group_invitations_title_plural),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
                     description = context.getString(R.string.notification_channel_group_invitations_description)

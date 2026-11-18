@@ -32,7 +32,7 @@ class MessengerConnectionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        promoteToForeground("Preparing the Messenger connection\u2026")
+        promoteToForeground(getString(R.string.connection_service_preparing))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -55,9 +55,9 @@ class MessengerConnectionService : Service() {
                 connectedRepository.connectionIssue,
             ) { profile, issue ->
                 when {
-                    issue != null -> "Reconnecting automatically\u2026"
-                    profile.email.isNotBlank() -> "Connected as ${profile.email}"
-                    else -> "Connected to Messenger"
+                    issue != null -> getString(R.string.connection_service_reconnecting)
+                    profile.email.isNotBlank() -> getString(R.string.connection_service_connected_as, profile.email)
+                    else -> getString(R.string.connection_service_connected)
                 }
             }.collect(::updateForegroundNotification)
         }

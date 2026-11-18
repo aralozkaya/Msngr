@@ -35,16 +35,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.ConversationNotificationSettingsActivity
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.notifications.InAppNotificationOptions
@@ -83,12 +86,9 @@ internal fun NotificationSettingsScreen(
                             Switch(checked = settings.push.silenceWhenNotOnline, onCheckedChange = null)
                         },
                         supportingContent = {
-                            Text(
-                                "Deliver non-chat push notifications silently when your status is " +
-                                    "Busy, Away, or Appear offline.",
-                            )
+                            Text(stringResource(R.string.notification_silence_offline_summary_you_singular))
                         },
-                        content = { Text("Silence push notifications when not Online") },
+                        content = { Text(stringResource(R.string.notification_silence_offline_title)) },
                     )
                 },
             ) { shapes, colors ->
@@ -107,12 +107,9 @@ internal fun NotificationSettingsScreen(
                         )
                     },
                     supportingContent = {
-                        Text(
-                            "Also silence contact and group message push notifications when your " +
-                                "status is not Online.",
-                        )
+                        Text(stringResource(R.string.notification_silence_messages_summary_you_singular))
                     },
-                    content = { Text("Include contact and group messages") },
+                    content = { Text(stringResource(R.string.notification_silence_messages_title)) },
                 )
             }
         }
@@ -122,8 +119,8 @@ internal fun NotificationSettingsScreen(
                 onClick = onInAppNotifications,
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
                 modifier = Modifier.fillMaxWidth().testTag("in_app_notification_settings"),
-                supportingContent = { Text("Banners and vibration while Msngr is open.") },
-                content = { Text("In-app notifications") },
+                supportingContent = { Text(stringResource(R.string.notification_in_app_summary)) },
+                content = { Text(stringResource(R.string.notification_in_app_title)) },
             )
         }
     }
@@ -138,7 +135,7 @@ internal fun InAppNotificationSettingsScreen(
     val settings by remember(context) { InAppNotificationPrefs.state(context) }.collectAsState()
     PageContentList(innerPadding = innerPadding, scrollBehavior = scrollBehavior,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-        notificationToggle("In-app notifications", settings.defaults.enabled, true, "in_app_enabled") { enabled ->
+        notificationToggle(R.string.notification_in_app_title, settings.defaults.enabled, true, "in_app_enabled") { enabled ->
             InAppNotificationPrefs.update(context) { it.copy(defaults = it.defaults.copy(enabled = enabled)) }
         }
         notificationOptions(settings.defaults, settings.defaults.enabled, InAppNotificationType.entries,
@@ -151,12 +148,12 @@ internal fun InAppNotificationSettingsMenu(onCustomizedNotifications: () -> Unit
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.testTag("in_app_notification_options")) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Notification options")
+            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.notification_options_description))
         }
         DropdownMenuPopup(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
                 DropdownMenuItem(
-                    text = { Text("Customized notifications") },
+                    text = { Text(stringResource(R.string.notification_customized_title)) },
                     leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                     shape = MenuDefaults.standaloneItemShape,
                     modifier = Modifier.testTag("customized_notification_settings"),
@@ -181,7 +178,7 @@ internal fun CustomizedNotificationsScreen(innerPadding: PaddingValues, scrollBe
                 .padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("No custom notifications", textAlign = TextAlign.Center,
+            Text(stringResource(R.string.notification_customized_empty), textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("no_notification_customizations"))
         }
         return
@@ -191,10 +188,19 @@ internal fun CustomizedNotificationsScreen(innerPadding: PaddingValues, scrollBe
         items(customizations, key = { it.contactId }) { custom ->
             val name = contacts.firstOrNull { it.id.notificationKey() == custom.contactId }?.displayName
                 ?.messengerPlusPlainText() ?: custom.displayName
+            val kindLabel = stringResource(
+                if (custom.isGroup) R.string.notification_type_group_singular else R.string.notification_type_contact_singular,
+            )
+            val stateLabel = stringResource(
+                if (!custom.options.enabled && !custom.backgroundEnabled) {
+                    R.string.notification_state_muted
+                } else {
+                    R.string.notification_state_custom
+                },
+            )
             NotificationCustomizationRow(
                 name = name,
-                summary = (if (custom.isGroup) "Group" else "Contact") + " · " +
-                    if (!custom.options.enabled && !custom.backgroundEnabled) "Muted" else "Custom alerts",
+                summary = stringResource(R.string.notification_row_summary_format, kindLabel, stateLabel),
                 contactId = custom.contactId,
                 onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
                     context, custom.contactId, name, custom.isGroup)) },
@@ -227,12 +233,16 @@ internal fun ConversationNotificationSettingsScreen(
                 Text(displayName, style = MaterialTheme.typography.titleLarge)
             }
         }
-        notificationToggle("Use custom settings", custom != null, true, "use_custom_notifications") { enabled ->
+        notificationToggle(R.string.notification_custom_use, custom != null, true, "use_custom_notifications") { enabled ->
             InAppNotificationPrefs.setCustomizationEnabled(context, contactId, displayName, isGroup, enabled)
         }
-        item { Text("In-app notifications", Modifier.padding(16.dp), style = MaterialTheme.typography.titleSmall) }
-        notificationToggle("In-app alerts for this ${if (isGroup) "group" else "contact"}", options.enabled,
-            custom != null, "conversation_notifications_enabled") { enabled ->
+        item { Text(stringResource(R.string.notification_in_app_title), Modifier.padding(16.dp), style = MaterialTheme.typography.titleSmall) }
+        notificationToggle(
+            if (isGroup) R.string.notification_custom_group_alerts else R.string.notification_custom_contact_alerts,
+            options.enabled,
+            custom != null,
+            "conversation_notifications_enabled",
+        ) { enabled ->
             update { it.copy(enabled = enabled) }
         }
         notificationOptions(options, custom != null && options.enabled,
@@ -241,20 +251,22 @@ internal fun ConversationNotificationSettingsScreen(
             onChange = { changed -> update { changed } })
         item {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Background notifications", style = MaterialTheme.typography.titleSmall)
-                Text("Android notification permissions and channels also apply when Msngr is in the background.")
+                Text(stringResource(R.string.notification_background_title), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.notification_background_summary))
             }
         }
-        notificationToggle("Background alerts", custom?.backgroundEnabled ?: true, custom != null, "conversation_background_enabled") { enabled ->
+        notificationToggle(R.string.notification_background_alerts, custom?.backgroundEnabled ?: true, custom != null, "conversation_background_enabled") { enabled ->
             InAppNotificationPrefs.customizeBackground(context, contactId, displayName, isGroup) { it.copy(backgroundEnabled = enabled) }
         }
-        notificationToggle("Silent background alerts", custom?.backgroundSilent ?: false,
+        notificationToggle(R.string.notification_background_silent, custom?.backgroundSilent ?: false,
             custom != null && custom.backgroundEnabled, "conversation_background_silent") { silent ->
             InAppNotificationPrefs.customizeBackground(context, contactId, displayName, isGroup) { it.copy(backgroundSilent = silent) }
         }
         if (custom != null) item {
             OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { InAppNotificationPrefs.reset(context, contactId) },
-                modifier = Modifier.testTag("reset_conversation_notifications")) { Text("Reset to general settings") }
+                modifier = Modifier.testTag("reset_conversation_notifications")) {
+                Text(stringResource(R.string.notification_reset_general))
+            }
         }
     }
 }
@@ -263,23 +275,23 @@ private fun LazyListScope.notificationOptions(
     options: InAppNotificationOptions, enabled: Boolean, types: List<InAppNotificationType>,
     onChange: (InAppNotificationOptions) -> Unit,
 ) {
-    notificationToggle("Vibration", options.vibrate, enabled, "in_app_vibration") {
+    notificationToggle(R.string.notification_vibration, options.vibrate, enabled, "in_app_vibration") {
         onChange(options.copy(vibrate = it))
     }
-    notificationToggle("Banners", options.banners, enabled, "in_app_banners") {
+    notificationToggle(R.string.notification_banners, options.banners, enabled, "in_app_banners") {
         onChange(options.copy(banners = it))
     }
     types.forEach { type ->
         item(key = "notification-section-${type.name}") {
-            Text(type.label, Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+            Text(type.displayLabel(), Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
                 .semantics { heading() },
                 style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         }
         val rule = options.rule(type)
-        notificationToggle("Notifications", rule.enabled, enabled, "in_app_type_${type.name}", index = 0, count = 2) {
+        notificationToggle(R.string.notification_toggle_notifications, rule.enabled, enabled, "in_app_type_${type.name}", index = 0, count = 2) {
             onChange(options.copy(rules = options.rules + (type to rule.copy(enabled = it))))
         }
-        notificationToggle("Vibration", rule.vibrate,
+        notificationToggle(R.string.notification_vibration, rule.vibrate,
             enabled && options.vibrate && rule.enabled, "in_app_type_vibration_${type.name}",
             index = 1, count = 2) {
             onChange(options.copy(rules = options.rules + (type to rule.copy(vibrate = it))))
@@ -287,13 +299,13 @@ private fun LazyListScope.notificationOptions(
     }
 }
 
-private fun LazyListScope.notificationToggle(label: String, checked: Boolean, enabled: Boolean, tag: String,
+private fun LazyListScope.notificationToggle(@StringRes labelRes: Int, checked: Boolean, enabled: Boolean, tag: String,
                                             index: Int = 0, count: Int = 1, onChange: (Boolean) -> Unit) {
     item(key = tag) {
         SegmentedListItem(checked = checked, onCheckedChange = onChange, enabled = enabled,
             shapes = ListItemDefaults.segmentedShapes(index, count),
             modifier = Modifier.fillMaxWidth().testTag(tag),
             trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
-            content = { Text(label) })
+            content = { Text(stringResource(labelRes)) })
     }
 }

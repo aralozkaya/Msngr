@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -157,6 +159,7 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
             }.getOrDefault(emptyList())
         }
     }
+    val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(clip, lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) job?.cancel() }
@@ -174,7 +177,7 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
                         progress = 0f
                         try { VoicePlayback.play(clip) { progress = it } }
                         catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { error = "Voice clip could not be played." }
+                        catch (_: Exception) { error = context.getString(R.string.voice_clip_cant_play) }
                         finally {
                             progress = 0f
                             if (job === currentCoroutineContext()[Job]) job = null
@@ -185,20 +188,20 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ), modifier = Modifier.size(if (compact) 36.dp else 48.dp)) {
                     Icon(if (job?.isActive == true) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = if (job?.isActive == true) "Stop voice clip" else "Play voice clip",
+                        contentDescription = stringResource(if (job?.isActive == true) R.string.voice_clip_stop_description else R.string.voice_clip_play_description),
                         modifier = Modifier.size(if (compact) 20.dp else 24.dp))
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 VoiceWaveform(levels, Modifier.fillMaxWidth().height(24.dp), progress)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Voice clip", style = MaterialTheme.typography.labelMedium)
-                    Text(String.format(Locale.ROOT, "%.1f s", clip.durationMillis / 1_000f),
+                    Text(stringResource(R.string.voice_clip_title), style = MaterialTheme.typography.labelMedium)
+                    Text(numberSentenceResource(R.string.voice_clip_duration_before_number, formatDecimal(clip.durationMillis / 1_000.0), R.string.voice_clip_duration_after_number),
                         style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -218,9 +221,9 @@ internal fun VoiceClipMessage(message: ChatMessage) {
                 message.isVoiceClipPending -> Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MsngrCircularWavyProgressIndicator(Modifier.size(20.dp))
-                    Text("Downloading voice clip\u2026", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.voice_clip_downloading), style = MaterialTheme.typography.bodySmall)
                 }
-                else -> Text(message.voiceClipTransferError ?: "Voice clip unavailable", style = MaterialTheme.typography.bodySmall)
+                else -> Text(message.voiceClipTransferError?.let { localizeUserMessage(it) } ?: stringResource(R.string.voice_clip_unavailable), style = MaterialTheme.typography.bodySmall)
             }
         }
     }

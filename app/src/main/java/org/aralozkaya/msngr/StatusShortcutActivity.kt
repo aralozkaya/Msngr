@@ -214,7 +214,7 @@ internal fun StatusShortcutWindow(
                     ) {
                         PresenceDot(selectedPresence, modifier = Modifier.size(10.dp))
                         Text(
-                            text = selectedPresence.ownStatusLabel(),
+                            text = selectedPresence.displayOwnStatusLabel(),
                             modifier = Modifier.weight(1f).padding(start = 12.dp),
                         )
                         Icon(
@@ -232,7 +232,7 @@ internal fun StatusShortcutWindow(
                         ) {
                             Presence.entries.forEach { presence ->
                                 DropdownMenuItem(
-                                    text = { Text(presence.ownStatusLabel()) },
+                                    text = { Text(presence.displayOwnStatusLabel()) },
                                     onClick = {
                                         selectedPresence = presence
                                         presenceMenuOpen = false

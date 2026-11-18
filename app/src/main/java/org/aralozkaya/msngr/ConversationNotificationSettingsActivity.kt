@@ -17,7 +17,7 @@ class ConversationNotificationSettingsActivity : MsngrActivity() {
         val group = intent.getBooleanExtra("is_group", false)
         setContent {
             MsngrTheme {
-                SecondaryPageScaffold(title = "Custom notifications", onBack = ::finish) { padding, scroll ->
+                SecondaryPageScaffold(title = androidx.compose.ui.res.stringResource(R.string.notification_custom_activity_title), onBack = ::finish) { padding, scroll ->
                     ConversationNotificationSettingsScreen(id, name, group, padding, scroll)
                 }
             }

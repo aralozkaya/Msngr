@@ -39,7 +39,7 @@ private fun ProfileRoute(
     onBack: () -> Unit,
 ) {
     SecondaryPageScaffold(
-        title = "Edit profile",
+        title = androidx.compose.ui.res.stringResource(R.string.profile_edit_title),
         onBack = onBack,
     ) { innerPadding, scrollBehavior ->
         ProfilePage(

@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.R
 
 @Composable
 fun MockServerBanner(modifier: Modifier = Modifier) {
@@ -30,7 +32,7 @@ fun MockServerBanner(modifier: Modifier = Modifier) {
         ) {
             Icon(Icons.Default.Science, contentDescription = null)
             Text(
-                text = "Mock server active · Test data only",
+                text = stringResource(R.string.mock_server_banner),
                 modifier = Modifier.padding(start = 8.dp),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,

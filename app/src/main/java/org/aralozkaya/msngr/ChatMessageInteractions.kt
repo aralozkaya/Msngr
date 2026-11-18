@@ -74,7 +74,7 @@ internal fun Modifier.copyMessageOnLongPress(
 internal fun copyChatMessage(context: Context, text: String) {
     val plainText = MessengerPlusTextCodec.plainText(text).withExpandedMsnMenuTokens()
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
-        ClipData.newPlainText(context.getString(R.string.chat_message_clip_label), plainText),
+        ClipData.newPlainText(context.getString(R.string.chat_message_clip_label_singular), plainText),
     )
     // Android 13 and later show their own clipboard confirmation.
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {

@@ -121,6 +121,12 @@ class MsngrApplication : Application() {
         updateManager.initialize(this)
         AppShortcuts.refresh(this)
     }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        NotificationChannels.createAll(this)
+        AppShortcuts.refresh(this)
+    }
 }
 
 class AppContainer(

@@ -422,7 +422,7 @@ class WinkInstrumentedTest {
         WinkPrefs.update(context, WinkSettings(playWinks = true, sounds = false))
         compose.setContent { MaterialTheme {
             org.aralozkaya.msngr.pages.components.SecondaryPageScaffold(
-                org.aralozkaya.msngr.pages.SettingsDestination.Emoticons.title, {}) { padding, scroll ->
+                context.getString(org.aralozkaya.msngr.pages.SettingsDestination.Emoticons.titleRes), {}) { padding, scroll ->
                 org.aralozkaya.msngr.pages.EmoticonSettingsScreen(padding, scroll)
             }
         } }

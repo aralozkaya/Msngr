@@ -461,7 +461,9 @@ internal fun ChatScreen(
                     TopAppBar(
                         modifier = Modifier.clickable(
                             enabled = contact != null && isConversationAvailable,
-                            onClickLabel = if (contact?.isGroup == true) "View group members" else "View contact profile",
+                            onClickLabel = stringResource(
+                                if (contact?.isGroup == true) R.string.chat_top_bar_view_group else R.string.chat_top_bar_view_profile,
+                            ),
                             role = androidx.compose.ui.semantics.Role.Button,
                         ) {
                             contact?.let {
@@ -481,18 +483,40 @@ internal fun ChatScreen(
                             titleContentColor = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurface,
                         ),
                         navigationIcon = {
+                            val backStateDescription = if (otherUnreadCount > 0) {
+                                quantityNumberSentenceResource(
+                                    count = otherUnreadCount,
+                                    oneBeforeRes = R.string.chat_other_unread_singular_before_number,
+                                    oneAfterRes = R.string.chat_other_unread_singular_after_number,
+                                    otherBeforeRes = R.string.chat_other_unread_plural_before_number,
+                                    otherAfterRes = R.string.chat_other_unread_plural_after_number,
+                                )
+                            } else {
+                                null
+                            }
                             IconButton(
                                 onClick = onBack,
                                 modifier = Modifier.semantics {
-                                    if (otherUnreadCount > 0) stateDescription = "$otherUnreadCount unread messages in other chats"
+                                    if (backStateDescription != null) stateDescription = backStateDescription
                                 },
                             ) {
                                 BadgedBox(badge = {
-                                    if (otherUnreadCount > 0) Badge(Modifier.testTag("other_chats_unread_badge")) {
-                                        Text(if (otherUnreadCount > 99) "99+" else otherUnreadCount.toString())
+                                    if (otherUnreadCount > 0) {
+                                        val badgeText = if (otherUnreadCount > 99) {
+                                            numberSentenceResource(
+                                                R.string.main_count_badge_cap_before_number,
+                                                formatLocalizedInt(99),
+                                                R.string.main_count_badge_cap_after_number,
+                                            )
+                                        } else {
+                                            formatLocalizedInt(otherUnreadCount)
+                                        }
+                                        Badge(Modifier.testTag("other_chats_unread_badge")) {
+                                            Text(badgeText)
+                                        }
                                     }
                                 }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                                 }
                             }
                         },
@@ -514,7 +538,7 @@ internal fun ChatScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 Avatar(
-                                    name = contact?.displayName?.messengerPlusPlainText() ?: "Contact",
+                                    name = contact?.displayName?.messengerPlusPlainText() ?: stringResource(R.string.common_contact_singular),
                                     avatarUri = contact?.avatarUri,
                                     presence = contact?.presence ?: Presence.Offline,
                                     modifier = Modifier.size(42.dp),
@@ -522,7 +546,7 @@ internal fun ChatScreen(
                                 )
                                 Column {
                                     MessengerPlusText(
-                                        text = contact?.displayName ?: "Conversation",
+                                        text = contact?.displayName ?: stringResource(R.string.chat_conversation_fallback),
                                         sceneGlow = scene != null,
                                         color = if (scene != null) sceneInk else Color.Unspecified,
                                         style = MaterialTheme.typography.titleMedium.copy(
@@ -539,11 +563,17 @@ internal fun ChatScreen(
                                         )
                                         SceneText(
                                             text = if (isTyping) {
-                                                "typing\u2026"
+                                                stringResource(R.string.chat_typing_status)
                                             } else if (contact?.isGroup == true) {
-                                                "${contact.joinedMembers.size} ${if (contact.joinedMembers.size == 1) "member" else "members"}"
+                                                quantityNumberSentenceResource(
+                                                    count = contact.joinedMembers.size,
+                                                    oneBeforeRes = R.string.group_members_count_singular_before_number,
+                                                    oneAfterRes = R.string.group_members_count_singular_after_number,
+                                                    otherBeforeRes = R.string.group_members_count_plural_before_number,
+                                                    otherAfterRes = R.string.group_members_count_plural_after_number,
+                                                )
                                             } else {
-                                                contact?.presence?.label ?: "Offline"
+                                                contact?.presence?.displayLabel() ?: stringResource(R.string.presence_offline)
                                             },
                                             style = MaterialTheme.typography.labelMedium,
                                             color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -864,8 +894,18 @@ internal fun MessageComposer(
     ) {
         if (enabled && nudgeCooldownMillis > 0L) {
             Text(
-                text = if (nudgeCooldownMillis == Long.MAX_VALUE) "Sending nudge\u2026" else
-                    "You can send another nudge in ${(nudgeCooldownMillis + 999) / 1_000} seconds.",
+                text = if (nudgeCooldownMillis == Long.MAX_VALUE) {
+                    stringResource(R.string.chat_sending_nudge)
+                } else {
+                    val cooldownSeconds = ((nudgeCooldownMillis + 999) / 1_000).toInt()
+                    quantityNumberSentenceResource(
+                        count = cooldownSeconds,
+                        oneBeforeRes = R.string.chat_nudge_cooldown_singular_you_singular_before_number,
+                        oneAfterRes = R.string.chat_nudge_cooldown_singular_you_singular_after_number,
+                        otherBeforeRes = R.string.chat_nudge_cooldown_plural_you_singular_before_number,
+                        otherAfterRes = R.string.chat_nudge_cooldown_plural_you_singular_after_number,
+                    )
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().background(composerBackgroundColor)
@@ -979,7 +1019,7 @@ internal fun MessageComposer(
                                     ) {
                                         Icon(
                                             Icons.Default.NotificationsActive,
-                                            contentDescription = "Send nudge",
+                                            contentDescription = stringResource(R.string.chat_send_nudge_desc),
                                         )
                                     }
                                 }
@@ -1022,7 +1062,7 @@ internal fun MessageComposer(
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send message")
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.chat_send_message_desc))
                         }
                     },
                 )
@@ -1205,6 +1245,7 @@ private fun EmoticonAndHandwritingMenuButton(
                 }
             },
     ) {
+        val plusMenuDescription = stringResource(R.string.chat_open_plus_menu_desc)
         IconButton(
             onClick = {
                 if (suppressNextClick) {
@@ -1219,7 +1260,7 @@ private fun EmoticonAndHandwritingMenuButton(
             modifier = Modifier
                 .testTag(EMOTICON_MODE_BUTTON_TAG)
                 .semantics {
-                    onLongClick("Open emoticon, handwriting, and winks menu") {
+                    onLongClick(plusMenuDescription) {
                         menuExpanded = true
                         true
                     }
@@ -1232,13 +1273,13 @@ private fun EmoticonAndHandwritingMenuButton(
                 if (emoticonSheetVisible) {
                     Icon(
                         Icons.Default.Keyboard,
-                        contentDescription = "Show keyboard",
+                        contentDescription = stringResource(R.string.chat_show_keyboard_desc),
                         modifier = Modifier.size(22.dp),
                     )
                 } else {
                     Icon(
                         Icons.Default.EmojiEmotions,
-                        contentDescription = "Show emoticons",
+                        contentDescription = stringResource(R.string.chat_show_emoticons_desc),
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -1295,7 +1336,7 @@ private fun EmoticonAndHandwritingMenuButton(
                 val isWinksHovered = draggedOption == ComposerEmoticonMenuOption.Winks
                 val isSoundsHovered = draggedOption == ComposerEmoticonMenuOption.EmotionSounds
                 DropdownMenuItem(
-                    text = { Text("Emoticons") },
+                    text = { Text(stringResource(R.string.insert_emoticon)) },
                     leadingIcon = { Icon(Icons.Default.EmojiEmotions, contentDescription = null) },
                     shape = MenuDefaults.leadingItemShape,
                     interactionSource = emoticonsItemInteractionSource,
@@ -1336,7 +1377,7 @@ private fun EmoticonAndHandwritingMenuButton(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Handwriting") },
+                    text = { Text(stringResource(R.string.chat_menu_handwriting)) },
                     leadingIcon = { Icon(Icons.Default.Draw, contentDescription = null) },
                     shape = MenuDefaults.middleItemShape,
                     enabled = handwritingEnabled,
@@ -1378,7 +1419,7 @@ private fun EmoticonAndHandwritingMenuButton(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Winks") },
+                    text = { Text(stringResource(R.string.chat_menu_winks_plural)) },
                     leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
                     shape = MenuDefaults.middleItemShape,
                     enabled = winksEnabled,
@@ -1420,7 +1461,7 @@ private fun EmoticonAndHandwritingMenuButton(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Emotion sounds") },
+                    text = { Text(stringResource(R.string.chat_menu_emotion_sounds_plural)) },
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null) },
                     shape = MenuDefaults.trailingItemShape,
                     enabled = soundsEnabled,
@@ -1509,7 +1550,7 @@ internal fun EmoticonPanel(
     state: EmoticonSheetState,
     useOriginalEmoticons: Boolean,
     canDelete: Boolean = state.canDelete,
-    backspaceDescription: String = "Backspace message",
+    backspaceDescription: String = stringResource(R.string.chat_backspace_message_desc),
     onSearchFocusChanged: (Boolean) -> Unit = {},
     onFallbackInsert: (Char) -> Unit = {},
 ) {
@@ -1533,12 +1574,14 @@ internal fun EmoticonPanel(
         }
     }
     val query = searchFieldState.text.toString().withExpandedMsnMenuTokens().trim()
-    val emoticons = remember(query) {
-        MSN_EMOTICON_SHORTCUTS.filter { emoticon ->
-            emoticon.name.contains(query, ignoreCase = true) ||
+    val emoticonsWithNames = MSN_EMOTICON_SHORTCUTS.map { it to stringResource(it.nameRes) }
+    val emoticons = remember(query, emoticonsWithNames) {
+        emoticonsWithNames.filter { (emoticon, localizedName) ->
+            localizedName.contains(query, ignoreCase = true) ||
+                emoticon.name.contains(query, ignoreCase = true) ||
                 emoticon.allShortcuts.any { it.contains(query, ignoreCase = true) } ||
                 emoticon.unicode.contains(query)
-        }
+        }.map { it.first }
     }
     KeyboardPickerSheet(
         visible = state.visible,
@@ -1602,7 +1645,7 @@ internal fun EmoticonPanel(
                     positionProvider =
                         TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                     tooltip = {
-                        val tooltipText = "${emoticon.name}  ${emoticon.tooltipShortcut}"
+                        val tooltipText = stringResource(R.string.chat_emoticon_tooltip_format, stringResource(emoticon.nameRes), emoticon.tooltipShortcut)
                         PlainTooltip(
                             modifier = Modifier.semantics {
                                 liveRegion = LiveRegionMode.Assertive
@@ -1659,11 +1702,14 @@ internal fun MessageBubble(
     val emotionSound = message.emotionSound
     val deliveryError = message.deliveryError
     val winkTransferFailed = message.wink != null && !message.isWinkPending && message.winkTransferError != null
+    val localizedEmotionSoundText = emotionSound?.let {
+        stringResource(R.string.chat_emotion_sound_message, localizedEmotionSoundName(it.sound.name))
+    }
     val containerInteractionModifier = if (containerInteractionEnabled) {
         val interactionSource = remember { MutableInteractionSource() }
         val context = LocalContext.current
         val haptic = LocalHapticFeedback.current
-        val copyText = emotionSound?.displayText ?: message.text
+        val copyText = localizedEmotionSoundText ?: localizedChatMessageText(message)
         val onCopy = remember(context, haptic, copyText) {
             {
                 copyChatMessage(context, copyText)
@@ -1742,10 +1788,14 @@ internal fun MessageBubble(
                     )
                 } else {
                     MsnEmoticonText(
-                        text = emotionSound?.displayText ?: message.text,
-                        modifier = if (emotionSound != null) Modifier.testTag("emotion_sound_message_${message.id}")
-                            .clickable(onClickLabel = "Show emotion sound options", role = androidx.compose.ui.semantics.Role.Button) { showSoundOptions = true }
-                            else Modifier,
+                        text = localizedEmotionSoundText ?: localizedChatMessageText(message),
+                        modifier = if (emotionSound != null) {
+                            Modifier.testTag("emotion_sound_message_${message.id}")
+                                .clickable(
+                                    onClickLabel = stringResource(R.string.chat_emotion_sound_options_desc),
+                                    role = androidx.compose.ui.semantics.Role.Button,
+                                ) { showSoundOptions = true }
+                        } else Modifier,
                         nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
                             else message.nativeStyle.copy(size = textSize),
                         useOriginalEmoticons = useOriginalEmoticons,
@@ -1805,7 +1855,7 @@ internal fun MessageBubble(
         AlertDialog(
             onDismissRequest = { showDeliveryError = false },
             title = { Text(stringResource(R.string.chat_message_failed)) },
-            text = { Text(deliveryError) },
+            text = { Text(localizeUserMessage(deliveryError)) },
             confirmButton = {
                 Button(onClick = {
                     showDeliveryError = false

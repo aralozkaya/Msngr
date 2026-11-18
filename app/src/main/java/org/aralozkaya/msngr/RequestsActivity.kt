@@ -58,7 +58,7 @@ class RequestsActivity : MsngrActivity() {
                 val groups = repository.refreshGroupInvitations()
                 refreshError = listOfNotNull(contacts.exceptionOrNull(), groups.exceptionOrNull())
                     .takeIf { it.isNotEmpty() }
-                    ?.joinToString("\n") { it.message ?: getString(R.string.requests_refresh_failed) }
+                    ?.joinToString("\n") { error -> error.message?.let { localizeUserMessage(it) } ?: getString(R.string.requests_refresh_failed) }
             } finally { refreshing = false }
         }
     }

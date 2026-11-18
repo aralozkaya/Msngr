@@ -112,14 +112,14 @@ internal fun NativeTextStyleSheet(
             ) {
                 NativeFontStyleDropdown(style.fontStyle) { onStyleChange(style.withFontStyle(it)) }
                 NativeStyleToggle(
-                    label = "Strikeout",
+                    label = stringResource(R.string.format_strikethrough),
                     checked = style.strikeout,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 ) {
                     onStyleChange(style.copy(strikeout = it))
                 }
                 NativeStyleToggle(
-                    label = "Underline",
+                    label = stringResource(R.string.format_underline),
                     checked = style.underline,
                     modifier = Modifier.padding(horizontal = 8.dp),
                 ) {
@@ -134,14 +134,18 @@ internal fun NativeTextStyleSheet(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Color", modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.native_style_color_singular), modifier = Modifier.weight(1f))
+                    val currentColorDesc = stringResource(
+                        R.string.native_style_current_color,
+                        style.colorRgb.toString(16).padStart(6, '0'),
+                    )
                     Box(
                         Modifier
                             .size(height = 32.dp, width = 52.dp)
                             .background(Color(0xFF000000.toInt() or style.colorRgb), CircleShape)
                             .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
                             .semantics {
-                                contentDescription = "Current color #${style.colorRgb.toString(16).padStart(6, '0')}"
+                                contentDescription = currentColorDesc
                             },
                     )
                 }
@@ -150,7 +154,7 @@ internal fun NativeTextStyleSheet(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Size", modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.native_style_size), modifier = Modifier.weight(1f))
                     OutlinedTextField(
                         value = sizeInput,
                         onValueChange = { input ->
@@ -161,7 +165,7 @@ internal fun NativeTextStyleSheet(
                         },
                         modifier = Modifier.width(100.dp).testTag("native_text_size_input"),
                         singleLine = true,
-                        label = { Text("Size") },
+                        label = { Text(stringResource(R.string.native_style_size)) },
                         isError = !validSize,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
@@ -178,7 +182,13 @@ internal fun NativeTextStyleSheet(
                 )
                 if (!validSize) {
                     Text(
-                        "Enter a size from 8 to 72.",
+                        twoNumbersSentenceResource(
+                            R.string.native_style_size_range_before_first_number,
+                            NativeTextStyle.MIN_SIZE,
+                            R.string.native_style_size_range_between_numbers,
+                            NativeTextStyle.MAX_SIZE,
+                            R.string.native_style_size_range_after_second_number,
+                        ),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -191,7 +201,7 @@ internal fun NativeTextStyleSheet(
                     },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 ) {
-                    Text("Reset styling")
+                    Text(stringResource(R.string.native_style_reset))
                 }
             }
             ActionSnackbarHost(
@@ -203,7 +213,7 @@ internal fun NativeTextStyleSheet(
     if (choosingColor) {
         MessengerPlusCustomColorDialog(
             initialColor = checkNotNull(MessengerPlusTextCodec.colorValue("#${style.colorRgb.toString(16).padStart(6, '0')}")),
-            applyLabel = "Apply color",
+            applyLabel = stringResource(R.string.plus_apply_color),
             onColorSelected = {
                 onStyleChange(style.copy(colorRgb = it.argb and 0xFFFFFF))
                 choosingColor = false
@@ -229,12 +239,18 @@ private fun NativeTextSizeSlider(size: Int, onSizeChange: (Int) -> Unit, modifie
         shouldAutoSnap = false
         value = position
     }
+    val sizeDescription = stringResource(R.string.native_style_text_size_desc)
+    val sizeStateDescription = numberSentenceResource(
+        R.string.native_style_pt_before_number,
+        size,
+        R.string.native_style_pt_after_number,
+    )
     Slider(
         state = sliderState,
         onValueChange = { onSizeChange(NativeTextSizeStops[it.roundToInt()]) },
         modifier = modifier.semantics {
-            contentDescription = "Text size"
-            stateDescription = "$size pt"
+            contentDescription = sizeDescription
+            stateDescription = sizeStateDescription
             progressBarRangeInfo = ProgressBarRangeInfo(
                 size.toFloat(),
                 NativeTextStyle.MIN_SIZE.toFloat()..NativeTextStyle.MAX_SIZE.toFloat(),
@@ -264,7 +280,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Font Style", modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.native_style_font_style), modifier = Modifier.weight(1f))
         Box {
             OutlinedButton(
                 shapes = ButtonDefaults.shapes(),
@@ -284,7 +300,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
                         DropdownMenuItem(
                             text = { NativeFontStyleLabel(option) },
                             trailingContent = if (option == selected) {
-                                { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.common_selected)) }
                             } else null,
                             shape = MenuDefaults.itemShape(index, NativeFontStyle.entries.size).shape,
                             onClick = {
@@ -303,7 +319,7 @@ private fun NativeFontStyleDropdown(selected: NativeFontStyle, onSelected: (Nati
 @Composable
 private fun NativeFontStyleLabel(option: NativeFontStyle) {
     Text(
-        option.label,
+        option.displayLabel(),
         style = LocalTextStyle.current.merge(
             nativeFontRendering(option.weight, option.italic).spanStyle(option.weight, option.italic),
         ),

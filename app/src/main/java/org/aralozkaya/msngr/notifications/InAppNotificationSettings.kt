@@ -1,12 +1,20 @@
 package org.aralozkaya.msngr.notifications
 
 /** These categories belong to Msngr; none creates an Android notification channel. */
-internal enum class InAppNotificationType(val label: String) {
-    Message("Messages"),
-    GroupMessage("Group messages"),
-    Nudge("Nudges"),
-    ContactRequest("Contact requests"),
-    GroupInvitation("Group invitations"),
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import org.aralozkaya.msngr.R
+
+enum class InAppNotificationType(val label: String, @param:StringRes val labelRes: Int) {
+    Message("Messages", R.string.in_app_notification_type_messages_plural),
+    GroupMessage("Group messages", R.string.in_app_notification_type_group_messages_plural),
+    Nudge("Nudges", R.string.in_app_notification_type_nudges_plural),
+    ContactRequest("Contact requests", R.string.in_app_notification_type_contact_requests_plural),
+    GroupInvitation("Group invitations", R.string.in_app_notification_type_group_invitations_plural);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 internal data class InAppNotificationRule(val enabled: Boolean = true, val vibrate: Boolean = true)

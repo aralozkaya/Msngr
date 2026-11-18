@@ -68,10 +68,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 import org.aralozkaya.msngr.CompactSearchField
 import org.aralozkaya.msngr.ContactProfileActivity
 import org.aralozkaya.msngr.GroupDetailsActivity
 import org.aralozkaya.msngr.MessengerPlusEditorController
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
@@ -82,8 +85,8 @@ import org.aralozkaya.msngr.pages.components.LoggedInUserProfileCard
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.withExpandedMsnMenuTokens
 
-private enum class ContactSort(val label: String) {
-    Status("Status"), Name("Name"),
+private enum class ContactSort(@param:StringRes val labelRes: Int) {
+    Status(R.string.contacts_sort_status), Name(R.string.contacts_sort_name),
 }
 
 @Composable
@@ -177,8 +180,8 @@ fun ContactsPage(
                         // Keep the app's native editor so search filters the page in place.
                         CompactSearchField(
                             state = searchFieldState,
-                            placeholder = "Search",
-                            clearContentDescription = "Clear search",
+                            placeholder = stringResource(R.string.contacts_search_placeholder),
+                            clearContentDescription = stringResource(R.string.contacts_search_clear),
                             modifier = Modifier.fillMaxWidth(),
                             controller = searchEditorController,
                             onFocusChanged = { searchFocused = it },
@@ -205,50 +208,50 @@ fun ContactsPage(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = "Sort",
+                            contentDescription = stringResource(R.string.contacts_sort_action),
                             modifier = Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight)),
                         )
                         Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(ButtonDefaults.MinHeight)))
-                        Text("Sort")
+                        Text(stringResource(R.string.contacts_sort_action))
                     }
                 }
             }
         }
         item(key = "groups-section") {
-            ExpandableContactSection("Groups", groups.size, groupsTransition, { groupsExpanded = !groupsExpanded }) {
+            ExpandableContactSection(stringResource(R.string.contacts_section_groups_plural), groups.size, groupsTransition, { groupsExpanded = !groupsExpanded }) {
                 groups.forEachIndexed { index, group ->
                     key(group.id) {
                         ContactRow(index = index + 1, count = groups.size + 1, contact = group,
                             onClick = { onOpenChat(group) }, onOpenProfile = {
                                 context.startActivity(GroupDetailsActivity.createIntent(context, group.id))
                             },
-                            contextActionLabel = "Block", onContextAction = { onBlockContact(group) },
+                            contextActionLabel = stringResource(R.string.contacts_block_action), onContextAction = { onBlockContact(group) },
                             onReadStateChange = { onReadStateChange(group, it) },
                             hasDraft = drafts[group.id]?.hasMessengerPlusVisibleContent() == true)
                     }
                 }
                 if (groups.isEmpty()) {
                     EmptySectionItem {
-                        Text(when {
-                            search.isNotEmpty() -> "No groups found"
-                            hideOffline -> "No online groups to show"
-                            else -> "No groups to show"
-                        })
+                        Text(stringResource(when {
+                            search.isNotEmpty() -> R.string.contacts_groups_empty_search
+                            hideOffline -> R.string.contacts_groups_empty_online
+                            else -> R.string.contacts_groups_empty
+                        }))
                     }
                 }
             }
         }
         item(key = "contacts-section") {
-            ExpandableContactSection("Other Contacts", visible.size, contactsTransition, { contactsExpanded = !contactsExpanded }) {
+            ExpandableContactSection(stringResource(R.string.contacts_section_other), visible.size, contactsTransition, { contactsExpanded = !contactsExpanded }) {
                 if (visible.isEmpty()) {
                     EmptySectionItem {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(if (search.isNotEmpty()) "No contacts found" else "No contacts to show")
-                            Text(when {
-                                search.isNotEmpty() -> "Try a different name or email."
-                                hideOffline -> "Offline contacts are hidden."
-                                else -> "Your contact list is empty."
-                            })
+                            Text(stringResource(if (search.isNotEmpty()) R.string.contacts_empty_search else R.string.contacts_empty))
+                            Text(stringResource(when {
+                                search.isNotEmpty() -> R.string.contacts_empty_search_subtitle
+                                hideOffline -> R.string.contacts_empty_offline_subtitle
+                                else -> R.string.contacts_empty_list_subtitle_you_singular
+                            }))
                         }
                     }
                 } else {
@@ -263,7 +266,7 @@ fun ContactsPage(
                                 onOpenProfile = {
                                     context.startActivity(ContactProfileActivity.createIntent(context, contact.id))
                                 },
-                                contextActionLabel = "Block",
+                                contextActionLabel = stringResource(R.string.contacts_block_action),
                                 onContextAction = { onBlockContact(contact) },
                                 onReadStateChange = { unread -> onReadStateChange(contact, unread) },
                                 onDeleteContact = onDeleteContact?.let { delete -> { delete(contact) } },
@@ -288,6 +291,11 @@ fun ContactsPage(
 
 @Composable
 private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    val stateLabel = stringResource(if (expanded) R.string.contacts_section_expanded else R.string.contacts_section_collapsed)
+    val toggleDesc = stringResource(
+        if (expanded) R.string.contacts_section_collapse else R.string.contacts_section_expand,
+        title,
+    )
     SegmentedListItem(
         onClick = onToggle,
         shapes = ListItemDefaults.segmentedShapes(
@@ -299,7 +307,7 @@ private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, o
         modifier = Modifier.fillMaxWidth()
             .semantics {
                 role = Role.Button
-                stateDescription = if (expanded) "Expanded" else "Collapsed"
+                stateDescription = stateLabel
             },
         trailingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -322,7 +330,7 @@ private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, o
                     Icon(
                         tint = MaterialTheme.colorScheme.onSurface,
                         imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) "Collapse $title" else "Expand $title"
+                        contentDescription = toggleDesc,
                     )
                 }
             }
@@ -385,7 +393,7 @@ private fun ContactSortSheet(
             verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             Text(
-                text = "Sort",
+                text = stringResource(R.string.contacts_sort_action),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -403,7 +411,7 @@ private fun ContactSortSheet(
                             onClick = null,
                         )
                     },
-                    content = { Text(option.label) },
+                    content = { Text(stringResource(option.labelRes)) },
                 )
             }
 
@@ -421,7 +429,7 @@ private fun ContactSortSheet(
                         onCheckedChange = null,
                     )
                 },
-                content = { Text("Hide offline groups and contacts") },
+                content = { Text(stringResource(R.string.contacts_hide_offline)) },
             )
         }
     }

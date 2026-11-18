@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -357,10 +358,11 @@ internal fun MsnEmoticonArtwork(
             }
         }
     }
+    val description = stringResource(emoticon.nameRes)
     Spacer(
         modifier = modifier
             .semantics {
-                contentDescription = emoticon.name
+                contentDescription = description
                 role = Role.Image
             }
             .drawBehind {

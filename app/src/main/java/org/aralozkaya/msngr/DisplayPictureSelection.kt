@@ -35,14 +35,14 @@ internal data class DisplayPictureSelection(
 
 internal fun Context.readProfilePictureBytes(uri: String): ByteArray {
     uri.inlineImageBytes()?.let { return it }
-    return requireNotNull(openDisplayPictureInputStream(uri)) { "That image could not be opened." }.use { input ->
+    return requireNotNull(openDisplayPictureInputStream(uri)) { getString(R.string.display_picture_select_cant_open) }.use { input ->
         ByteArrayOutputStream().use { output ->
             val buffer = ByteArray(8192)
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
                 require(count <= DisplayPictureLimits.MAX_SOURCE_BYTES - output.size()) {
-                    "Select an image smaller than 32 MiB."
+                    getNumberSentence(R.string.display_picture_select_max_mib_before_number, 32, R.string.display_picture_select_max_mib_after_number)
                 }
                 output.write(buffer, 0, count)
             }
@@ -54,29 +54,31 @@ internal fun Context.readProfilePictureBytes(uri: String): ByteArray {
 internal suspend fun Context.inspectDisplayPicture(uri: String): DisplayPictureSelection = withContext(Dispatchers.IO) {
     val bytes = readProfilePictureBytes(uri)
     val format = requireNotNull(DisplayPictureFormat.detect(bytes)) {
-        "Choose a PNG, JPEG, BMP, or GIF picture. Animated pictures must use GIF."
+        getString(R.string.display_picture_select_unsupported_format)
     }
     if (format == DisplayPictureFormat.GIF) {
         val gif = requireNotNull(GifDisplayPicture.parse(bytes, DisplayPictureLimits.MAX_SOURCE_BYTES,
-            DisplayPictureLimits.MAX_SOURCE_PIXELS)) { "This GIF is damaged or exceeds the 500-frame or 16-megapixel safety limit." }
-        require(gif.width.toLong() * gif.height * gif.frameDelaysMillis.size <= DisplayPictureLimits.MAX_ANIMATION_PIXELS) {
-            "This animation is too complex to resize safely. Choose a smaller GIF."
+            DisplayPictureLimits.MAX_SOURCE_PIXELS)) {
+            getTwoNumbersSentence(R.string.display_picture_gif_limits_before_first_number, 500, R.string.display_picture_gif_limits_between_numbers, 16, R.string.display_picture_gif_limits_after_second_number)
         }
-        requireNotNull(Movie.decodeByteArray(bytes, 0, bytes.size)) { "This GIF could not be decoded." }
+        require(gif.width.toLong() * gif.height * gif.frameDelaysMillis.size <= DisplayPictureLimits.MAX_ANIMATION_PIXELS) {
+            getString(R.string.display_picture_select_complex_gif)
+        }
+        requireNotNull(Movie.decodeByteArray(bytes, 0, bytes.size)) { getString(R.string.display_picture_select_cant_decode_gif) }
         DisplayPictureSelection(bytes, format, gif.width, gif.height, gif)
     } else {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "This image is damaged or could not be decoded." }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { getString(R.string.display_picture_select_damaged) }
         require(bounds.outWidth.toLong() * bounds.outHeight <= DisplayPictureLimits.MAX_SOURCE_PIXELS) {
-            "Choose an image of at most 16 megapixels."
+            getNumberSentence(R.string.display_picture_select_max_mp_before_number, 16, R.string.display_picture_select_max_mp_after_number)
         }
         // Do not flatten an APNG into a still picture.
         require(format != DisplayPictureFormat.PNG || !bytes.hasAnimatedPngChunk()) {
-            "Animated PNG pictures are not supported by Messenger. Choose an animated GIF."
+            getString(R.string.display_picture_select_apng_unsupported)
         }
         requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
-            "This image is damaged or could not be decoded."
+            getString(R.string.display_picture_select_damaged)
         }.recycle()
         DisplayPictureSelection(bytes, format, bounds.outWidth, bounds.outHeight)
     }

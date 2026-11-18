@@ -1,0 +1,1915 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity and shortcuts -->
+    <string name="shortcut_change_status_short">Durumu değiştir</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="shortcut_change_status_long_you_singular">Messenger durumunuzu seçin</string>
+    <string name="shortcut_change_status_choose">Durum seçin</string>
+    <string name="shortcut_status_message_label">Durum mesajı</string>
+    <string name="shortcut_status_save">Kaydet</string>
+    <string name="shortcut_status_save_error">Durum güncellenemedi. Tekrar deneyin.</string>
+    <string name="shortcut_chat_long">%1$s ile sohbet et</string>
+    <string name="shortcut_avatar_fallback_initial">\?</string>
+
+    <!-- Common actions, labels, and fallbacks -->
+    <string name="common_back">Geri</string>
+    <string name="common_close">Kapat</string>
+    <string name="common_cancel">İptal</string>
+    <string name="common_ok">Tamam</string>
+    <string name="common_save">Kaydet</string>
+    <string name="common_apply">Uygula</string>
+    <string name="common_retry">Yeniden dene</string>
+    <string name="common_try_again">Tekrar dene</string>
+    <string name="common_selected">Seçili</string>
+    <string name="common_default">Varsayılan</string>
+    <string name="common_delete">Sil</string>
+    <string name="common_remove">Kaldır</string>
+    <string name="common_done">Bitti</string>
+    <string name="common_block">Engelle</string>
+    <string name="common_blocked">Engellenmiş</string>
+    <string name="common_unknown">Bilinmeyen</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="common_you_singular">Siz</string>
+    <!-- Note: singular text variant -->
+    <string name="common_contact_singular">Kişi</string>
+    <!-- Note: singular text variant -->
+    <string name="common_group_singular">Grup</string>
+    <string name="common_all">Hepsi</string>
+    <string name="common_play">Oynat</string>
+    <string name="common_stop">Durdur</string>
+    <string name="common_preview">Önizle</string>
+    <string name="common_download">İndir</string>
+    <string name="common_open">Aç</string>
+    <string name="common_accept">Kabul Et</string>
+    <string name="common_decline">Reddet</string>
+    <string name="common_animated">Hareketli</string>
+    <string name="common_device_android">Android</string>
+    <string name="common_device_this">Bu cihaz</string>
+    <string name="common_device_unnamed">İsimsiz cihaz</string>
+    <!-- Note: singular text variant -->
+    <string name="common_member_fallback_singular">Üye</string>
+    <string name="common_site_fallback">Site</string>
+    <string name="common_announcement">Duyuru</string>
+
+    <!-- Formatting, emoticons, and Plus! styling -->
+    <string name="format_plus">Plus! Stili</string>
+    <string name="format_native">Metin Stili</string>
+    <string name="format_bold">Kalın</string>
+    <string name="format_italic">İtalik</string>
+    <string name="format_strikethrough">Üstü çizili</string>
+    <string name="format_underline">Altı çizili</string>
+    <string name="format_clear">Tüm stillemeyi kaldır</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="format_colors_plural">Renkler</string>
+    <string name="insert_emoticon">İfadeler</string>
+    <string name="emoticon_backspace">Sil</string>
+    <string name="emoticon_search_hint">İfade ara</string>
+    <string name="emoticon_search_back">İfadelere geri dön</string>
+    <string name="emoticon_search_clear">İfade aramasını temizle</string>
+    <string name="emoticon_search_empty">İfade bulunamadı</string>
+
+    <!-- Presence and enums -->
+    <string name="presence_online">Uygun</string>
+    <string name="presence_busy">Meşgul</string>
+    <string name="presence_away">Uzakta</string>
+    <string name="presence_offline">Çevrim dışı</string>
+    <string name="presence_appear_offline">Çevrim dışı görün</string>
+    <string name="theme_mode_system">Sistem</string>
+    <string name="theme_mode_light">Açık</string>
+    <string name="theme_mode_dark">Koyu</string>
+    <string name="color_mode_default">Varsayılan</string>
+    <string name="color_mode_dynamic">Dinamik</string>
+    <string name="color_mode_scenes">Sahneler</string>
+    <string name="display_picture_sync_always_incoming">Her zaman geleni kullan</string>
+    <string name="display_picture_sync_always_local">Her zaman yereli kullan</string>
+    <string name="display_picture_sync_ask_every_time">Her seferinde sor</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="in_app_notification_type_messages_plural">Mesajlar</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="in_app_notification_type_group_messages_plural">Grup mesajları</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="in_app_notification_type_nudges_plural">Titreşimler</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="in_app_notification_type_contact_requests_plural">Bağlantı istekleri</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="in_app_notification_type_group_invitations_plural">Grup davetleri</string>
+    <string name="group_role_owner">Sahip</string>
+    <string name="group_role_administrator">Yönetici</string>
+    <string name="group_role_user">Kullanıcı</string>
+    <string name="group_role_unknown">Bilinmeyen</string>
+    <string name="native_font_style_light">İnce</string>
+    <string name="native_font_style_light_italic">İnce İtalik</string>
+    <string name="native_font_style_semilight">Yarı ince</string>
+    <string name="native_font_style_semilight_italic">Yarı ince İtalik</string>
+    <string name="native_font_style_regular">Normal</string>
+    <string name="native_font_style_italic">İtalik</string>
+    <string name="native_font_style_semibold">Yarı kalın</string>
+    <string name="native_font_style_semibold_italic">Yarı kalın İtalik</string>
+    <string name="native_font_style_bold">Kalın</string>
+    <string name="native_font_style_bold_italic">Kalın İtalik</string>
+    <string name="native_font_style_black">Çok kalın</string>
+    <string name="native_font_style_black_italic">Çok kalın İtalik</string>
+    <string name="contacts_sort_status">Durum</string>
+    <string name="contacts_sort_name">İsim</string>
+
+    <!-- Requests, invitations, and blocked contacts -->
+    <string name="requests_title">İstekler &amp; davetler</string>
+    <string name="requests_empty">Bekleyen istek veya davet yok</string>
+    <string name="requests_refresh">Yenile</string>
+    <string name="blocked_contacts_title">Engellenen bağlantılar</string>
+    <string name="blocked_contacts_empty">Engellenmiş bağlantı yok</string>
+    <string name="blocked_contacts_refreshing">Engellenmiş bağlantılar yenileniyor...</string>
+    <string name="blocked_contacts_refresh_failed">Engellenmiş bağlantılar yenilenemedi. Lütfen tekrar deneyin.</string>
+    <string name="group_block_action">Grubu engelle</string>
+    <string name="group_unblock_action">Grubun engellini kaldır</string>
+    <string name="group_block_title">Grup engellensin mi?</string>
+    <string name="group_unblock_title">Grubun engeli kaldırılsın mı?</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_block_message_you_singular">%1$s tarafından mesaj almayı kesmek ister misiniz? Üye olmaya devam edeceksiniz. Sonrasında engellenmiş bağlantılar sayfasından bu grubun engelini kaldırabilirsiniz.</string>
+    <string name="group_unblock_message">%1$s tarafından mesaj almaya devam etmek ister misiniz?</string>
+    <string name="group_block_busy">Grup güncelleniyor...</string>
+    <string name="group_block_failed">Engellenmiş gruplar güncellenemedi. Lütfen tekrar deneyin.</string>
+    <string name="requests_refreshing">İstekler ve davetler yenileniyor...</string>
+    <string name="requests_refresh_failed">İstekler ve davetler yenilenemedi. Lütfen tekrar deneyin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_invitation_message_you_singular">Sizi bu Messenger grubuna davet etti.</string>
+    <string name="group_invitation_unknown_inviter">Bir Messenger kullanıcısı</string>
+    <string name="group_invitation_join">Katıl</string>
+    <string name="group_invitation_failed">Grup davetine cevap verilemedi. Lütfen tekrar deneyin.</string>
+    <!-- Note: singular text variant -->
+    <string name="requests_badge_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="requests_badge_singular_after_number">bekleyen istek veya davet</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="requests_badge_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="requests_badge_plural_after_number">bekleyen istek veya davet</string>
+    <!-- Note: singular text variant -->
+    <string name="pending_items_badge_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="pending_items_badge_singular_after_number">bekleyen</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="pending_items_badge_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="pending_items_badge_plural_after_number">bekleyen</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="contact_requests_title_plural">Bağlantı istekleri</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contact_request_message_you_singular">Sizi Messenger\'a eklemek istiyor.</string>
+    <string name="contact_request_accept">Kabul et</string>
+    <string name="contact_request_decline">Reddet</string>
+    <string name="contact_request_block">Bu kişiden gelen davetleri engelle</string>
+    <string name="contact_request_set_default">Varsayılan olarak ayarla</string>
+    <string name="contact_request_later">Sonra karar ver</string>
+    <string name="contact_request_ok">Tamam</string>
+    <string name="contact_request_busy">İsteğe cevap veriliyor...</string>
+    <string name="contact_request_failed">Bağlantı isteğine cevap verilemedi. Lütfen tekrar deneyin.</string>
+    <string name="contact_request_mock_hint">Temsili istek · Bir bağlantı kurulmayacak ve hiçbir ağ paketi gönderilmeyecek.</string>
+    <string name="request_optional_message">Mesaj (isteğe bağlı)</string>
+    <string name="requests_group_invitations_unavailable">Grup davetleri uygun değil.</string>
+
+    <!-- Notifications and connection service -->
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="notification_channel_contact_requests_plural">Bağlantı istekleri</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_channel_contact_requests_description_you_singular">Çevrim dışı olduğunuz zamanlar dahil sizi ekleyen kişiler</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_contact_requests_singular_you_singular_before_number"></string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_contact_requests_singular_you_singular_after_number">kişi sizi ekledi. Kabul etmek veya reddetmek için açın.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_contact_requests_plural_you_singular_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_contact_requests_plural_you_singular_after_number">kişi sizi ekledi. Kabul etmek veya reddetmek için açın.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="notification_channel_messages_plural">Mesajlar</string>
+    <string name="notification_channel_messages_description">Yeni Messenger konuşmaları ve doğrudan yanıtlar</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="notification_channel_nudges_plural">Titreşimler</string>
+    <string name="notification_channel_nudges_description">Dikkat çeken Messenger titreşimleri</string>
+    <string name="notification_channel_contact_signed_in">Kişi oturum açtı</string>
+    <string name="notification_channel_contact_signed_in_description">Az önce oturum açan kişiler</string>
+    <string name="notification_contact_signed_in">%1$s şimdi oturum açtı.</string>
+    <string name="notification_channel_offline_messages">Çevrim dışı mesajlar</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_channel_offline_messages_description_you_singular">Çevrim dışı olduğunuz sürede gelen anlık mesajlar için bildirim</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_offline_messages_received_you_singular">Çevrimdışıyken anlık ileti aldınız.</string>
+    <string name="notification_channel_background_connection">Arka plan bağlantısı</string>
+    <string name="notification_channel_background_connection_description">Anlık bildirim teslimi kullanılamadığında süren MSNP bağlantı durumu</string>
+    <string name="notification_reply_label">Yanıtla</string>
+    <string name="notification_mark_read_label">Okundu olarak işaretle</string>
+    <!-- Note: singular text variant -->
+    <string name="notification_nudge_label_singular">Titreşim gönder</string>
+    <string name="notification_nudge_back_label">Titreşimle yanıt ver</string>
+    <string name="notification_sending_nudge">Titreşim gönderiliyor…</string>
+    <string name="notification_nudge_failed_title">Titreşim gönderilemedi</string>
+    <string name="notification_nudge_failed_text">%1$s. Yeniden bağlanıp tekrar denemek için Msngr\'ı açın.</string>
+    <string name="notification_sending_reply">Yanıt gönderiliyor…</string>
+    <string name="notification_reply_failed">Yanıt gönderilemedi. Yeniden bağlanıp tekrar denemek için Msngr\'ı açın.</string>
+    <string name="notification_public_new_message">Yeni mesaj</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_self_name_you_singular">Siz</string>
+    <string name="background_connection_title">Msngr bağlantıyı açık tutuyor</string>
+    <string name="connection_service_preparing">Messenger bağlantısı hazırlanıyor…</string>
+    <string name="connection_service_reconnecting">Otomatik olarak yeniden bağlanılıyor…</string>
+    <string name="connection_service_connected_as">%1$s olarak bağlandı</string>
+    <string name="connection_service_connected">Messenger\'a bağlandı</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="group_invitations_title_plural">Grup davetleri</string>
+    <string name="notification_channel_group_invitations_description">Messenger gruplarına katılma davetleri</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_group_invitations_singular_you_singular_before_number"></string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_group_invitations_singular_you_singular_after_number">grup davetiniz var</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_group_invitations_plural_you_singular_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_group_invitations_plural_you_singular_after_number">grup davetiniz var</string>
+    <string name="in_app_notification_dismiss">Bildirimi kapat</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="in_app_notification_group_invite_text_you_singular">Bu gruba katılmaya davet edildiniz.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="in_app_notification_contact_request_text_you_singular">Sizi kişi olarak eklemek istiyor.</string>
+    <string name="in_app_notification_group_message_format">%1$s: %2$s</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="in_app_notification_nudge_text_you_singular">Size bir titreşim gönderdi.</string>
+
+    <!-- Chat and conversation UI -->
+    <string name="chat_copy_message">Mesajı kopyala</string>
+    <string name="chat_day_today">Bugün</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_message_clip_label_singular">Mesaj</string>
+    <string name="chat_message_copied">Mesaj kopyalandı</string>
+    <string name="empty_conversation_warning">Anlık mesajda parola veya kredi kartı numarası gibi bilgileri paylaşmayın</string>
+    <string name="chat_contact_unavailable">%1$s adlı kişi %2$s olduğundan yanıt veremeyebilir</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_contact_offline_you_singular">%1$s çevrimdışı görünüyor. Gönderdiğiniz iletiler oturum açtığında teslim edilecek.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_appear_offline_you_singular">Durumunuz Çevrimdışı görün olarak ayarlandı. Kişilerinizle iletişim kurabilirsiniz, ancak çevrimdışı göründüğünüzü anlarlar.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_group_offline_you_singular">%1$s şu anda çevrimdışı. Daha fazla grup üyesi çevrimiçi olduğunda ileti gönderebilirsiniz.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_group_removed_you_singular">%1$s artık kullanılamıyor. Gruptan ayrılmış veya çıkarılmış olabilirsiniz.</string>
+    <string name="chat_dismiss_status">Kapat</string>
+    <string name="chat_message_sending">Gönderiliyor</string>
+    <string name="chat_message_failed">Mesaj gönderilemedi</string>
+    <string name="wink_download_failed">Göz kırpması indirilemedi</string>
+    <string name="chat_message_retry">Yeniden dene</string>
+    <string name="chat_text_size_local_notice">Metin boyutu yalnızca bu cihazda, hem gelen hem de giden mesajlar için değişir.</string>
+    <string name="chat_scroll_to_latest">En son mesaja kaydır</string>
+    <string name="chat_error_emotion_sounds_unavailable">Duygu sesleri kullanılamıyor.</string>
+    <string name="chat_error_winks_unavailable">Göz kırpmaları kullanılamıyor.</string>
+    <string name="chat_error_voice_clips_unavailable">Ses klipleri kullanılamıyor.</string>
+    <string name="chat_top_bar_view_group">Grup üyelerini görüntüle</string>
+    <string name="chat_top_bar_view_profile">Kişi profilini görüntüle</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_other_unread_singular_before_number">Diğer sohbetlerde</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_other_unread_singular_after_number">okunmamış mesaj</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_other_unread_plural_before_number">Diğer sohbetlerde</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_other_unread_plural_after_number">okunmamış mesaj</string>
+    <string name="chat_conversation_fallback">Konuşma</string>
+    <string name="chat_typing_status">yazıyor…</string>
+    <string name="chat_sending_nudge">Titreşim gönderiliyor…</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_cooldown_singular_you_singular_before_number"></string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_cooldown_singular_you_singular_after_number">saniye içinde başka bir titreşim gönderebilirsiniz.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_cooldown_plural_you_singular_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_cooldown_plural_you_singular_after_number">saniye içinde başka bir titreşim gönderebilirsiniz.</string>
+    <string name="chat_send_nudge_desc">Titreşim gönder</string>
+    <string name="chat_send_message_desc">Mesaj gönder</string>
+    <string name="chat_open_plus_menu_desc">İfade, el yazısı ve göz kırpması menüsünü aç</string>
+    <string name="chat_show_keyboard_desc">Klavyeyi göster</string>
+    <string name="chat_show_emoticons_desc">İfadeleri göster</string>
+    <string name="chat_menu_handwriting">El yazısı</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_menu_winks_plural">Göz Kırpmaları</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_menu_emotion_sounds_plural">Duygu Sesleri</string>
+    <string name="chat_backspace_message_desc">Mesajda geri sil</string>
+    <string name="chat_emoticon_tooltip_format">%1$s  %2$s</string>
+    <string name="chat_emotion_sound_options_desc">Duygu sesi seçeneklerini göster</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_message_hint_singular">Mesaj</string>
+    <string name="chat_message_input_desc">Mesaj girişi</string>
+
+    <!-- Chat system messages -->
+    <string name="chat_handwriting_message">El yazısı</string>
+    <string name="chat_voice_clip_message">Ses Klibi</string>
+    <string name="chat_wink_message">Göz kırpması: %1$s</string>
+    <string name="chat_emotion_sound_message">Bir ses gönderdi: %1$s</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_sent_you_singular">Şu anda bir titreşim gönderdiniz.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_nudge_received_you_singular">Bir titreşim aldınız!</string>
+    <string name="chat_nudge_received_from">%1$s şu anda size bir titreşim gönderdi.</string>
+    <string name="chat_nudge_failed">Titreşim gönderilemedi.</string>
+    <string name="chat_nudge_failed_with_reason">Titreşim gönderilemedi: %1$s</string>
+    <string name="chat_file_message">Dosya: %1$s</string>
+
+    <!-- Contact management, contacts page, groups -->
+    <string name="contacts_action_add_contact">Kişi ekle</string>
+    <string name="contact_add_email">Anlık mesajlaşma adresi</string>
+    <string name="contact_add_invitation_hint">Messenger\'a eklemek ve kişi daveti göndermek için e-posta adresini girin.</string>
+    <string name="contact_add_submit">Ekle</string>
+    <string name="contact_add_cancel">İptal</string>
+    <string name="contact_add_busy">Kişi ekleniyor…</string>
+    <string name="contact_add_failed">Bu kişi eklenemedi. Lütfen tekrar deneyin.</string>
+    <string name="contact_add_success">Kişi eklendi. Bir davet gönderildi.</string>
+    <string name="contact_add_mock_hint">Sahte verilerle kişi eklemeyi deneyin. Bağlantı kurulmaz ve davet gönderilmez.</string>
+    <string name="contact_add_mock_success">Temsili kişi eklendi.</string>
+    <string name="contacts_action_create_group">Grup oluştur</string>
+    <string name="group_invitations_sent">Grup davetleri gönderildi.</string>
+    <string name="group_leave_title">Gruptan ayrılınsın mı?</string>
+    <string name="group_leave_submit">Gruptan ayrıl</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_leave_message_you_singular">%1$s grubundan ayrılacaksınız. Kaydedilmiş konuşma geçmişiniz bu cihazda kalacaktır.</string>
+    <string name="group_leave_busy">Gruptan ayrılınıyor…</string>
+    <string name="group_leave_failed">Bu gruptan ayrılınamadı. Lütfen tekrar deneyin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_leave_success_you_singular">%1$s grubundan ayrıldınız.</string>
+    <string name="profile_save_busy">Profil kaydediliyor…</string>
+    <string name="picture_save_busy">Resim kaydediliyor…</string>
+    <string name="chat_history_erase_busy">Sohbet geçmişi siliniyor…</string>
+    <string name="contacts_actions_open">Kişi işlemlerini aç</string>
+    <string name="contacts_actions_close">Kişi işlemlerini kapat</string>
+    <string name="contacts_actions_expanded">Genişletildi</string>
+    <string name="contacts_actions_collapsed">Daraltıldı</string>
+    <string name="contact_delete_title">Kişi silinsin mi?</string>
+    <string name="contact_delete_action">Kişiyi sil</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contact_delete_message_you_singular">%1$s kişilerinizden kaldırılsın mı? Kaydedilmiş sohbet geçmişiniz korunacaktır.</string>
+    <string name="contact_delete_also_block">Bu kişiyi de engelle</string>
+    <string name="contact_delete_already_blocked">Bu kişi engelli kalacak</string>
+    <string name="contact_delete_submit">Sil</string>
+    <string name="contact_delete_busy">Kişi siliniyor…</string>
+    <string name="contact_delete_failed">Bu kişi silinemedi. Lütfen tekrar deneyin.</string>
+    <string name="contact_delete_success">Kişi silindi.</string>
+    <string name="contact_delete_mock_hint">Yalnızca test verisi. Bağlantı kurulmaz ve paket gönderilmez.</string>
+    <string name="contact_delete_mock_success">Temsili kişi silindi.</string>
+    <string name="contact_unblock_action">Engeli kaldır</string>
+    <string name="contact_profile_title">Kişi profili</string>
+    <string name="contact_profile_unavailable">Kişi artık kullanılamıyor.</string>
+    <string name="contact_profile_view_picture">Görüntü resmini gör</string>
+    <string name="contact_profile_no_picture">Görüntü resmi yok</string>
+    <string name="contact_profile_email_label">E-posta adresi</string>
+    <string name="contact_profile_status_label">Durum mesajı</string>
+    <string name="contact_profile_no_status">Durum mesajı yok</string>
+    <string name="contact_customize_notifications">Bildirimleri Özelleştir</string>
+    <string name="contact_erase_history_action">Geçmişi sil</string>
+    <string name="contact_erase_history_title">Sohbet geçmişi silinsin mi?</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contact_erase_history_message_you_singular">Bu işlem %1$s ile kaydedilmiş konuşmanızı bu cihazdan kalıcı olarak siler. Bu işlem geri alınamaz.</string>
+    <string name="contact_erase_history_failed">Geçmiş silinemedi. Lütfen tekrar deneyin.</string>
+    <string name="contact_erase_history_confirm">Sil</string>
+    <string name="contact_block_dialog_title">Kişi engellensin mi?</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contact_block_dialog_message_you_singular">%1$s adlı kişiyi engellemek istediğinizden emin misiniz? Engelini daha sonra Engellenen bağlantılar bölümünden kaldırabilirsiniz.</string>
+    <string name="contacts_search_placeholder">Ara</string>
+    <string name="contacts_search_clear">Aramayı temizle</string>
+    <string name="contacts_sort_action">Sırala</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="contacts_section_groups_plural">Gruplar</string>
+    <string name="contacts_section_other">Diğer Kişiler</string>
+    <string name="contacts_block_action">Engelle</string>
+    <string name="contacts_groups_empty_search">Aramanızla eşleşen grup yok.</string>
+    <string name="contacts_groups_empty_online">Gösterilecek çevrim içi grup yok</string>
+    <string name="contacts_groups_empty">Gösterilecek grup yok</string>
+    <string name="contacts_empty_search">Kişi bulunamadı</string>
+    <string name="contacts_empty">Gösterilecek kişi yok</string>
+    <string name="contacts_empty_search_subtitle">Farklı bir isim veya e-posta deneyin.</string>
+    <string name="contacts_empty_offline_subtitle">Çevrim dışı kişiler gizlendi.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="contacts_empty_list_subtitle_you_singular">Henüz kişi listenizde kimse yok.</string>
+    <string name="contacts_section_expanded">Genişletilmiş</string>
+    <string name="contacts_section_collapsed">Daraltılmış</string>
+    <string name="contacts_section_collapse">%1$s bölümünü daralt</string>
+    <string name="contacts_section_expand">%1$s bölümünü genişlet</string>
+    <string name="contacts_hide_offline">Çevrim dışı grupları ve kişileri gizle</string>
+    <string name="contact_view_group_members">Grup üyelerini görüntüle</string>
+    <string name="contact_view_profile">Profili görüntüle</string>
+    <string name="contact_view_group_members_of">%1$s grup üyelerini görüntüle</string>
+    <string name="contact_view_profile_of">%1$s profilini görüntüle</string>
+    <string name="contact_draft_label">Taslak</string>
+    <string name="contact_badge_pending">Beklemede</string>
+    <string name="contact_unread_description">Okunmamış</string>
+    <string name="contact_read_description">Okunmuş</string>
+    <string name="contact_long_click_actions">Kişi işlemleri</string>
+    <string name="contact_mark_as_read">Okundu olarak işaretle</string>
+    <string name="contact_mark_as_unread">Okunmadı olarak işaretle</string>
+    <string name="contact_avatar_description">%1$s görüntü resmi</string>
+    <string name="profile_no_personal_message">Kişisel ileti yok</string>
+    <string name="profile_change_status">Durumu değiştir</string>
+    <string name="group_details_title">Grup ayrıntıları</string>
+    <string name="group_details_unavailable">Grup artık kullanılamıyor.</string>
+    <!-- Note: singular text variant -->
+    <string name="group_members_count_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="group_members_count_singular_after_number">üye</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="group_members_count_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="group_members_count_plural_after_number">üye</string>
+    <string name="group_pending_count_before_number"></string>
+    <string name="group_pending_count_after_number">beklemede</string>
+    <string name="group_count_separator">%1$s · %2$s</string>
+    <string name="group_search_members_placeholder">Üyeleri ara</string>
+    <string name="group_edit_profile_action">Profili düzenle</string>
+    <string name="group_members_empty_none">Bu grubun hiç üyesi yok.</string>
+    <string name="group_members_empty_search">Üye bulunamadı.</string>
+    <string name="group_options_description">Grup seçenekleri</string>
+    <string name="group_invite_contacts">Kişileri davet et</string>
+    <string name="group_custom_notifications">Özel bildirimler</string>
+    <string name="group_invite_at_least_one">Davet etmek için en az bir kişi seçin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_created_invites_failed_you_singular">Grubunuz oluşturuldu. %1$s Davetleri göndermek için yeniden deneyin.</string>
+    <string name="group_invites_failed_default">Davetler gönderilemedi.</string>
+    <string name="group_update_failed_default">Bu grup güncellenemedi. Lütfen tekrar deneyin.</string>
+    <string name="group_invite_to_heading">“%1$s” grubuna kişileri davet et</string>
+    <string name="group_name_label">Grup adı</string>
+    <string name="group_create_instruction">Şimdi üyeleri seçin veya boş bir grup oluşturup kişileri daha sonra davet edin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="group_invite_instruction_you_singular">Kişiler davetinizi kabul ettikten sonra katılır.</string>
+    <string name="group_add_email_description">E-posta ekle</string>
+    <string name="group_selected_members_before_number">Seçili üyeler (</string>
+    <string name="group_selected_members_after_number">)</string>
+    <string name="group_remove_member_description">%1$s kişisini kaldır</string>
+    <string name="group_creating_busy">Grup oluşturuluyor…</string>
+    <string name="group_sending_invitations_busy">Davetler gönderiliyor…</string>
+    <string name="group_send_action">Gönder</string>
+    <string name="group_create_action">Oluştur</string>
+    <string name="group_create_title">Grup oluştur</string>
+    <string name="group_invite_title">Üye davet et</string>
+    <string name="group_choose_contacts_title">Kişileri seçin</string>
+    <string name="group_choose_contacts_empty">Davet edilecek kişi yok.</string>
+
+    <!-- Portal and home feed -->
+    <string name="settings_show_ads_title">Reklam kartını göster</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_show_ads_supporting_you_singular">Ana sayfada Messenger hizmetinizden sponsor afişlerini ve metin reklamlarını gösterin.</string>
+    <string name="portal_whats_new_title">Yenilikler</string>
+    <string name="portal_whats_new_refresh">Yenilikleri yenile</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="portal_whats_new_empty_you_singular">Kişilerinizin yeni etkinliği yok</string>
+    <string name="portal_whats_new_unavailable">Yenilikler, Bugün ve siteleri görmek için canlı bir Messenger hizmetine bağlanın.</string>
+    <string name="portal_ad_label">Reklam</string>
+    <string name="portal_today_title">Bugün</string>
+    <string name="portal_sites_open">Siteleri ve Bugün\'ü aç</string>
+    <string name="portal_sites_close">Siteleri ve Bugün\'ü kapat</string>
+    <string name="portal_sites_empty">Bu sunucu tarafından yapılandırılmış site yok</string>
+    <string name="portal_webview_back">Geri</string>
+    <string name="portal_webview_open_in_browser">Tarayıcıda aç</string>
+    <string name="portal_webview_refresh">Yenile</string>
+    <string name="portal_webview_close">Kapat</string>
+    <string name="portal_webview_load_error">Sayfa yüklenemedi.</string>
+    <string name="portal_webview_http_error_before_number">HTTP</string>
+    <string name="portal_webview_http_error_after_number"></string>
+    <string name="portal_pager_home_label">Ana Sayfa</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="portal_pager_contacts_label_plural">Kişiler</string>
+    <string name="portal_view_profile">Profili görüntüle</string>
+    <string name="portal_whats_new_display_picture">yeni bir görüntü resmi ekledi</string>
+    <string name="portal_whats_new_photo">bir fotoğraf paylaştı</string>
+
+    <!-- Main, Login, Reconnect, and Sessions -->
+    <string name="main_open_profile">Profili aç</string>
+    <string name="main_open_menu">Menüyü aç</string>
+    <string name="main_simulate_reconnection">Yeniden bağlanmayı simüle et</string>
+    <string name="main_log_out">Oturumu kapat</string>
+    <string name="main_log_out_ellipsis">Oturumu kapat…</string>
+    <!-- Note: singular text variant -->
+    <string name="main_active_sessions_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="main_active_sessions_singular_after_number">etkin oturum</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="main_active_sessions_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="main_active_sessions_plural_after_number">etkin oturum</string>
+    <string name="main_log_out_dialog_title">Oturum kapatılsın mı?</string>
+    <string name="main_log_out_dialog_message">Bu işlem mevcut oturumu sonlandırır. Hatırlanan kimlik bilgileri bu cihazda kayıtlı kalır.</string>
+    <string name="main_count_badge_cap_before_number"></string>
+    <string name="main_count_badge_cap_after_number">+</string>
+    <string name="mock_server_banner">Temsili sunucu etkin · Yalnızca test verisi</string>
+    <!-- Note: singular text variant -->
+    <string name="sessions_logged_out_singular">%1$s oturumu kapatıldı.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="sessions_logged_out_plural">Diğer oturumlar kapatıldı.</string>
+    <string name="sessions_title">Etkin oturumlar</string>
+    <string name="sessions_description">Hangi oturumların kapatılacağını seçin. Hatırlanan kimlik bilgileri bu cihazda kayıtlı kalır.</string>
+    <string name="sessions_meta_separator">%1$s · %2$s</string>
+    <string name="sessions_log_out_this_device">Bu cihazda oturumu kapat</string>
+    <string name="sessions_log_out_device_format">%1$s, %2$s oturumundan çıkış yap</string>
+    <string name="sessions_logging_out">Oturum kapatılıyor…</string>
+    <string name="sessions_log_out_action">Oturumu kapat</string>
+    <string name="sessions_log_out_others">Diğer oturumları kapat</string>
+    <string name="sessions_log_out_all">Tüm oturumları kapat</string>
+    <string name="sessions_logout_not_confirmed">%1$s çıkış işlemini doğrulamadı. Lütfen tekrar deneyin.</string>
+    <string name="account_provider_escargot">Escargot</string>
+    <string name="account_provider_crosstalk">CrossTalk</string>
+    <string name="account_provider_custom">Özel</string>
+    <string name="account_provider_mock">Temsili</string>
+    <string name="account_dropdown_label_format">%1$s · %2$s</string>
+    <string name="login_loading_storage">Güvenli depolama açılıyor…</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="login_error_service_default_you_singular">Seçilen topluluk hizmeti oturumunuzu açamadı.</string>
+    <string name="login_dialog_title_logged_out">Oturum kapatıldı</string>
+    <string name="login_dialog_title_error">Oturum açılamadı</string>
+    <string name="login_welcome_headline">Msngr\'a Hoş Geldiniz</string>
+    <string name="login_welcome_subtitle_before_number"></string>
+    <string name="login_welcome_subtitle_after_number">\'leri bir topluluk hizmeti aracılığıyla yeniden yaşayın.</string>
+    <string name="login_choose_saved_account">Kayıtlı hesap seç</string>
+    <string name="login_invalid_email">Geçerli bir e-posta adresi girin.</string>
+    <string name="login_password_label">Parola</string>
+    <string name="login_remember_me">Beni anımsa</string>
+    <string name="login_auto_sign_in">Oturumumu otomatik olarak aç</string>
+    <string name="login_sign_in_as">Oturum açma durumu</string>
+    <string name="login_choose_status">Oturum açma durumunu seçin</string>
+    <string name="login_use_mock_server">Temsili sunucu kullan</string>
+    <string name="login_signing_in">Oturum açılıyor</string>
+    <string name="login_sign_in">Oturum aç</string>
+    <string name="login_service_title">Hizmet</string>
+    <string name="login_choose_service">Hizmet seçin</string>
+    <string name="login_server_summary">%1$s:%2$s · %3$s</string>
+    <string name="reconnect_title">Bağlantı geri yükleniyor</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="reconnect_interrupted_you_singular">Messenger bağlantısı kesildi. Oturumunuz yeniden açılıyor…</string>
+    <string name="reconnect_retrying">Hizmet henüz yanıt vermiyor. Otomatik olarak yeniden deneniyor…</string>
+
+    <!-- Custom server dialog -->
+    <string name="custom_server_title">Özel MSNP hizmeti</string>
+    <string name="custom_server_description">Bildirim ve yapılandırma uç noktaları gereklidir. İsteğe bağlı hizmetler bildirim ana bilgisayarına geri döner.</string>
+    <string name="custom_server_notification_host">Bildirim ana bilgisayarı</string>
+    <string name="custom_server_notification_port">Bildirim bağlantı noktası</string>
+    <string name="custom_server_switchboard_port">Santral bağlantı noktası</string>
+    <string name="custom_server_config_host">Yapılandırma ana bilgisayarı</string>
+    <string name="custom_server_optional_services">İsteğe bağlı hizmetler</string>
+    <string name="custom_server_service_advertising">Reklamlar</string>
+    <string name="custom_server_service_social">Sosyal</string>
+    <string name="custom_server_winks_url_label">Göz kırpması katalog URL\'si</string>
+    <string name="custom_server_winks_url_supporting">İsteğe bağlı. Tam HTTP veya HTTPS göz kırpması katalog URL\'si</string>
+    <string name="custom_server_emotion_sounds_url_label">Duygu sesleri hizmet URL\'si</string>
+    <string name="custom_server_emotion_sounds_url_supporting">İsteğe bağlı. /esnd/snd/ ile biten tam HTTP veya HTTPS temel URL</string>
+    <string name="custom_server_host_suffix">%1$s ana bilgisayarı</string>
+    <string name="custom_server_port_range_before_first_number"></string>
+    <string name="custom_server_port_range_between_numbers">ile</string>
+    <string name="custom_server_port_range_after_second_number">arasında bir bağlantı noktası girin.</string>
+
+    <!-- Settings -->
+    <string name="settings_destination_root">Ayarlar</string>
+    <string name="settings_destination_appearance">Görünüm</string>
+    <string name="settings_destination_emoticons">İfadeler ve Göz Kırpmaları</string>
+    <string name="settings_destination_messenger_plus">Messenger Plus!</string>
+    <string name="settings_destination_contact_invitations">Kişi Davetleri</string>
+    <string name="settings_destination_transfers">Dosya ve fotoğraf aktarımları</string>
+    <string name="settings_destination_notifications">Bildirimler</string>
+    <string name="settings_destination_in_app_notifications">Uygulama içi bildirimler</string>
+    <string name="settings_destination_customized_notifications">Özelleştirilmiş bildirimler</string>
+    <string name="settings_destination_connection">Bağlantı</string>
+    <string name="settings_destination_connection_information">Bağlantı bilgileri</string>
+    <string name="settings_destination_updates">Uygulama güncellemeleri</string>
+    <string name="settings_destination_about">Hakkında</string>
+    <string name="settings_destination_licenses">Açık kaynak lisansları</string>
+    <string name="settings_sign_out_other_places">Messenger oturumu açtığımda diğer yerlerdeki oturumlarımı kapat</string>
+    <string name="settings_keep_connected">Msngr\'ı Bağlı Tut</string>
+    <string name="settings_delete_all_histories">Tüm sohbet geçmişlerini sil</string>
+    <string name="settings_delete_all_title">Tüm sohbet geçmişleri silinsin mi?</string>
+    <string name="settings_delete_all_message">Bu işlem bu cihazdaki tüm kayıtlı konuşmaları kalıcı olarak siler. Bu işlem geri alınamaz.</string>
+    <string name="settings_delete_all_confirm">Tümünü sil</string>
+    <string name="settings_roaming_title">Oturum açtığım her yerde aynı görüntü resmini ve kişisel iletiyi kullan</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_roaming_supporting_you_singular">Oturum açtığınız tüm cihazlarda görüntü resmi ve kişisel ileti değişikliklerini eşitleyin.</string>
+    <string name="settings_picture_changes_title">Görüntü resmi değişiklikleri</string>
+    <string name="settings_picture_changes_body">Messenger\'daki resim bu cihazda kayıtlı olandan farklı olduğunda:</string>
+    <string name="settings_decline_default_title">Varsayılan reddetme eylemlerini kullan</string>
+    <string name="settings_decline_default_supporting">Reddetme sırasında sormadan aşağıdaki eylemleri kullanır. Her seferinde seçmek için bunu kapatın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_decline_block_supporting_you_singular">Reddettiğiniz kişilerden gelecek davetleri de engelleyin.</string>
+    <string name="settings_plus_rendering_title">Messenger Plus! biçimlendirmesini etkinleştir</string>
+    <string name="settings_plus_hide_codes_title">Denetim karakterlerini gizle</string>
+    <string name="settings_plus_hide_codes_supporting">Biçimlendirme kapalıyken biçim kodlarını gizle. Biçimlendirme etkinken her zaman açıktır.</string>
+    <string name="settings_emotion_sounds_auto_title">Duygu seslerini otomatik çal</string>
+    <string name="settings_emotion_sounds_auto_supporting">Konuşma açıkken yeni duygu seslerini çal.</string>
+    <string name="settings_theme_header">Tema</string>
+    <string name="settings_color_scheme_header">Renk düzeni</string>
+    <string name="settings_home_header">Ana Sayfa</string>
+    <string name="settings_convert_shortcuts_title">Yazılan kısayolları dönüştür</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_convert_shortcuts_supporting_you_singular">Yazarken :D gibi klavye kısayollarını ifade olarak gösterin. Gelen mesajlar her zaman simgeleri kullanır.</string>
+    <string name="settings_original_emoticons_title">Orijinal Messenger ifadelerini kullan</string>
+    <string name="settings_original_emoticons_supporting">Modern Unicode emojiler yerine klasik MSN görsellerini göster.</string>
+    <string name="settings_play_winks_auto_title">Göz kırpmalarını otomatik oynat</string>
+    <string name="settings_play_winks_auto_supporting">Sohbet açıkken gelen göz kırpmalarını oynat. Azaltılmış hareket ayarında küçük resim gösterilir.</string>
+    <string name="settings_wink_sounds_title">Göz kırpması sesleri</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_wink_sounds_supporting_you_singular">Göz kırpması sesleri medya ses seviyenizi kullanır.</string>
+    <string name="connection_provider">Sağlayıcı</string>
+    <string name="connection_remembered_credentials">Hatırlanan kimlik bilgileri</string>
+    <string name="connection_encrypted_on_device">Bu cihazda şifreli</string>
+    <string name="connection_not_saved">Kaydedilmedi</string>
+    <string name="connection_notification_server">Bildirim sunucusu</string>
+    <string name="connection_configuration">Yapılandırma</string>
+    <string name="connection_authentication">Kimlik doğrulama</string>
+    <string name="connection_address_book">Adres defteri</string>
+    <string name="connection_storage">Depolama</string>
+    <string name="connection_games_activities">Oyunlar ve etkinlikler</string>
+    <string name="connection_mail">Posta</string>
+    <string name="connection_section_account">Hesap ve hizmet</string>
+    <string name="connection_section_services">Bağlı hizmetler</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="connection_winks_plural">Göz Kırpmaları</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="connection_emotion_sounds_plural">Duygu Sesleri</string>
+    <string name="connection_not_configured">Yapılandırılmadı</string>
+    <string name="connection_host_port_format">%1$s:%2$s</string>
+    <string name="settings_about_version_before_number">Sürüm</string>
+    <string name="settings_about_version_after_number"></string>
+    <string name="settings_about_developer_label">Geliştirici</string>
+    <string name="settings_about_developer_name">Aral Özkaya</string>
+    <string name="settings_about_license_summary">Msngr kodu: BSD Zero Clause (0BSD). LGPL-2.1-or-later kapsamında libsiren ve diğer açık kaynak kütüphanelerini kullanır.</string>
+    <string name="settings_about_licenses_button">Açık kaynak lisansları</string>
+    <string name="settings_about_credits">Messenger tarihini yaşattıkları için Escargot, NINA, CrossTalk, Pidgin ve retro bilişim topluluklarına teşekkürler.</string>
+    <string name="plus_disclaimer">Messenger Plus! yüklü olmayan alıcılar işlenmiş sonucu görmez ve bunun yerine biçimlendirme kodlarını görebilir.</string>
+
+    <!-- In-app notification settings -->
+    <string name="notification_custom_activity_title">Özel bildirimler</string>
+    <string name="notification_silence_offline_title">Uygun değilken anlık bildirimleri sessize al</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_silence_offline_summary_you_singular">Durumunuz Meşgul, Uzakta veya Çevrim dışı görün iken sohbet dışı anlık bildirimleri sessizce iletin.</string>
+    <string name="notification_silence_messages_title">Kişi ve grup mesajlarını dahil et</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="notification_silence_messages_summary_you_singular">Durumunuz Uygun değilken kişi ve grup mesajı anlık bildirimlerini de sessize alın.</string>
+    <string name="notification_in_app_title">Uygulama içi bildirimler</string>
+    <string name="notification_in_app_summary">Msngr açıkken başlıklar ve titreşim.</string>
+    <string name="notification_options_description">Bildirim seçenekleri</string>
+    <string name="notification_customized_title">Özelleştirilmiş bildirimler</string>
+    <string name="notification_customized_empty">Özel bildirim yok</string>
+    <!-- Note: singular text variant -->
+    <string name="notification_type_group_singular">Grup</string>
+    <!-- Note: singular text variant -->
+    <string name="notification_type_contact_singular">Kişi</string>
+    <string name="notification_state_muted">Sessiz</string>
+    <string name="notification_state_custom">Özel uyarılar</string>
+    <string name="notification_row_summary_format">%1$s · %2$s</string>
+    <string name="notification_custom_use">Özel ayarları kullan</string>
+    <string name="notification_custom_group_alerts">Bu grup için uygulama içi uyarılar</string>
+    <string name="notification_custom_contact_alerts">Bu kişi için uygulama içi uyarılar</string>
+    <string name="notification_background_title">Arka plan bildirimleri</string>
+    <string name="notification_background_summary">Msngr arka plandayken Android bildirim izinleri ve kanalları da geçerlidir.</string>
+    <string name="notification_background_alerts">Arka plan uyarıları</string>
+    <string name="notification_background_silent">Sessiz arka plan uyarıları</string>
+    <string name="notification_reset_general">Genel ayarlara sıfırla</string>
+    <string name="notification_vibration">Titreşim</string>
+    <string name="notification_banners">Başlıklar</string>
+    <string name="notification_toggle_notifications">Bildirimler</string>
+    <string name="notification_reset_for">%1$s için bildirimleri sıfırla</string>
+
+    <!-- Profile, display picture dialogs, and viewer -->
+    <string name="profile_edit_title">Profili düzenle</string>
+    <string name="profile_error_read_image">Bu resim okunamadı.</string>
+    <string name="profile_error_resize_picture">Bu resim yeniden boyutlandırılamadı.</string>
+    <string name="profile_error_open_camera">Kamera açılamadı. Bunun yerine fotoğraf seçmeyi deneyin.</string>
+    <string name="profile_error_open_picker">Fotoğraf seçici açılamadı. Lütfen tekrar deneyin.</string>
+    <string name="profile_change_display_picture">Görüntü resmini değiştir</string>
+    <string name="profile_display_name_label">Görünen ad</string>
+    <string name="profile_personal_message_label">Kişisel ileti</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="profile_personal_message_placeholder_you_singular">Ne yaptığınızı paylaşın</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="profile_personal_message_supporting_you_singular">Messenger kişilerinize görünür</string>
+    <string name="profile_clear_personal_message">Kişisel iletiyi temizle</string>
+    <string name="profile_error_save_picture_server">Görüntü resmi sunucuya kaydedilemedi.</string>
+    <string name="profile_save_button">Profili kaydet</string>
+    <string name="profile_sign_in_address_label">Oturum açma adresi</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="profile_sign_in_address_supporting_you_singular">Seçilen topluluk hizmeti tarafından yönetilir</string>
+    <string name="display_picture_conflict_title">Görüntü resmi değişti</string>
+    <string name="display_picture_conflict_body">Messenger\'da farklı bir görüntü resmi var. Hangisinin tutulacağını seçin.</string>
+    <string name="display_picture_conflict_old">Eski resim</string>
+    <string name="display_picture_conflict_local_sub">Bu cihazda</string>
+    <string name="display_picture_conflict_arrow">Yeni hâli</string>
+    <string name="display_picture_conflict_new">Yeni resim</string>
+    <string name="display_picture_conflict_incoming_sub">Messenger\'dan</string>
+    <string name="display_picture_conflict_keep_local">Yereli koru</string>
+    <string name="display_picture_conflict_use_incoming">Geleni kullan</string>
+    <string name="display_picture_conflict_updating">Görüntü resmi güncelleniyor…</string>
+    <string name="display_picture_conflict_not_now">Şimdi değil</string>
+    <string name="display_picture_conflict_none">Resim yok</string>
+    <string name="display_picture_dialog_title">Görüntü resmi</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="display_picture_dialog_subtitle_you_singular">Biraz daha siz.</string>
+    <string name="display_picture_action_view">Görüntüle</string>
+    <string name="display_picture_option_take_photo">Fotoğraf çek</string>
+    <string name="display_picture_option_take_photo_sub">Yeni bir an yakala</string>
+    <string name="display_picture_option_select_photo">Fotoğraf seç</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="display_picture_option_select_photo_sub_you_singular">Galerinizdeki fotoğraf ve GIF\'ler</string>
+    <string name="display_picture_option_default_photo">Varsayılan fotoğraf kullan</string>
+    <string name="display_picture_option_default_photo_sub">Orijinal Messenger koleksiyonu</string>
+    <string name="display_picture_defaults_title">Varsayılan resimler</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="display_picture_defaults_subtitle_you_singular">En sevdiğiniz Messenger resimleri, tek bir yerde.</string>
+    <string name="display_picture_defaults_load_failed">Varsayılan resimler yüklenemedi.</string>
+    <string name="display_picture_use_photo">Fotoğrafı kullan</string>
+    <string name="display_picture_tile_desc_static">%1$s, %2$s, görüntü resmi</string>
+    <string name="display_picture_tile_desc_animated">%1$s, %2$s, hareketli görüntü resmi</string>
+    <string name="display_picture_unavailable">Resim kullanılamıyor</string>
+    <string name="display_picture_resize_title">Görüntü resmi yeniden boyutlandırılsın mı?</string>
+    <string name="display_picture_resize_dimensions_before_first_number">Bu resim</string>
+    <string name="display_picture_resize_dimensions_between_numbers">×</string>
+    <string name="display_picture_resize_dimensions_after_second_number"></string>
+    <string name="display_picture_resize_size_before_number">ve</string>
+    <string name="display_picture_resize_size_after_number">KiB boyutunda.</string>
+    <string name="display_picture_resize_kb_limit_before_first_number">Messenger resimleri</string>
+    <string name="display_picture_resize_kb_limit_between_numbers">KB (</string>
+    <string name="display_picture_resize_kb_limit_after_second_number">bayt) sınırından küçük olmalıdır.</string>
+    <string name="display_picture_resize_mp_limit_before_number">Uygulama ayrıca oynatma için resimleri</string>
+    <string name="display_picture_resize_mp_limit_after_number">megapiksel ile sınırlar.</string>
+    <string name="display_picture_resize_prompt_static">Oranlarını koruyarak sığan en büyük boyuta yeniden boyutlandırılsın mı?</string>
+    <string name="display_picture_resize_prompt_animated">Oranlarını, animasyonunu ve kare zamanlamasını koruyarak sığan en büyük boyuta yeniden boyutlandırılsın mı?</string>
+    <string name="display_picture_resize_confirm">Yeniden boyutlandır ve devam et</string>
+    <string name="display_picture_resize_body_format">%1$s %2$s %3$s %4$s %5$s</string>
+    <string name="picture_viewer_saved">Görüntü resmi kaydedildi</string>
+    <string name="picture_viewer_save_failed">Görüntü resmi kaydedilemedi. Lütfen tekrar deneyin.</string>
+    <string name="picture_viewer_title">Görüntü resmi</string>
+    <string name="picture_viewer_close">Resmi kapat</string>
+    <string name="picture_viewer_load_failed">Bu görüntü resmi yüklenemedi.</string>
+    <string name="picture_viewer_download">Resmi indir</string>
+    <string name="default_picture_version_prefix">Messenger %1$s</string>
+    <string name="default_picture_version_6_to_8_before_first_number"></string>
+    <string name="default_picture_version_6_to_8_between_numbers">–</string>
+    <string name="default_picture_version_6_to_8_after_second_number"></string>
+    <string name="default_picture_version_2009_before_number"></string>
+    <string name="default_picture_version_2009_after_number"></string>
+    <string name="default_picture_version_2011_2012_before_first_number"></string>
+    <string name="default_picture_version_2011_2012_between_numbers">–</string>
+    <string name="default_picture_version_2011_2012_after_second_number"></string>
+
+    <!-- Display picture validation & sync errors -->
+    <string name="display_picture_select_cant_open">Bu resim açılamadı.</string>
+    <string name="display_picture_select_max_mib_before_number"></string>
+    <string name="display_picture_select_max_mib_after_number">MiB boyutundan küçük bir resim seçin.</string>
+    <string name="display_picture_select_unsupported_format">Bir PNG, JPEG, BMP veya GIF resmi seçin. Hareketli resimler GIF kullanmalıdır.</string>
+    <string name="display_picture_gif_limits_before_first_number">Bu GIF bozuk veya</string>
+    <string name="display_picture_gif_limits_between_numbers">kare ya da</string>
+    <string name="display_picture_gif_limits_after_second_number">megapiksel güvenlik sınırını aşıyor.</string>
+    <string name="display_picture_select_complex_gif">Bu animasyon güvenli bir şekilde yeniden boyutlandırılamayacak kadar karmaşık. Daha küçük bir GIF seçin.</string>
+    <string name="display_picture_select_cant_decode_gif">Bu GIF çözülemedi.</string>
+    <string name="display_picture_select_damaged">Bu resim bozuk veya çözülemedi.</string>
+    <string name="display_picture_select_max_mp_before_number">En fazla</string>
+    <string name="display_picture_select_max_mp_after_number">megapiksel boyutunda bir resim seçin.</string>
+    <string name="display_picture_select_apng_unsupported">Hareketli PNG resimleri Messenger tarafından desteklenmez. Hareketli bir GIF seçin.</string>
+    <string name="display_picture_select_max_kb_animated_before_number">Bu resim, animasyonu korunurken Messenger\'ın</string>
+    <string name="display_picture_select_max_kb_animated_after_number">KB sınırına sığmıyor.</string>
+    <string name="display_picture_sync_account_changed">Oturum açılan hesap değişti. Lütfen tekrar deneyin.</string>
+    <string name="display_picture_sync_check_failed">En son resim denetlenemedi. Tekrar deneyin.</string>
+    <string name="display_picture_sync_update_failed">Görüntü resmi güncellenemedi. Tekrar deneyin.</string>
+    <string name="display_picture_inline_unsupported">Desteklenmeyen satır içi görüntü resmi kodlaması.</string>
+    <string name="display_picture_inline_too_large">Satır içi görüntü resmi çok büyük.</string>
+    <string name="display_picture_inline_invalid">Geçersiz satır içi görüntü resmi.</string>
+    <string name="display_picture_gif_too_large">GIF çok büyük.</string>
+
+    <!-- Appearance, colors, and scenes -->
+    <string name="appearance_color_mode_default_summary">Messenger renkleri veya özel bir ana renk</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="appearance_color_mode_dynamic_summary_you_singular">Cihaz duvar kağıdınızdan renkler</string>
+    <string name="appearance_color_mode_scenes_summary">Eşleşen uygulama renkleriyle klasik sahneler</string>
+    <string name="appearance_choose_scene">Bir sahne seçin</string>
+    <string name="appearance_show_scene_in_chats">Sohbetlerde sahneyi göster</string>
+    <string name="appearance_show_scene_in_chats_summary">Her sohbetin üst kısmında adın arkasında sahneyi göster.</string>
+    <string name="appearance_dark_mode_tint">Koyu mod tonu</string>
+    <string name="appearance_dark_mode_tint_summary">Koyu modda her iki ekrandaki sahne görsellerini karart.</string>
+    <string name="appearance_main_color">Ana renk</string>
+    <string name="appearance_colors_from_scene">%1$s renkleri</string>
+    <string name="appearance_main_color_summary">Uygulama genelinde açık ve koyu temalarda uygulanır.</string>
+    <string name="appearance_custom_color">Özel renk</string>
+    <string name="appearance_use_scene_colors">Sahne renklerini kullan</string>
+    <string name="appearance_reset_color">Rengi sıfırla</string>
+    <string name="appearance_scenes_title">Sahneler</string>
+    <string name="appearance_close_scenes">Sahneleri kapat</string>
+    <string name="appearance_search_scenes">Sahne ara</string>
+    <string name="appearance_scene_card_desc_static">%1$s, %2$s</string>
+    <string name="appearance_scene_card_desc_animated">%1$s, %2$s, hareketli</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="appearance_scenes_empty_you_singular">Aramanızla eşleşen sahne yok.</string>
+    <string name="appearance_brightness">Parlaklık</string>
+    <string name="appearance_hex_color">Hex rengi</string>
+    <string name="appearance_hex_format_hint">#RRGGBB</string>
+    <string name="appearance_palette_preview">Palet önizlemesi</string>
+    <string name="scene_collection_2009">Messenger 2009</string>
+    <string name="scene_collection_2011_2012">Messenger 2011–2012</string>
+    <string name="color_swatch_messenger_blue">Messenger mavisi</string>
+    <string name="color_swatch_ice_blue">Buz mavisi</string>
+    <string name="color_swatch_lavender">Lavanta</string>
+    <string name="color_swatch_aqua">Su yeşili</string>
+    <string name="color_swatch_green">Yeşil</string>
+    <string name="color_swatch_yellow">Sarı</string>
+    <string name="color_swatch_peach">Şeftali</string>
+    <string name="color_swatch_orange">Turuncu</string>
+    <string name="color_swatch_rose">Gül</string>
+    <string name="color_swatch_coral">Mercan</string>
+    <string name="color_swatch_pink">Pembe</string>
+    <string name="color_swatch_purple">Mor</string>
+    <string name="color_swatch_mauve">Leylak</string>
+    <string name="color_swatch_silver">Gümüş</string>
+
+    <!-- Plus! color sheet and color picker -->
+    <string name="plus_apply_gradient">Seçime gradyan uygula</string>
+    <string name="plus_select_text_gradient">Gradyan uygulamak için metin seçin.</string>
+    <string name="plus_clear_formatting">Biçimlendirmeyi temizle</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="plus_colors_plural">Renkler</string>
+    <string name="plus_gradient">Gradyan</string>
+    <string name="plus_target_text">Metin</string>
+    <string name="plus_target_background">Arka plan</string>
+    <string name="plus_gradient_start">Başlangıç</string>
+    <string name="plus_gradient_end">Bitiş</string>
+    <string name="plus_use_for_end">Bitiş için kullan</string>
+    <string name="plus_use_for_start">Başlangıç için kullan</string>
+    <string name="plus_apply_color">Rengi uygula</string>
+    <string name="plus_gradient_chip_label">%1$s: %2$s</string>
+    <string name="plus_palette_tile_desc">%1$s %2$s</string>
+    <string name="plus_custom_color">Özel renk</string>
+    <string name="plus_custom_short">Özel</string>
+    <string name="plus_color_white">Beyaz</string>
+    <string name="plus_color_black">Siyah</string>
+    <string name="plus_color_dark_blue">Koyu mavi</string>
+    <string name="plus_color_dark_green">Koyu yeşil</string>
+    <string name="plus_color_red">Kırmızı</string>
+    <string name="plus_color_dark_red">Bordo</string>
+    <string name="plus_color_purple">Mor</string>
+    <string name="plus_color_orange">Turuncu</string>
+    <string name="plus_color_yellow">Sarı</string>
+    <string name="plus_color_light_green">Açık yeşil</string>
+    <string name="plus_color_teal">Deniz mavisi</string>
+    <string name="plus_color_cyan">Camgöbeği</string>
+    <string name="plus_color_blue">Mavi</string>
+    <string name="plus_color_magenta">Macenta</string>
+    <string name="plus_color_gray">Gri</string>
+    <string name="plus_color_light_gray">Açık gri</string>
+    <string name="color_picker_title">Özel renk</string>
+    <string name="color_picker_code_label">Renk kodu</string>
+    <string name="color_picker_code_error_before_first_number">Geçerli bir renk girin: #RRGGBB,</string>
+    <string name="color_picker_code_error_between_numbers">–</string>
+    <string name="color_picker_code_error_after_second_number">veya ad.</string>
+    <string name="color_picker_code_hint_before_first_number">#RRGGBB,</string>
+    <string name="color_picker_code_hint_between_numbers">–</string>
+    <string name="color_picker_code_hint_after_second_number">veya ad</string>
+    <string name="color_wheel_description">Renk tekerleği</string>
+    <string name="color_wheel_state_before_first_number">Ton</string>
+    <string name="color_wheel_state_between_numbers">derece, %</string>
+    <string name="color_wheel_state_after_second_number">doygunluk</string>
+    <string name="color_wheel_next_hue">Sonraki ton</string>
+    <string name="color_wheel_prev_hue">Önceki ton</string>
+    <string name="color_wheel_inc_sat">Doygunluğu artır</string>
+    <string name="color_wheel_dec_sat">Doygunluğu azalt</string>
+
+    <!-- Native text style sheet -->
+    <!-- Note: singular text variant -->
+    <string name="native_style_color_singular">Renk</string>
+    <string name="native_style_current_color">Geçerli renk #%1$s</string>
+    <string name="native_style_size">Boyut</string>
+    <string name="native_style_size_range_before_first_number"></string>
+    <string name="native_style_size_range_between_numbers">ile</string>
+    <string name="native_style_size_range_after_second_number">arasında bir boyut girin.</string>
+    <string name="native_style_reset">Stili sıfırla</string>
+    <string name="native_style_text_size_desc">Metin boyutu</string>
+    <string name="native_style_pt_before_number"></string>
+    <string name="native_style_pt_after_number">pt</string>
+    <string name="native_style_font_style">Yazı Tipi Stili</string>
+
+    <!-- Handwriting composer -->
+    <string name="ink_pen_fine">İnce</string>
+    <string name="ink_pen_normal">Normal</string>
+    <string name="ink_pen_bold">Kalın</string>
+    <string name="ink_eraser_small">Küçük</string>
+    <string name="ink_eraser_big">Büyük</string>
+    <!-- Note: singular text variant -->
+    <string name="ink_eraser_stroke_singular">Fırça Darbesi</string>
+    <string name="ink_grid_small">Küçük kılavuz</string>
+    <string name="ink_grid_medium">Orta boy kılavuz</string>
+    <string name="ink_grid_large">Büyük kılavuz</string>
+    <string name="ink_grid_blank">Boş</string>
+    <string name="ink_color_black">Siyah</string>
+    <string name="ink_color_gray">Gri</string>
+    <string name="ink_color_silver">Gümüş</string>
+    <string name="ink_color_white">Beyaz</string>
+    <string name="ink_color_navy">Lacivert</string>
+    <string name="ink_color_blue">Mavi</string>
+    <string name="ink_color_aqua">Açık mavi</string>
+    <string name="ink_color_teal">Deniz mavisi</string>
+    <string name="ink_color_maroon">Bordo</string>
+    <string name="ink_color_red">Kırmızı</string>
+    <string name="ink_color_fuchsia">Fuşya</string>
+    <string name="ink_color_purple">Mor</string>
+    <string name="ink_color_green">Yeşil</string>
+    <string name="ink_color_lime">Açık yeşil</string>
+    <string name="ink_color_olive">Zeytin yeşili</string>
+    <string name="ink_color_yellow">Sarı</string>
+    <string name="ink_clear_all">Tümünü temizle</string>
+    <string name="ink_menu_color">Mürekkep rengi</string>
+    <string name="ink_color_description">Mürekkep rengi %1$s</string>
+    <string name="ink_canvas_description">El yazısı tuvali</string>
+    <!-- Note: singular text variant -->
+    <string name="ink_strokes_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="ink_strokes_singular_after_number">çizgi</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="ink_strokes_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="ink_strokes_plural_after_number">çizgi</string>
+    <string name="ink_pen_summary">%1$s kalem</string>
+    <string name="ink_canvas_state_format">%1$s, %2$s, %3$s, %4$s</string>
+    <string name="ink_canvas_placeholder">El yazısı mesajını buraya çizin…</string>
+    <string name="ink_send_description">El yazısını gönder</string>
+    <string name="ink_type_mode">Yazma modu</string>
+    <string name="ink_pen_label_format">Kalem (%1$s)</string>
+    <string name="ink_eraser_active_label_format">Silgi (%1$s, etkin)</string>
+    <string name="ink_eraser_label_format">Silgi (%1$s)</string>
+    <string name="ink_undo_stroke">Yazılanı geri al</string>
+    <string name="ink_redo_stroke">Yazılanı yinele</string>
+    <string name="ink_color_selected_description">Mürekkep rengi (%1$s)</string>
+    <string name="ink_grid_label_format">Izgara (%1$s)</string>
+    <string name="ink_more_tools_description">Diğer el yazısı araçları</string>
+    <!-- Note: singular text variant -->
+    <string name="ink_message_strokes_singular_before_number">El yazısı mesajı (</string>
+    <!-- Note: singular text variant -->
+    <string name="ink_message_strokes_singular_after_number">çizgi)</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="ink_message_strokes_plural_before_number">El yazısı mesajı (</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="ink_message_strokes_plural_after_number">çizgi)</string>
+
+    <!-- Voice clips -->
+    <string name="voice_clip_title">Ses Klibi</string>
+    <string name="voice_clip_hold_to_record">Ses Klibi kaydetmek için bu düğmeyi basılı tutun. İletinizi göndermek için düğmeyi bırakın.</string>
+    <string name="voice_clip_record_failed">Ses Klibi kaydedilemedi.</string>
+    <string name="voice_clip_mic_permission">Ses klibi kaydetmek için mikrofon erişimine izin verin.</string>
+    <string name="voice_clip_send_failed">Ses klibi gönderilemedi.</string>
+    <string name="voice_clip_send_action">Ses klibini gönder</string>
+    <string name="voice_clip_stop_recording">Kaydı durdur</string>
+    <string name="voice_clip_recording">Ses klibi kaydediliyor</string>
+    <string name="voice_clip_record_action">Ses klibi kaydet</string>
+    <string name="voice_clip_unlock_recording">Kayıt kilidini aç</string>
+    <string name="voice_clip_lock_recording">Kaydı kilitle</string>
+    <string name="voice_clip_locked_state">Kayıt kilitlendi</string>
+    <string name="voice_clip_drag_to_lock">Kaydı kilitlemek için yukarı sürükleyin</string>
+    <string name="voice_clip_delete_description">Ses klibini sil</string>
+    <string name="voice_clip_progress_before_first_number"></string>
+    <string name="voice_clip_progress_between_numbers">/</string>
+    <string name="voice_clip_progress_after_second_number">sn</string>
+    <string name="voice_clip_duration_before_number"></string>
+    <string name="voice_clip_duration_after_number">sn</string>
+    <string name="voice_clip_max_seconds_before_number">En fazla</string>
+    <string name="voice_clip_max_seconds_after_number">saniyelik ses kaydedin.</string>
+    <string name="voice_clip_preparing">Hazırlanıyor…</string>
+    <string name="voice_clip_locked">Kilitlendi</string>
+    <string name="voice_clip_release_to_review">Önizlemek için bırakın</string>
+    <string name="voice_clip_mic_unavailable">Mikrofon kullanılamıyor.</string>
+    <string name="voice_clip_mic_open_failed">Mikrofon açılamadı.</string>
+    <string name="voice_clip_mic_start_failed">Mikrofon başlatılamadı.</string>
+    <string name="voice_clip_mic_recording_failed">Mikrofon kaydı başarısız oldu.</string>
+    <string name="voice_clip_audio_playback_failed">Ses oynatılamadı.</string>
+    <string name="voice_clip_cant_play">Ses Klibinin çalınmasında sorun vardı.</string>
+    <string name="voice_clip_stop_description">Ses klibini durdur</string>
+    <string name="voice_clip_play_description">Ses klibini oynat</string>
+    <string name="voice_clip_downloading">Ses klibi indiriliyor…</string>
+    <string name="voice_clip_unavailable">Ses klibi kullanılamıyor</string>
+
+    <!-- Emotion sounds -->
+    <string name="random_sound_title">Rastgele ses</string>
+    <string name="random_sound_instructions">Bir ses bulun, önizleyin ve tutup tutmayacağınızı seçin.</string>
+    <string name="random_sound_category_format">Kategori: %1$s</string>
+    <string name="random_sound_language_label">Dil</string>
+    <string name="random_sound_language_desc">Ses dili</string>
+    <string name="random_sound_try_another">Başka dene</string>
+    <string name="random_sound_keep">Tut</string>
+    <string name="random_sound_discard">Vazgeç</string>
+    <string name="emotion_sound_id_before_number">#</string>
+    <string name="emotion_sound_id_after_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="emotion_sound_numbered_singular_before_number">Duygu sesi</string>
+    <!-- Note: singular text variant -->
+    <string name="emotion_sound_numbered_singular_after_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="emotion_sound_fallback_name_singular">Duygu sesi</string>
+    <string name="emotion_sound_not_configured">Bu hizmet için çevrim içi duygu sesleri yapılandırılmamış.</string>
+    <string name="emotion_sound_download_failed">Ses indirilemedi.</string>
+    <string name="emotion_sound_save_failed">Ses kaydedilemedi.</string>
+    <string name="emotion_sound_audio_in_use">Ses kullanımda. Tekrar deneyin.</string>
+    <string name="emotion_sound_too_long">Duygu sesi çok uzun.</string>
+    <string name="emotion_sound_play_failed">Duygu sesi çalınamadı.</string>
+    <string name="emotion_sound_account_changed">Seçilen hesap değişti. Ses seçiciyi tekrar açın.</string>
+    <string name="emotion_sound_generic_play_failed">Messenger seçilen sesi çalamadı.</string>
+    <string name="emotion_sound_load_failed">Çevrim içi sesler yüklenemedi.</string>
+    <string name="emotion_sound_search_hint">Ses ara</string>
+    <string name="emotion_sound_search_clear">Ses aramasını temizle</string>
+    <string name="emotion_sound_tab_local">Yerel</string>
+    <string name="emotion_sound_tab_online">Çevrim içi</string>
+    <string name="emotion_sound_category_desc">Ses kategorisi</string>
+    <string name="emotion_sound_added_status">%1$s eklendi</string>
+    <string name="emotion_sound_random_action">Rastgele</string>
+    <string name="emotion_sound_loading_online">Çevrim içi sesler yükleniyor</string>
+    <string name="emotion_sound_empty_online">Eşleşen ses yok. İndirmek için bir ses kimliği girin veya Rastgele\'yi deneyin.</string>
+    <string name="emotion_sound_empty_local">Eşleşen ses yok.</string>
+    <string name="emotion_sound_stop_desc">Sesi durdur</string>
+    <string name="emotion_sound_preview_desc">%1$s sesini önizle</string>
+    <string name="emotion_sound_send_action">Ses gönder</string>
+    <string name="emotion_sound_download_desc">%1$s sesini indir</string>
+    <string name="emotion_sound_remove_desc">%1$s sesini kaldır</string>
+    <string name="emotion_sound_save_add">Kayıtlı seslere ekle</string>
+    <string name="emotion_sound_save_remove">Kayıtlı seslerden kaldır</string>
+    <string name="emotion_sound_cat_any">Tüm kategoriler</string>
+    <string name="emotion_sound_cat_cartoons_games">Çizgi Filmler / Oyunlar</string>
+    <string name="emotion_sound_cat_tv_movies">TV / Filmler</string>
+    <string name="emotion_sound_cat_music">Müzik</string>
+    <string name="emotion_sound_cat_vocals">Seslendirmeler</string>
+    <string name="emotion_sound_cat_sfx">Ses Efektleri</string>
+    <string name="emotion_sound_lang_any">Tüm diller</string>
+    <string name="emotion_sound_lang_arabic">Arapça</string>
+    <string name="emotion_sound_lang_catalan">Katalanca</string>
+    <string name="emotion_sound_lang_chinese">Çince</string>
+    <string name="emotion_sound_lang_danish">Danca</string>
+    <string name="emotion_sound_lang_german">Almanca</string>
+    <string name="emotion_sound_lang_greek">Yunanca</string>
+    <string name="emotion_sound_lang_english">İngilizce</string>
+    <string name="emotion_sound_lang_spanish">İspanyolca</string>
+    <string name="emotion_sound_lang_finnish">Fince</string>
+    <string name="emotion_sound_lang_french">Fransızca</string>
+    <string name="emotion_sound_lang_hebrew">İbranice</string>
+    <string name="emotion_sound_lang_portuguese">Portekizce</string>
+    <string name="emotion_sound_lang_italian">İtalyanca</string>
+    <string name="emotion_sound_lang_japanese">Japonca</string>
+    <string name="emotion_sound_lang_korean">Korece</string>
+    <string name="emotion_sound_lang_dutch">Felemenkçe</string>
+    <string name="emotion_sound_lang_norwegian">Norveççe</string>
+    <string name="emotion_sound_lang_russian">Rusça</string>
+    <string name="emotion_sound_lang_swedish">İsveççe</string>
+    <string name="emotion_sound_lang_thai">Tayca</string>
+    <string name="emotion_sound_lang_turkish">Türkçe</string>
+    <string name="emotion_sound_lang_kurdish">Kürtçe</string>
+    <string name="emotion_sound_lang_estonian">Estonca</string>
+    <string name="emotion_sound_lang_hungarian">Macarca</string>
+    <string name="emotion_sound_default_hello">Merhaba!</string>
+    <string name="emotion_sound_default_bye">Hoşça kal!</string>
+    <string name="emotion_sound_default_brb">Hemen Döneceğim</string>
+    <string name="emotion_sound_default_im_so_stupid">Çok Aptalım!</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="emotion_sound_default_are_you_mad_you_singular">Delirdin mi Sen?!?</string>
+    <string name="emotion_sound_default_omg">Aman Tanrım!</string>
+    <string name="emotion_sound_default_kiss">Öpücük</string>
+    <string name="emotion_sound_default_evil_laugh">Kötü Kahkaha</string>
+    <string name="emotion_sound_default_imperial_march">Imperial March</string>
+    <string name="emotion_sound_default_come_on">Hadi ama!</string>
+    <string name="emotion_sound_default_dangerous">Tehlikeli</string>
+    <string name="emotion_sound_default_applause">Alkış</string>
+    <string name="emotion_sound_default_woow">Vay!</string>
+    <string name="emotion_sound_default_right">Doğru ya...</string>
+    <string name="emotion_sound_default_trekkie">Trekkie</string>
+    <string name="emotion_sound_default_yawn">Esneme</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="emotion_sound_default_boring_you_singular">Çok Sıkıcısın!</string>
+
+    <!-- Winks -->
+    <!-- Note: singular text variant -->
+    <string name="wink_fallback_name_singular">Göz Kırpması</string>
+    <string name="wink_sign_in_required">Göz kırpması eklemeden önce oturum açın.</string>
+    <string name="wink_not_configured">Bu hizmet için üçüncü taraf göz kırpmaları yapılandırılmamış.</string>
+    <string name="wink_download_failed_generic">Göz kırpması indirilemedi.</string>
+    <string name="wink_get_more">Diğer göz kırpmalarını al</string>
+    <string name="wink_catalog_stopped">Katalog durdu. Kapatıp tekrar deneyin.</string>
+    <string name="wink_add_dialog_title">Göz kırpması ekle</string>
+    <string name="wink_account_changed">Seçilen hesap değişti. Tekrar deneyin.</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="wink_added_count_singular_you_singular_before_number">Kitaplığınıza</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="wink_added_count_singular_you_singular_after_number">göz kırpması eklendi.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="wink_added_count_plural_you_singular_before_number">Kitaplığınıza</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="wink_added_count_plural_you_singular_after_number">göz kırpması eklendi.</string>
+    <string name="wink_add_failed">Göz kırpmaları eklenemedi.</string>
+    <string name="wink_add_to_library">Göz kırpmalarıma ekle</string>
+    <string name="wink_untrusted_link">Bu göz kırpması indirme bağlantısı yapılandırılan katalogdan değil.</string>
+    <string name="wink_invalid_redirect">Geçersiz indirme yönlendirmesi.</string>
+    <string name="wink_untrusted_redirect">Güvenilmeyen göz kırpması indirme yönlendirmesi.</string>
+    <string name="wink_download_http_error_before_number">Göz kırpması indirilemedi (HTTP</string>
+    <string name="wink_download_http_error_after_number">).</string>
+    <string name="wink_too_large">Göz kırpması paketi çok büyük.</string>
+    <string name="wink_too_many_redirects">Çok fazla indirme yönlendirmesi.</string>
+    <string name="wink_not_cached">Bu göz kırpması artık önbellekte değil.</string>
+    <string name="wink_play_failed">Göz kırpmasını yürütme işleminde sorun çıktı.</string>
+    <string name="wink_close_player">Göz kırpmasını kapat</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="wink_title_plural">Göz Kırpmaları</string>
+    <string name="wink_unavailable">Göz kırpması kullanılamıyor.</string>
+    <string name="wink_delete_failed">Göz kırpması silinemedi.</string>
+    <string name="wink_send_label">Göz kırpması gönder</string>
+    <string name="wink_options_label">Göz kırpması seçeneklerini göster</string>
+    <string name="wink_downloading">Göz kırpması indiriliyor…</string>
+    <string name="wink_update_saved_failed">Kayıtlı göz kırpmaları güncellenemedi.</string>
+    <string name="wink_save_remove">Kayıtlı göz kırpmalarından kaldır</string>
+    <string name="wink_save_add">Kayıtlı göz kırpmalarına ekle</string>
+    <string name="wink_open_failed">Göz kırpması açılamadı: %1$s</string>
+    <string name="wink_builtin_bouncy_ball">Zıplayan Top</string>
+    <string name="wink_builtin_bow">Fiyonk</string>
+    <string name="wink_builtin_crying">Ağlama</string>
+    <string name="wink_builtin_dancer">Dansçı</string>
+    <string name="wink_builtin_dancing_pig">Dans Eden Domuzcuk</string>
+    <string name="wink_builtin_frog">Kurbağa</string>
+    <string name="wink_builtin_guitar_smash">Gitar Parçalama</string>
+    <string name="wink_builtin_heart">Kalp</string>
+    <string name="wink_builtin_kiss">Öpücük</string>
+    <string name="wink_builtin_knock">Kapı Çalma</string>
+    <string name="wink_builtin_laughing_girl">Gülen Kız</string>
+    <string name="wink_builtin_lightbulb">Ampul</string>
+    <string name="wink_builtin_silly_face">Komik Surat</string>
+    <string name="wink_builtin_ufo">UFO</string>
+    <string name="wink_builtin_water_balloon">Su Torbası</string>
+
+    <!-- File transfers, photo sharing, and storage -->
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="transfers_storage_access_default_folders_you_singular_before_number">Android</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="transfers_storage_access_default_folders_you_singular_after_number">ve önceki sürümlerde varsayılan klasörler için depolama erişimi gereklidir. Bunun yerine özel bir klasör seçebilirsiniz.</string>
+    <string name="transfers_folder_authorize_failed">Klasör yetkilendirilemedi. Klasörü yeniden seçin ve erişime izin verin.</string>
+    <string name="transfers_auto_accept_title">Aktarımları otomatik kabul et</string>
+    <string name="transfers_auto_accept_supporting">Gelen dosya isteklerini ve fotoğraf paylaşımı davetlerini otomatik olarak kabul edin.</string>
+    <string name="transfers_auto_save_title">Alınan dosyaları otomatik kaydet</string>
+    <string name="transfers_auto_save_supporting">İndirme tamamlandıktan sonra alınan dosyaları dosya klasörüne kaydedin.</string>
+    <string name="transfers_include_photos_title">Paylaşılan fotoğrafları dahil et</string>
+    <string name="transfers_save_locations_header">Kayıt konumları</string>
+    <string name="transfers_location_options_label">Konum seçenekleri</string>
+    <string name="transfers_file_folder_default">İndirilenler (varsayılan)</string>
+    <string name="transfers_file_folder_choose">Dosya klasörü seçin</string>
+    <string name="transfers_file_folder_title">Dosya klasörü</string>
+    <string name="transfers_photo_folder_default">DCIM/Msngr (varsayılan)</string>
+    <string name="transfers_photo_folder_choose">Fotoğraf klasörü seçin</string>
+    <string name="transfers_photo_folder_title">Fotoğraf klasörü</string>
+    <string name="transfers_error_title">Kayıt konumu ayarlanamadı</string>
+    <string name="transfers_restore_default">Varsayılan konumu geri yükle</string>
+    <string name="transfers_selected_folder_fallback">Seçili klasör</string>
+    <string name="file_sharing_unavailable">Bu dosya kullanılamıyor.</string>
+    <string name="file_sharing_open_selected_file_failed">Seçilen dosya açılamadı.</string>
+    <string name="photo_sharing_limit_before_number">Tek seferde en fazla</string>
+    <string name="photo_sharing_limit_after_number">fotoğraf seçin.</string>
+    <string name="photo_sharing_open_selected_failed">Seçilen fotoğraflar açılamadı.</string>
+    <string name="chat_share_menu_description">Paylaş veya bir etkinlik başlat</string>
+    <string name="chat_share_menu_photos">Fotoğraflar</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_share_menu_files_plural">Dosyalar</string>
+    <string name="chat_share_menu_games">Oyunlar ve etkinlikler</string>
+    <string name="file_sharing_error_title">Paylaşılamadı</string>
+    <string name="file_sharing_save_failed">Dosya kaydedilemedi.</string>
+    <string name="file_sharing_waiting_acceptance">Kabul bekleniyor</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="file_sharing_wants_to_send_you_singular">Size bir dosya göndermek istiyor</string>
+    <string name="file_sharing_sending">%1$s gönderiliyor</string>
+    <string name="file_sharing_receiving">%1$s alınıyor</string>
+    <string name="file_sharing_saved">Kaydedildi</string>
+    <string name="file_sharing_send_complete">Gönderme tamamlandı</string>
+    <string name="file_sharing_receive_complete">Alım tamamlandı</string>
+    <string name="file_sharing_declined">Dosya reddedildi</string>
+    <string name="file_sharing_canceled">Dosya aktarımı iptal edildi</string>
+    <string name="file_sharing_failed">Aktarım Hatası</string>
+    <string name="file_sharing_save_as">Farklı kaydet</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="file_sharing_no_open_app_you_singular">Bu dosyayı açabilecek bir uygulama bulunamadı. Önce kaydedebilirsiniz.</string>
+    <!-- Note: singular text variant -->
+    <string name="file_sharing_file_icon_desc_singular">Dosya</string>
+    <string name="transfer_storage_access_photos_before_number">Android</string>
+    <string name="transfer_storage_access_photos_after_number">ve önceki sürümlerde fotoğrafları DCIM/Msngr klasörüne kaydetmek için depolama erişimi gereklidir.</string>
+    <string name="photo_sharing_save_failed">Fotoğraf kaydedilemedi.</string>
+    <string name="photo_sharing_view_photos">Fotoğrafları görüntüle</string>
+    <string name="photo_sharing_invitation_state">Fotoğraf paylaşımı daveti</string>
+    <!-- Note: singular text variant -->
+    <string name="photo_sharing_count_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="photo_sharing_count_singular_after_number">fotoğraf paylaşılıyor</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="photo_sharing_count_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="photo_sharing_count_plural_after_number">fotoğraf paylaşılıyor</string>
+    <string name="photo_sharing_ended_state">Fotoğraf paylaşımı sona erdi</string>
+    <string name="photo_sharing_waiting_peer">Diğer kişinin kabul etmesi bekleniyor…</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="photo_sharing_invited_you_singular">Fotoğraf paylaşmaya davet edildiniz.</string>
+    <string name="photo_sharing_stopped_remote">Diğer kişi fotoğraf paylaşımını durdurdu.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="photo_sharing_stopped_local_you_singular">Fotoğraf paylaşımını durdurdunuz.</string>
+    <string name="photo_sharing_declined">Fotoğraf paylaşımı daveti reddedildi.</string>
+    <string name="photo_sharing_failed">Fotoğraf paylaşımı başarısız oldu.</string>
+    <string name="photo_sharing_active">Fotoğraflar paylaşılıyor</string>
+    <string name="photo_sharing_preview_unavailable">Önizleme kullanılamıyor.</string>
+    <string name="photo_sharing_receiving_photo">Fotoğraf alınıyor…</string>
+    <string name="photo_sharing_counter_before_first_number"></string>
+    <string name="photo_sharing_counter_between_numbers">/</string>
+    <string name="photo_sharing_counter_after_second_number"></string>
+    <string name="photo_sharing_retry_photo">Fotoğrafı yeniden dene</string>
+    <string name="photo_sharing_saving">Kaydediliyor…</string>
+    <string name="photo_sharing_save_photo">Fotoğrafı kaydet</string>
+    <string name="photo_sharing_preparing">Hazırlanıyor…</string>
+    <string name="photo_sharing_add_photos">Fotoğraf ekle</string>
+    <string name="photo_sharing_stop_sharing">Paylaşımı durdur</string>
+    <string name="file_sharing_unsupported_name">Dosya adı desteklenmiyor.</string>
+    <string name="file_sharing_executable_unsupported">Çalıştırılabilir dosyalar paylaşılamaz.</string>
+    <string name="file_sharing_size_limit_before_number"></string>
+    <string name="file_sharing_size_limit_after_number">GB boyutundan büyük dosyalar desteklenmiyor.</string>
+    <string name="photo_sharing_unsupported_image">Desteklenen bir resim seçin.</string>
+    <string name="received_transfer_save_failed">Aktarım kaydedilemedi.</string>
+    <string name="received_transfer_original_unavailable">Alınan orijinal dosya artık kullanılamıyor.</string>
+    <string name="received_transfer_unsupported_photo">Orijinal dosya desteklenen bir fotoğraf değil.</string>
+    <string name="received_transfer_photo_folder_lost">Klasör erişimi kayboldu. Dosya ve fotoğraf aktarımları bölümünden fotoğraf klasörünü tekrar seçin.</string>
+    <string name="received_transfer_file_folder_lost">Klasör erişimi kayboldu. Dosya ve fotoğraf aktarımları bölümünden dosya klasörünü tekrar seçin veya Farklı kaydet\'i kullanın.</string>
+    <string name="received_transfer_selected_folder_unavailable">Seçilen klasör kullanılamıyor.</string>
+    <string name="received_transfer_default_folder_unavailable">Varsayılan klasör kullanılamıyor.</string>
+    <string name="received_transfer_default_access_needed">Bu Android sürümünde varsayılan klasöre kaydetmek için depolama erişimine izin verin veya özel bir klasör seçin.</string>
+
+    <!-- Games & activities -->
+    <string name="games_title">Oyunlar ve etkinlikler</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="games_intro_you_singular">Kişini doğrudan sohbet içinde oyun oynamaya veya bir etkinlik paylaşmaya davet et.</string>
+    <string name="games_activity_badge">Etkinlik</string>
+    <!-- Note: singular text variant -->
+    <string name="game_players_exact_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="game_players_exact_singular_after_number">Oyuncu</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="game_players_exact_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="game_players_exact_plural_after_number">Oyuncu</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="game_players_range_plural_before_first_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="game_players_range_plural_between_numbers">–</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="game_players_range_plural_after_second_number">Oyuncu</string>
+    <string name="game_state_invitation">%1$s daveti</string>
+    <string name="game_state_playing">%1$s oynanıyor</string>
+    <string name="game_state_ended">%1$s sona erdi</string>
+    <string name="game_attention_badge">!</string>
+    <string name="game_open_desc">%1$s oyununu aç</string>
+    <string name="game_waiting_accept">Kabul etmesi için %1$s bekleniyor…</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_invited_you_singular">%1$s seni davet etti</string>
+    <string name="game_with_peer">%1$s ile</string>
+    <string name="game_loading_peer">%1$s kişisinin oyunu yükleniyor…</string>
+    <string name="game_invitation_declined">Davet reddedildi</string>
+    <string name="game_peer_left">%1$s oyundan ayrıldı</string>
+    <string name="game_ended">Oyun sona erdi</string>
+    <string name="game_failed">Oyun başarısız oldu</string>
+    <string name="game_minimize">Küçült</string>
+    <string name="game_end_action">Bitir</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_invite_outgoing_body_you_singular">%1$s oynama davetin gönderildi. Beklerken bu paneli köşe düğmesine küçültüp sohbete devam edebilirsin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_invite_incoming_body_you_singular">%1$s seninle %2$s başlatmak istiyor.</string>
+    <string name="game_accept_and_play">Kabul et ve oyna</string>
+    <string name="game_help_title">%1$s — Yardım</string>
+    <string name="game_key_enter">ENTER</string>
+    <string name="game_key_backspace_symbol">⌫</string>
+    <string name="game_control_left">◀</string>
+    <string name="game_control_rotate">⟳</string>
+    <string name="game_control_down">▼</string>
+    <string name="game_control_right">▶</string>
+    <string name="game_control_drop">Bırak</string>
+    <string name="game_cat_microsoft_name">Microsoft</string>
+    <string name="game_cat_microsoft_desc">Microsoft ve Zone.com resmi oyunları</string>
+    <string name="game_cat_escargot_games_name">Escargot Oyunları</string>
+    <string name="game_cat_escargot_games_desc">Escargot için yapılmış oyunlar!</string>
+    <string name="game_cat_messbe_name">Mess.be Oyunları</string>
+    <string name="game_cat_messbe_desc">Mess.be\'den klasik oyunlar</string>
+    <string name="game_cat_escargot_activities_name">Escargot Etkinlikleri</string>
+    <string name="game_cat_escargot_activities_desc">Escargot için paylaşımlı etkinlikler</string>
+    <string name="game_tic_tac_toe_name">Tic Tac Toe</string>
+    <string name="game_tic_tac_toe_desc">Bir arkadaşınla klasik Tic Tac Toe oyna!</string>
+    <string name="game_wordle_name">Wordle (beta)</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_wordle_desc_you_singular">Kelimeleri arkadaşından daha hızlı tahmin et!</string>
+    <string name="game_reversi_name">Reversi</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_reversi_desc_you_singular">Rakibinin taşlarını çevirerek tahtayı ele geçir!</string>
+    <string name="game_yahtzee_name">Yahtzee</string>
+    <string name="game_yahtzee_desc">Yüksek puanlı kombinasyonlar için beş zar at!</string>
+    <string name="game_battleships_name">Amiral Battı</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_battleships_desc_you_singular">Rakibin seninkini batırmadan önce onun filosunu bul ve batır!</string>
+    <string name="game_chess_name">Satranç</string>
+    <string name="game_chess_desc">Klasik strateji ve taktik oyunu!</string>
+    <string name="game_nine_mens_morris_name">Dokuz Taş</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_nine_mens_morris_desc_you_singular">Rakibinin taşlarını almak için üç taştan değirmenler kur!</string>
+    <string name="game_connect4_name">Connect 4</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_connect4_desc_you_singular">Pulları bırak ve art arda dörtlüyü ilk sen tamamla!</string>
+    <string name="game_memory_name">Hafıza Oyunu</string>
+    <string name="game_memory_desc">Bu klasik hafıza oyununda kart çiftlerini eşleştir!</string>
+    <string name="game_tetris_name">Tetris</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_tetris_desc_you_singular">Karşılıklı Tetris\'te satırları temizle ve rakibinden daha uzun süre dayan!</string>
+    <string name="game_backgammon_name">Tavla</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="game_backgammon_desc_you_singular">Zarları at ve tüm pullarını ilk sen topla!</string>
+    <string name="game_whiteboard_name">Beyaz Tahta</string>
+    <string name="game_whiteboard_desc">Gerçek zamanlı olarak birlikte çizim yapın!</string>
+
+    <!-- App updates (merged from updates.xml + updater errors) -->
+    <string name="updates_title">Uygulama güncellemeleri</string>
+    <string name="update_notification_channel">Uygulama güncellemeleri</string>
+    <string name="update_notification_channel_description">GitHub\'dan yeni Msngr sürümleri</string>
+    <string name="update_notification_title">Msngr %1$s kullanıma sunuldu</string>
+    <string name="update_notification_text">Yenilikleri görün ve güncellemeyi indirin.</string>
+    <string name="update_available">Güncelleme mevcut</string>
+    <string name="update_badge">Yeni</string>
+    <string name="update_release_only">İmzalı sürüm gerekli</string>
+    <string name="update_release_only_explanation">Güncelleyici imzalı sürüm derlemelerinde çalışır. Etkinleştirmek için GitHub\'dan imzalı sürüm APK\'sını yükleyin.</string>
+    <string name="update_stay_current">Güncel kalın</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="update_up_to_date_you_singular">Güncelsiniz</string>
+    <string name="update_skipped">Sürüm atlandı</string>
+    <string name="update_checking">Güncellemeler denetleniyor…</string>
+    <string name="update_check_now">Güncellemeleri denetle</string>
+    <string name="update_installed_version">Yüklü sürüm: %1$s</string>
+    <string name="update_last_checked">Son denetim: %1$s</string>
+    <string name="update_release_date">%1$s tarihinde yayımlandı</string>
+    <string name="update_prerelease_label">Ön sürüm</string>
+    <string name="update_changelog">Yenilikler</string>
+    <string name="update_no_changelog">Sürüm notu sağlanmadı.</string>
+    <string name="update_download">APK indir</string>
+    <string name="update_apk_ready">APK\'yı yükle veya kaydet</string>
+    <string name="update_apk_not_available">İmzalı sürüm APK\'sı henüz eklenmedi. Sürüm derlemesi tamamlandıktan sonra tekrar kontrol edin.</string>
+    <string name="update_downloading_before_number">İndiriliyor… %</string>
+    <string name="update_downloading_after_number"></string>
+    <string name="update_skip_version">Bu sürümü atla</string>
+    <string name="update_unskip">Bu sürümü atlamayı durdur</string>
+    <string name="update_view_release">Sürümü GitHub\'da görüntüle</string>
+    <string name="update_all_releases">GitHub\'daki tüm sürümler</string>
+    <string name="update_automatic">Otomatik denetle</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="update_automatic_description_you_singular">Msngr başladığında ve seçtiğiniz aralıkta denetleyin. Elle denetim her zaman kullanılabilir.</string>
+    <string name="update_frequency">Denetim sıklığı</string>
+    <string name="update_include_prereleases">Ön sürümleri dahil et</string>
+    <string name="update_prerelease_description">Alfa, beta ve sürüm adayı sürümlerini de sunun.</string>
+    <string name="update_schedule_note">Denetimler Msngr yeniden başladığında çalışır; bağlantının geri yüklenmesi denetimi tetiklemez. Android pil tasarrufu veya ağ beklemek için arka plan denetimlerini geciktirebilir.</string>
+    <string name="update_interval_start">Yalnızca uygulama başladığında</string>
+    <string name="update_interval_hours_before_number">Her</string>
+    <string name="update_interval_hours_after_number">saatte bir ve uygulama başlangıcında</string>
+    <string name="update_interval_week">Her hafta ve uygulama başlangıcında</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="update_download_choice_title_you_singular">Nasıl güncellemek istersiniz?</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="update_download_choice_description_you_singular">Yükle seçeneği indirdikten sonra Android\'in yükleyicisini açar. Android, Msngr\'dan yüklemelere izin vermenizi isteyebilir. Geçici APK başarılı bir güncellemeden sonra silinir. APK\'yı kaydet seçeneği bir klasör seçmenizi sağlar.</string>
+    <string name="update_install">İndir ve yükle</string>
+    <string name="update_save_apk">APK\'yı bir klasöre kaydet</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="update_saved_you_singular">APK seçtiğiniz konuma kaydedildi.</string>
+    <string name="update_check_failed">Güncellemeler denetlenemedi. Lütfen tekrar deneyin.</string>
+    <string name="update_install_failed">Android\'in yükleyicisi açılamadı.</string>
+    <string name="update_install_permission_denied">Android ayarlarında Msngr\'dan yüklemelere izin verin ve ardından yüklemeyi tekrar deneyin.</string>
+    <string name="update_save_failed">APK kaydedilemedi. Lütfen başka bir konum seçin.</string>
+    <string name="update_release_changed">Sürüm değişti. Lütfen güncellemeyi tekrar seçin.</string>
+    <string name="update_clip_label">Msngr güncellemesi</string>
+    <string name="update_github_rate_limit">GitHub istek sınırına ulaşıldı. Lütfen daha sonra tekrar deneyin.</string>
+    <string name="update_github_http_error_before_number">GitHub\'a ulaşılamadı (HTTP</string>
+    <string name="update_github_http_error_after_number">).</string>
+    <string name="update_github_too_many_pages">GitHub çok fazla sürüm sayfası döndürdü. Lütfen sürümler sayfasını kontrol edin.</string>
+    <string name="update_release_info_too_large">Sürüm bilgisi çok büyük.</string>
+    <string name="update_worker_release_changed">Sürüm değişti. Lütfen güncellemeleri tekrar denetleyin.</string>
+    <string name="update_apk_invalid_size">APK boyutu geçersiz.</string>
+    <string name="update_apk_unexpected_size">İndirilen APK beklenmeyen bir boyutta.</string>
+    <string name="update_apk_incomplete">APK indirmesi tamamlanamadı. Lütfen tekrar deneyin.</string>
+    <string name="update_apk_temp_save_failed">APK geçici depolamaya kaydedilemedi.</string>
+    <string name="update_download_failed_generic">Güncelleme indirilemedi.</string>
+    <string name="update_apk_unsupported_address">GitHub desteklenmeyen bir indirme adresi döndürdü.</string>
+    <string name="update_apk_download_http_error_before_number">APK indirilemedi (HTTP</string>
+    <string name="update_apk_download_http_error_after_number">).</string>
+    <string name="update_apk_too_many_redirects">GitHub indirmeyi çok fazla kez yönlendirdi.</string>
+    <string name="update_apk_checksum_mismatch">APK sağlama toplamı GitHub\'daki sürüm dosyasıyla eşleşmiyor.</string>
+    <string name="update_apk_not_valid_signed">İndirilen dosya geçerli bir imzalı APK değil.</string>
+    <string name="update_apk_wrong_package">APK bu uygulama ve sürümle eşleşmiyor.</string>
+    <string name="update_apk_min_sdk_higher">Bu güncelleme daha yeni bir Android sürümü gerektiriyor.</string>
+    <string name="update_apk_wrong_signature">Güncelleme farklı bir anahtarla imzalanmış ve bu yüklemeyi güncelleyemez.</string>
+
+    <!-- Built-in 79 emoticon names -->
+    <string name="emoticon_smile">Gülümseme</string>
+    <string name="emoticon_open_mouthed">Açık ağızlı gülümseme</string>
+    <string name="emoticon_surprised">Şaşkın gülümseme</string>
+    <string name="emoticon_tongue_out">Dil çıkaran gülümseme</string>
+    <!-- Note: singular text variant -->
+    <string name="emoticon_wink_singular">Göz kırpan gülümseme</string>
+    <string name="emoticon_sad">Üzgün gülümseme</string>
+    <string name="emoticon_confused">Kafası karışmış gülümseme</string>
+    <string name="emoticon_disappointed">Hayal kırıklığına uğramış gülümseme</string>
+    <string name="emoticon_crying">Ağlayan surat</string>
+    <string name="emoticon_embarrassed">Mahcup gülümseme</string>
+    <string name="emoticon_hot">Çekici gülümseme</string>
+    <string name="emoticon_angry">Kızgın gülümseme</string>
+    <string name="emoticon_angel">Melek</string>
+    <string name="emoticon_devil">Şeytan</string>
+    <string name="emoticon_dont_tell_anyone">Kimseye söyleme gülümsemesi</string>
+    <string name="emoticon_baring_teeth">Dişlek gülümseme</string>
+    <string name="emoticon_nerd">Şapşal gülümseme</string>
+    <string name="emoticon_sarcastic">Alaycı gülümseme</string>
+    <string name="emoticon_secret_telling">Sır veren gülümseme</string>
+    <string name="emoticon_sick">Hasta gülümsemesi</string>
+    <string name="emoticon_i_dont_know">Bilmem ki gülümsemesi</string>
+    <string name="emoticon_thinking">Düşünceli gülümseme</string>
+    <string name="emoticon_party">Parti gülümsemesi</string>
+    <string name="emoticon_eye_rolling">Gözlerini deviren gülümseme</string>
+    <string name="emoticon_sleepy">Uykulu gülümseme</string>
+    <string name="emoticon_coffee_cup">Kahve fincanı</string>
+    <string name="emoticon_thumbs_up">Başparmak yukarı</string>
+    <string name="emoticon_thumbs_down">Başparmak aşağı</string>
+    <string name="emoticon_beer_mug">Bira bardağı</string>
+    <string name="emoticon_martini_glass">Martini kadehi</string>
+    <string name="emoticon_girl">Kız</string>
+    <string name="emoticon_boy">Oğlan</string>
+    <string name="emoticon_left_hug">Soldan kucaklama</string>
+    <string name="emoticon_right_hug">Sağdan kucaklama</string>
+    <string name="emoticon_vampire_bat">Vampir yarasa</string>
+    <string name="emoticon_birthday_cake">Doğum günü pastası</string>
+    <string name="emoticon_red_heart">Kırmızı kalp</string>
+    <string name="emoticon_broken_heart">Kırık kalp</string>
+    <string name="emoticon_red_lips">Kırmızı dudaklar</string>
+    <string name="emoticon_gift_with_bow">Fiyonklu hediye paketi</string>
+    <string name="emoticon_red_rose">Kırmızı gül</string>
+    <string name="emoticon_wilted_rose">Solmuş gül</string>
+    <string name="emoticon_camera">Kamera</string>
+    <string name="emoticon_filmstrip">Film şeridi</string>
+    <string name="emoticon_cat_face">Kedi suratı</string>
+    <string name="emoticon_dog_face">Köpek suratı</string>
+    <string name="emoticon_telephone_receiver">Telefon ahizesi</string>
+    <string name="emoticon_light_bulb">Ampul</string>
+    <string name="emoticon_note">Nota</string>
+    <string name="emoticon_sleeping_half_moon">Uyuyan yarım ay</string>
+    <string name="emoticon_star">Yıldız</string>
+    <string name="emoticon_email">E-posta</string>
+    <string name="emoticon_clock">Saat</string>
+    <string name="emoticon_msn_icon">Messenger</string>
+    <string name="emoticon_snail">Salyangoz</string>
+    <string name="emoticon_black_sheep">Kara koyun</string>
+    <string name="emoticon_plate">Tepsi</string>
+    <string name="emoticon_bowl">Çanak</string>
+    <string name="emoticon_pizza">Pizza</string>
+    <string name="emoticon_soccer_ball">Futbol topu</string>
+    <string name="emoticon_auto">Otomobil</string>
+    <string name="emoticon_airplane">Uçak</string>
+    <string name="emoticon_umbrella">Şemsiye</string>
+    <string name="emoticon_island">Palmiyeli ada</string>
+    <string name="emoticon_computer">Bilgisayar</string>
+    <string name="emoticon_mobile_phone">Mobil</string>
+    <string name="emoticon_stormy_cloud">Fırtına bulutu</string>
+    <string name="emoticon_lightning">Şimşek</string>
+    <string name="emoticon_money">Para</string>
+    <string name="emoticon_goat">Keçi</string>
+    <string name="emoticon_sun">Güneş</string>
+    <string name="emoticon_rainbow">Gökkuşağı</string>
+    <string name="emoticon_turtle">Kaplumbağa</string>
+    <string name="emoticon_be_right_back">Hemen dönecek</string>
+    <string name="emoticon_high_five">Çak!</string>
+    <string name="emoticon_bunny">Tavşan</string>
+    <string name="emoticon_fingers_crossed">İyi şans işareti</string>
+    <string name="emoticon_cigarette">Sigara</string>
+    <string name="emoticon_xbox">Xbox</string>
+
+    <!-- Built-in scene names -->
+    <string name="scene_name_mezmerizing_white">Çarpıcı Beyaz</string>
+    <string name="scene_name_daisy_hill">Papatya Tepesi</string>
+    <string name="scene_name_field">Tarla</string>
+    <string name="scene_name_silhouette">Siluet</string>
+    <string name="scene_name_morty">Morty</string>
+    <string name="scene_name_dawn">Şafak</string>
+    <string name="scene_name_zune_2">Zune 2</string>
+    <string name="scene_name_dottie_green">Noktalı Yeşil</string>
+    <string name="scene_name_violet_springtime">Bahar Menekşeleri</string>
+    <string name="scene_name_cherry_blossoms">Kiraz Çiçekleri</string>
+    <string name="scene_name_zune_5">Zune 5</string>
+    <string name="scene_name_zune_1">Zune 1</string>
+    <string name="scene_name_flourish">Süslü</string>
+    <string name="scene_name_carbon_fiber">Karbon Fiber</string>
+    <string name="scene_name_robot">Robot</string>
+    <string name="scene_name_graffiti">Grafiti</string>
+    <string name="scene_name_bamboo">Bambu</string>
+    <string name="scene_name_zune_6">Zune 6</string>
+    <string name="scene_name_zune_4">Zune 4</string>
+    <string name="scene_name_mezmerizing_brown">Çarpıcı Kahverengi</string>
+    <string name="scene_name_zune_3">Zune 3</string>
+    <string name="scene_name_butterfly_pattern">Kelebek Deseni</string>
+    <string name="scene_name_bird_man">Kuş Adam</string>
+    <string name="scene_name_bounce">Sıçrama</string>
+    <string name="scene_name_carbon">Karbon</string>
+    <string name="scene_name_dahlias">Yıldız Çiçekleri</string>
+    <string name="scene_name_dark_hearts">Koyu Kalpler</string>
+    <string name="scene_name_desert">Çöl</string>
+    <string name="scene_name_grafitti">Grafiti</string>
+    <string name="scene_name_hostas">Hosta Bitkileri</string>
+    <string name="scene_name_metalwork">Metal İşleme</string>
+    <string name="scene_name_misty_hills">Sisli Tepeler</string>
+    <string name="scene_name_moonlight">Ay Işığı</string>
+    <string name="scene_name_prairie">Bozkır</string>
+    <string name="scene_name_psychedelic">Saykodelik</string>
+    <string name="scene_name_punga">Punga</string>
+    <string name="scene_name_sky_turtle">Gökyüzü Kaplumbağası</string>
+    <string name="scene_name_spore">Spor</string>
+    <string name="scene_name_sporty">Sportif</string>
+    <string name="scene_name_sweet_monsters">Tatlı Canavarlar</string>
+    <string name="scene_name_tugboat">Römorkör</string>
+    <string name="scene_name_watercolor">Suluboya</string>
+    <string name="scene_name_wildflowers">Kır Çiçekleri</string>
+    <string name="scene_name_windows_live">Windows Live</string>
+    <string name="scene_name_zune_hearts">Zune Kalpler</string>
+
+    <!-- Default display picture names (45 items) -->
+    <string name="dp_beach_chairs">Plaj Sandalyeleri</string>
+    <string name="dp_chess_pieces">Satranç Taşları</string>
+    <string name="dp_dirt_bike">Arazi Motosikleti</string>
+    <string name="dp_friendly_dog">Sevimli Köpek</string>
+    <string name="dp_orange_daisy">Turuncu Papatya</string>
+    <string name="dp_palm_trees">Palmiye Ağaçları</string>
+    <string name="dp_rocket_launch">Roket Fırlatma</string>
+    <string name="dp_rubber_ducky">Plastik Ördek</string>
+    <string name="dp_running_horses">Koşan Atlar</string>
+    <string name="dp_skateboarder">Kaykaycı</string>
+    <string name="dp_soccer_ball">Futbol Topu</string>
+    <string name="dp_basketball">Basketbol</string>
+    <string name="dp_bonsai">Bonzai</string>
+    <string name="dp_chef">Şef</string>
+    <string name="dp_chess">Satranç</string>
+    <string name="dp_daisy">Papatya</string>
+    <string name="dp_doctor">Doktor</string>
+    <string name="dp_dog">Köpek</string>
+    <string name="dp_electric_guitar">Elektrogitar</string>
+    <string name="dp_executive">Yönetici</string>
+    <string name="dp_fall">Sonbahar</string>
+    <string name="dp_fish">Balık</string>
+    <string name="dp_flare">Parlama</string>
+    <string name="dp_gerber_daisy">Gerbera</string>
+    <string name="dp_golf">Golf</string>
+    <string name="dp_guest">Konuk</string>
+    <string name="dp_guitar">Gitar</string>
+    <string name="dp_kitten">Yavru Kedi</string>
+    <string name="dp_leaf">Yaprak</string>
+    <string name="dp_morty">Morty</string>
+    <string name="dp_music">Müzik</string>
+    <string name="dp_robot">Robot</string>
+    <string name="dp_seastar">Deniz yıldızı</string>
+    <string name="dp_shopping">Alışveriş</string>
+    <string name="dp_soccer">Futbol</string>
+    <string name="dp_sports">Spor</string>
+    <string name="dp_spring">Bahar</string>
+    <string name="dp_summer">Yaz</string>
+    <string name="dp_surf">Sörf</string>
+    <string name="dp_tennis">Tenis</string>
+    <string name="dp_winter">Kış</string>
+    <string name="dp_city_light">Şehir Işıkları</string>
+    <string name="dp_fish_tank">Akvaryum</string>
+    <string name="dp_shooting_star">Kayan Yıldız</string>
+    <string name="dp_sunshine">Gün Işığı</string>
+
+    <!-- Backend, protocol, storage, and mock status/error messages -->
+    <string name="err_contact_invalid_email">Geçerli bir anlık mesajlaşma e-posta adresi girin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_add_self_you_singular">Kendinizi kişi olarak ekleyemezsiniz.</string>
+    <string name="err_contact_blocked_unblock_first">Bu kişi engelli. Önce Engellenen bağlantılar bölümünden engelini kaldırın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_already_exists_you_singular">Bu kişi zaten kişilerinizde kayıtlı.</string>
+    <string name="err_history_erase_failed">Bu kişinin kayıtlı geçmişi silinemedi. Lütfen tekrar deneyin.</string>
+    <string name="err_sending_interrupted">Gönderim kesintiye uğradı. Teslimat doğrulanamadı.</string>
+    <string name="err_voice_clip_download_interrupted">Ses klibi indirmesi kesintiye uğradı.</string>
+    <string name="err_wink_download_interrupted">Göz kırpması indirmesi kesintiye uğradı.</string>
+    <string name="err_emotion_sound_invalid_url">Geçersiz duygu sesleri hizmet URL\'si.</string>
+    <string name="err_emotion_sound_unavailable_server">Bu ses artık sunucuda bulunmuyor.</string>
+    <string name="err_emotion_sound_none_found">Bu kategori ve dil için ses bulunamadı.</string>
+    <string name="emotion_sound_service_http_error_before_number">Duygu sesleri hizmeti HTTP</string>
+    <string name="emotion_sound_service_http_error_after_number">hatası döndürdü.</string>
+    <string name="err_emotion_sound_download_too_large">Ses indirmesi çok büyük.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_emotion_sound_library_full_you_singular">Kayıtlı sesler kitaplığınız dolu.</string>
+    <string name="err_emotion_sound_remove_failed">Ses kaldırılamadı.</string>
+    <string name="err_emotion_sound_invalid_id">Geçersiz ses kimliği.</string>
+    <string name="err_emotion_sound_invalid_or_oversized">Geçersiz veya aşırı büyük duygu sesi.</string>
+    <string name="err_emotion_sound_not_mp3">Sunucu bir MP3 sesi döndürmedi.</string>
+    <string name="err_emotion_sound_missing_metadata">Sesin Plus! üstverisi eksik.</string>
+    <string name="err_emotion_sound_id_mismatch">İndirilen ses kimliği eşleşmiyor.</string>
+    <string name="err_emotion_sound_integrity_failed">İndirilen ses bütünlük denetimini geçemedi.</string>
+    <string name="err_file_transfer_interrupted">Dosya aktarımı kesintiye uğradı.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_group_enter_name_you_singular">Grubunuz için bir ad girin.</string>
+    <string name="group_name_max_chars_before_number">Grup adları en fazla</string>
+    <string name="group_name_max_chars_after_number">karakter olabilir.</string>
+    <string name="err_group_name_control_chars">Denetim karakterleri içermeyen bir grup adı girin.</string>
+    <string name="err_group_pending_invite">Bu kişinin zaten bekleyen bir grup daveti var.</string>
+    <string name="err_group_already_member">Bu kişi zaten bir grup üyesi.</string>
+    <string name="group_members_max_count_before_number">Messenger\'daki grubunuzda en fazla</string>
+    <string name="group_members_max_count_after_number">üye bulunabilir.</string>
+    <string name="err_auth_email_password_required">E-posta ve parola gereklidir.</string>
+    <string name="err_auth_server_rejected_signin">Topluluk sunucusu bu oturum açmayı kabul etmedi.</string>
+    <string name="err_auth_missing_circle_ticket">Grup kimlik doğrulama bileti eksik.</string>
+    <string name="err_auth_signed_out_during_signin">Oturum açma sırasında bu oturum kapatıldı.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_dp_sign_in_required_you_singular">Görüntü resminizi değiştirmeden önce oturum açın.</string>
+    <string name="err_session_changed_retry">Oturum açılan hesap değişti. Lütfen tekrar deneyin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_dp_roaming_storage_issue_you_singular">Resim bu oturum için güncellendi. Hizmetiniz gelecekteki oturumlar için kaydedemedi.</string>
+    <string name="err_dp_incomplete">Hizmet tam bir görüntü resmi döndürmedi. Tekrar deneyin.</string>
+    <string name="err_storage_missing_photo_id">Depolama hizmeti bir fotoğraf kaynak kimliği döndürmedi.</string>
+    <string name="err_storage_missing_expression_id">Depolama hizmeti bir ifade profili kaynak kimliği döndürmedi.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_dp_roaming_remove_failed_you_singular">Hizmet dolaşım resmini kaldırmadı. Yerel resminiz korundu. Tekrar deneyin.</string>
+    <string name="err_storage_missing_profile_id">Depolama hizmeti bir profil kaynak kimliği döndürmedi.</string>
+    <string name="err_wink_already_downloading">Bu göz kırpması zaten indiriliyor. Kısa süre sonra tekrar deneyin.</string>
+    <string name="err_wink_retry_sign_in">Bu göz kırpmasını yeniden denemeden önce oturum açın.</string>
+    <string name="err_wink_sender_offline_group">Göz kırpması göndericisi artık bu grupta çevrim içi değil.</string>
+    <string name="err_wink_unblock_before_retry">Yeniden denemeden önce bu kişinin engelini kaldırın.</string>
+    <string name="err_wink_require_online">Çevrimdışı görünen kişiler göz kırpması kabul edemez.</string>
+    <string name="err_wink_group_unsupported">Tüm çevrim içi grup üyeleri göz kırpmalarını desteklemelidir.</string>
+    <string name="err_wink_client_unsupported">Bu kişi tarafından kullanılan Messenger sürümünde bu göz kırpma türü gösterilemiyor.</string>
+    <string name="err_wink_metadata_mismatch">Göz kırpması verileri üstverisiyle eşleşmiyor.</string>
+    <string name="err_wink_invalid_package">Geçersiz göz kırpması paketi.</string>
+    <string name="err_wink_unsupported_or_invalid">Desteklenmeyen veya geçersiz göz kırpması paketi.</string>
+    <string name="err_wink_download_timed_out">Göz kırpması indirmesi zaman aşımına uğradı.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_wink_not_cached_send_you_singular">Bu göz kırpması artık önbellekte değil. Tekrar göndermek için kitaplığınıza ekleyin.</string>
+    <string name="err_photo_original_request_failed">Orijinal fotoğraf istenemedi.</string>
+    <string name="err_photo_contact_unavailable">Bu kişi fotoğraf paylaşımı için uygun değil.</string>
+    <string name="err_photo_client_unsupported">Bu kişinin istemcisi fotoğraf paylaşımını desteklemiyor.</string>
+    <string name="err_photo_share_ended">Bu fotoğraf paylaşımı sona erdi.</string>
+    <string name="err_game_session_ended">Bu oyun oturumu sona erdi.</string>
+    <string name="err_game_contact_unavailable">Bu kişi oyunlar ve etkinlikler için uygun değil.</string>
+    <string name="err_game_client_unsupported">Bu kişinin istemcisi oyunları ve etkinlikleri desteklemiyor.</string>
+    <string name="err_file_sign_in_required">Dosya paylaşmadan önce oturum açın.</string>
+    <string name="err_file_group_unsupported">Dosya aktarımları yalnızca bire bir sohbetlerde kullanılabilir.</string>
+    <string name="err_file_contact_unavailable">Bu kişi dosya aktarımları için uygun değil.</string>
+    <string name="err_file_client_unsupported">Bu kişinin istemcisi dosya aktarımlarını desteklemiyor.</string>
+    <string name="err_file_offer_ended">Bu dosya teklifi sona erdi.</string>
+    <string name="err_voice_group_unsupported">Ses klipleri grup sohbetlerinde desteklenmez.</string>
+    <string name="err_voice_require_online">Ses klipleri için kişinin çevrim içi olması gerekir.</string>
+    <string name="err_voice_require_online_alt">Ses klipleri çevrim içi bir kişi gerektirir.</string>
+    <string name="err_voice_client_unsupported">Bu kişi, Messenger\'ın Ses Kliplerini desteklemeyen bir sürümünü kullanıyor.</string>
+    <string name="err_voice_invalid">Geçersiz ses klibi.</string>
+    <string name="err_voice_download_failed">Ses klibi indirilemedi.</string>
+    <string name="err_voice_encode_failed">Ses klibi kodlanamadı.</string>
+    <string name="err_session_not_connected">Messenger oturumu bağlı değil.</string>
+    <string name="err_message_blocked_contact">Engellenen bir kişiye mesaj gönderilemez.</string>
+    <string name="err_handwriting_group_unsupported">Tüm çevrim içi grup üyeleri el yazısını desteklemelidir.</string>
+    <string name="err_handwriting_require_online">El yazısı mesajları için kişinin çevrim içi olması gerekir.</string>
+    <string name="err_handwriting_client_unsupported">Bu kişinin istemcisi el yazısını desteklemiyor.</string>
+    <string name="err_message_send_failed">Mesaj gönderilemedi.</string>
+    <string name="err_nudge_offline">Çevrim dışı bir kişiye titreşim gönderilemez.</string>
+    <string name="err_nudge_require_online">Titreşim göndermek için çevrim içi bir kişi gerekir.</string>
+    <string name="err_nudge_blocked">Engellenen bir kişiye titreşim gönderilemez.</string>
+    <string name="err_nudge_group_unsupported">Tüm çevrim içi grup üyeleri titreşimleri desteklemelidir.</string>
+    <string name="err_nudge_client_unsupported">Bu kişinin istemcisi titreşimleri desteklemiyor.</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="nudge_rate_limit_singular_you_singular_before_number">Bu kadar sık titreşim gönderemezsiniz. Lütfen</string>
+    <!-- Note: singular text variant | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="nudge_rate_limit_singular_you_singular_after_number">saniye bekleyin.</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="nudge_rate_limit_plural_you_singular_before_number">Bu kadar sık titreşim gönderemezsiniz. Lütfen</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) | "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="nudge_rate_limit_plural_you_singular_after_number">saniye bekleyin.</string>
+    <string name="err_contact_add_sign_in">Kişi eklemeden önce oturum açın.</string>
+    <string name="err_contact_add_session_ended">Kişi eklenirken bu oturum sona erdi.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_saved_timeout_you_singular">Kişi kaydedildi ancak bağlantı zaman aşımına uğradı. Kişilerinizi yenilemek için yeniden bağlanın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_saved_session_you_singular">Kişi kaydedildi ancak bu oturum güncelleyemedi. Kişilerinizi yenilemek için yeniden bağlanın.</string>
+    <string name="err_contact_delete_sign_in">Kişi silmeden önce oturum açın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_delete_self_you_singular">Kendinizi kişi olarak silemezsiniz.</string>
+    <string name="err_contact_delete_group">Gruplar bu işlemle silinemez.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_not_in_list_you_singular">Bu kişi artık kişilerinizde değil.</string>
+    <string name="err_contact_delete_session_ended">Kişi silinirken bu oturum sona erdi.</string>
+    <string name="err_contact_id_unavailable">Kişi tanımlayıcısı kullanılamıyor. Yeniden bağlanıp tekrar deneyin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_delete_timeout_you_singular">Kişi silinirken bağlantı zaman aşımına uğradı. Yeniden bağlanıp tekrar denemeden önce kişilerinizi kontrol edin.</string>
+    <string name="err_contact_blocked_not_deleted">Kişi engellendi ancak silinemedi. Lütfen tekrar deneyin.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_deleted_timeout_you_singular">Kişi silindi ancak bağlantı zaman aşımına uğradı. Kişilerinizi yenilemek için yeniden bağlanın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_contact_deleted_session_you_singular">Kişi silindi ancak bu oturum güncelleyemedi. Kişilerinizi yenilemek için yeniden bağlanın.</string>
+    <string name="err_group_create_sign_in">Grup oluşturmadan önce oturum açın.</string>
+    <string name="err_group_create_session_ended">Grup oluşturulurken bu oturum sona erdi.</string>
+    <string name="err_group_invite_sign_in">Grup üyelerini davet etmeden önce oturum açın.</string>
+    <string name="err_group_invite_session_ended">Grup üyeleri davet edilirken bu oturum sona erdi.</string>
+    <string name="err_group_unavailable">Bu grup artık kullanılamıyor.</string>
+    <string name="err_group_invite_permission">Grup üyelerini yalnızca sahipler ve yöneticiler davet edebilir.</string>
+    <string name="err_group_leave_sign_in">Bir gruptan ayrılmadan önce oturum açın.</string>
+    <string name="err_group_owner_cannot_leave">Grup sahipleri gruplarından ayrılamaz.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_group_member_id_unavailable_you_singular">Grup üyesi tanımlayıcınız kullanılamıyor. Yenileyip tekrar deneyin.</string>
+    <string name="err_group_invitations_sign_in">Grup davetlerini yüklemek için oturum açın.</string>
+    <string name="err_group_invitation_respond_sign_in">Bir grup davetine yanıt vermeden önce oturum açın.</string>
+    <string name="err_group_invitation_handled_withdrawn">Bu grup daveti zaten yanıtlanmış veya geri çekilmiş.</string>
+    <string name="err_group_invitation_handled">Bu grup daveti zaten yanıtlanmış.</string>
+    <string name="err_group_update_session_ended">Grup güncellenirken bu oturum sona erdi.</string>
+    <string name="err_requests_sign_in">Kişi isteklerini yüklemek için oturum açın.</string>
+    <string name="err_requests_session_ended">İstekler yüklenirken bu oturum sona erdi.</string>
+    <string name="err_blocked_sign_in">Engellenen bağlantıları yüklemek için oturum açın.</string>
+    <string name="err_blocked_session_ended">Engellenen bağlantılar yüklenirken bu oturum sona erdi.</string>
+    <string name="err_request_respond_sign_in">Bir kişi isteğine yanıt vermeden önce oturum açın.</string>
+    <string name="err_request_accept_cannot_block">Kabul edilen bir kişi engellenemez.</string>
+    <string name="err_request_respond_session_ended">İsteğe yanıt verilirken bu oturum sona erdi.</string>
+    <string name="err_request_handled_withdrawn">Bu kişi isteği zaten yanıtlanmış veya geri çekilmiş.</string>
+    <string name="err_request_handled">Bu kişi isteği zaten yanıtlanmış.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_request_self_you_singular">Kendi isteğinize yanıt veremezsiniz.</string>
+    <string name="err_request_respond_timeout">Yanıt verilirken bağlantı zaman aşımına uğradı. Tekrar denemeden önce istekleri yenileyin.</string>
+    <string name="err_group_blocking_sign_in">Grup engellemesini değiştirmeden önce oturum açın.</string>
+    <string name="err_contact_change_session_ended">Kişi değiştirilirken bu oturum sona erdi.</string>
+    <string name="err_ns_rejected_list_change">Bildirim sunucusu kişi listesi değişikliğini reddetti.</string>
+    <string name="err_remote_signout_use_local">Mevcut oturumu sonlandırmak için yerel çıkışı kullanın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="remote_sign_out_msnp_error_you_singular_before_number">Sunucu uzaktan oturum kapatmayı iletemedi (MSNP</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="remote_sign_out_msnp_error_you_singular_after_number">). Tüm oturumlar çevrim dışı görünüyorsa durumunuzu Uygun olarak değiştirip tekrar deneyin.</string>
+    <string name="err_session_already_ended">Bu oturum zaten sona erdi.</string>
+    <string name="err_sessions_unavailable">Sunucu etkin oturumları sağlamadı. Lütfen tekrar deneyin.</string>
+    <string name="err_server_no_msnp18">Seçilen sunucu MSNP18\'i desteklemiyor.</string>
+    <string name="err_server_unsupported_redirect">Topluluk sunucusu desteklenmeyen bir yönlendirme döndürdü.</string>
+    <string name="err_server_invalid_redirect">Topluluk sunucusu geçersiz bir yönlendirme döndürdü.</string>
+    <string name="err_server_invalid_sso">Topluluk sunucusu geçersiz bir SSO doğrulaması döndürdü.</string>
+    <string name="err_sso_missing_policy">SSO ilkesi eksikti.</string>
+    <string name="err_sso_missing_nonce">SSO tek kullanımlık değeri eksikti.</string>
+    <string name="err_server_too_many_redirects">Topluluk sunucusu çok fazla kez yönlendirdi.</string>
+    <string name="err_ns_disconnected">Bildirim sunucusu bağlantıyı kesti.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_logged_out_other_session_you_singular">Başka bir oturumdan çıkış yaptırıldınız.</string>
+    <string name="err_server_restarting">Sunucu yeniden başlatılıyor.</string>
+    <string name="err_server_ended_session">Sunucu bu oturumu sonlandırdı. Lütfen tekrar oturum açın.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_group_no_longer_member_you_singular">Artık bu grubun üyesi değilsiniz.</string>
+    <string name="err_ns_invalid_sb">Bildirim sunucusu geçersiz bir santral döndürdü.</string>
+    <string name="err_sb_missing_endpoint">Santral uç noktası eksikti.</string>
+    <string name="err_sb_missing_key">Santral kimlik doğrulama anahtarı eksikti.</string>
+    <string name="err_ns_rejected_list">Bildirim sunucusu kişi listesini reddetti.</string>
+    <string name="chat_photo_invite_sent">Fotoğraf paylaşımı daveti gönderildi.</string>
+    <string name="chat_photo_invite_received">Fotoğraf paylaşımı daveti alındı.</string>
+    <string name="chat_game_invite_sent">Oyun daveti gönderildi: %1$s.</string>
+    <string name="chat_game_invite_received">Oyun daveti alındı: %1$s.</string>
+    <string name="chat_game_stopped_remote">Diğer kişi %1$s oyununu kapattı.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="chat_game_stopped_local_you_singular">%1$s oyununu kapattınız.</string>
+    <string name="chat_game_declined">%1$s daveti reddedildi.</string>
+    <string name="chat_game_failed">%1$s başarısız oldu.</string>
+    <string name="err_msnp_rejected_credentials">Topluluk sunucusu bu kimlik bilgilerini reddetti.</string>
+    <string name="err_msnp_server_unavailable">Topluluk sunucusu kullanılamıyor.</string>
+    <string name="msnp_server_returned_error">Topluluk sunucusu %1$s MSNP hatasını döndürdü.</string>
+    <string name="err_sso_rejected_credentials">Kimlik doğrulama hizmeti bu kimlik bilgilerini reddetti.</string>
+    <string name="err_sso_missing_messenger">Kimlik doğrulama hizmeti bir Messenger kimlik bilgisi döndürmedi.</string>
+    <string name="err_sso_missing_ab">Kimlik doğrulama hizmeti bir adres defteri kimlik bilgisi döndürmedi.</string>
+    <string name="err_sso_missing_storage">Kimlik doğrulama hizmeti bir depolama kimlik bilgisi döndürmedi.</string>
+    <string name="err_sso_missing_oim">Kimlik doğrulama hizmeti bir çevrim dışı mesaj kimlik bilgisi döndürmedi.</string>
+    <string name="err_sso_could_not_authenticate">Topluluk hizmetiyle kimlik doğrulaması yapılamadı.</string>
+    <string name="err_sso_invalid_response">Kimlik doğrulama hizmeti geçersiz bir yanıt döndürdü.</string>
+    <string name="err_client_no_create_group">Bu istemci grup oluşturmayı desteklemiyor.</string>
+    <string name="err_client_no_group_invites">Bu istemci grup davetlerini desteklemiyor.</string>
+    <string name="err_client_no_leave_group">Bu istemci gruptan ayrılmayı desteklemiyor.</string>
+    <string name="err_client_no_sessions">Bu istemci oturum yönetimini desteklemiyor.</string>
+    <string name="err_client_no_retry">Mesaj yeniden deneme desteklenmiyor.</string>
+    <string name="err_client_no_ink">El yazısı mesajları desteklenmiyor.</string>
+    <string name="err_client_no_photos">Fotoğraf paylaşımı kullanılamıyor.</string>
+    <string name="err_client_no_games">Oyunlar ve etkinlikler kullanılamıyor.</string>
+    <string name="err_client_no_files">Dosya aktarımları kullanılamıyor.</string>
+    <string name="err_client_no_voice">Ses klipleri desteklenmiyor.</string>
+    <string name="err_client_no_winks">Göz kırpmaları kullanılamıyor.</string>
+    <string name="err_client_no_add_contact">Bu istemci kişi eklemeyi desteklemiyor.</string>
+    <string name="err_client_no_delete_contact">Bu istemci kişi silmeyi desteklemiyor.</string>
+    <string name="err_client_no_contact_requests">Bu istemci kişi isteklerini desteklemiyor.</string>
+    <string name="err_contact_unavailable">Bu kişi artık kullanılamıyor.</string>
+    <string name="err_repo_connection_interrupted">Bağlantı kesildi</string>
+    <string name="err_repo_previous_session_unavailable">Önceki oturum artık kullanılamıyor.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="settings_remote_sign_out_failed_you_singular">Diğer tüm yerlerde oturumunuz kapatılamadı.%1$s</string>
+    <string name="err_repo_group_update_sign_in">Grupları güncellemeden önce oturum açın.</string>
+    <string name="err_ab_load_failed">Messenger kişi listesi yüklenemedi.</string>
+    <string name="msnp_address_book_http_error_before_number">Adres defteri hizmeti HTTP</string>
+    <string name="msnp_address_book_http_error_after_number">hatası döndürdü.</string>
+    <string name="err_contact_service_invalid">Kişi hizmeti geçersiz bir yanıt döndürdü.</string>
+    <string name="err_contact_account_not_found">Bu e-posta adresi için bir Messenger hesabı bulunamadı.</string>
+    <string name="err_contact_add_server_retry">Sunucu bu kişiyi ekleyemedi. Lütfen tekrar deneyin.</string>
+    <string name="err_contact_id_invalid">Kişi tanımlayıcısı geçersiz.</string>
+    <string name="err_contact_update_server_retry">Sunucu bu kişiyi güncelleyemedi. Lütfen tekrar deneyin.</string>
+    <string name="err_request_update_server_retry">Sunucu bu kişi isteğini güncelleyemedi. Lütfen tekrar deneyin.</string>
+    <string name="err_ab_service_rejected">Adres defteri hizmeti isteği reddetti.</string>
+    <string name="err_ab_service_invalid">Adres defteri hizmeti geçersiz bir yanıt döndürdü.</string>
+    <string name="err_membership_rejected">Üyelik hizmeti isteği reddetti.</string>
+    <string name="err_membership_invalid">Üyelik hizmeti geçersiz bir yanıt döndürdü.</string>
+    <string name="err_circle_required">Grup engellemesini değiştirmek için bir çevre gereklidir.</string>
+    <string name="msnp_group_message_too_long_before_number">Grup mesajı çok uzun (en fazla</string>
+    <string name="msnp_group_message_too_long_after_number">UTF-8 baytı).</string>
+    <string name="err_config_invalid_url">Geçersiz yapılandırma URL\'si.</string>
+    <string name="msnp_config_http_error_before_number">Yapılandırma isteği HTTP</string>
+    <string name="msnp_config_http_error_after_number">ile başarısız oldu.</string>
+    <string name="msnp_get_client_config_http_error_before_number">GetClientConfig HTTP</string>
+    <string name="msnp_get_client_config_http_error_after_number">ile başarısız oldu.</string>
+    <string name="msnp_response_exceeded_bytes_before_number">Yanıt</string>
+    <string name="msnp_response_exceeded_bytes_after_number">bayt sınırını aştı.</string>
+    <string name="err_file_timed_out">Aktarım zaman aşımına uğradı</string>
+    <string name="err_file_selected_unavailable">Seçilen dosya kullanılamıyor.</string>
+    <string name="err_file_too_many_active">Çok fazla etkin dosya aktarımı var.</string>
+    <string name="err_file_invite_send_failed">Dosya daveti gönderilemedi.</string>
+    <string name="err_file_peer_cant_receive">Diğer istemci bu dosyayı alamadı.</string>
+    <string name="err_photo_original_cannot_save">Bu orijinal fotoğraf kaydedilemiyor.</string>
+    <string name="err_photo_original_invalid_hash">Geçersiz orijinal fotoğraf özeti.</string>
+    <string name="err_file_send_failed">Dosya gönderilemedi.</string>
+    <string name="err_storage_not_enough_space">Yeterli depolama alanı yok.</string>
+    <string name="err_file_receive_failed">Dosya alınamadı.</string>
+    <string name="err_file_incomplete_invalid">Alınan dosya eksik veya geçersiz.</string>
+    <string name="err_conversation_disconnected">Konuşma bağlantısı kesildi.</string>
+    <string name="err_game_wait_current_invite">Mevcut oyun davetinin yanıtlanmasını bekleyin.</string>
+    <string name="err_game_invite_send_failed">Oyun daveti gönderilemedi.</string>
+    <string name="err_game_invite_timed_out">Oyun daveti zaman aşımına uğradı.</string>
+    <string name="err_group_create_retry">Sunucu bu grubu oluşturamadı. Lütfen yenileyip tekrar deneyin.</string>
+    <string name="err_group_leave_retry">Sunucu bu gruptan ayrılma işlemini yapamadı. Lütfen yenileyip tekrar deneyin.</string>
+    <string name="err_group_invite_update_retry">Sunucu bu grup davetini güncelleyemedi. Lütfen yenileyip tekrar deneyin.</string>
+    <string name="err_group_service_invalid">Grup hizmeti geçersiz bir yanıt döndürdü.</string>
+    <string name="err_group_service_invalid_id">Grup hizmeti geçersiz bir grup tanımlayıcısı döndürdü.</string>
+    <string name="err_group_service_invalid_member_id">Grup hizmeti geçersiz bir üye tanımlayıcısı döndürdü.</string>
+    <string name="err_group_members_load_failed">Mevcut grup üyeleri yüklenemedi.</string>
+    <string name="err_oim_recipient_invalid">Çevrim dışı mesaj alıcısı geçersiz.</string>
+    <string name="msnp_offline_message_too_long_before_number">Çevrim dışı mesaj çok uzun (en fazla</string>
+    <string name="msnp_offline_message_too_long_after_number">UTF-8 baytı).</string>
+    <string name="err_photo_wait_invite">Fotoğraf davetinin kabul edilmesini bekleyin.</string>
+    <string name="photo_share_max_count_before_number">Bir fotoğraf paylaşımı en fazla</string>
+    <string name="photo_share_max_count_after_number">fotoğraf içerebilir.</string>
+    <string name="err_photo_preview_limit">Bu fotoğraflar paylaşım oturumunun önizleme sınırını aşıyor.</string>
+    <string name="err_photo_invite_send_failed">Fotoğraf daveti gönderilemedi.</string>
+    <string name="err_photo_receive_retry">Fotoğraf alınamadı. Yeniden denemek için seçin.</string>
+    <string name="err_photo_invite_timed_out">Fotoğraf paylaşımı daveti zaman aşımına uğradı.</string>
+    <string name="err_storage_no_photo_id">Depolama profilinde fotoğraf kaynak kimliği yok.</string>
+    <string name="err_dp_empty">Görüntü resmi boş.</string>
+    <string name="err_storage_no_profile_id">Depolama profilinde profil kaynak kimliği yok.</string>
+    <string name="err_storage_no_expression_id">Depolama profilinde ifade profili kaynak kimliği yok.</string>
+    <string name="err_storage_invalid_cid">Depolama profili kaynak kimliği geçersiz.</string>
+    <string name="err_storage_invalid_profile">Depolama hizmeti geçersiz bir profil döndürdü.</string>
+    <string name="msnp_storage_action_http_error">Depolama %1$s işlemi %2$s ile başarısız oldu.</string>
+    <string name="msnp_http_status_before_number">HTTP</string>
+    <string name="msnp_http_status_after_number"></string>
+    <string name="msnp_storage_action_failed">Depolama %1$s işlemi tamamlanamadı.</string>
+    <string name="err_sb_no_contact">Santralde konuşma kişisi yok.</string>
+    <string name="err_sb_closed">Santral kapalı.</string>
+    <string name="err_game_invite_ended">Bu oyun daveti sona erdi.</string>
+    <string name="err_sb_disconnected_retry">Konuşma bağlantısı kesildi. Tekrar deneyin.</string>
+    <string name="err_wink_sender_mismatch">Göz kırpması göndericisi bu konuşmayla eşleşmiyor.</string>
+    <string name="err_sb_message_too_long">Mesaj bir MSNP santrali için çok uzun.</string>
+    <string name="msnp_switchboard_returned_error">Santral %1$s MSNP hatasını döndürdü.</string>
+    <string name="err_sb_p2p_rejected">Santral bir P2P paketini reddetti.</string>
+    <string name="err_social_host_not_configured">Sosyal hizmet ana bilgisayarı yapılandırılmamış.</string>
+    <string name="err_social_ticket_missing">Sosyal hizmet kimlik doğrulama bileti eksik.</string>
+    <string name="msnp_whats_new_http_error_before_number">Yenilikler isteği HTTP</string>
+    <string name="msnp_whats_new_http_error_after_number">ile başarısız oldu.</string>
+    <string name="err_social_rejected">Sosyal akış hizmeti bu isteği reddetti.</string>
+    <string name="err_wink_default_delete">Varsayılan göz kırpmaları silinemez.</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="err_wink_library_full_you_singular">Göz kırpması kitaplığınız dolu.</string>
+    <string name="err_wink_save_failed">Göz kırpması kaydedilemedi.</string>
+    <string name="err_wink_replace_metadata">Göz kırpması üstverisi değiştirilemedi.</string>
+    <string name="err_wink_save_metadata">Göz kırpması üstverisi kaydedilemedi.</string>
+    <string name="err_file_invalid_name_or_size">Geçersiz dosya adı veya boyutu.</string>
+    <string name="game_data_limit_before_number">Oyun verisi</string>
+    <string name="game_data_limit_after_number">KB P4 paket sınırını aşıyor.</string>
+    <string name="err_ink_empty">Boş bir el yazısı çizimi kodlanamaz.</string>
+    <string name="handwriting_chunks_max_before_number">El yazısı çizimi MSNP\'nin en fazla</string>
+    <string name="handwriting_chunks_max_after_number">parça sınırını aşıyor.</string>
+    <string name="err_socket_not_connected">MSNP soketi bağlı değil</string>
+    <string name="err_socket_closed">MSNP soketi kapandı</string>
+    <string name="err_wink_missing_manifest">Göz kırpması bildirimi eksik.</string>
+    <string name="err_wink_not_a_wink">Bu paket bir göz kırpması değil.</string>
+    <string name="err_wink_missing_animation">Göz kırpması animasyonu eksik.</string>
+    <string name="err_wink_missing_swf">SWF eksik.</string>
+    <string name="err_wink_swf_too_large">SWF çok büyük.</string>
+    <string name="err_wink_missing_pkg_manifest">Paket bildirimi eksik.</string>
+    <string name="err_wink_unsupported_pkg">Desteklenmeyen içerik paketi.</string>
+    <string name="err_wink_missing_in_installer">Yükleyicide göz kırpması eksik.</string>
+    <string name="err_wink_empty_installer">Bu yükleyici hiç göz kırpması içermiyor.</string>
+    <string name="err_wink_dtd_disallowed">DTD\'ye izin verilmiyor.</string>
+    <string name="err_wink_external_entities">Harici varlıklara izin verilmiyor.</string>
+    <string name="err_wink_unsafe_path">Güvenli olmayan paket yolu.</string>
+    <string name="err_wink_too_large_or_incomplete">Göz kırpması paketi çok büyük veya eksik.</string>
+    <string name="err_wink_expected_cab">Bir CAB/MCO paketi bekleniyordu.</string>
+    <string name="err_wink_unsupported_compression">Desteklenmeyen CAB sıkıştırması.</string>
+    <string name="err_wink_cab_checksum">CAB sağlama toplamı uyuşmuyor.</string>
+
+    <!-- Mock server strings -->
+    <string name="mock_profile_name">Temsili Profil</string>
+    <string name="mock_profile_status">Test verisi ile deneniyor</string>
+    <string name="mock_contact_status_data">Temsili kişi · Yalnızca test verisi</string>
+    <string name="mock_status_i_love_msn">MSN\'i seviyorum!</string>
+    <string name="mock_status_heads_down">Bugün yoğun çalışıyorum</string>
+    <string name="mock_status_at_studio">Stüdyodayım</string>
+    <string name="mock_status_ping_later">Sonra yaz</string>
+    <string name="mock_status_coffee_first">Önce kahve</string>
+    <string name="mock_status_shipping">Derleme dosyaları hazırlanıyor</string>
+    <string name="mock_status_in_call">Görüşmede</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="mock_reply_1_you_singular">Selam! Seni çevrim içi görmek harika 👋</string>
+    <string name="mock_reply_2">Bence de — tıpkı eski Messenger günleri gibi.</string>
+    <string name="mock_reply_3">Anlaşıldı! Bu temsili yanıt MSNP olay akışı üzerinden ulaştı.</string>
+</resources>

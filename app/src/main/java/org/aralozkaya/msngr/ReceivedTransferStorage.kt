@@ -70,30 +70,29 @@ internal class ReceivedTransferStorage(private val context: Context) {
                 Result.success(uri)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                record(account, key, TransferSaveState(error = error.message ?: "The transfer could not be saved."))
+                record(account, key, TransferSaveState(error = error.message ?: context.getString(R.string.received_transfer_save_failed)))
                 Result.failure(error)
             }
         }
     }
 
     private suspend fun export(file: File, name: String, photo: Boolean, tree: String?): Uri {
-        require(file.isFile) { "The received original is no longer available." }
-        require(MsnFileContext.validName(name)) { "The file name is unsupported." }
+        require(file.isFile) { context.getString(R.string.received_transfer_original_unavailable) }
+        require(MsnFileContext.validName(name)) { context.getString(R.string.file_sharing_unsupported_name) }
         val mime = if (photo) {
             // A peer's name may have no extension. Sniff the original instead of the JPEG preview.
             val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
             android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
-            requireNotNull(options.outMimeType?.takeIf { it.startsWith("image/") }) { "The original is not a supported photo." }
+            requireNotNull(options.outMimeType?.takeIf { it.startsWith("image/") }) { context.getString(R.string.received_transfer_unsupported_photo) }
         } else FileSharingProvider.mime(name)
         val resolver = context.contentResolver
         if (tree != null) {
             val root = Uri.parse(tree)
             check(resolver.persistedUriPermissions.any { it.uri == root && it.isWritePermission }) {
-                "Folder access was lost. Choose the ${if (photo) "photo" else "file"} folder again in File & photo transfers" +
-                    if (photo) "." else ", or use Save as."
+                context.getString(if (photo) R.string.received_transfer_photo_folder_lost else R.string.received_transfer_file_folder_lost)
             }
             val parent = DocumentsContract.buildDocumentUriUsingTree(root, DocumentsContract.getTreeDocumentId(root))
-            val target = requireNotNull(DocumentsContract.createDocument(resolver, parent, mime, name)) { "The selected folder is unavailable." }
+            val target = requireNotNull(DocumentsContract.createDocument(resolver, parent, mime, name)) { context.getString(R.string.received_transfer_selected_folder_unavailable) }
             try { copy(file, target); return target }
             catch (error: Exception) { runCatching { DocumentsContract.deleteDocument(resolver, target) }; throw error }
         }
@@ -106,18 +105,18 @@ internal class ReceivedTransferStorage(private val context: Context) {
                 put(MediaStore.MediaColumns.RELATIVE_PATH, if (photo) "${Environment.DIRECTORY_DCIM}/Msngr" else Environment.DIRECTORY_DOWNLOADS)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
-            val target = requireNotNull(resolver.insert(collection, values)) { "The default folder is unavailable." }
+            val target = requireNotNull(resolver.insert(collection, values)) { context.getString(R.string.received_transfer_default_folder_unavailable) }
             try {
                 copy(file, target)
                 check(resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null) == 1)
                 return target
             } catch (error: Exception) { runCatching { resolver.delete(target, null, null) }; throw error }
         }
-        check(hasDefaultTransferStorageAccess(context)) { "Allow storage access to save to the default folder on this Android version, or choose a custom folder." }
+        check(hasDefaultTransferStorageAccess(context)) { context.getString(R.string.received_transfer_default_access_needed) }
         @Suppress("DEPRECATION")
         val directory = Environment.getExternalStoragePublicDirectory(if (photo) Environment.DIRECTORY_DCIM else Environment.DIRECTORY_DOWNLOADS)
             .let { if (photo) File(it, "Msngr") else it }
-        check(directory.isDirectory || directory.mkdirs()) { "The default folder is unavailable." }
+        check(directory.isDirectory || directory.mkdirs()) { context.getString(R.string.received_transfer_default_folder_unavailable) }
         var target = File(directory, name)
         var suffix = 1
         while (!target.createNewFile()) {

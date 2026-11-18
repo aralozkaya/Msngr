@@ -146,7 +146,7 @@ class NotificationConfigurationInstrumentedTest {
         assertTrue(wearableReply.hintDisplayActionInline)
         assertFalse(wearableReply.hintLaunchesActivity)
         val nudgeAction = compatActions.single { action ->
-            action.title.toString() == context.getString(R.string.notification_nudge_label)
+            action.title.toString() == context.getString(R.string.notification_nudge_label_singular)
         }
         assertTrue(nudgeAction.remoteInputs.isNullOrEmpty())
         assertFalse(nudgeAction.showsUserInterface)
@@ -176,7 +176,7 @@ class NotificationConfigurationInstrumentedTest {
         )
         val signedInNudgeAction = signedInNotification.actions.orEmpty().single()
         assertEquals(
-            context.getString(R.string.notification_nudge_label),
+            context.getString(R.string.notification_nudge_label_singular),
             signedInNudgeAction.title.toString(),
         )
         assertTrue(signedInNudgeAction.remoteInputs.isNullOrEmpty())
@@ -309,7 +309,7 @@ class NotificationConfigurationInstrumentedTest {
         assertNull(contactPictureNotification.getLargeIcon())
         val messagingStyle = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(contactPictureNotification)
-        assertEquals(context.getString(R.string.notification_self_name), messagingStyle?.user?.name)
+        assertEquals(context.getString(R.string.notification_self_name_you_singular), messagingStyle?.user?.name)
         val sender = messagingStyle
             ?.messages
             ?.single()
@@ -327,7 +327,7 @@ class NotificationConfigurationInstrumentedTest {
         assertNull(signedInNotification.getLargeIcon())
         val signedInStyle = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(signedInNotification)
-        assertEquals(context.getString(R.string.notification_self_name), signedInStyle?.user?.name)
+        assertEquals(context.getString(R.string.notification_self_name_you_singular), signedInStyle?.user?.name)
         assertEquals(false, signedInStyle?.isGroupConversation)
         val signedInMessage = signedInStyle?.messages?.single()
         assertEquals("Contact with picture has just signed in.", signedInMessage?.text?.toString())
