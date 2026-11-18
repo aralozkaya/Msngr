@@ -67,7 +67,9 @@ import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.avatarInitial
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.quantityNumberSentenceResource
 import org.aralozkaya.msngr.rememberAvatarImage
 import org.aralozkaya.msngr.sceneContentColor
 import org.aralozkaya.msngr.ui.theme.avatar
@@ -122,7 +124,9 @@ fun LoggedInUserProfileCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     MsnEmoticonText(
-                        text = profile.statusMessage.ifBlank { "No personal message" },
+                        text = profile.statusMessage.ifBlank {
+                            stringResource(R.string.profile_no_personal_message)
+                        }.let { localizeUserMessage(it) },
                         useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                         sceneGlow = scene != null,
                         style = MaterialTheme.typography.bodyMedium,
@@ -141,10 +145,10 @@ fun LoggedInUserProfileCard(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 PresenceDot(profile.presence, modifier = Modifier.size(9.dp))
-                                Text(profile.presence.ownStatusLabel(), style = MaterialTheme.typography.labelLarge)
+                                Text(profile.presence.displayOwnStatusLabel(), style = MaterialTheme.typography.labelLarge)
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Change status",
+                                    contentDescription = stringResource(R.string.profile_change_status),
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
@@ -159,7 +163,7 @@ fun LoggedInUserProfileCard(
                             ) {
                                 Presence.entries.forEachIndexed { index, presence ->
                                     DropdownMenuItem(
-                                        text = { Text(presence.ownStatusLabel()) },
+                                        text = { Text(presence.displayOwnStatusLabel()) },
                                         onClick = {
                                             presenceMenuExpanded = false
                                             onPresenceSelected(presence)
@@ -211,6 +215,10 @@ fun ContactRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
+                    val avatarProfileDescription = profileActionLabel ?: stringResource(
+                        if (contact.isGroup) R.string.contact_view_group_members_of else R.string.contact_view_profile_of,
+                        contact.displayName.messengerPlusPlainText(),
+                    )
                     Avatar(
                         name = contact.displayName.messengerPlusPlainText(),
                         avatarUri = contact.avatarUri,
@@ -222,16 +230,14 @@ fun ContactRow(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = ripple(bounded = false, radius = 28.dp),
                                     role = Role.Button,
-                                    onClickLabel = profileActionLabel ?: if (contact.isGroup) "View group members" else "View profile",
+                                    onClickLabel = profileActionLabel ?: stringResource(
+                                        if (contact.isGroup) R.string.contact_view_group_members else R.string.contact_view_profile,
+                                    ),
                                     onClick = onOpenProfile,
                                 )
                                 .testTag("contact-profile-${contact.id}")
                                 .semantics {
-                                    contentDescription = profileActionLabel ?: if (contact.isGroup) {
-                                        "View " + contact.displayName.messengerPlusPlainText() + " group members"
-                                    } else {
-                                        "View " + contact.displayName.messengerPlusPlainText() + "'s profile"
-                                    }
+                                    contentDescription = avatarProfileDescription
                                 }
                         } else Modifier,
                     )
@@ -256,13 +262,13 @@ fun ContactRow(
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                ) { Text("You") }
+                                ) { Text(stringResource(R.string.common_you_singular)) }
                             }
                             if (isPendingMember) {
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                ) { Text("Pending") }
+                                ) { Text(stringResource(R.string.contact_badge_pending)) }
                             }
                         }
                         if (hasDraft) {
@@ -277,7 +283,7 @@ fun ContactRow(
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Text(
-                                    text = "Draft",
+                                    text = stringResource(R.string.contact_draft_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
@@ -285,7 +291,17 @@ fun ContactRow(
                             }
                         } else {
                             MsnEmoticonText(
-                                text = supportingText ?: if (contact.isGroup) "${contact.joinedMembers.size} ${if (contact.joinedMembers.size == 1) "member" else "members"}" else contact.statusMessage.ifBlank { contact.email },
+                                text = supportingText ?: if (contact.isGroup) {
+                                    quantityNumberSentenceResource(
+                                        count = contact.joinedMembers.size,
+                                        oneBeforeRes = R.string.group_members_count_singular_before_number,
+                                        oneAfterRes = R.string.group_members_count_singular_after_number,
+                                        otherBeforeRes = R.string.group_members_count_plural_before_number,
+                                        otherAfterRes = R.string.group_members_count_plural_after_number,
+                                    )
+                                } else {
+                                    localizeUserMessage(contact.statusMessage.ifBlank { contact.email })
+                                },
                                 useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -306,7 +322,7 @@ fun ContactRow(
                                 Text(it, style = MaterialTheme.typography.labelMedium)
                             }
                             if (!isPendingMember) Text(
-                                text = if (contact.isGroup) "Group" else contact.presence.label,
+                                text = if (contact.isGroup) stringResource(R.string.common_group_singular) else contact.presence.displayLabel(),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -314,7 +330,8 @@ fun ContactRow(
                         if (contact.unreadCount > 0) {
                             Badge { Text(contact.unreadCount.coerceAtMost(99).toString()) }
                         } else if (contact.isMarkedUnread) {
-                            Badge(modifier = Modifier.semantics { contentDescription = "Unread" }) {
+                            val unreadDesc = stringResource(R.string.contact_unread_description)
+                            Badge(modifier = Modifier.semantics { contentDescription = unreadDesc }) {
                                 Text("")
                             }
                         }
@@ -331,7 +348,7 @@ fun ContactRow(
                     onLongClick = if (contextActionLabel != null || onReadStateChange != null || onDeleteContact != null) {
                         { contextMenuExpanded = true }
                     } else null,
-                    onLongClickLabel = "Contact actions",
+                    onLongClickLabel = stringResource(R.string.contact_long_click_actions),
                     shapes = shapes,
                     modifier = modifier,
                     content = rowContent,
@@ -348,7 +365,13 @@ fun ContactRow(
             ) {
                 onReadStateChange?.let { changeReadState ->
                     DropdownMenuItem(
-                        text = { Text(if (contact.isUnread) "Mark as read" else "Mark as unread") },
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (contact.isUnread) R.string.contact_mark_as_read else R.string.contact_mark_as_unread,
+                                ),
+                            )
+                        },
                         onClick = {
                             contextMenuExpanded = false
                             changeReadState(!contact.isUnread)
@@ -412,7 +435,7 @@ fun Avatar(
             if (painter != null) {
                 Image(
                     painter = painter,
-                    contentDescription = "$name display picture",
+                    contentDescription = stringResource(R.string.contact_avatar_description, name),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )

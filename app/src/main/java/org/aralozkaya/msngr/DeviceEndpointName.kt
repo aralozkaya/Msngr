@@ -24,9 +24,14 @@ internal fun deviceEndpointName(context: Context? = null): String = resolveDevic
         }
     },
     model = Build.MODEL,
+    fallback = context?.getString(R.string.common_device_android) ?: "Android",
 )
 
-internal fun resolveDeviceEndpointName(readDeviceName: () -> String?, model: String?): String =
+internal fun resolveDeviceEndpointName(
+    readDeviceName: () -> String?,
+    model: String?,
+    fallback: String = "Android",
+): String =
     runCatching { readDeviceName() }.getOrNull()?.trim()?.takeIf(String::isNotEmpty)
         ?: model?.trim()?.takeIf { it.isNotEmpty() && !it.equals("unknown", ignoreCase = true) }
-        ?: "Android"
+        ?: fallback

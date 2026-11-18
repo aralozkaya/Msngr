@@ -87,7 +87,7 @@ class ContactsSectionsInstrumentedTest {
         compose.onNodeWithText("Alice").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Zoe").assertDoesNotExist()
         compose.onNodeWithText("Alpha group").assertDoesNotExist()
-        compose.onNodeWithText("No groups found").assertExists()
+        compose.onNodeWithText("No groups match your search.").assertExists()
 
         search.performScrollTo().performTextReplacement(" Z@LIVE.COM ")
         compose.onNodeWithText("Zulu group").assertIsDisplayed()
@@ -96,9 +96,9 @@ class ContactsSectionsInstrumentedTest {
         compose.onNodeWithText("No contacts found").performScrollTo().assertIsDisplayed()
 
         search.performScrollTo().performTextReplacement("missing")
-        compose.onNodeWithText("No groups found").assertExists()
+        compose.onNodeWithText("No groups match your search.").assertExists()
         compose.onNodeWithText("No contacts found").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Your contact list is empty.").assertDoesNotExist()
+        compose.onNodeWithText("You don't have anyone in your contact list yet.").assertDoesNotExist()
     }
 
     @Test fun searchRevealsCollapsedSectionsAndClearingRestoresTheList() {
@@ -270,7 +270,7 @@ class ContactsSectionsInstrumentedTest {
         compose.onNodeWithContentDescription("Edit profile", useUnmergedTree = true).assertDoesNotExist()
         val usernameNode = compose.onNodeWithText(username, useUnmergedTree = true).assertIsDisplayed()
         val statusNode = compose.onNodeWithText(statusMessage, useUnmergedTree = true).assertIsDisplayed()
-        val presenceNode = compose.onNodeWithText("Online", useUnmergedTree = true).assertIsDisplayed()
+        val presenceNode = compose.onNodeWithText("Available", useUnmergedTree = true).assertIsDisplayed()
         val usernameBounds = usernameNode.fetchSemanticsNode().boundsInRoot
         val statusBounds = statusNode.fetchSemanticsNode().boundsInRoot
         val presenceBounds = presenceNode.fetchSemanticsNode().boundsInRoot

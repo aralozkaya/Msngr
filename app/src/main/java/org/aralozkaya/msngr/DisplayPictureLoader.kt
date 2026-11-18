@@ -146,7 +146,7 @@ internal fun Context.loadAvatarGifBytes(uri: String?): ByteArray? {
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
-                require(count <= GifDisplayPicture.MAX_BYTES - output.size()) { "GIF is too large." }
+                require(count <= GifDisplayPicture.MAX_BYTES - output.size()) { getString(R.string.display_picture_gif_too_large) }
                 output.write(buffer, 0, count)
             }
             output.toByteArray()

@@ -69,7 +69,9 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                 saving = false
                 Toast.makeText(
                     context,
-                    if (saved) "Display picture saved" else "Could not save display picture. Please try again.",
+                    context.getString(
+                        if (saved) R.string.picture_viewer_saved else R.string.picture_viewer_save_failed,
+                    ),
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -84,10 +86,13 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { Text("Display picture") },
+                    title = { Text(androidx.compose.ui.res.stringResource(R.string.picture_viewer_title)) },
                     navigationIcon = {
                         IconButton(onClick = onDismiss, enabled = !saving, shapes = IconButtonDefaults.shapes()) {
-                            Icon(Icons.Default.Close, contentDescription = "Close picture")
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = androidx.compose.ui.res.stringResource(R.string.picture_viewer_close),
+                            )
                         }
                     },
                 )
@@ -100,12 +105,12 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                     when {
                         painter != null -> Image(
                             painter = painter,
-                            contentDescription = "$name display picture",
+                            contentDescription = androidx.compose.ui.res.stringResource(R.string.contact_avatar_description, name),
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
                         image.isLoading -> MsngrCircularWavyProgressIndicator()
-                        else -> Text("This display picture could not be loaded.")
+                        else -> Text(androidx.compose.ui.res.stringResource(R.string.picture_viewer_load_failed))
                     }
                 }
                 FilledTonalButton(
@@ -125,7 +130,7 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                         indicatorModifier = Modifier.testTag("picture-save-loading"),
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
-                        Text("Download picture", Modifier.padding(start = 8.dp))
+                        Text(androidx.compose.ui.res.stringResource(R.string.picture_viewer_download), Modifier.padding(start = 8.dp))
                     }
                 }
             }

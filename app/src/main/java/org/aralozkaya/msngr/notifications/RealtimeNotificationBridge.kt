@@ -10,6 +10,9 @@ import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.localizeChatMessageText
+import org.aralozkaya.msngr.localizeEmotionSoundName
 
 internal class RealtimeNotificationBridge(
     private val visibilityTracker: AppVisibilityTracker,
@@ -20,6 +23,7 @@ internal class RealtimeNotificationBridge(
     private var eventJob: Job? = null
     private var requestsJob: Job? = null
     private var groupInvitationsJob: Job? = null
+    private val appContext get() = notificationManager.context
 
     fun attach(repository: MessengerRepository) {
         eventJob?.cancel()
@@ -36,7 +40,7 @@ internal class RealtimeNotificationBridge(
                     if (visibilityTracker.isForeground) {
                         newInvitations.lastOrNull()?.let { invitation ->
                             inAppNotifications?.show(InAppNotification(InAppNotificationType.GroupInvitation,
-                                invitation.groupName.messengerPlusPlainText(), "You have been invited to join this group.", invitation.id))
+                                invitation.groupName.messengerPlusPlainText(), appContext.getString(R.string.in_app_notification_group_invite_text_you_singular), invitation.id))
                         }
                     }
                     previousAccount = inbox.accountId
@@ -55,7 +59,7 @@ internal class RealtimeNotificationBridge(
                         newRequests.lastOrNull()?.let { request ->
                             inAppNotifications?.show(InAppNotification(InAppNotificationType.ContactRequest,
                                 (request.displayName ?: request.email).messengerPlusPlainText(),
-                                "Wants to add you as a contact.", request.id))
+                                appContext.getString(R.string.in_app_notification_contact_request_text_you_singular), request.id))
                         }
                     }
                     previousAccount = inbox.accountId
@@ -85,7 +89,9 @@ internal class RealtimeNotificationBridge(
                             contactName = contact?.displayName?.messengerPlusPlainText()
                                 ?: event.contactId.substringBefore('@'),
                             contactAvatarUri = contact?.avatarUri,
-                            messageText = (message.emotionSound?.displayText ?: message.text).messengerPlusPlainText(),
+                            messageText = (message.emotionSound?.let {
+                                appContext.getString(R.string.chat_emotion_sound_message, appContext.localizeEmotionSoundName(it.sound.name))
+                            } ?: appContext.localizeChatMessageText(message)).messengerPlusPlainText(),
                             sentAtMillis = message.timestampMillis,
                             isGroup = contact?.isGroup == true,
                             senderName = (message.senderName ?: senderContact?.displayName)
@@ -130,9 +136,12 @@ internal class RealtimeNotificationBridge(
                         NotificationEventType.ContactSignedIn -> return@collect
                     }
                     val text = when (type) {
-                        InAppNotificationType.GroupMessage ->
-                            "${notificationEvent.senderName ?: notificationEvent.senderEmail ?: "Member"}: ${notificationEvent.messageText.orEmpty()}"
-                        InAppNotificationType.Nudge -> "Sent you a nudge."
+                        InAppNotificationType.GroupMessage -> appContext.getString(
+                            R.string.in_app_notification_group_message_format,
+                            notificationEvent.senderName ?: notificationEvent.senderEmail ?: appContext.getString(R.string.common_member_fallback_singular),
+                            notificationEvent.messageText.orEmpty(),
+                        )
+                        InAppNotificationType.Nudge -> appContext.getString(R.string.in_app_notification_nudge_text_you_singular)
                         else -> notificationEvent.messageText.orEmpty()
                     }
                     inAppNotifications?.show(InAppNotification(type, notificationEvent.contactName, text,

@@ -6,7 +6,7 @@
         android:enabled="true"
         android:icon="@drawable/ic_shortcut_change_status"
         android:shortcutShortLabel="@string/shortcut_change_status_short"
-        android:shortcutLongLabel="@string/shortcut_change_status_long"
+        android:shortcutLongLabel="@string/shortcut_change_status_long_you_singular"
         tools:targetApi="25">
         <intent
             android:action="org.aralozkaya.msngr.action.CHANGE_STATUS"

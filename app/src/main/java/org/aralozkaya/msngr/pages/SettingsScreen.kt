@@ -3,6 +3,7 @@
 package org.aralozkaya.msngr.pages
 
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -57,7 +58,7 @@ import org.aralozkaya.msngr.ContactInvitationPrefs
 import org.aralozkaya.msngr.DisplayPictureSyncBehavior
 import org.aralozkaya.msngr.DisplayPictureSyncPrefs
 import org.aralozkaya.msngr.EmoticonPrefs
-import org.aralozkaya.msngr.MESSENGER_PLUS_DISCLAIMER
+import org.aralozkaya.msngr.MESSENGER_PLUS_DISCLAIMER_RES
 import org.aralozkaya.msngr.MessengerPlusPrefs
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
@@ -67,108 +68,110 @@ import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
+import org.aralozkaya.msngr.numberSentenceResource
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
+import org.aralozkaya.msngr.providerDisplayName
 import org.aralozkaya.msngr.updates.updateManager
 
 enum class SettingsDestination(
-    val title: String,
+    @param:StringRes val titleRes: Int,
 ) {
-    Root("Settings"),
-    Appearance("Appearance"),
-    Emoticons("Emoticons & Winks"),
-    MessengerPlus("Messenger Plus!"),
-    ContactInvitations("Contact Invitations"),
-    Transfers("File & photo transfers"),
-    Notifications("Notifications"),
-    InAppNotifications("In-app notifications"),
-    CustomizedNotifications("Customized notifications"),
-    Connection("Connection"),
-    ConnectionInformation("Connection information"),
-    Updates("App updates"),
-    About("About"),
-    Licenses("Open-source licenses"),
+    Root(R.string.settings_destination_root),
+    Appearance(R.string.settings_destination_appearance),
+    Emoticons(R.string.settings_destination_emoticons),
+    MessengerPlus(R.string.settings_destination_messenger_plus),
+    ContactInvitations(R.string.settings_destination_contact_invitations),
+    Transfers(R.string.settings_destination_transfers),
+    Notifications(R.string.settings_destination_notifications),
+    InAppNotifications(R.string.settings_destination_in_app_notifications),
+    CustomizedNotifications(R.string.settings_destination_customized_notifications),
+    Connection(R.string.settings_destination_connection),
+    ConnectionInformation(R.string.settings_destination_connection_information),
+    Updates(R.string.settings_destination_updates),
+    About(R.string.settings_destination_about),
+    Licenses(R.string.settings_destination_licenses),
 }
 
 internal enum class SettingsCategory(
-    val title: String,
+    @param:StringRes val titleRes: Int,
     val presentation: SettingsCategoryPresentation,
     val destination: SettingsDestination? = null,
     val testTag: String? = null,
-    val supportingText: String? = null,
+    @param:StringRes val supportingTextRes: Int? = null,
 ) {
     Appearance(
-        title = "Appearance",
+        titleRes = R.string.settings_destination_appearance,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Appearance,
     ),
     Emoticons(
-        title = "Emoticons & Winks",
+        titleRes = R.string.settings_destination_emoticons,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Emoticons,
     ),
     MessengerPlus(
-        title = "Messenger Plus!",
+        titleRes = R.string.settings_destination_messenger_plus,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.MessengerPlus,
     ),
     ContactInvitations(
-        title = "Contact Invitations",
+        titleRes = R.string.settings_destination_contact_invitations,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.ContactInvitations,
         testTag = "contact_invitation_settings",
     ),
     Transfers(
-        title = "File & photo transfers",
+        titleRes = R.string.settings_destination_transfers,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Transfers,
         testTag = "transfer_settings",
     ),
     Connection(
-        title = "Connection",
+        titleRes = R.string.settings_destination_connection,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Connection,
     ),
     Notifications(
-        title = "Notifications",
+        titleRes = R.string.settings_destination_notifications,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Notifications,
         testTag = "notification_settings",
     ),
     InAppNotifications(
-        title = "In-app notifications",
+        titleRes = R.string.settings_destination_in_app_notifications,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.InAppNotifications,
         testTag = "in_app_notification_settings",
     ),
     ConnectionInformation(
-        title = "Connection information",
+        titleRes = R.string.settings_destination_connection_information,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.ConnectionInformation,
     ),
     About(
-        title = "About",
+        titleRes = R.string.settings_destination_about,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.About,
     ),
     Updates(
-        title = "App updates",
+        titleRes = R.string.settings_destination_updates,
         presentation = SettingsCategoryPresentation.Destination,
         destination = SettingsDestination.Updates,
         testTag = "update-settings",
     ),
     SignOutOtherSessions(
-        title = "Sign me out of all other places when I sign in to Msngr",
+        titleRes = R.string.settings_sign_out_other_places,
         presentation = SettingsCategoryPresentation.Toggle,
         testTag = "sign_out_other_sessions_on_sign_in",
     ),
     BackgroundConnection(
-        title = "Keep Msngr Connected",
+        titleRes = R.string.settings_keep_connected,
         presentation = SettingsCategoryPresentation.Toggle,
         testTag = "keep_messenger_connected",
     ),
     DeleteAllChatHistories(
-        title = "Delete all chat histories",
+        titleRes = R.string.settings_delete_all_histories,
         presentation = SettingsCategoryPresentation.DestructiveAction,
         testTag = "delete_all_chat_histories",
     ),
@@ -323,9 +326,9 @@ fun ConnectionSettingsScreen(
                         modifier = Modifier.settingsRow().testTag("roaming-profile-setting"),
                         trailingContent = { Switch(checked = usesSamePictureAndStatusEverywhere, onCheckedChange = null) },
                         supportingContent = {
-                            Text("Sync display picture and personal message changes across places where you sign in.")
+                            Text(stringResource(R.string.settings_roaming_supporting_you_singular))
                         },
-                    ) { Text("Use the same display picture and personal message wherever I sign in") }
+                    ) { Text(stringResource(R.string.settings_roaming_title)) }
                 },
             ) { shapes, colors ->
                 SegmentedListItem(
@@ -333,18 +336,18 @@ fun ConnectionSettingsScreen(
                     shapes = shapes,
                     colors = colors,
                     modifier = Modifier.settingsRow().testTag("display-picture-sync-setting"),
-                    supportingContent = { Text(pictureBehavior.label) },
-                ) { Text("Display picture changes") }
+                    supportingContent = { Text(pictureBehavior.displayLabel()) },
+                ) { Text(stringResource(R.string.settings_picture_changes_title)) }
             }
         }
     }
     if (showPictureBehavior) {
         AlertDialog(
             onDismissRequest = { showPictureBehavior = false },
-            title = { Text("Display picture changes") },
+            title = { Text(stringResource(R.string.settings_picture_changes_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("When the picture from Messenger differs from the one saved on this device:")
+                    Text(stringResource(R.string.settings_picture_changes_body))
                     Column(Modifier.selectableGroup()) {
                         DisplayPictureSyncBehavior.entries.forEach { behavior ->
                             Row(
@@ -369,10 +372,10 @@ fun ConnectionSettingsScreen(
                             ) {
                                 RadioButton(selected = pictureBehavior == behavior, onClick = null)
                                 Column {
-                                    Text(behavior.label)
+                                    Text(behavior.displayLabel())
                                     if (behavior == DisplayPictureSyncBehavior.AskEveryTime) {
                                         Text(
-                                            text = "Default",
+                                            text = stringResource(R.string.common_default),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -383,7 +386,11 @@ fun ConnectionSettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showPictureBehavior = false }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(onClick = { showPictureBehavior = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
         )
     }
 }
@@ -406,7 +413,7 @@ private fun LazyListScope.settingsCategory(
                 onClick = onClick,
                 shapes = ListItemDefaults.segmentedShapes(index, count),
                 modifier = modifier,
-                content = { Text(category.title) },
+                content = { Text(stringResource(category.titleRes)) },
                 trailingContent = if (category == SettingsCategory.Updates) {
                     {
                         val updateState by LocalContext.current.updateManager.state.collectAsState()
@@ -425,10 +432,10 @@ private fun LazyListScope.settingsCategory(
                         onCheckedChange = null,
                     )
                 },
-                supportingContent = category.supportingText?.let { supportingText ->
-                    { Text(supportingText) }
+                supportingContent = category.supportingTextRes?.let { res ->
+                    { Text(stringResource(res)) }
                 },
-                content = { Text(category.title) },
+                content = { Text(stringResource(category.titleRes)) },
             )
             SettingsCategoryPresentation.DestructiveAction -> FilledTonalButton(
                 onClick = onClick,
@@ -439,7 +446,7 @@ private fun LazyListScope.settingsCategory(
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 ),
             ) {
-                Text(category.title)
+                Text(stringResource(category.titleRes))
             }
         }
     }
@@ -469,9 +476,9 @@ fun ContactInvitationSettingsScreen(
                         Switch(checked = settings.useDeclineDefaults, onCheckedChange = null)
                     },
                     supportingContent = {
-                        Text("Decline uses the actions below without asking. Turn this off to choose each time.")
+                        Text(stringResource(R.string.settings_decline_default_supporting))
                     },
-                    content = { Text("Use default decline actions") },
+                    content = { Text(stringResource(R.string.settings_decline_default_title)) },
                 )
             }) { shapes, colors ->
                 SegmentedListItem(
@@ -486,7 +493,7 @@ fun ContactInvitationSettingsScreen(
                             onCheckedChange = null,
                         )
                     },
-                    supportingContent = { Text("Also block future invitations from anyone you decline.") },
+                    supportingContent = { Text(stringResource(R.string.settings_decline_block_supporting_you_singular)) },
                     content = { Text(stringResource(R.string.contact_request_block)) },
                 )
             }
@@ -517,8 +524,8 @@ fun MessengerPlusSettingsScreen(
                     trailingContent = {
                         Switch(checked = settings.enabled, onCheckedChange = null)
                     },
-                    supportingContent = { Text(MESSENGER_PLUS_DISCLAIMER) },
-                    content = { Text("Enable Messenger Plus! rendering") },
+                    supportingContent = { Text(stringResource(MESSENGER_PLUS_DISCLAIMER_RES)) },
+                    content = { Text(stringResource(R.string.settings_plus_rendering_title)) },
                 )
             }) { shapes, colors ->
                 SegmentedListItem(
@@ -534,9 +541,9 @@ fun MessengerPlusSettingsScreen(
                         )
                     },
                     supportingContent = {
-                        Text("Hide formatting codes when rendering is off. Always on while rendering is enabled.")
+                        Text(stringResource(R.string.settings_plus_hide_codes_supporting))
                     },
-                    content = { Text("Hide control characters") },
+                    content = { Text(stringResource(R.string.settings_plus_hide_codes_title)) },
                 )
             }
         }
@@ -547,8 +554,8 @@ fun MessengerPlusSettingsScreen(
                 shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
                 modifier = Modifier.settingsRow().testTag("emotion_sound_autoplay"),
                 trailingContent = { Switch(checked = settings.playEmotionSounds, onCheckedChange = null) },
-                supportingContent = { Text("Play new emotion sounds while their conversation is open.") },
-                content = { Text("Play emotion sounds automatically") },
+                supportingContent = { Text(stringResource(R.string.settings_emotion_sounds_auto_supporting)) },
+                content = { Text(stringResource(R.string.settings_emotion_sounds_auto_title)) },
             )
         }
     }
@@ -569,7 +576,7 @@ fun AppearanceSettingsScreen(
         scrollBehavior = scrollBehavior,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
-        settingsSectionHeader("Theme", first = true)
+        settingsSectionHeader(R.string.settings_theme_header, first = true)
         ThemeMode.entries.forEachIndexed { index, mode ->
             item(key = "theme-${mode.name}") {
                 SegmentedListItem(
@@ -583,13 +590,13 @@ fun AppearanceSettingsScreen(
                             onClick = null,
                         )
                     },
-                    content = { Text(mode.label) },
+                    content = { Text(mode.displayLabel()) },
                 )
             }
         }
         run {
             settingsSectionSpacer()
-            settingsSectionHeader("Color scheme")
+            settingsSectionHeader(R.string.settings_color_scheme_header)
             val colorModes = ColorMode.entries.filter { it != ColorMode.Dynamic || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
             colorModes.forEachIndexed { index, mode ->
                 item(key = "color-${mode.name}") {
@@ -598,7 +605,7 @@ fun AppearanceSettingsScreen(
             }
         }
         settingsSectionSpacer()
-        settingsSectionHeader("Home")
+        settingsSectionHeader(R.string.settings_home_header)
         item(key = "show-ads") {
             SegmentedListItem(
                 checked = appearance.showAds,
@@ -614,7 +621,7 @@ fun AppearanceSettingsScreen(
                     )
                 },
                 supportingContent = {
-                    Text(stringResource(R.string.settings_show_ads_supporting))
+                    Text(stringResource(R.string.settings_show_ads_supporting_you_singular))
                 },
                 content = { Text(stringResource(R.string.settings_show_ads_title)) },
             )
@@ -654,12 +661,9 @@ fun EmoticonSettingsScreen(
                     )
                 },
                 supportingContent = {
-                    Text(
-                        "Show keyboard shortcuts such as :D as emoticons while you type. " +
-                            "Incoming messages always use glyphs.",
-                    )
+                    Text(stringResource(R.string.settings_convert_shortcuts_supporting_you_singular))
                 },
-                content = { Text("Convert typed shortcuts") },
+                content = { Text(stringResource(R.string.settings_convert_shortcuts_title)) },
             )
         }
         item(key = "original-emoticons") {
@@ -679,9 +683,9 @@ fun EmoticonSettingsScreen(
                     )
                 },
                 supportingContent = {
-                    Text("Show the classic MSN artwork instead of modern Unicode emoji.")
+                    Text(stringResource(R.string.settings_original_emoticons_supporting))
                 },
-                content = { Text("Use original Messenger emoticons") },
+                content = { Text(stringResource(R.string.settings_original_emoticons_title)) },
             )
         }
         item(key = "play-winks") {
@@ -689,16 +693,16 @@ fun EmoticonSettingsScreen(
                 onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(playWinks = it)) },
                 shapes = ListItemDefaults.segmentedShapes(index = 2, count = itemCount), modifier = Modifier.settingsRow(),
                 trailingContent = { Switch(winkSettings.playWinks, null) },
-                supportingContent = { Text("Play incoming winks while the chat is open. Reduced motion uses a thumbnail.") },
-                content = { Text("Play winks automatically") })
+                supportingContent = { Text(stringResource(R.string.settings_play_winks_auto_supporting)) },
+                content = { Text(stringResource(R.string.settings_play_winks_auto_title)) })
         }
         item(key = "wink-sounds") {
             SegmentedListItem(checked = winkSettings.sounds,
                 onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(sounds = it)) },
                 shapes = ListItemDefaults.segmentedShapes(index = 3, count = itemCount), modifier = Modifier.settingsRow(),
                 trailingContent = { Switch(winkSettings.sounds, null) },
-                supportingContent = { Text("Wink sounds use your media volume.") },
-                content = { Text("Wink sounds") })
+                supportingContent = { Text(stringResource(R.string.settings_wink_sounds_supporting_you_singular)) },
+                content = { Text(stringResource(R.string.settings_wink_sounds_title)) })
         }
     }
 }
@@ -711,50 +715,51 @@ fun ConnectionInformationScreen(
     val context = LocalContext.current
     val snapshot = remember(context) { SessionPrefs.readLoginSnapshot(context) }
     val accountDetails = listOf(
-        "Provider" to snapshot.provider,
-        "Remembered credentials" to if (snapshot.savePassword) {
-            "Encrypted on this device"
-        } else {
-            "Not saved"
-        },
-        "Notification server" to
-            "${snapshot.resolvedServers.mainServer}:${snapshot.resolvedServers.mainPort}",
-        "Configuration" to snapshot.resolvedServers.configServer,
+        stringResource(R.string.connection_provider) to providerDisplayName(snapshot.provider),
+        stringResource(R.string.connection_remembered_credentials) to stringResource(
+            if (snapshot.savePassword) R.string.connection_encrypted_on_device
+            else R.string.connection_not_saved,
+        ),
+        stringResource(R.string.connection_notification_server) to stringResource(
+            R.string.connection_host_port_format,
+            snapshot.resolvedServers.mainServer,
+            snapshot.resolvedServers.mainPort.toString(),
+        ),
+        stringResource(R.string.connection_configuration) to snapshot.resolvedServers.configServer,
     )
     val serviceEndpoints = listOf(
-        "Authentication" to snapshot.resolvedServers.authServer,
-        "Address book" to snapshot.resolvedServers.addressBookServer,
-        "Storage" to snapshot.resolvedServers.storageServer,
-        "Games & activities" to snapshot.resolvedServers.activitiesServer,
-        "Mail" to snapshot.resolvedServers.mailServer,
+        stringResource(R.string.connection_authentication) to snapshot.resolvedServers.authServer,
+        stringResource(R.string.connection_address_book) to snapshot.resolvedServers.addressBookServer,
+        stringResource(R.string.connection_storage) to snapshot.resolvedServers.storageServer,
+        stringResource(R.string.connection_games_activities) to snapshot.resolvedServers.activitiesServer,
+        stringResource(R.string.connection_mail) to snapshot.resolvedServers.mailServer,
     )
+    val notConfigured = stringResource(R.string.connection_not_configured)
+    val plusDetails = messengerPlusConnectionDetailItems(
+        winkCatalogUrl = snapshot.resolvedServers.winkCatalogServer,
+        emotionSoundUrl = snapshot.resolvedServers.emotionSoundServer,
+    ).map { (labelRes, url) -> stringResource(labelRes) to (url ?: notConfigured) }
 
     PageContentList(
         innerPadding = innerPadding,
         scrollBehavior = scrollBehavior,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
-        settingsDetailsSection("Account and service", accountDetails, first = true)
+        settingsDetailsSection(R.string.connection_section_account, accountDetails, first = true)
         settingsSectionSpacer()
-        settingsDetailsSection("Connected services", serviceEndpoints)
+        settingsDetailsSection(R.string.connection_section_services, serviceEndpoints)
         settingsSectionSpacer()
-        settingsDetailsSection(
-            "Messenger Plus!",
-            messengerPlusConnectionDetails(
-                winkCatalogUrl = snapshot.resolvedServers.winkCatalogServer,
-                emotionSoundUrl = snapshot.resolvedServers.emotionSoundServer,
-            ),
-        )
+        settingsDetailsSection(R.string.settings_destination_messenger_plus, plusDetails)
     }
 }
 
-internal fun messengerPlusConnectionDetails(
+internal fun messengerPlusConnectionDetailItems(
     winkCatalogUrl: String?,
     emotionSoundUrl: String?,
-): List<Pair<String, String>> = listOf(
-    "Winks" to winkCatalogUrl,
-    "Emotion sounds" to emotionSoundUrl,
-).map { (label, url) -> label to (url?.takeIf { it.isNotBlank() } ?: "Not configured") }
+): List<Pair<Int, String?>> = listOf(
+    R.string.connection_winks_plural to winkCatalogUrl?.takeIf { it.isNotBlank() },
+    R.string.connection_emotion_sounds_plural to emotionSoundUrl?.takeIf { it.isNotBlank() },
+)
 
 @Composable
 fun AboutSettingsScreen(
@@ -770,23 +775,32 @@ fun AboutSettingsScreen(
             SettingsInformationCard {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Msngr",
+                        stringResource(R.string.app_name),
                         modifier = Modifier.semantics { heading() },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "Version ${BuildConfig.VERSION_NAME}",
+                        numberSentenceResource(
+                            R.string.settings_about_version_before_number,
+                            BuildConfig.VERSION_NAME,
+                            R.string.settings_about_version_after_number,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsValue("Developer", "Aral Özkaya")
-                Text("Msngr code: BSD Zero Clause (0BSD). Uses libsiren under LGPL-2.1-or-later and other open-source libraries.")
-                TextButton(onClick = onLicenses) { Text("Open-source licenses") }
+                SettingsValue(
+                    stringResource(R.string.settings_about_developer_label),
+                    stringResource(R.string.settings_about_developer_name),
+                )
+                Text(stringResource(R.string.settings_about_license_summary))
+                TextButton(onClick = onLicenses) {
+                    Text(stringResource(R.string.settings_about_licenses_button))
+                }
                 Text(
-                    "Thanks to the Escargot, NINA, CrossTalk, Pidgin, and retro-computing communities for keeping Messenger history alive.",
+                    stringResource(R.string.settings_about_credits),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -813,13 +827,13 @@ private fun SettingsInformationCard(content: @Composable ColumnScope.() -> Unit)
 }
 
 private fun LazyListScope.settingsDetailsSection(
-    title: String,
+    @StringRes titleRes: Int,
     details: List<Pair<String, String>>,
     first: Boolean = false,
 ) {
-    settingsSectionHeader(title, first)
+    settingsSectionHeader(titleRes, first)
     details.forEachIndexed { index, (label, value) ->
-        item(key = "$title-$label") {
+        item(key = "$titleRes-$index") {
             SegmentedListItem(
                 shapes = ListItemDefaults.segmentedShapes(index, details.size),
                 modifier = Modifier.fillMaxWidth(),
@@ -854,12 +868,9 @@ private fun DeleteHistoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Delete all chat histories?") },
+        title = { Text(stringResource(R.string.settings_delete_all_title)) },
         text = {
-            Text(
-                "This permanently deletes every saved conversation from this device. " +
-                    "This cannot be undone.",
-            )
+            Text(stringResource(R.string.settings_delete_all_message))
         },
         confirmButton = {
             Button(
@@ -870,23 +881,23 @@ private fun DeleteHistoryDialog(
                     contentColor = MaterialTheme.colorScheme.onError,
                 ),
             ) {
-                Text("Delete all")
+                Text(stringResource(R.string.settings_delete_all_confirm))
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
             ) {
-                Text("Cancel")
+                Text(stringResource(R.string.common_cancel))
             }
         },
     )
 }
 
-internal fun LazyListScope.settingsSectionHeader(title: String, first: Boolean = false) {
-    item(key = "header-$title") {
+internal fun LazyListScope.settingsSectionHeader(@StringRes titleRes: Int, first: Boolean = false) {
+    item(key = "header-$titleRes") {
         Text(
-            text = title,
+            text = stringResource(titleRes),
             modifier = Modifier
                 .padding(
                     start = 16.dp,

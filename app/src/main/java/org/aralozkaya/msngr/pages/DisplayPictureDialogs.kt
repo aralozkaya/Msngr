@@ -72,7 +72,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.localizedDefaultPictureVersion
+import org.aralozkaya.msngr.localizedName
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -115,8 +119,8 @@ internal fun DisplayPictureOptionsDialog(
                     Avatar(name, pictureUri, Presence.Offline, modifier = Modifier.size(80.dp),
                         showPresenceIndicator = false, shape = MaterialTheme.shapes.ownDisplayPicture)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Display picture", style = MaterialTheme.typography.headlineSmall)
-                        Text("A little more you.", style = MaterialTheme.typography.bodyMedium,
+                        Text(stringResource(R.string.display_picture_dialog_title), style = MaterialTheme.typography.headlineSmall)
+                        Text(stringResource(R.string.display_picture_dialog_subtitle_you_singular), style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -124,21 +128,39 @@ internal fun DisplayPictureOptionsDialog(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onViewPicture) {
                             Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("View", Modifier.padding(start = 8.dp))
+                            Text(stringResource(R.string.display_picture_action_view), Modifier.padding(start = 8.dp))
                         }
                         DestructiveOutlinedButton(onClick = onRemovePicture) {
                             Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("Remove", Modifier.padding(start = 8.dp))
+                            Text(stringResource(R.string.common_remove), Modifier.padding(start = 8.dp))
                         }
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                    PictureSourceOption(0, "Take a photo", "Capture a new moment", Icons.Default.CameraAlt, onTakePhoto)
-                    PictureSourceOption(1, "Select a photo", "Photos and GIFs from your gallery", Icons.Default.PhotoLibrary, onSelectPhoto)
-                    PictureSourceOption(2, "Use a default photo", "The original Messenger collection", Icons.Default.PhotoSizeSelectActual, onDefaultPhoto)
+                    PictureSourceOption(
+                        0,
+                        stringResource(R.string.display_picture_option_take_photo),
+                        stringResource(R.string.display_picture_option_take_photo_sub),
+                        Icons.Default.CameraAlt,
+                        onTakePhoto,
+                    )
+                    PictureSourceOption(
+                        1,
+                        stringResource(R.string.display_picture_option_select_photo),
+                        stringResource(R.string.display_picture_option_select_photo_sub_you_singular),
+                        Icons.Default.PhotoLibrary,
+                        onSelectPhoto,
+                    )
+                    PictureSourceOption(
+                        2,
+                        stringResource(R.string.display_picture_option_default_photo),
+                        stringResource(R.string.display_picture_option_default_photo_sub),
+                        Icons.Default.PhotoSizeSelectActual,
+                        onDefaultPhoto,
+                    )
                 }
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         }
@@ -162,6 +184,8 @@ private fun PictureSourceOption(index: Int, title: String, subtitle: String, ico
     ) { Text(title, style = MaterialTheme.typography.titleMedium) }
 }
 
+private const val DP_FILTER_ALL_KEY = "__all__"
+
 @Composable
 internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
@@ -171,10 +195,10 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
     var pictures by remember { mutableStateOf<List<DefaultDisplayPicture>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
-    var version by rememberSaveable { mutableStateOf("All") }
+    var version by rememberSaveable { mutableStateOf(DP_FILTER_ALL_KEY) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val selection = pictures?.firstOrNull { it.id == selectedId }
-    val versions = remember(pictures) { listOf("All") + pictures.orEmpty().map { it.version }.distinct() }
+    val versions = remember(pictures) { listOf(DP_FILTER_ALL_KEY) + pictures.orEmpty().map { it.version }.distinct() }
     LaunchedEffect(version, versions) {
         // Bring a partially visible selected chip fully into view on narrow screens.
         filterState.animateScrollToItem(versions.indexOf(version).coerceAtLeast(0))
@@ -184,7 +208,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
         try {
             pictures = context.loadDefaultDisplayPictures()
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = "The default pictures could not be loaded." }
+        catch (_: Exception) { error = context.getString(R.string.display_picture_defaults_load_failed) }
     }
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -194,23 +218,35 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
         Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.height((screenHeight - 64).coerceIn(240, 760).dp)
                 .testTag("default-display-pictures")) {
-                Text("Default pictures", style = MaterialTheme.typography.headlineSmall,
+                Text(stringResource(R.string.display_picture_defaults_title), style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 8.dp))
-                if (!compact) Text("Your Messenger favourites, all in one place.",
+                if (!compact) Text(stringResource(R.string.display_picture_defaults_subtitle_you_singular),
                     Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 LazyRow(state = filterState, contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(top = if (compact) 0.dp else 12.dp).selectableGroup()) {
-                    items(versions) { label ->
-                        FilterChip(selected = version == label, onClick = { version = label }, label = { Text(label) },
-                            modifier = Modifier.testTag("picture-version-$label"))
+                    items(versions) { filterKey ->
+                        val chipLabel = if (filterKey == DP_FILTER_ALL_KEY) {
+                            stringResource(R.string.common_all)
+                        } else {
+                            localizedDefaultPictureVersion(filterKey)
+                        }
+                        val chipTag = if (filterKey == DP_FILTER_ALL_KEY) "All" else filterKey
+                        FilterChip(
+                            selected = version == filterKey,
+                            onClick = { version = filterKey },
+                            label = { Text(chipLabel) },
+                            modifier = Modifier.testTag("picture-version-$chipTag"),
+                        )
                     }
                 }
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     when {
                         error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(requireNotNull(error))
-                            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { retry++ }) { Text("Try again") }
+                            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { retry++ }) {
+                                Text(stringResource(R.string.common_try_again))
+                            }
                         }
                         pictures == null -> MsngrCircularWavyProgressIndicator()
                         else -> LazyVerticalGrid(
@@ -220,7 +256,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.fillMaxSize().selectableGroup().testTag("default-picture-grid"),
                         ) {
-                            items(pictures.orEmpty().filter { version == "All" || it.version == version }, key = { it.id }) { picture ->
+                            items(pictures.orEmpty().filter { version == DP_FILTER_ALL_KEY || it.version == version }, key = { it.id }) { picture ->
                                 DefaultPictureTile(picture, picture.id == selectedId) { selectedId = picture.id }
                             }
                         }
@@ -228,9 +264,11 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
                 }
                 Surface(color = MaterialTheme.colorScheme.surfaceContainerHighest) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                        TextButton(onClick = onDismiss) { Text("Cancel") }
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
                         Button(onClick = { selection?.let(onSelect) }, enabled = selection != null,
-                            shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("use-default-picture")) { Text("Use photo") }
+                            shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("use-default-picture")) {
+                            Text(stringResource(R.string.display_picture_use_photo))
+                        }
                     }
                 }
             }
@@ -244,6 +282,13 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "picture selection corners")
     val borderWidth by animateDpAsState(if (checked) 3.dp else 1.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "picture selection border")
+    val localizedName = picture.localizedName()
+    val versionLabel = stringResource(R.string.default_picture_version_prefix, localizedDefaultPictureVersion(picture.version))
+    val description = stringResource(
+        if (picture.animated) R.string.display_picture_tile_desc_animated else R.string.display_picture_tile_desc_static,
+        localizedName,
+        versionLabel,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Surface(
             onClick = onClick,
@@ -254,7 +299,7 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
                 .semantics {
                     role = Role.RadioButton
                     selected = checked
-                    contentDescription = "${picture.name}, Messenger ${picture.version}" + if (picture.animated) ", animated display picture" else ", display picture"
+                    contentDescription = description
                 },
         ) {
             Box {
@@ -265,14 +310,14 @@ private fun DefaultPictureTile(picture: DefaultDisplayPicture, checked: Boolean,
                     shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = .9f),
                     contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                ) { Text("Animated", Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall) }
+                ) { Text(stringResource(R.string.common_animated), Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall) }
                 if (checked) Icon(Icons.Default.CheckCircle, contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).clip(RoundedCornerShape(50))
                         .background(MaterialTheme.colorScheme.surface).size(24.dp))
             }
         }
-        Text(picture.name, style = MaterialTheme.typography.labelMedium, maxLines = 2,
+        Text(localizedName, style = MaterialTheme.typography.labelMedium, maxLines = 2,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
     }
 }
@@ -283,6 +328,6 @@ private fun DefaultPictureImage(picture: DefaultDisplayPicture, modifier: Modifi
     Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
         image.painter?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
             ?: if (image.isLoading) MsngrCircularWavyProgressIndicator(Modifier.size(24.dp)) else
-                Icon(Icons.Default.PhotoSizeSelectActual, contentDescription = "Picture unavailable")
+                Icon(Icons.Default.PhotoSizeSelectActual, contentDescription = stringResource(R.string.display_picture_unavailable))
     }
 }

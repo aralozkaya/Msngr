@@ -43,6 +43,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,14 +213,14 @@ internal fun GameCatalogDialog(
                 containerColor = Color.Transparent,
                 topBar = {
                     TopAppBar(
-                        title = { Text("Games & activities", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        title = { Text(stringResource(R.string.games_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(
                                 onClick = onDismiss,
                                 enabled = startingAppId == null,
                                 modifier = Modifier.testTag("game_catalog_close"),
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -271,13 +272,13 @@ private fun GameCatalogContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Invite your contact to play a game or share an activity right inside the chat.",
+            text = stringResource(R.string.games_intro_you_singular),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         error?.let {
             Text(
-                text = it,
+                text = localizeUserMessage(it),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -291,13 +292,13 @@ private fun GameCatalogContent(
             if (categoryEntries.isEmpty()) continue
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = category.name,
+                    text = localizedGameCategoryName(category.name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (category.description.isNotBlank()) {
                     Text(
-                        text = category.description,
+                        text = localizedGameCategoryDescription(category.description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -330,7 +331,7 @@ private fun GameCatalogContent(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = entry.name,
+                                        text = localizedGameName(entry.name),
                                         style = MaterialTheme.typography.titleSmall,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -341,10 +342,21 @@ private fun GameCatalogContent(
                                     ) {
                                         Text(
                                             text = when {
-                                                entry.appType == 1 -> "Activity"
-                                                entry.minUsers == 1 && entry.maxUsers == 1 -> "1 Player"
-                                                entry.minUsers == 1 -> "1–${entry.maxUsers} Players"
-                                                else -> "${entry.maxUsers} Players"
+                                                entry.appType == 1 -> stringResource(R.string.games_activity_badge)
+                                                entry.minUsers == 1 && entry.maxUsers > 1 -> twoNumbersSentenceResource(
+                                                    R.string.game_players_range_plural_before_first_number,
+                                                    1,
+                                                    R.string.game_players_range_plural_between_numbers,
+                                                    entry.maxUsers,
+                                                    R.string.game_players_range_plural_after_second_number,
+                                                )
+                                                else -> quantityNumberSentenceResource(
+                                                    count = entry.maxUsers,
+                                                    oneBeforeRes = R.string.game_players_exact_singular_before_number,
+                                                    oneAfterRes = R.string.game_players_exact_singular_after_number,
+                                                    otherBeforeRes = R.string.game_players_exact_plural_before_number,
+                                                    otherAfterRes = R.string.game_players_exact_plural_after_number,
+                                                )
                                             },
                                             style = MaterialTheme.typography.labelSmall,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -353,7 +365,7 @@ private fun GameCatalogContent(
                                 }
                                 if (entry.description.isNotBlank()) {
                                     Text(
-                                        text = entry.description,
+                                        text = localizedGameDescription(entry.description),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 2,
@@ -1589,11 +1601,15 @@ internal fun GameHost(
                     if (visible) {
                         Modifier.clearAndSetSemantics {}
                     } else {
-                        Modifier.testTag("reopen_game_session").semantics {
-                            stateDescription = when (session.status) {
-                                GameSessionStatus.Invited -> "${session.appName} invitation"
-                                GameSessionStatus.Active -> "Playing ${session.appName}"
-                                else -> "${session.appName} ended"
+                        Modifier.let { baseModifier ->
+                            val gameDisplayName = localizedGameName(session.appName)
+                            val reopenState = when (session.status) {
+                                GameSessionStatus.Invited -> stringResource(R.string.game_state_invitation, gameDisplayName)
+                                GameSessionStatus.Active -> stringResource(R.string.game_state_playing, gameDisplayName)
+                                else -> stringResource(R.string.game_state_ended, gameDisplayName)
+                            }
+                            baseModifier.testTag("reopen_game_session").semantics {
+                                stateDescription = reopenState
                             }
                         }
                     },
@@ -1602,7 +1618,7 @@ internal fun GameHost(
             BadgedBox(
                 badge = {
                     if (hasPendingInvite || controller.activeJsDialog != null) {
-                        Badge { Text("!") }
+                        Badge { Text(stringResource(R.string.game_attention_badge)) }
                     } else if (unreadMoves > 0) {
                         Badge { Text(unreadMoves.toString()) }
                     }
@@ -1610,7 +1626,7 @@ internal fun GameHost(
             ) {
                 Icon(
                     imageVector = if (session.entry.appType == 1) Icons.Default.Brush else Icons.Default.SportsEsports,
-                    contentDescription = "Open ${session.appName}",
+                    contentDescription = stringResource(R.string.game_open_desc, localizedGameName(session.appName)),
                 )
             }
         }
@@ -1622,22 +1638,22 @@ internal fun GameHost(
     val backProgress = remember { Animatable(0f) }
     val statusSubtitle = when (session.status) {
         GameSessionStatus.Invited -> if (session.outgoing) {
-            "Waiting for $peerDisplayName to accept\u2026"
+            stringResource(R.string.game_waiting_accept, peerDisplayName)
         } else {
-            "$peerDisplayName invited you"
+            stringResource(R.string.game_invited_you_singular, peerDisplayName)
         }
         GameSessionStatus.Active -> if (session.remoteAppLoaded) {
-            "With $peerDisplayName"
+            stringResource(R.string.game_with_peer, peerDisplayName)
         } else {
-            "Loading $peerDisplayName's game\u2026"
+            stringResource(R.string.game_loading_peer, peerDisplayName)
         }
-        GameSessionStatus.Declined -> "Invitation declined"
+        GameSessionStatus.Declined -> stringResource(R.string.game_invitation_declined)
         GameSessionStatus.Stopped -> if (session.remoteStopped) {
-            "$peerDisplayName left the game"
+            stringResource(R.string.game_peer_left, peerDisplayName)
         } else {
-            "Game ended"
+            stringResource(R.string.game_ended)
         }
-        GameSessionStatus.Failed -> session.error ?: "Game failed"
+        GameSessionStatus.Failed -> session.error?.let { localizeUserMessage(it) } ?: stringResource(R.string.game_failed)
     }
 
     Dialog(
@@ -1684,7 +1700,7 @@ internal fun GameHost(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Minimize",
+                                    contentDescription = stringResource(R.string.game_minimize),
                                 )
                             }
                         },
@@ -1696,7 +1712,7 @@ internal fun GameHost(
                                 GameEntryIcon(entry = session.entry, modifier = Modifier.size(36.dp))
                                 Column(modifier = Modifier.weight(1f, fill = false)) {
                                     Text(
-                                        text = session.appName,
+                                        text = localizedGameName(session.appName),
                                         style = MaterialTheme.typography.titleMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -1721,7 +1737,7 @@ internal fun GameHost(
                                     modifier = Modifier.testTag("stop_game_session"),
                                 ) {
                                     Text(
-                                        if (session.status == GameSessionStatus.Invited) "Cancel" else "End",
+                                        stringResource(if (session.status == GameSessionStatus.Invited) R.string.common_cancel else R.string.game_end_action),
                                     )
                                 }
                             } else if (!ongoing) {
@@ -1729,7 +1745,7 @@ internal fun GameHost(
                                     onClick = { visible = false; closed = true },
                                     modifier = Modifier.testTag("close_game_session"),
                                 ) {
-                                    Text("Close")
+                                    Text(stringResource(R.string.common_close))
                                 }
                             }
                         },
@@ -1765,11 +1781,12 @@ internal fun GameHost(
                                     modifier = Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
+                                    val localizedAppName = localizedGameName(session.appName)
                                     Text(
                                         text = if (session.outgoing) {
-                                            "Your invitation to play ${session.appName} has been sent. You can minimize this panel into the corner button and keep chatting while you wait."
+                                            stringResource(R.string.game_invite_outgoing_body_you_singular, localizedAppName)
                                         } else {
-                                            "$peerDisplayName wants to start ${session.appName} with you."
+                                            stringResource(R.string.game_invite_incoming_body_you_singular, peerDisplayName, localizedAppName)
                                         },
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
@@ -1786,13 +1803,13 @@ internal fun GameHost(
                                                     }
                                                 },
                                             ) {
-                                                Text("Accept & play")
+                                                Text(stringResource(R.string.game_accept_and_play))
                                             }
                                             DestructiveOutlinedButton(
                                                 onClick = stop,
                                                 modifier = Modifier.testTag("stop_game_session"),
                                             ) {
-                                                Text("Decline")
+                                                Text(stringResource(R.string.common_decline))
                                             }
                                         }
                                     } else {
@@ -1886,7 +1903,7 @@ internal fun GameHost(
     helpUrl?.let { targetHelpUrl ->
         AlertDialog(
             onDismissRequest = { helpUrl = null },
-            title = { Text("${session.appName} — Help") },
+            title = { Text(stringResource(R.string.game_help_title, localizedGameName(session.appName))) },
             text = {
                 Box(
                     modifier = Modifier
@@ -1915,7 +1932,7 @@ internal fun GameHost(
             },
             confirmButton = {
                 TextButton(onClick = { helpUrl = null }) {
-                    Text("Close")
+                    Text(stringResource(R.string.common_close))
                 }
             },
         )
@@ -1939,7 +1956,7 @@ private fun GameJsDialog(
                 is GameJsDialogKind.Prompt -> dialog.cancel()
             }
         },
-        title = { Text(appName) },
+        title = { Text(localizedGameName(appName)) },
         text = {
             when (dialog.kind) {
                 GameJsDialogKind.Alert,
@@ -1966,7 +1983,7 @@ private fun GameJsDialog(
                         onClick = { dialog.confirm() },
                         modifier = Modifier.testTag("game_js_dialog_confirm"),
                     ) {
-                        Text("OK")
+                        Text(stringResource(R.string.common_ok))
                     }
                 }
                 GameJsDialogKind.Confirm -> {
@@ -1975,7 +1992,7 @@ private fun GameJsDialog(
                         onClick = { dialog.confirm() },
                         modifier = Modifier.testTag("game_js_dialog_confirm"),
                     ) {
-                        Text("OK")
+                        Text(stringResource(R.string.common_ok))
                     }
                 }
                 is GameJsDialogKind.Prompt -> {
@@ -1984,7 +2001,7 @@ private fun GameJsDialog(
                         onClick = { dialog.confirm(promptText) },
                         modifier = Modifier.testTag("game_js_dialog_confirm"),
                     ) {
-                        Text("OK")
+                        Text(stringResource(R.string.common_ok))
                     }
                 }
             }
@@ -1998,7 +2015,7 @@ private fun GameJsDialog(
                         onClick = { dialog.cancel() },
                         modifier = Modifier.testTag("game_js_dialog_dismiss"),
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.common_cancel))
                     }
                 }
             }
@@ -2042,7 +2059,7 @@ private fun WordleTouchKeyboard(
                         modifier = Modifier.height(36.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     ) {
-                        Text("ENTER", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.game_key_enter), style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 for (ch in row) {
@@ -2070,7 +2087,7 @@ private fun WordleTouchKeyboard(
                         modifier = Modifier.height(36.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     ) {
-                        Text("⌫", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.game_key_backspace_symbol), style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -2096,22 +2113,22 @@ private fun TetrisTouchControls(
         FilledTonalButton(
             onClick = { onKey(37, "ArrowLeft") },
             modifier = Modifier.weight(1f),
-        ) { Text("◀") }
+        ) { Text(stringResource(R.string.game_control_left)) }
         FilledTonalButton(
             onClick = { onKey(38, "ArrowUp") },
             modifier = Modifier.weight(1f),
-        ) { Text("⟳") }
+        ) { Text(stringResource(R.string.game_control_rotate)) }
         FilledTonalButton(
             onClick = { onKey(40, "ArrowDown") },
             modifier = Modifier.weight(1f),
-        ) { Text("▼") }
+        ) { Text(stringResource(R.string.game_control_down)) }
         FilledTonalButton(
             onClick = { onKey(39, "ArrowRight") },
             modifier = Modifier.weight(1f),
-        ) { Text("▶") }
+        ) { Text(stringResource(R.string.game_control_right)) }
         Button(
             onClick = { onKey(32, " ") },
             modifier = Modifier.weight(1.2f),
-        ) { Text("Drop") }
+        ) { Text(stringResource(R.string.game_control_drop)) }
     }
 }

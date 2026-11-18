@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -42,9 +43,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.DisplayPictureConflict
 import org.aralozkaya.msngr.DisplayPictureSyncState
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.displayPictureSync
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.rememberAvatarImage
 import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 
@@ -55,7 +58,7 @@ internal fun DisplayPictureSyncHost(repository: MessengerRepository) {
     val state by sync.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.notice) {
         state.notice?.let { notice ->
-            Toast.makeText(context, notice, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.localizeUserMessage(notice), Toast.LENGTH_LONG).show()
             sync.consumeNotice(notice)
         }
     }
@@ -77,37 +80,55 @@ internal fun DisplayPictureConflictDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!state.busy) onDismiss() },
-        title = { Text("Display picture changed") },
+        title = { Text(stringResource(R.string.display_picture_conflict_title)) },
         modifier = Modifier.testTag("display-picture-conflict"),
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Text("Messenger has a different display picture. Choose which one to keep.")
+                Text(stringResource(R.string.display_picture_conflict_body))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ComparisonPicture("Old picture", "On this device", conflict.local.uri,
-                        Modifier.weight(1f).testTag("old-display-picture"))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Changed to", modifier = Modifier.size(24.dp))
-                    ComparisonPicture("New picture", "From Messenger", conflict.incomingUri,
-                        Modifier.weight(1f).testTag("incoming-display-picture"))
+                    ComparisonPicture(
+                        stringResource(R.string.display_picture_conflict_old),
+                        stringResource(R.string.display_picture_conflict_local_sub),
+                        conflict.local.uri,
+                        Modifier.weight(1f).testTag("old-display-picture"),
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = stringResource(R.string.display_picture_conflict_arrow),
+                        modifier = Modifier.size(24.dp),
+                    )
+                    ComparisonPicture(
+                        stringResource(R.string.display_picture_conflict_new),
+                        stringResource(R.string.display_picture_conflict_incoming_sub),
+                        conflict.incomingUri,
+                        Modifier.weight(1f).testTag("incoming-display-picture"),
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onKeepLocal, enabled = !state.busy, shapes = ButtonDefaults.shapes(),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                        modifier = Modifier.weight(1f).testTag("keep-local-picture")) { Text("Keep local") }
+                        modifier = Modifier.weight(1f).testTag("keep-local-picture")) {
+                        Text(stringResource(R.string.display_picture_conflict_keep_local))
+                    }
                     Button(onClick = onUseIncoming, enabled = !state.busy, shapes = ButtonDefaults.shapes(),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                        modifier = Modifier.weight(1f).testTag("use-incoming-picture")) { Text("Use incoming") }
+                        modifier = Modifier.weight(1f).testTag("use-incoming-picture")) {
+                        Text(stringResource(R.string.display_picture_conflict_use_incoming))
+                    }
                 }
                 if (state.busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MsngrCircularWavyProgressIndicator(Modifier.size(20.dp))
-                    Text("Updating display picture\u2026", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.display_picture_conflict_updating), style = MaterialTheme.typography.bodySmall)
                 }
-                state.error?.let { message -> Text(message, color = MaterialTheme.colorScheme.error,
+                state.error?.let { message -> Text(localizeUserMessage(message), color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag("picture-sync-error")) }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, enabled = !state.busy) { Text("Not now") }
+            TextButton(onClick = onDismiss, enabled = !state.busy) {
+                Text(stringResource(R.string.display_picture_conflict_not_now))
+            }
         },
     )
 }
@@ -122,10 +143,17 @@ private fun ComparisonPicture(title: String, subtitle: String, uri: String?, mod
             Box(contentAlignment = Alignment.Center) {
                 image.painter?.let { Image(it, contentDescription = title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
                     ?: if (image.isLoading) MsngrCircularWavyProgressIndicator(Modifier.size(24.dp))
-                    else Icon(Icons.Default.Person, contentDescription = "No display picture", modifier = Modifier.size(48.dp))
+                    else Icon(
+                        Icons.Default.Person,
+                        contentDescription = stringResource(R.string.contact_profile_no_picture),
+                        modifier = Modifier.size(48.dp),
+                    )
             }
         }
-        Text(if (uri == null) "No picture" else subtitle, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            if (uri == null) stringResource(R.string.display_picture_conflict_none) else subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

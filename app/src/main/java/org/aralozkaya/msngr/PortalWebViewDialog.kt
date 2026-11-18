@@ -466,7 +466,7 @@ fun PortalWebViewDialog(
                                     ) {
                                         if (request.isForMainFrame) {
                                             val msg = error.description?.toString()?.ifBlank { null }
-                                                ?: "Could not load page."
+                                                ?: context.getString(R.string.portal_webview_load_error)
                                             if (BuildConfig.DEBUG) {
                                                 Log.w("PortalWebView", "Main-frame error (${error.errorCode}): $msg for ${request.url}")
                                             }
@@ -485,7 +485,7 @@ fun PortalWebViewDialog(
                                             if (BuildConfig.DEBUG) {
                                                 Log.w("PortalWebView", "HTTP ${errorResponse.statusCode} for ${request.url}")
                                             }
-                                            loadError = "HTTP ${errorResponse.statusCode}"
+                                            loadError = context.getNumberSentence(R.string.portal_webview_http_error_before_number, errorResponse.statusCode, R.string.portal_webview_http_error_after_number)
                                         }
                                     }
 

@@ -46,6 +46,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+internal const val SCENE_GROUP_2009 = "Windows Live Messenger 2009"
+internal const val SCENE_GROUP_2011_2012 = "Windows Live Messenger 2011 and 2012"
+
 internal data class MessengerScene(
     val id: String,
     val name: String,
@@ -58,8 +61,8 @@ internal data class MessengerScene(
     val assetPath: String get() = "scenes/$file"
     val previewPath: String get() = "scenes/${id}_preview.webp"
     val collectionName: String get() = when (group) {
-        "Windows Live Messenger 2009" -> "Messenger 2009"
-        "Windows Live Messenger 2011 and 2012" -> "Messenger 2011–2012"
+        SCENE_GROUP_2009 -> "Messenger 2009"
+        SCENE_GROUP_2011_2012 -> "Messenger 2011\u20132012"
         else -> group
     }
 }

@@ -63,6 +63,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -207,12 +208,12 @@ internal fun VoiceClipComposer(
                 finishRecording()
                 locked = false
                 processing = true
-                check(pcm.isNotEmpty()) { "Hold the microphone to record a voice clip." }
+                check(pcm.isNotEmpty()) { context.getString(R.string.voice_clip_hold_to_record) }
                 clip = withContext(Dispatchers.Default) { MsnVoiceClip.encode(pcm) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Voice clip recording failed."
+                error = e.message ?: context.getString(R.string.voice_clip_record_failed)
             } finally {
                 if (recorder === capture) {
                     finishRecording()
@@ -226,7 +227,7 @@ internal fun VoiceClipComposer(
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         // The permission sheet interrupts the press. A fresh hold starts capture after granting access.
-        error = if (granted) null else "Allow microphone access to record a voice clip."
+        error = if (granted) null else context.getString(R.string.voice_clip_mic_permission)
     }
     fun requestStart(handsFree: Boolean) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -242,11 +243,11 @@ internal fun VoiceClipComposer(
             try {
                 val result = onSend(ready)
                 if (result.isSuccess) discard()
-                else error = result.exceptionOrNull()?.message ?: "Voice clip could not be sent."
+                else error = result.exceptionOrNull()?.message ?: context.getString(R.string.voice_clip_send_failed)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Voice clip could not be sent."
+                error = e.message ?: context.getString(R.string.voice_clip_send_failed)
             } finally { sending = false }
         }
     }
@@ -293,12 +294,14 @@ internal fun VoiceClipComposer(
             !processing && !sending -> requestStart(true) // Accessible click starts hands-free capture.
         }
     }
-    val actionDescription = when {
-        clip != null -> "Send voice clip"
-        recording && locked -> "Stop recording"
-        recording -> "Recording voice clip"
-        else -> "Record voice clip"
-    }
+    val actionDescription = stringResource(
+        when {
+            clip != null -> R.string.voice_clip_send_action
+            recording && locked -> R.string.voice_clip_stop_recording
+            recording -> R.string.voice_clip_recording
+            else -> R.string.voice_clip_record_action
+        },
+    )
     val canPress by rememberUpdatedState(enabled && !processing && !sending)
 
     Column(Modifier.fillMaxWidth()) {
@@ -328,9 +331,13 @@ internal fun VoiceClipComposer(
                             contentColor = lockContentColor,
                         ),
                         modifier = Modifier.size(48.dp).onGloballyPositioned { lockCoordinates = it }
-                            .semantics {
-                                contentDescription = if (locked) "Unlock recording" else "Lock recording"
-                                stateDescription = if (locked) "Recording locked" else "Drag up to lock recording"
+                            .let { baseModifier ->
+                                val lockDesc = stringResource(if (locked) R.string.voice_clip_unlock_recording else R.string.voice_clip_lock_recording)
+                                val lockState = stringResource(if (locked) R.string.voice_clip_locked_state else R.string.voice_clip_drag_to_lock)
+                                baseModifier.semantics {
+                                    contentDescription = lockDesc
+                                    stateDescription = lockState
+                                }
                             }
                             .graphicsLayer { scaleX = lockScale; scaleY = lockScale },
                     ) {
@@ -386,16 +393,23 @@ internal fun VoiceClipComposer(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (readyClip != null) {
                                         IconButton(onClick = { discard() }, enabled = active && !sending) {
-                                            Icon(Icons.Default.DeleteOutline, "Delete voice clip", tint = MaterialTheme.colorScheme.error)
+                                            Icon(Icons.Default.DeleteOutline, stringResource(R.string.voice_clip_delete_description), tint = MaterialTheme.colorScheme.error)
                                         }
                                         VoiceClipPlayer(readyClip, Modifier.weight(1f), compact = true)
                                     } else {
                                         Box(Modifier.padding(4.dp).size(8.dp)
                                             .background(MaterialTheme.colorScheme.error, CircleShape))
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(String.format(Locale.ROOT, "%.1f / 15 s", elapsed / 1_000f),
+                                            Text(
+                                                twoNumbersSentenceResource(
+                                                    R.string.voice_clip_progress_before_first_number,
+                                                    formatDecimal(elapsed / 1_000.0),
+                                                    R.string.voice_clip_progress_between_numbers,
+                                                    15,
+                                                    R.string.voice_clip_progress_after_second_number,
+                                                ),
                                                 style = MaterialTheme.typography.labelLarge)
-                                            Crossfade(if (processing) "Preparing\u2026" else if (locked) "Locked" else "Release to review",
+                                            Crossfade(stringResource(if (processing) R.string.voice_clip_preparing else if (locked) R.string.voice_clip_locked else R.string.voice_clip_release_to_review),
                                                 animationSpec = motion.fastEffectsSpec(), label = "voiceRecordingStatus") { status ->
                                                 Text(status, style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -481,7 +495,7 @@ internal fun VoiceClipComposer(
                 } else sendButton()
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error,
+        error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
                 .padding(start = 20.dp, end = 20.dp, bottom = 8.dp)) }

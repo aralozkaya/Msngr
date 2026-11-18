@@ -18,7 +18,7 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 ## What it does
 
 - **Keep your people close.** Search contacts and groups, sort by name or presence, hide offline
-  entries, and collapse each section independently. Set yourself to Online, Busy, Away, or Appear offline.
+  entries, and collapse each section independently. Set yourself to Available, Busy, Away, or Appear offline.
 - **Chat the classic way.** Send and receive text, use built-in MSN emoticons or modern Unicode
   alternatives, see typing indicators, and send nudges. Conversations have timestamps, unread
   counts, and local history that survives restarts and reconnects.
@@ -70,6 +70,9 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
 - **Manage your sessions.** View connected devices and their presence. Sign out an individual
   device, all other sessions, or all sessions. An optional setting signs out other sessions
   whenever Msngr signs in. See [session support](docs/MULTI_PRESENCE.md).
+- **Use your language.** Available in **English** (default) and **Turkish**, with per-app
+  language selection in Android Settings on Android 13+ (API 33+) and a
+  [translation template](app/src/main/strings.template.xml) for adding new languages.
 - **Keep Msngr updated.** Signed release builds check GitHub releases on app startup and at a
   configurable interval. Review release notes, opt into prereleases, skip versions, and install
   an update or save its APK. See [app updates](docs/APP_UPDATES.md).
@@ -294,6 +297,18 @@ Msngr is a **client**: you sign in with an account from your selected community 
 
 **Android 7.0+ (API 24)** is supported by the app's minimum SDK setting. The project currently
 compiles and targets API 37.
+
+### Supported languages
+
+| Language | Code | Notes |
+| --- | --- | --- |
+| **English** | `en` | Default language (fallback for unsupported device locales). |
+| **Turkish** | `tr` | Complete translation aligned with Windows Live Messenger 14 terminology. |
+
+On Android 13+ (API 33+), you can choose Msngr's language per app in system settings
+(**Settings → System → Languages → App languages**). To contribute a new translation, start from
+[`app/src/main/strings.template.xml`](app/src/main/strings.template.xml) and register the locale in
+[`app/src/main/res/xml/locales_config.xml`](app/src/main/res/xml/locales_config.xml).
 
 This is an evolving implementation of the Messenger experience. Voice/video calls, general file
 transfers, and ad hoc multi-person switchboard chats are outside its current scope. Persistent

@@ -222,7 +222,7 @@ fun PortalPage(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Text(
-                                text = portalState.whatsNewError,
+                                text = org.aralozkaya.msngr.localizeUserMessage(portalState.whatsNewError),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -230,7 +230,7 @@ fun PortalPage(
                                 onClick = onRefresh,
                                 shapes = ButtonDefaults.shapes(),
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.common_retry))
                             }
                         }
                     }
@@ -244,7 +244,7 @@ fun PortalPage(
                         modifier = Modifier.fillMaxWidth(),
                         content = {
                             Text(
-                                text = stringResource(R.string.portal_whats_new_empty),
+                                text = stringResource(R.string.portal_whats_new_empty_you_singular),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },
@@ -619,7 +619,7 @@ private fun WhatsNewDetailDialog(
                     onClick = openProfile,
                     modifier = Modifier.testTag("whats_new_detail_profile"),
                 ) {
-                    Text("View profile")
+                    Text(stringResource(R.string.portal_view_profile))
                 }
             }
         },
@@ -634,10 +634,11 @@ private fun WhatsNewDetailDialog(
     )
 }
 
+@Composable
 private fun WhatsNewActivity.resolvedDisplayText(): String = text.ifBlank {
     when (kind) {
-        WhatsNewKind.DisplayPicture -> "has a new display picture"
-        WhatsNewKind.Photo -> "shared a photo"
+        WhatsNewKind.DisplayPicture -> stringResource(R.string.portal_whats_new_display_picture)
+        WhatsNewKind.Photo -> stringResource(R.string.portal_whats_new_photo)
         else -> ""
     }
 }

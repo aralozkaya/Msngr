@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
@@ -86,12 +87,12 @@ internal fun MessengerPlusProfileField(
                             if (emoticonsOpen) {
                                 Icon(
                                     imageVector = Icons.Default.Keyboard,
-                                    contentDescription = "Show keyboard",
+                                    contentDescription = stringResource(R.string.chat_show_keyboard_desc),
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.EmojiEmotions,
-                                    contentDescription = "Show emoticons",
+                                    contentDescription = stringResource(R.string.chat_show_emoticons_desc),
                                 )
                             }
                         }

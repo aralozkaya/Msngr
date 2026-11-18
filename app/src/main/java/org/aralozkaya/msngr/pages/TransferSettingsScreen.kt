@@ -26,10 +26,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.TransferPrefs
+import org.aralozkaya.msngr.getNumberSentence
 import org.aralozkaya.msngr.hasDefaultTransferStorageAccess
 import org.aralozkaya.msngr.pages.components.PageContentList
 
@@ -45,7 +48,11 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
             "photos" -> TransferPrefs.update(context) { it.copy(autoSavePhotos = true) }
             "default" -> TransferPrefs.update(context) { it.copy(fileTree = null, fileTreeName = null) }
             "photo_default" -> TransferPrefs.update(context) { it.copy(photoTree = null, photoTreeName = null) }
-        } else error = "Storage access is needed for the default folders on Android 9 and earlier. You can choose a custom folder instead."
+        } else error = context.getNumberSentence(
+            R.string.transfers_storage_access_default_folders_you_singular_before_number,
+            9,
+            R.string.transfers_storage_access_default_folders_you_singular_after_number,
+        )
         permissionAction = null
     }
     fun withDefaultAccess(action: String, change: () -> Unit) {
@@ -62,7 +69,7 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
                 if (photo) it.copy(photoTree = uri.toString(), photoTreeName = name)
                 else it.copy(fileTree = uri.toString(), fileTreeName = name)
             }
-        } catch (_: Exception) { error = "The folder could not be authorized. Choose it again and allow access." }
+        } catch (_: Exception) { error = context.getString(R.string.transfers_folder_authorize_failed) }
     }
     val fileFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { authorizeFolder(it, photo = false) }
     val photoFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { authorizeFolder(it, photo = true) }
@@ -77,8 +84,8 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
                 shapes = ListItemDefaults.segmentedShapes(0, 1),
                 modifier = Modifier.fillMaxWidth().testTag("auto_accept_transfers"),
                 trailingContent = { Switch(settings.autoAccept, onCheckedChange = null) },
-                supportingContent = { Text("Accept incoming file requests and photo sharing invitations automatically.") },
-                content = { Text("Automatically accept transfers") })
+                supportingContent = { Text(stringResource(R.string.transfers_auto_accept_supporting)) },
+                content = { Text(stringResource(R.string.transfers_auto_accept_title)) })
         }
         item {
             Column {
@@ -91,8 +98,8 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
                     shapes = parentShapes.copy(selectedShape = parentShapes.shape),
                     modifier = Modifier.fillMaxWidth().testTag("auto_save_files"),
                     trailingContent = { Switch(settings.autoSaveFiles, onCheckedChange = null) },
-                    supportingContent = { Text("Save received files to the file folder after they finish downloading.") },
-                    content = { Text("Automatically save received files") })
+                    supportingContent = { Text(stringResource(R.string.transfers_auto_save_supporting)) },
+                    content = { Text(stringResource(R.string.transfers_auto_save_title)) })
                 if (settings.autoSaveFiles) Spacer(Modifier.height(ListItemDefaults.SegmentedGap))
                 AnimatedVisibility(visible = settings.autoSaveFiles) {
                     val shapes = ListItemDefaults.segmentedShapes(1, 2)
@@ -106,22 +113,23 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
                         colors = colors.copy(containerColor = colors.selectedContainerColor, contentColor = colors.selectedContentColor),
                         modifier = Modifier.fillMaxWidth().semantics { role = Role.Checkbox }.testTag("auto_save_photos"),
                         trailingContent = { Checkbox(settings.autoSavePhotos, onCheckedChange = null) },
-                        content = { Text("Include shared photos") })
+                        content = { Text(stringResource(R.string.transfers_include_photos_title)) })
                 }
             }
         }
         settingsSectionSpacer()
-        settingsSectionHeader("Save locations")
+        settingsSectionHeader(R.string.transfers_save_locations_header)
         item(key = "file-folder") {
             var menuExpanded by remember { mutableStateOf(false) }
             Box {
                 SegmentedListItem(onClick = { fileFolder.launch(initialFolder(settings.fileTree)) },
-                    onLongClick = { menuExpanded = true }, onLongClickLabel = "Location options",
+                    onLongClick = { menuExpanded = true },
+                    onLongClickLabel = stringResource(R.string.transfers_location_options_label),
                     shapes = ListItemDefaults.segmentedShapes(0, 2),
                     modifier = Modifier.fillMaxWidth().testTag("transfer_file_folder"),
-                    supportingContent = { Text(settings.fileTreeName ?: "Downloads (default)") },
-                    trailingContent = { Icon(Icons.Default.FolderOpen, contentDescription = "Choose file folder") },
-                    content = { Text("File folder") })
+                    supportingContent = { Text(settings.fileTreeName ?: stringResource(R.string.transfers_file_folder_default)) },
+                    trailingContent = { Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.transfers_file_folder_choose)) },
+                    content = { Text(stringResource(R.string.transfers_file_folder_title)) })
                 RestoreLocationMenu(menuExpanded, settings.fileTree != null, "transfer_default_folder",
                     onDismiss = { menuExpanded = false }, onRestore = {
                         val change = { TransferPrefs.update(context) { it.copy(fileTree = null, fileTreeName = null) } }
@@ -133,12 +141,13 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
             var menuExpanded by remember { mutableStateOf(false) }
             Box {
                 SegmentedListItem(onClick = { photoFolder.launch(initialFolder(settings.photoTree)) },
-                    onLongClick = { menuExpanded = true }, onLongClickLabel = "Location options",
+                    onLongClick = { menuExpanded = true },
+                    onLongClickLabel = stringResource(R.string.transfers_location_options_label),
                     shapes = ListItemDefaults.segmentedShapes(1, 2),
                     modifier = Modifier.fillMaxWidth().testTag("transfer_photo_folder"),
-                    supportingContent = { Text(settings.photoTreeName ?: "DCIM/Msngr (default)") },
-                    trailingContent = { Icon(Icons.Default.PhotoLibrary, contentDescription = "Choose photo folder") },
-                    content = { Text("Photo folder") })
+                    supportingContent = { Text(settings.photoTreeName ?: stringResource(R.string.transfers_photo_folder_default)) },
+                    trailingContent = { Icon(Icons.Default.PhotoLibrary, contentDescription = stringResource(R.string.transfers_photo_folder_choose)) },
+                    content = { Text(stringResource(R.string.transfers_photo_folder_title)) })
                 RestoreLocationMenu(menuExpanded, settings.photoTree != null, "transfer_default_photo_folder",
                     onDismiss = { menuExpanded = false }, onRestore = {
                         val change = { TransferPrefs.update(context) { it.copy(photoTree = null, photoTreeName = null) } }
@@ -147,8 +156,16 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
             }
         }
     }
-    error?.let { message -> AlertDialog(onDismissRequest = { error = null }, title = { Text("Could not set save location") },
-        text = { Text(message) }, confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } }) }
+    error?.let { message ->
+        AlertDialog(
+            onDismissRequest = { error = null },
+            title = { Text(stringResource(R.string.transfers_error_title)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { error = null }) { Text(stringResource(R.string.common_ok)) }
+            },
+        )
+    }
 }
 
 @Composable
@@ -157,7 +174,7 @@ private fun RestoreLocationMenu(expanded: Boolean, enabled: Boolean, testTag: St
     DropdownMenuPopup(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
             DropdownMenuItem(
-                text = { Text("Restore default location") },
+                text = { Text(stringResource(R.string.transfers_restore_default)) },
                 leadingIcon = { Icon(Icons.Default.Restore, contentDescription = null) },
                 shape = MenuDefaults.standaloneItemShape,
                 modifier = Modifier.testTag(testTag),

@@ -76,7 +76,7 @@ internal fun LeaveGroupDialog(
                 Text(stringResource(R.string.group_leave_title),
                     style = MaterialTheme.typography.headlineSmall,
                     color = AlertDialogDefaults.titleContentColor)
-                Text(stringResource(R.string.group_leave_message, groupName),
+                Text(stringResource(R.string.group_leave_message_you_singular, groupName),
                     color = AlertDialogDefaults.textContentColor)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                     TextButton(onClick = onDismiss, enabled = !busy,

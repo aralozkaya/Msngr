@@ -80,7 +80,7 @@ class ContactInvitationSettingsInstrumentedTest {
                 LocalDensity provides Density(density.density, 2f)) {
                 MaterialTheme {
                     key(version.intValue) {
-                        SecondaryPageScaffold(destination.value?.title ?: "Settings",
+                        SecondaryPageScaffold(androidx.compose.ui.res.stringResource(destination.value?.titleRes ?: R.string.settings_destination_root),
                             { destination.value = null }) { padding, scroll ->
                             if (destination.value == SettingsDestination.ContactInvitations) {
                                 ContactInvitationSettingsScreen(padding, scroll)

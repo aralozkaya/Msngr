@@ -65,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -81,7 +82,9 @@ import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.validateGroupInvitees
 import org.aralozkaya.msngr.data.validateGroupName
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.numberSentenceResource
 import java.util.Locale
 
 @Composable
@@ -108,6 +111,7 @@ internal fun GroupEditorDialog(
     var invitationAction by rememberSaveable { mutableStateOf(group != null) }
     var error by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var focusManager by remember { mutableStateOf<FocusManager?>(null) }
     // Match the space reserved above the outlined field for its floating label.
@@ -149,8 +153,13 @@ internal fun GroupEditorDialog(
             addresses = validateGroupInvitees(if (attemptedInvites) requested.filterNot { email ->
                 group?.members.orEmpty().any { it.email.equals(email, true) }
             } else requested, ownEmail, group?.members.orEmpty())
-            if (group != null && !attemptedInvites) require(addresses.isNotEmpty()) { "Choose at least one person to invite." }
-        } catch (failure: IllegalArgumentException) { error = failure.message; return }
+            if (group != null && !attemptedInvites) {
+                require(addresses.isNotEmpty()) { context.getString(R.string.group_invite_at_least_one) }
+            }
+        } catch (failure: IllegalArgumentException) {
+            error = failure.message?.let(context::localizeUserMessage)
+            return
+        }
         submitting = true; error = null
         snackbarHostState.currentSnackbarData?.dismiss()
         focusManager?.clearFocus()
@@ -165,10 +174,16 @@ internal fun GroupEditorDialog(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 if (group == null && createdId != null) invitationAction = true
-                val message = if (group == null && createdId != null)
-                    "Your group was created. ${failure.message ?: "Invitations could not be sent."} Retry to send the invitations."
-                else failure.message ?: "Could not update this group. Please try again."
-                scope.launch { snackbarHostState.showActionSnackbar(message, isError = true) }
+                val localizedFailure = failure.message?.let(context::localizeUserMessage)
+                val snackbarMessage = if (group == null && createdId != null) {
+                    context.getString(
+                        R.string.group_created_invites_failed_you_singular,
+                        localizedFailure ?: context.getString(R.string.group_invites_failed_default),
+                    )
+                } else {
+                    localizedFailure ?: context.getString(R.string.group_update_failed_default)
+                }
+                scope.launch { snackbarHostState.showActionSnackbar(snackbarMessage, isError = true) }
             } finally { submitting = false }
         }
     }
@@ -180,21 +195,23 @@ internal fun GroupEditorDialog(
         ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
             Column(modifier.verticalScroll(rememberScrollState(), enabled = !busy).testTag("group-editor"),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (group != null) Text("Invite people to \"${group.displayName.messengerPlusPlainText()}\"",
-                    style = MaterialTheme.typography.titleMedium)
+                if (group != null) Text(
+                    stringResource(R.string.group_invite_to_heading, group.displayName.messengerPlusPlainText()),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 if (group == null) OutlinedTextField(name, { name = it; error = null },
-                    label = { Text("Group name") }, singleLine = true,
+                    label = { Text(stringResource(R.string.group_name_label)) }, singleLine = true,
                     enabled = !busy && createdId == null,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("group-name"))
-                Text(if (group == null) "Choose members now, or create an empty group and invite people later." else "People join after accepting your invitation.")
-                OutlinedTextField(email, { email = it; error = null }, label = { Text("Email address") },
+                Text(stringResource(if (group == null) R.string.group_create_instruction else R.string.group_invite_instruction_you_singular))
+                OutlinedTextField(email, { email = it; error = null }, label = { Text(stringResource(R.string.contact_profile_email_label)) },
                     enabled = !busy, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { addEmail() }),
                     trailingIcon = {
                         IconButton(onClick = {if (email.isBlank()) showContactPicker = true else addEmail()}, enabled = !busy,
                             modifier = Modifier.testTag("group-add-email")) {
-                            Icon(if (email.isBlank()) Icons.Default.Contacts else Icons.Default.Add, contentDescription = "Add email")
+                            Icon(if (email.isBlank()) Icons.Default.Contacts else Icons.Default.Add, contentDescription = stringResource(R.string.group_add_email_description))
                         }
                     },
                     modifier = Modifier.fillMaxWidth().testTag("group-invite-emails"))
@@ -202,8 +219,15 @@ internal fun GroupEditorDialog(
                     label = { Text(stringResource(R.string.request_optional_message)) },
                     enabled = !busy, minLines = 2, maxLines = 4,
                     modifier = Modifier.fillMaxWidth().testTag("group-invitation-message"))
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("group-editor-error")) }
-                Text("Selected members (${selected.size})", style = MaterialTheme.typography.titleSmall)
+                error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("group-editor-error")) }
+                Text(
+                    numberSentenceResource(
+                        R.string.group_selected_members_before_number,
+                        selected.size,
+                        R.string.group_selected_members_after_number,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                )
                 if (selected.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                         selected.forEachIndexed { index, address ->
@@ -217,7 +241,7 @@ internal fun GroupEditorDialog(
                                     trailingContent = {
                                         IconButton(onClick = { selected = selected - address; error = null }, enabled = !busy,
                                             modifier = Modifier.testTag("group-remove-$address")) {
-                                            Icon(Icons.Default.Close, contentDescription = "Remove $address")
+                                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.group_remove_member_description, address))
                                         }
                                     },
                                     content = { Text(contact?.displayName?.messengerPlusPlainText() ?: address) },
@@ -235,10 +259,10 @@ internal fun GroupEditorDialog(
             modifier = Modifier.testTag("group-editor-submit")) {
             LoadingButtonContent(
                 loading = submitting,
-                label = if (createdId == null) "Creating group\u2026" else "Sending invitations\u2026",
+                label = stringResource(if (createdId == null) R.string.group_creating_busy else R.string.group_sending_invitations_busy),
                 indicatorModifier = Modifier.testTag("group-editor-loading"),
             ) {
-                Text(if (invitationAction) "Send" else "Create")
+                Text(stringResource(if (invitationAction) R.string.group_send_action else R.string.group_create_action))
             }
         }
     }
@@ -252,11 +276,11 @@ internal fun GroupEditorDialog(
                 snackbarHost = { ActionSnackbarHost(snackbarHostState) },
                 topBar = {
                     TopAppBar(
-                        title = { Text(if (group == null) "Create a group" else "Invite members", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        title = { Text(stringResource(if (group == null) R.string.group_create_title else R.string.group_invite_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(onClick = ::dismiss, enabled = !busy,
                                 modifier = Modifier.testTag("group-editor-dismiss")) {
-                                Icon(Icons.Default.Close, contentDescription = if (invitationAction) "Done" else "Close")
+                                Icon(Icons.Default.Close, contentDescription = stringResource(if (invitationAction) R.string.common_done else R.string.common_close))
                             }
                         },
                         actions = { submitButton() },
@@ -318,10 +342,10 @@ private fun GroupContactPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Choose contacts") },
+        title = { Text(stringResource(R.string.group_choose_contacts_title)) },
         text = {
             if (contacts.isEmpty()) {
-                Text("No contacts available to invite.")
+                Text(stringResource(R.string.group_choose_contacts_empty))
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -361,7 +385,7 @@ private fun GroupContactPickerDialog(
         },
         confirmButton = {
             Button(shapes = ButtonDefaults.shapes(), onClick = onDismiss,
-                modifier = Modifier.testTag("group-contact-picker-done")) { Text("Done") }
+                modifier = Modifier.testTag("group-contact-picker-done")) { Text(stringResource(R.string.common_done)) }
         },
     )
 }

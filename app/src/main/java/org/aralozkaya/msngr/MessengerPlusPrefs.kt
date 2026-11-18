@@ -69,3 +69,5 @@ internal val LocalMessengerPlusHideControlCharacters = staticCompositionLocalOf 
 internal const val MESSENGER_PLUS_DISCLAIMER =
     "Recipients without Messenger Plus! installed will not see the rendered result and may see " +
         "formatting codes instead."
+
+internal val MESSENGER_PLUS_DISCLAIMER_RES = R.string.plus_disclaimer

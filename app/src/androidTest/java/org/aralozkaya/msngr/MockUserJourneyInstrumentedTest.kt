@@ -286,14 +286,14 @@ class MockUserJourneyInstrumentedTest {
         compose.onNodeWithContentDescription("Send message").performClick()
         waitForText("(y)")
         compose.onNodeWithContentDescription("Send nudge").performClick()
-        waitForText("You sent a nudge.")
+        waitForText("You have just sent a nudge.")
         compose.onNodeWithContentDescription("Back").performClick()
 
         waitForText(MockServerData.ACCOUNT_NICKNAME)
         compose.onNodeWithContentDescription("Open menu").performClick()
-        compose.onNodeWithText("Log out").performClick()
-        waitForText("Log out?")
-        compose.onNodeWithText("Log out").performClick()
+        compose.onNodeWithText("Sign out").performClick()
+        waitForText("Sign out?")
+        compose.onNodeWithText("Sign out").performClick()
 
         waitForText("Welcome to Msngr")
         compose.onNodeWithText(MOCK_BANNER).assertExists()

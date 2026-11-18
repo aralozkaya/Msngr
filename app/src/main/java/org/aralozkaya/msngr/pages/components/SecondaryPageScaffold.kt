@@ -17,6 +17,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -48,7 +50,7 @@ fun SecondaryPageScaffold(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.common_back),
                             )
                         }
                     },

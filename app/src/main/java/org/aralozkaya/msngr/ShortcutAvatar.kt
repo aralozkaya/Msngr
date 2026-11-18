@@ -9,10 +9,17 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.Composable
 import org.aralozkaya.msngr.ui.theme.msngrColorScheme
 
+internal fun Context.avatarInitial(name: String): String =
+    name.trim().take(1).uppercase(currentAppLocale()).ifBlank { getString(R.string.shortcut_avatar_fallback_initial) }
+
+@Composable
 internal fun avatarInitial(name: String): String =
-    name.trim().take(1).uppercase().ifBlank { "?" }
+    name.trim().take(1).uppercase(currentAppLocale()).ifBlank {
+        androidx.compose.ui.res.stringResource(R.string.shortcut_avatar_fallback_initial)
+    }
 
 internal fun Context.shortcutAvatarBitmap(name: String, photo: Bitmap?): Bitmap {
     val size = 128

@@ -51,5 +51,5 @@ internal object TransferPrefs {
         context.contentResolver.query(document, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
         }
-    }.getOrNull() ?: "Selected folder"
+    }.getOrNull() ?: context.getString(R.string.transfers_selected_folder_fallback)
 }

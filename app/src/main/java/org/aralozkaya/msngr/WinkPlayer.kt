@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -143,7 +144,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
     val muted = !settings.sounds
     LaunchedEffect(reference.metadata.sha1d, account) {
         wink = withContext(Dispatchers.IO) { account?.let { context.winkStore().bytes(it, reference.metadata) }?.let(MsnWinkPackage::parse) }
-        if (wink == null) error = "This wink is no longer cached."
+        if (wink == null) error = context.getString(R.string.wink_not_cached)
     }
     LaunchedEffect(Unit) { delay(18_000); dismiss() } // Also bounds a stalled WebAssembly startup.
     LaunchedEffect(readyDuration, animate) { readyDuration?.let { delay(it); dismiss() }; if (!animate) { delay(3_000); dismiss() } }
@@ -189,12 +190,12 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         }
         Box(Modifier.fillMaxSize().clickable { onDismiss() }, contentAlignment = Alignment.Center) {
             val image = remember(wink) { winkThumbnail(wink?.thumbnail)?.asImageBitmap() }
-            if (image != null && (readyDuration == null || !animate)) Image(image, reference.name, Modifier.size(160.dp))
+            if (image != null && (readyDuration == null || !animate)) Image(image, localizedWinkName(reference.name), Modifier.size(160.dp))
             if (error != null) Surface(shape = MaterialTheme.shapes.large, modifier = Modifier.padding(24.dp)) {
-                Text(error!!, Modifier.padding(20.dp))
+                Text(localizeUserMessage(error!!), Modifier.padding(20.dp))
             }
             if (animate && wink != null && error == null) AndroidView(
-                factory = { WinkWebView(it, wink!!.animation, true, { duration -> if (readyDuration == null) readyDuration = duration }, { error = "This wink could not be played."; player?.release() }).also { player = it; onPlayerCreated(it) } },
+                factory = { WinkWebView(it, wink!!.animation, true, { duration -> if (readyDuration == null) readyDuration = duration }, { error = context.getString(R.string.wink_play_failed); player?.release() }).also { player = it; onPlayerCreated(it) } },
                 modifier = Modifier.fillMaxWidth().aspectRatio(wink!!.width.toFloat() / wink!!.height),
                 onRelease = { it.release() })
             FilledIconButton(
@@ -206,7 +207,7 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
                 ),
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp),
             ) {
-                Icon(Icons.Default.Close, "Close wink")
+                Icon(Icons.Default.Close, stringResource(R.string.wink_close_player))
             }
         }
     }

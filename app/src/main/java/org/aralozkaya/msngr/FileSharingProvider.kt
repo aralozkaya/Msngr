@@ -35,7 +35,7 @@ class FileSharingProvider : ContentProvider() {
         private fun resolve(context: Context, uri: Uri): File {
             val root = area(context)
             val file = File(root, uri.pathSegments.joinToString(File.separator)).canonicalFile
-            require(file.path.startsWith(root.path + File.separator) && file.isFile) { "This file is unavailable." }
+            require(file.path.startsWith(root.path + File.separator) && file.isFile) { context.getString(R.string.file_sharing_unavailable) }
             return file
         }
         internal fun uri(context: Context, file: File, name: String): Uri {

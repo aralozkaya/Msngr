@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -41,6 +42,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.aralozkaya.msngr.ChatActivity
 import org.aralozkaya.msngr.MsngrApplication
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.RequestsActivity
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.pages.components.Avatar
@@ -116,7 +118,7 @@ internal fun InAppNotificationBanner(
                 Text(notification.text, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onDismiss, enabled = enabled, modifier = Modifier.testTag("dismiss_in_app_notification")) {
-                Icon(Icons.Default.Close, contentDescription = "Dismiss notification")
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.in_app_notification_dismiss))
             }
         }
     }

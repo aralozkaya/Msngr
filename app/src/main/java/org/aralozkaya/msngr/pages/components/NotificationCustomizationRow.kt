@@ -13,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import org.aralozkaya.msngr.R
 
 @Composable
 internal fun NotificationCustomizationRow(
@@ -25,7 +27,7 @@ internal fun NotificationCustomizationRow(
 ) {
     SwipeRevealAction(
         itemKey = contactId,
-        label = "Reset notifications for $name",
+        label = stringResource(R.string.notification_reset_for, name),
         icon = Icons.Outlined.DeleteOutline,
         onAction = onReset,
         onClick = onClick,

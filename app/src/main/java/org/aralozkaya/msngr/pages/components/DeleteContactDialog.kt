@@ -93,7 +93,7 @@ internal fun DeleteContactDialog(
                 Text(stringResource(R.string.contact_delete_title),
                     style = MaterialTheme.typography.headlineSmall,
                     color = AlertDialogDefaults.titleContentColor, modifier = Modifier.align(Alignment.CenterHorizontally))
-                Text(stringResource(R.string.contact_delete_message, contact.displayName.messengerPlusPlainText()),
+                Text(stringResource(R.string.contact_delete_message_you_singular, contact.displayName.messengerPlusPlainText()),
                     color = AlertDialogDefaults.textContentColor)
                 if (isMock) Text(stringResource(R.string.contact_delete_mock_hint),
                     color = AlertDialogDefaults.textContentColor)

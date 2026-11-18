@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation3.runtime.NavEntry
@@ -151,7 +152,7 @@ private fun SettingsPage(
     onDeleteAllChatHistories: () -> Unit,
 ) {
     SecondaryPageScaffold(
-        title = destination.title,
+        title = stringResource(destination.titleRes),
         onBack = onBack,
         actions = {
             if (

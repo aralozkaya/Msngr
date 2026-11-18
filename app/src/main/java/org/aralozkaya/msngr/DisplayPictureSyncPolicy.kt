@@ -1,9 +1,16 @@
 package org.aralozkaya.msngr
 
-enum class DisplayPictureSyncBehavior(val label: String) {
-    AlwaysIncoming("Always use incoming one"),
-    AlwaysLocal("Always use local one"),
-    AskEveryTime("Ask every time"),
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+
+enum class DisplayPictureSyncBehavior(val label: String, @param:StringRes val labelRes: Int) {
+    AlwaysIncoming("Always use incoming one", R.string.display_picture_sync_always_incoming),
+    AlwaysLocal("Always use local one", R.string.display_picture_sync_always_local),
+    AskEveryTime("Ask every time", R.string.display_picture_sync_ask_every_time);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 /** A failed download is distinct from a successfully fetched profile with no picture. */

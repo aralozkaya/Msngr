@@ -58,7 +58,7 @@ internal fun GroupDetailsMenu(
         IconButton(
             onClick = { expanded = true },
         ) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Group options")
+            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.group_options_description))
         }
         DropdownMenuPopup(
             expanded = expanded,
@@ -71,7 +71,7 @@ internal fun GroupDetailsMenu(
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Invite contacts", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        text = { Text(stringResource(R.string.group_invite_contacts), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
                         shape = if (canCustomize || canBlock || canLeave) MenuDefaults.leadingItemShape else MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group-invite"),
@@ -87,7 +87,7 @@ internal fun GroupDetailsMenu(
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Custom notifications") },
+                        text = { Text(stringResource(R.string.group_custom_notifications)) },
                         leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                         shape = when {
                             canInvite && (canBlock || canLeave) -> MenuDefaults.middleItemShape
@@ -129,7 +129,7 @@ internal fun GroupDetailsMenu(
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Leave group", color = MaterialTheme.colorScheme.error) },
+                        text = { Text(stringResource(R.string.group_leave_submit), color = MaterialTheme.colorScheme.error) },
                         leadingIcon = {
                             Icon(Icons.Default.GroupOff, contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error)

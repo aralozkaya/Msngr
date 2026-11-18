@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
+import org.aralozkaya.msngr.localizeUserMessage
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -94,7 +95,7 @@ class UpdateManager internal constructor(
                         downloading = work?.let { info -> !info.state.isFinished } ?: it.downloading,
                         downloadProgress = work?.progress?.getFloat("progress", 0f) ?: 0f,
                         downloadedVersion = downloaded?.let { release.version.code },
-                        error = if (work?.state == WorkInfo.State.FAILED) work.outputData.getString("error") else it.error,
+                        error = if (work?.state == WorkInfo.State.FAILED) work.outputData.getString("error")?.let(context::localizeUserMessage) else it.error,
                     ) }
                 }
             } else {
@@ -153,7 +154,7 @@ class UpdateManager internal constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            mutableState.update { it.copy(error = error.message ?: context.getString(R.string.update_check_failed)) }
+            mutableState.update { it.copy(error = error.message?.let(context::localizeUserMessage) ?: context.getString(R.string.update_check_failed)) }
             false
         } finally {
             mutableState.update { it.copy(checking = false) }

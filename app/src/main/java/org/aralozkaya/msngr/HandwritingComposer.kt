@@ -68,6 +68,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -115,25 +117,48 @@ internal const val HANDWRITING_TYPE_BUTTON_TAG = "handwriting_type_mode_button"
 internal const val INK_MESSAGE_CANVAS_TAG = "ink_message_canvas"
 
 /** Pen widths from WLM 2009's Handwriting Pen Size submenu (`10`, `100`, `200` HIMETRIC). */
-enum class WlmPenSize(val label: String, val widthHimetric: Int, val previewDp: Float) {
-    Fine("Fine", InkStroke.FINE_PEN_WIDTH_HIMETRIC, 2f),
-    Normal("Normal", InkStroke.NORMAL_PEN_WIDTH_HIMETRIC, 5f),
-    Bold("Bold", InkStroke.BOLD_PEN_WIDTH_HIMETRIC, 9f),
+enum class WlmPenSize(
+    val label: String,
+    val widthHimetric: Int,
+    val previewDp: Float,
+    @param:StringRes val labelRes: Int,
+) {
+    Fine("Fine", InkStroke.FINE_PEN_WIDTH_HIMETRIC, 2f, R.string.ink_pen_fine),
+    Normal("Normal", InkStroke.NORMAL_PEN_WIDTH_HIMETRIC, 5f, R.string.ink_pen_normal),
+    Bold("Bold", InkStroke.BOLD_PEN_WIDTH_HIMETRIC, 9f, R.string.ink_pen_bold);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 /** Eraser modes from WLM 2009's Handwriting Eraser submenu (`212`, `500`, `501`, `502`). */
-enum class WlmEraserMode(val label: String, val radiusPx: Float, val wholeStroke: Boolean) {
-    Small("Small", 10f, wholeStroke = false),
-    Big("Big", 24f, wholeStroke = false),
-    Stroke("Stroke", 14f, wholeStroke = true),
+enum class WlmEraserMode(
+    val label: String,
+    val radiusPx: Float,
+    val wholeStroke: Boolean,
+    @param:StringRes val labelRes: Int,
+) {
+    Small("Small", 10f, wholeStroke = false, R.string.ink_eraser_small),
+    Big("Big", 24f, wholeStroke = false, R.string.ink_eraser_big),
+    Stroke("Stroke", 14f, wholeStroke = true, R.string.ink_eraser_stroke_singular);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 /** Rule-line / grid spacing options from WLM 2009's Grid submenu (`10`, `30`, `50`, `0`). */
-enum class WlmGridStyle(val label: String, val spacingPx: Int) {
-    SmallGrid("Small grid", 10),
-    MediumGrid("Medium grid", 30),
-    LargeGrid("Large grid", 50),
-    Blank("Blank", 0),
+enum class WlmGridStyle(
+    val label: String,
+    val spacingPx: Int,
+    @param:StringRes val labelRes: Int,
+) {
+    SmallGrid("Small grid", 10, R.string.ink_grid_small),
+    MediumGrid("Medium grid", 30, R.string.ink_grid_medium),
+    LargeGrid("Large grid", 50, R.string.ink_grid_large),
+    Blank("Blank", 0, R.string.ink_grid_blank);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 enum class WlmHandwritingTool {
@@ -144,28 +169,32 @@ enum class WlmHandwritingTool {
 data class WlmInkColorOption(
     val name: String,
     val rgb: Int,
+    @param:StringRes val nameRes: Int,
 ) {
     val composeColor: Color get() = Color(0xFF000000L or (rgb.toLong() and 0xFFFFFFL))
+
+    @Composable
+    fun displayName(): String = stringResource(nameRes)
 }
 
 /** Exact 16-color WLM 2009 ISF protocol palette (`chat.xml` IDs `55510..55525`). */
 val WLM_INK_COLORS: List<WlmInkColorOption> = listOf(
-    WlmInkColorOption("Black", 0x000000),
-    WlmInkColorOption("Gray", 0x404040),
-    WlmInkColorOption("Silver", 0x808080),
-    WlmInkColorOption("White", 0xFFFFFF),
-    WlmInkColorOption("Navy", 0x000080),
-    WlmInkColorOption("Blue", 0x0000FF),
-    WlmInkColorOption("Aqua", 0x00FFFF),
-    WlmInkColorOption("Teal", 0x008080),
-    WlmInkColorOption("Maroon", 0x800000),
-    WlmInkColorOption("Red", 0xFF0000),
-    WlmInkColorOption("Fuchsia", 0xFF00FF),
-    WlmInkColorOption("Purple", 0x800080),
-    WlmInkColorOption("Green", 0x008000),
-    WlmInkColorOption("Lime", 0x00FF00),
-    WlmInkColorOption("Olive", 0x808000),
-    WlmInkColorOption("Yellow", 0xFFFF00),
+    WlmInkColorOption("Black", 0x000000, R.string.ink_color_black),
+    WlmInkColorOption("Gray", 0x404040, R.string.ink_color_gray),
+    WlmInkColorOption("Silver", 0x808080, R.string.ink_color_silver),
+    WlmInkColorOption("White", 0xFFFFFF, R.string.ink_color_white),
+    WlmInkColorOption("Navy", 0x000080, R.string.ink_color_navy),
+    WlmInkColorOption("Blue", 0x0000FF, R.string.ink_color_blue),
+    WlmInkColorOption("Aqua", 0x00FFFF, R.string.ink_color_aqua),
+    WlmInkColorOption("Teal", 0x008080, R.string.ink_color_teal),
+    WlmInkColorOption("Maroon", 0x800000, R.string.ink_color_maroon),
+    WlmInkColorOption("Red", 0xFF0000, R.string.ink_color_red),
+    WlmInkColorOption("Fuchsia", 0xFF00FF, R.string.ink_color_fuchsia),
+    WlmInkColorOption("Purple", 0x800080, R.string.ink_color_purple),
+    WlmInkColorOption("Green", 0x008000, R.string.ink_color_green),
+    WlmInkColorOption("Lime", 0x00FF00, R.string.ink_color_lime),
+    WlmInkColorOption("Olive", 0x808000, R.string.ink_color_olive),
+    WlmInkColorOption("Yellow", 0xFFFF00, R.string.ink_color_yellow),
 )
 
 class HandwritingCanvasState {
@@ -439,7 +468,7 @@ internal fun HandwritingComposerPanel(
             ) {
                 WlmPenSize.entries.forEachIndexed { index, option ->
                     DropdownMenuItem(
-                        text = { Text(option.label) },
+                        text = { Text(option.displayLabel()) },
                         shape = MenuDefaults.itemShape(index, WlmPenSize.entries.size).shape,
                         leadingIcon = {
                             Box(
@@ -480,7 +509,7 @@ internal fun HandwritingComposerPanel(
             ) {
                 WlmEraserMode.entries.forEachIndexed { index, mode ->
                     DropdownMenuItem(
-                        text = { Text(mode.label) },
+                        text = { Text(mode.displayLabel()) },
                         shape = if (index == 0) {
                             MenuDefaults.leadingItemShape
                         } else {
@@ -503,7 +532,7 @@ internal fun HandwritingComposerPanel(
                 interactionSource = eraserMenuInteractionSource,
             ) {
                 DropdownMenuItem(
-                    text = { Text("Clear all") },
+                    text = { Text(stringResource(R.string.ink_clear_all)) },
                     shape = MenuDefaults.trailingItemShape,
                     leadingIcon = {
                         Icon(Icons.Default.DeleteSweep, contentDescription = null)
@@ -533,7 +562,7 @@ internal fun HandwritingComposerPanel(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "Ink color",
+                        text = stringResource(R.string.ink_menu_color),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -541,6 +570,7 @@ internal fun HandwritingComposerPanel(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowColors.forEach { option ->
                                 val isSelected = state.selectedColorRgb == option.rgb
+                                val colorSwatchDesc = stringResource(R.string.ink_color_description, option.displayName())
                                 Button(
                                     onClick = {
                                         state.selectedColorRgb = option.rgb
@@ -557,7 +587,7 @@ internal fun HandwritingComposerPanel(
                                     ),
                                     contentPadding = PaddingValues(0.dp),
                                     modifier = Modifier.size(30.dp).semantics {
-                                        contentDescription = "Ink color ${option.name}"
+                                        contentDescription = colorSwatchDesc
                                     },
                                 ) {}
                             }
@@ -580,7 +610,7 @@ internal fun HandwritingComposerPanel(
             ) {
                 WlmGridStyle.entries.forEachIndexed { index, style ->
                     DropdownMenuItem(
-                        text = { Text(style.label) },
+                        text = { Text(style.displayLabel()) },
                         shape = MenuDefaults.itemShape(index, WlmGridStyle.entries.size).shape,
                         trailingContent = if (state.gridStyle == style) {
                             { Icon(Icons.Default.Check, contentDescription = null) }
@@ -608,6 +638,21 @@ internal fun HandwritingComposerPanel(
                 .height(184.dp),
             shape = MaterialTheme.shapes.large,
         ) {
+            val canvasDesc = stringResource(R.string.ink_canvas_description)
+            val strokesLabel = quantityNumberSentenceResource(
+                count = state.strokes.size,
+                oneBeforeRes = R.string.ink_strokes_singular_before_number,
+                oneAfterRes = R.string.ink_strokes_singular_after_number,
+                otherBeforeRes = R.string.ink_strokes_plural_before_number,
+                otherAfterRes = R.string.ink_strokes_plural_after_number,
+            )
+            val canvasStateDesc = stringResource(
+                R.string.ink_canvas_state_format,
+                strokesLabel,
+                stringResource(R.string.ink_pen_summary, state.penSize.displayLabel()),
+                selectedColorOption.displayName(),
+                state.gridStyle.displayLabel(),
+            )
             Box(modifier = Modifier.fillMaxSize()) {
                 Canvas(
                     modifier = Modifier
@@ -615,8 +660,8 @@ internal fun HandwritingComposerPanel(
                         .clipToBounds()
                         .testTag(HANDWRITING_CANVAS_TAG)
                         .semantics {
-                            contentDescription = "Handwriting canvas"
-                            stateDescription = "${state.strokes.size} strokes, ${state.penSize.label} pen, ${selectedColorOption.name}, ${state.gridStyle.label}"
+                            contentDescription = canvasDesc
+                            stateDescription = canvasStateDesc
                         }
                         .onSizeChanged { size ->
                             if (size.width > 0 && size.height > 0) {
@@ -685,7 +730,7 @@ internal fun HandwritingComposerPanel(
 
                 if (!state.hasStrokes && activeStrokePoints.isEmpty()) {
                     Text(
-                        text = "Draw handwriting message here\u2026",
+                        text = stringResource(R.string.ink_canvas_placeholder),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -751,7 +796,7 @@ internal fun HandwritingComposerPanel(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send handwriting",
+                            contentDescription = stringResource(R.string.ink_send_description),
                         )
                     }
                 },
@@ -768,7 +813,7 @@ internal fun HandwritingComposerPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Keyboard,
-                                    contentDescription = "Type mode",
+                                    contentDescription = stringResource(R.string.ink_type_mode),
                                 )
                             }
                         }
@@ -796,7 +841,7 @@ internal fun HandwritingComposerPanel(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Draw,
-                                        contentDescription = "Pen (${state.penSize.label})",
+                                        contentDescription = stringResource(R.string.ink_pen_label_format, state.penSize.displayLabel()),
                                     )
                                 }
                                 PenSubmenuPopup()
@@ -820,11 +865,14 @@ internal fun HandwritingComposerPanel(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.AutoFixNormal,
-                                        contentDescription = if (state.activeTool == WlmHandwritingTool.Eraser) {
-                                            "Eraser (${state.eraserMode.label}, active)"
-                                        } else {
-                                            "Eraser (${state.eraserMode.label})"
-                                        },
+                                        contentDescription = stringResource(
+                                            if (state.activeTool == WlmHandwritingTool.Eraser) {
+                                                R.string.ink_eraser_active_label_format
+                                            } else {
+                                                R.string.ink_eraser_label_format
+                                            },
+                                            state.eraserMode.displayLabel(),
+                                        ),
                                     )
                                 }
                                 EraserSubmenuPopup()
@@ -842,7 +890,7 @@ internal fun HandwritingComposerPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Undo,
-                                    contentDescription = "Undo stroke",
+                                    contentDescription = stringResource(R.string.ink_undo_stroke),
                                 )
                             }
                         }
@@ -858,7 +906,7 @@ internal fun HandwritingComposerPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Redo,
-                                    contentDescription = "Redo stroke",
+                                    contentDescription = stringResource(R.string.ink_redo_stroke),
                                 )
                             }
                         }
@@ -876,7 +924,7 @@ internal fun HandwritingComposerPanel(
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.Palette,
-                                            contentDescription = "Ink color (${selectedColorOption.name})",
+                                            contentDescription = stringResource(R.string.ink_color_selected_description, selectedColorOption.displayName()),
                                         )
                                         Box(
                                             modifier = Modifier
@@ -904,7 +952,7 @@ internal fun HandwritingComposerPanel(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.GridOn,
-                                        contentDescription = "Grid (${state.gridStyle.label})",
+                                        contentDescription = stringResource(R.string.ink_grid_label_format, state.gridStyle.displayLabel()),
                                     )
                                 }
                                 GridSubmenuPopup()
@@ -924,7 +972,7 @@ internal fun HandwritingComposerPanel(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More handwriting tools",
+                                contentDescription = stringResource(R.string.ink_more_tools_description),
                             )
                         }
                         DropdownMenuPopup(
@@ -940,7 +988,7 @@ internal fun HandwritingComposerPanel(
                                     when (item) {
                                         HandwritingToolbarItem.TypeMode -> {
                                             DropdownMenuItem(
-                                                text = { Text("Type mode") },
+                                                text = { Text(stringResource(R.string.ink_type_mode)) },
                                                 leadingIcon = { Icon(Icons.Default.Keyboard, contentDescription = null) },
                                                 shape = itemShape,
                                                 modifier = Modifier.testTag(HANDWRITING_TYPE_BUTTON_TAG),
@@ -953,7 +1001,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Pen -> {
                                             DropdownMenuItem(
-                                                text = { Text("Pen (${state.penSize.label})") },
+                                                text = { Text(stringResource(R.string.ink_pen_label_format, state.penSize.displayLabel())) },
                                                 leadingIcon = { Icon(Icons.Default.Draw, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled,
@@ -967,7 +1015,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Eraser -> {
                                             DropdownMenuItem(
-                                                text = { Text("Eraser (${state.eraserMode.label})") },
+                                                text = { Text(stringResource(R.string.ink_eraser_label_format, state.eraserMode.displayLabel())) },
                                                 leadingIcon = { Icon(Icons.Default.AutoFixNormal, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled,
@@ -981,7 +1029,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Undo -> {
                                             DropdownMenuItem(
-                                                text = { Text("Undo stroke") },
+                                                text = { Text(stringResource(R.string.ink_undo_stroke)) },
                                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled && state.canUndo,
@@ -995,7 +1043,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Redo -> {
                                             DropdownMenuItem(
-                                                text = { Text("Redo stroke") },
+                                                text = { Text(stringResource(R.string.ink_redo_stroke)) },
                                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled && state.canRedo,
@@ -1009,7 +1057,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Color -> {
                                             DropdownMenuItem(
-                                                text = { Text("Ink color (${selectedColorOption.name})") },
+                                                text = { Text(stringResource(R.string.ink_color_selected_description, selectedColorOption.displayName())) },
                                                 leadingIcon = { Icon(Icons.Default.Palette, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled,
@@ -1023,7 +1071,7 @@ internal fun HandwritingComposerPanel(
 
                                         HandwritingToolbarItem.Grid -> {
                                             DropdownMenuItem(
-                                                text = { Text("Grid (${state.gridStyle.label})") },
+                                                text = { Text(stringResource(R.string.ink_grid_label_format, state.gridStyle.displayLabel())) },
                                                 leadingIcon = { Icon(Icons.Default.GridOn, contentDescription = null) },
                                                 shape = itemShape,
                                                 enabled = enabled,
@@ -1071,13 +1119,20 @@ internal fun HandwritingMessageCanvas(
             .aspectRatio(aspect, matchHeightConstraintsFirst = false),
         shape = MaterialTheme.shapes.medium,
     ) {
+        val messageCanvasDescription = quantityNumberSentenceResource(
+            count = drawing.strokes.size,
+            oneBeforeRes = R.string.ink_message_strokes_singular_before_number,
+            oneAfterRes = R.string.ink_message_strokes_singular_after_number,
+            otherBeforeRes = R.string.ink_message_strokes_plural_before_number,
+            otherAfterRes = R.string.ink_message_strokes_plural_after_number,
+        )
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(6.dp)
                 .testTag(INK_MESSAGE_CANVAS_TAG)
                 .semantics {
-                    contentDescription = "Handwriting message (${drawing.strokes.size} strokes)"
+                    contentDescription = messageCanvasDescription
                 },
         ) {
             val scaleX = size.width / max(1f, bounds.width)

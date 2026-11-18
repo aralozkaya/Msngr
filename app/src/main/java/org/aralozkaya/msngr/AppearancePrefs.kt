@@ -1,21 +1,30 @@
 package org.aralozkaya.msngr
 
 import android.content.Context
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ThemeMode(val label: String) {
-    System("System"),
-    Light("Light"),
-    Dark("Dark"),
+enum class ThemeMode(val label: String, @param:StringRes val labelRes: Int) {
+    System("System", R.string.theme_mode_system),
+    Light("Light", R.string.theme_mode_light),
+    Dark("Dark", R.string.theme_mode_dark);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
-enum class ColorMode(val label: String) {
-    Default("Default"),
-    Dynamic("Dynamic"),
-    Scenes("Scenes"),
+enum class ColorMode(val label: String, @param:StringRes val labelRes: Int) {
+    Default("Default", R.string.color_mode_default),
+    Dynamic("Dynamic", R.string.color_mode_dynamic),
+    Scenes("Scenes", R.string.color_mode_scenes);
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 data class AppAppearance(

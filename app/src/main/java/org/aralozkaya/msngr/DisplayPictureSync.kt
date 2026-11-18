@@ -64,10 +64,10 @@ internal class DisplayPictureSync(private val context: Context, private val poll
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 runCatching {
-                    val account = checkNotNull(currentAccount(repository)) { "The signed-in account changed. Please try again." }
+                    val account = checkNotNull(currentAccount(repository)) { context.getString(R.string.display_picture_sync_account_changed) }
                     val normalizedStatus = statusMessage.replace('\r', ' ').replace('\n', ' ').trim()
                     repository.updateProfile(username, avatarUri, pictureBytes, updateDisplayPicture = pictureChanged).getOrThrow()
-                    check(currentAccount(repository) == account) { "The signed-in account changed. Please try again." }
+                    check(currentAccount(repository) == account) { context.getString(R.string.display_picture_sync_account_changed) }
                     val saved = if (pictureChanged) OwnDisplayPictureStore.write(context, account, pictureBytes) else null
                     if (saved != null) {
                         showLocal(repository, account, saved)
@@ -251,7 +251,7 @@ internal class DisplayPictureSync(private val context: Context, private val poll
             mutableState.value = DisplayPictureSyncState(conflict, busy = true)
             try {
                 val current = validate(repository.fetchOwnDisplayPicture())
-                check(current.fetched) { "The latest picture could not be checked. Try again." }
+                check(current.fetched) { context.getString(R.string.display_picture_sync_check_failed) }
                 if (currentAccount(repository) != conflict.account) return@withLock
                 if (!samePicture(current.bytes, conflict.incoming.bytes)) {
                     // Another change arrived while the choice was visible. Show that version
@@ -265,7 +265,7 @@ internal class DisplayPictureSync(private val context: Context, private val poll
                     notice = if (incoming) null else repository.displayPictureStorageIssue.value)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
-                mutableState.value = DisplayPictureSyncState(conflict, error = error.message ?: "The display picture could not be updated. Try again.")
+                mutableState.value = DisplayPictureSyncState(conflict, error = error.message?.let(context::localizeUserMessage) ?: context.getString(R.string.display_picture_sync_update_failed))
             } finally {
                 if (state.value.busy) mutableState.value = state.value.copy(busy = false)
             }
@@ -348,7 +348,7 @@ internal class DisplayPictureSync(private val context: Context, private val poll
                 if (local.initialized) {
                     showLocal(repository, account, local)
                     mutableState.value = DisplayPictureSyncState(DisplayPictureConflict(account, local, incoming),
-                        error = error.message ?: "The display picture could not be updated. Try again.")
+                        error = error.message?.let(context::localizeUserMessage) ?: context.getString(R.string.display_picture_sync_update_failed))
                 }
             }
         }

@@ -1,5 +1,9 @@
 package org.aralozkaya.msngr
 
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+
 /** Segoe UI faces exposed by the original Messenger's Font style list. */
 enum class NativeFontFace(val wireName: String, val weight: Int) {
     Regular("Segoe UI", 400),
@@ -14,22 +18,26 @@ enum class NativeFontStyle(
     val face: NativeFontFace,
     val bold: Boolean = false,
     val italic: Boolean = false,
+    @param:StringRes val labelRes: Int,
 ) {
-    Light("Light", NativeFontFace.Light),
-    LightItalic("Light Italic", NativeFontFace.Light, italic = true),
-    Semilight("Semilight", NativeFontFace.Semilight),
-    SemilightItalic("Semilight Italic", NativeFontFace.Semilight, italic = true),
-    Regular("Regular", NativeFontFace.Regular),
-    Italic("Italic", NativeFontFace.Regular, italic = true),
-    Semibold("Semibold", NativeFontFace.Semibold),
-    SemiboldItalic("Semibold Italic", NativeFontFace.Semibold, italic = true),
-    Bold("Bold", NativeFontFace.Regular, bold = true),
-    BoldItalic("Bold Italic", NativeFontFace.Regular, bold = true, italic = true),
-    Black("Black", NativeFontFace.Black, bold = true),
-    BlackItalic("Black Italic", NativeFontFace.Black, bold = true, italic = true),
+    Light("Light", NativeFontFace.Light, labelRes = R.string.native_font_style_light),
+    LightItalic("Light Italic", NativeFontFace.Light, italic = true, labelRes = R.string.native_font_style_light_italic),
+    Semilight("Semilight", NativeFontFace.Semilight, labelRes = R.string.native_font_style_semilight),
+    SemilightItalic("Semilight Italic", NativeFontFace.Semilight, italic = true, labelRes = R.string.native_font_style_semilight_italic),
+    Regular("Regular", NativeFontFace.Regular, labelRes = R.string.native_font_style_regular),
+    Italic("Italic", NativeFontFace.Regular, italic = true, labelRes = R.string.native_font_style_italic),
+    Semibold("Semibold", NativeFontFace.Semibold, labelRes = R.string.native_font_style_semibold),
+    SemiboldItalic("Semibold Italic", NativeFontFace.Semibold, italic = true, labelRes = R.string.native_font_style_semibold_italic),
+    Bold("Bold", NativeFontFace.Regular, bold = true, labelRes = R.string.native_font_style_bold),
+    BoldItalic("Bold Italic", NativeFontFace.Regular, bold = true, italic = true, labelRes = R.string.native_font_style_bold_italic),
+    Black("Black", NativeFontFace.Black, bold = true, labelRes = R.string.native_font_style_black),
+    BlackItalic("Black Italic", NativeFontFace.Black, bold = true, italic = true, labelRes = R.string.native_font_style_black_italic),
     ;
 
     val weight: Int get() = if (face == NativeFontFace.Regular && bold) 700 else face.weight
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
 }
 
 /** Whole-message Messenger formatting, independent of Plus! markup in the body. */

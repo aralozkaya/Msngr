@@ -66,6 +66,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.pages.components.ReleaseNotes
@@ -114,7 +115,7 @@ fun UpdateSettingsScreen(
                 context.startActivity(Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(uri, APK_MIME_TYPE)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    clipData = ClipData.newRawUri("Msngr update", uri)
+                    clipData = ClipData.newRawUri(resources.getString(R.string.update_clip_label), uri)
                 })
             } catch (error: Exception) {
                 manager.reportError(error.message ?: resources.getString(R.string.update_install_failed))
@@ -141,7 +142,7 @@ fun UpdateSettingsScreen(
                             ?: error(resources.getString(R.string.update_save_failed))
                         output.use { stream -> apk.inputStream().use { it.copyTo(stream) } }
                     }
-                    fileMessage = resources.getString(R.string.update_saved)
+                    fileMessage = resources.getString(R.string.update_saved_you_singular)
                 } catch (error: Exception) {
                     manager.reportError(error.message ?: resources.getString(R.string.update_save_failed))
                 } finally { fileActionBusy = false }
@@ -183,7 +184,7 @@ fun UpdateSettingsScreen(
                             state.checking -> R.string.update_checking
                             state.hasUpdate -> R.string.update_available
                             release != null -> R.string.update_skipped
-                            state.lastChecked > 0 -> R.string.update_up_to_date
+                            state.lastChecked > 0 -> R.string.update_up_to_date_you_singular
                             else -> R.string.update_stay_current
                         }), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                         if (state.hasUpdate) UpdateBadge(Modifier.testTag("updates-page-badge"))
@@ -204,7 +205,7 @@ fun UpdateSettingsScreen(
         if (state.error != null || fileMessage != null) item("feedback") {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
                 containerColor = if (state.error != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer)) {
-                Text(state.error ?: fileMessage.orEmpty(), Modifier.padding(16.dp).testTag("update-feedback"))
+                Text(localizeUserMessage(state.error ?: fileMessage.orEmpty()), Modifier.padding(16.dp).testTag("update-feedback"))
             }
         }
         if (release != null) item("release") {
@@ -217,7 +218,13 @@ fun UpdateSettingsScreen(
                     ReleaseNotes(release.notes, Modifier.fillMaxWidth().testTag("release-notes"))
                     if (state.downloading) {
                         MsngrLinearWavyProgressIndicator(progress = { state.downloadProgress }, modifier = Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.update_downloading, (state.downloadProgress * 100).toInt()))
+                        Text(
+                            org.aralozkaya.msngr.numberSentenceResource(
+                                R.string.update_downloading_before_number,
+                                (state.downloadProgress * 100).toInt(),
+                                R.string.update_downloading_after_number,
+                            ),
+                        )
                         DestructiveOutlinedButton(onClick = { pendingAction = null; pendingVersion = null; manager.cancelDownload() }) {
                             Text(stringResource(android.R.string.cancel))
                         }
@@ -242,29 +249,29 @@ fun UpdateSettingsScreen(
             }
         }
         item("preferences") {
-            Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                ExpandableSettingsGroup(expanded = state.supported && settings.enabled, master = { shapes ->
-                    SegmentedListItem(checked = settings.enabled,
-                        onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
-                        shapes = shapes,
-                        trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
-                        supportingContent = { Text(stringResource(R.string.update_automatic_description)) },
-                        modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
-                }) { shapes, colors ->
-                    SegmentedListItem(onClick = { intervalDialog = true },
-                        shapes = shapes, colors = colors,
-                        supportingContent = { Text(stringResource(settings.interval.labelResource())) },
-                        modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
-                }
-                SegmentedListItem(checked = settings.includePrereleases,
-                    onCheckedChange = { manager.configure(settings.copy(includePrereleases = it)); manager.checkManually() },
-                    enabled = state.supported && !state.checking && !state.downloading,
-                    shapes = ListItemDefaults.segmentedShapes(0, 1),
-                    trailingContent = { Switch(checked = settings.includePrereleases, onCheckedChange = null,
-                        enabled = state.supported && !state.checking && !state.downloading) },
-                    supportingContent = { Text(stringResource(R.string.update_prerelease_description)) },
-                    modifier = Modifier.testTag("include-prereleases"), content = { Text(stringResource(R.string.update_include_prereleases)) })
+            ExpandableSettingsGroup(expanded = state.supported && settings.enabled, master = { shapes ->
+                SegmentedListItem(checked = settings.enabled,
+                    onCheckedChange = { manager.configure(settings.copy(enabled = it)) }, enabled = state.supported,
+                    shapes = shapes,
+                    trailingContent = { Switch(checked = settings.enabled, onCheckedChange = null, enabled = state.supported) },
+                    supportingContent = { Text(stringResource(R.string.update_automatic_description_you_singular)) },
+                    modifier = Modifier.testTag("automatic-updates"), content = { Text(stringResource(R.string.update_automatic)) })
+            }) { shapes, colors ->
+                SegmentedListItem(onClick = { intervalDialog = true },
+                    shapes = shapes, colors = colors,
+                    supportingContent = { Text(settings.interval.displayLabel()) },
+                    modifier = Modifier.testTag("update-interval"), content = { Text(stringResource(R.string.update_frequency)) })
             }
+        }
+        item("include-prereleases") {
+            SegmentedListItem(checked = settings.includePrereleases,
+                onCheckedChange = { manager.configure(settings.copy(includePrereleases = it)); manager.checkManually() },
+                enabled = state.supported && !state.checking && !state.downloading,
+                shapes = ListItemDefaults.segmentedShapes(0, 1),
+                trailingContent = { Switch(checked = settings.includePrereleases, onCheckedChange = null,
+                    enabled = state.supported && !state.checking && !state.downloading) },
+                supportingContent = { Text(stringResource(R.string.update_prerelease_description)) },
+                modifier = Modifier.testTag("include-prereleases"), content = { Text(stringResource(R.string.update_include_prereleases)) })
         }
         item("schedule-note") { Text(stringResource(R.string.update_schedule_note), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall) }
         item("releases-link") {
@@ -291,15 +298,15 @@ fun UpdateSettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         RadioButton(selected = settings.interval == interval, onClick = null)
-                        Text(stringResource(interval.labelResource()))
+                        Text(interval.displayLabel())
                     }
                 }
             }
         }, confirmButton = { TextButton(onClick = { intervalDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
 
     if (downloadDialog) AlertDialog(onDismissRequest = { downloadDialog = false },
-        title = { Text(stringResource(R.string.update_download_choice_title)) },
-        text = { Text(stringResource(R.string.update_download_choice_description)) },
+        title = { Text(stringResource(R.string.update_download_choice_title_you_singular)) },
+        text = { Text(stringResource(R.string.update_download_choice_description_you_singular)) },
         confirmButton = {
             val downloadAction: (String) -> Unit = { action ->
                 downloadDialog = false
@@ -317,10 +324,23 @@ fun UpdateSettingsScreen(
         }, dismissButton = { TextButton(onClick = { downloadDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
 }
 
-private fun UpdateInterval.labelResource(): Int = when (this) {
-    UpdateInterval.OnAppStart -> R.string.update_interval_start
-    UpdateInterval.Every6Hours -> R.string.update_interval_6h
-    UpdateInterval.Every12Hours -> R.string.update_interval_12h
-    UpdateInterval.Every24Hours -> R.string.update_interval_24h
-    UpdateInterval.EveryWeek -> R.string.update_interval_week
+@Composable
+private fun UpdateInterval.displayLabel(): String = when (this) {
+    UpdateInterval.OnAppStart -> stringResource(R.string.update_interval_start)
+    UpdateInterval.Every6Hours -> org.aralozkaya.msngr.numberSentenceResource(
+        R.string.update_interval_hours_before_number,
+        6,
+        R.string.update_interval_hours_after_number,
+    )
+    UpdateInterval.Every12Hours -> org.aralozkaya.msngr.numberSentenceResource(
+        R.string.update_interval_hours_before_number,
+        12,
+        R.string.update_interval_hours_after_number,
+    )
+    UpdateInterval.Every24Hours -> org.aralozkaya.msngr.numberSentenceResource(
+        R.string.update_interval_hours_before_number,
+        24,
+        R.string.update_interval_hours_after_number,
+    )
+    UpdateInterval.EveryWeek -> stringResource(R.string.update_interval_week)
 }

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,9 +59,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import org.aralozkaya.msngr.EmoticonOutlinedTextField
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.ServerOverrides
 import org.aralozkaya.msngr.WinkDownloads
 import org.aralozkaya.msngr.protocol.MsnEmotionSound
+import org.aralozkaya.msngr.twoNumbersSentenceResource
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 
 private val ServerOverridesSaver: Saver<ServerOverrides, Any> = listSaver(
@@ -179,7 +182,7 @@ internal fun CustomServerDialog(
                         TopAppBar(
                             title = {
                                 Text(
-                                    text = "Custom MSNP service",
+                                    text = stringResource(R.string.custom_server_title),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -189,7 +192,7 @@ internal fun CustomServerDialog(
                                     onClick = ::dismiss,
                                     modifier = Modifier.testTag("custom-server-dismiss"),
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
                                 }
                             },
                             actions = {
@@ -198,7 +201,7 @@ internal fun CustomServerDialog(
                                     enabled = normalized.isValid(),
                                     modifier = Modifier.testTag("custom-server-save"),
                                 ) {
-                                    Text("Save")
+                                    Text(stringResource(R.string.common_save))
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -218,89 +221,96 @@ internal fun CustomServerDialog(
                                 .testTag("custom-server-form"),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
+                            val portRangeError = twoNumbersSentenceResource(
+                                R.string.custom_server_port_range_before_first_number,
+                                1,
+                                R.string.custom_server_port_range_between_numbers,
+                                65535,
+                                R.string.custom_server_port_range_after_second_number,
+                            )
                             Text(
-                                text = "Notification and config endpoints are required. Optional services fall back to the notification host.",
+                                text = stringResource(R.string.custom_server_description),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             ServerTextField(
-                                label = "Notification host",
+                                label = stringResource(R.string.custom_server_notification_host),
                                 value = draft.mainServer,
                                 modifier = Modifier.testTag("custom-server-main-host"),
                             ) {
                                 draft = draft.copy(mainServer = it)
                             }
                             ServerTextField(
-                                label = "Notification port",
+                                label = stringResource(R.string.custom_server_notification_port),
                                 value = mainPort,
                                 keyboardType = KeyboardType.Number,
                                 isError = mainPortError,
                                 supportingText = if (mainPortError) {
-                                    { Text("Enter a port between 1 and 65535.") }
+                                    { Text(portRangeError) }
                                 } else null,
                                 modifier = Modifier.testTag("custom-server-main-port"),
                             ) {
                                 mainPort = it
                             }
                             ServerTextField(
-                                label = "Switchboard port",
+                                label = stringResource(R.string.custom_server_switchboard_port),
                                 value = switchboardPort,
                                 keyboardType = KeyboardType.Number,
                                 isError = switchboardPortError,
                                 supportingText = if (switchboardPortError) {
-                                    { Text("Enter a port between 1 and 65535.") }
+                                    { Text(portRangeError) }
                                 } else null,
                                 modifier = Modifier.testTag("custom-server-switchboard-port"),
                             ) {
                                 switchboardPort = it
                             }
                             ServerTextField(
-                                label = "Configuration host",
+                                label = stringResource(R.string.custom_server_config_host),
                                 value = draft.configServer,
                                 modifier = Modifier.testTag("custom-server-config-host"),
                             ) {
                                 draft = draft.copy(configServer = it)
                             }
                             Text(
-                                text = "Optional services",
+                                text = stringResource(R.string.custom_server_optional_services),
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             OptionalServerField(
-                                label = "Authentication",
+                                label = stringResource(R.string.connection_authentication),
                                 enabled = draft.authServerEnabled,
                                 value = draft.authServer,
                                 onEnabledChange = { draft = draft.copy(authServerEnabled = it) },
                                 onValueChange = { draft = draft.copy(authServer = it) },
                             )
                             OptionalServerField(
-                                label = "Address book",
+                                label = stringResource(R.string.connection_address_book),
                                 enabled = draft.addressBookServerEnabled,
                                 value = draft.addressBookServer,
                                 onEnabledChange = { draft = draft.copy(addressBookServerEnabled = it) },
                                 onValueChange = { draft = draft.copy(addressBookServer = it) },
                             )
                             OptionalServerField(
-                                label = "Storage",
+                                label = stringResource(R.string.connection_storage),
                                 enabled = draft.storageServerEnabled,
                                 value = draft.storageServer,
                                 onEnabledChange = { draft = draft.copy(storageServerEnabled = it) },
                                 onValueChange = { draft = draft.copy(storageServer = it) },
                             )
                             OptionalServerField(
-                                label = "Advertising",
+                                label = stringResource(R.string.custom_server_service_advertising),
                                 enabled = draft.adsServerEnabled,
                                 value = draft.adsServer,
                                 onEnabledChange = { draft = draft.copy(adsServerEnabled = it) },
                                 onValueChange = { draft = draft.copy(adsServer = it) },
                             )
                             OptionalServerField(
-                                label = "Social",
+                                label = stringResource(R.string.custom_server_service_social),
                                 enabled = draft.socialServerEnabled,
                                 value = draft.socialServer,
                                 onEnabledChange = { draft = draft.copy(socialServerEnabled = it) },
                                 onValueChange = { draft = draft.copy(socialServer = it) },
                             )
                             OptionalServerField(
-                                label = "Games & activities",
+                                label = stringResource(R.string.connection_games_activities),
                                 enabled = draft.activitiesServerEnabled,
                                 value = draft.activitiesServer,
                                 onEnabledChange = { draft = draft.copy(activitiesServerEnabled = it) },
@@ -309,8 +319,8 @@ internal fun CustomServerDialog(
                             EmoticonOutlinedTextField(
                                 value = draft.winkCatalogServer,
                                 onValueChange = { draft = draft.copy(winkCatalogServer = it.withoutUnicodeEmoji()) },
-                                label = { Text("Winks catalog URL") },
-                                supportingText = { Text("Optional. Full HTTP or HTTPS wink catalog URL") },
+                                label = { Text(stringResource(R.string.custom_server_winks_url_label)) },
+                                supportingText = { Text(stringResource(R.string.custom_server_winks_url_supporting)) },
                                 isError = winkCatalogError,
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
@@ -322,8 +332,8 @@ internal fun CustomServerDialog(
                             EmoticonOutlinedTextField(
                                 value = draft.emotionSoundServer,
                                 onValueChange = { draft = draft.copy(emotionSoundServer = it.withoutUnicodeEmoji()) },
-                                label = { Text("Emotion sounds service URL") },
-                                supportingText = { Text("Optional. Full HTTP or HTTPS base URL, ending in /esnd/snd/") },
+                                label = { Text(stringResource(R.string.custom_server_emotion_sounds_url_label)) },
+                                supportingText = { Text(stringResource(R.string.custom_server_emotion_sounds_url_supporting)) },
                                 isError = emotionSoundError,
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
@@ -333,7 +343,7 @@ internal fun CustomServerDialog(
                                 modifier = Modifier.fillMaxWidth().testTag("emotion_sound_server"),
                             )
                             OptionalServerField(
-                                label = "Mail",
+                                label = stringResource(R.string.connection_mail),
                                 enabled = draft.mailServerEnabled,
                                 value = draft.mailServer,
                                 onEnabledChange = { draft = draft.copy(mailServerEnabled = it) },
@@ -391,6 +401,6 @@ private fun OptionalServerField(
             Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
             Switch(checked = enabled, onCheckedChange = null)
         }
-        if (enabled) ServerTextField("$label host", value, onValueChange = onValueChange)
+        if (enabled) ServerTextField(stringResource(R.string.custom_server_host_suffix, label), value, onValueChange = onValueChange)
     }
 }

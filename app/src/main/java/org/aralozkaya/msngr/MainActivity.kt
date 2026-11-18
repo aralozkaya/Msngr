@@ -11,7 +11,7 @@ import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -84,7 +84,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -205,7 +204,7 @@ class MainActivity : MsngrActivity() {
         val name = intent.getStringExtra(EXTRA_LEFT_GROUP_NAME) ?: return
         intent.removeExtra(EXTRA_LEFT_GROUP_NAME)
         lifecycleScope.launch {
-            snackbarHostState.showActionSnackbar(getString(R.string.group_leave_success, name))
+            snackbarHostState.showActionSnackbar(getString(R.string.group_leave_success_you_singular, name))
         }
     }
 
@@ -354,7 +353,7 @@ private fun MsngrApp(
         topBar = {
             Column(Modifier.onSizeChanged { topBarHeight = it.height }) {
                 MediumFlexibleTopAppBar(
-                    title = { Text("Msngr") },
+                    title = { Text(stringResource(R.string.app_name)) },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -369,7 +368,7 @@ private fun MsngrApp(
                             IconButton(
                                 onClick = onOpenProfile,
                             ) {
-                                Icon(Icons.Default.Person, contentDescription = "Open profile")
+                                Icon(Icons.Default.Person, contentDescription = stringResource(R.string.main_open_profile))
                             }
                         }
                         IconButton(
@@ -377,10 +376,17 @@ private fun MsngrApp(
                         ) {
                             BadgedBox(badge = {
                                 if (pendingCount > 0) {
-                                    CountBadge(pendingCount, "requests-icon-badge", R.plurals.pending_items_badge)
+                                    CountBadge(
+                                        count = pendingCount,
+                                        tag = "requests-icon-badge",
+                                        oneBeforeRes = R.string.pending_items_badge_singular_before_number,
+                                        oneAfterRes = R.string.pending_items_badge_singular_after_number,
+                                        otherBeforeRes = R.string.pending_items_badge_plural_before_number,
+                                        otherAfterRes = R.string.pending_items_badge_plural_after_number,
+                                    )
                                 }
                             }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Open menu")
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.main_open_menu))
                             }
                         }
                         DropdownMenuPopup(
@@ -401,7 +407,7 @@ private fun MsngrApp(
                                     shape = MenuDefaults.leadingItemShape,
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Blocked contacts") },
+                                    text = { Text(stringResource(R.string.blocked_contacts_title)) },
                                     leadingIcon = {
                                         Icon(Icons.Default.Block, contentDescription = null)
                                     },
@@ -412,7 +418,7 @@ private fun MsngrApp(
                                     shape = MenuDefaults.middleItemShape,
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Settings") },
+                                    text = { Text(stringResource(R.string.settings_destination_root)) },
                                     trailingContent = if (updateState.hasUpdate) {
                                         { UpdateBadge(Modifier.testTag("updates-settings-menu-badge")) }
                                     } else null,
@@ -427,7 +433,7 @@ private fun MsngrApp(
                                 )
                                 if (SessionPrefs.isMockServerActive()) {
                                     DropdownMenuItem(
-                                        text = { Text("Simulate reconnection") },
+                                        text = { Text(stringResource(R.string.main_simulate_reconnection)) },
                                         shape = MenuDefaults.middleItemShape,
                                         leadingIcon = {
                                             Icon(
@@ -449,11 +455,21 @@ private fun MsngrApp(
                             ) {
                                 DropdownMenuItem(
                                     text = {
-                                        Text(if (sessions.size > 1) "Log out\u2026" else "Log out",
+                                        Text(stringResource(if (sessions.size > 1) R.string.main_log_out_ellipsis else R.string.main_log_out),
                                             color = MaterialTheme.colorScheme.error)
                                     },
                                     supportingText = if (sessions.size > 1) {
-                                        { Text("${sessions.size} active sessions") }
+                                        {
+                                            Text(
+                                                quantityNumberSentenceResource(
+                                                    count = sessions.size,
+                                                    oneBeforeRes = R.string.main_active_sessions_singular_before_number,
+                                                    oneAfterRes = R.string.main_active_sessions_singular_after_number,
+                                                    otherBeforeRes = R.string.main_active_sessions_plural_before_number,
+                                                    otherAfterRes = R.string.main_active_sessions_plural_after_number,
+                                                ),
+                                            )
+                                        }
                                     } else null,
                                     shape = MenuDefaults.trailingItemShape,
                                     leadingIcon = {
@@ -648,9 +664,9 @@ private fun MsngrApp(
     if (showLogoutConfirmation) {
         AlertDialog(
             onDismissRequest = { showLogoutConfirmation = false },
-            title = { Text("Log out?") },
+            title = { Text(stringResource(R.string.main_log_out_dialog_title)) },
             text = {
-                Text("This ends the current session. Remembered credentials stay saved on this device.")
+                Text(stringResource(R.string.main_log_out_dialog_message))
             },
             confirmButton = {
                 Button(
@@ -661,14 +677,14 @@ private fun MsngrApp(
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
                 ) {
-                    Text("Log out")
+                    Text(stringResource(R.string.main_log_out))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showLogoutConfirmation = false },
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -682,7 +698,7 @@ private fun HomePagerIndicator(
     modifier: Modifier = Modifier,
 ) {
     val homeLabel = stringResource(R.string.portal_pager_home_label)
-    val contactsLabel = stringResource(R.string.portal_pager_contacts_label)
+    val contactsLabel = stringResource(R.string.portal_pager_contacts_label_plural)
     val currentPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
         .coerceIn(0f, (pagerState.pageCount - 1).coerceAtLeast(0).toFloat())
 
@@ -733,9 +749,31 @@ private fun HomePagerIndicator(
 }
 
 @Composable
-private fun CountBadge(count: Int, tag: String, @PluralsRes descriptionRes: Int = R.plurals.requests_badge) {
-    val description = pluralStringResource(descriptionRes, count, count)
+private fun CountBadge(
+    count: Int,
+    tag: String,
+    @StringRes oneBeforeRes: Int = R.string.requests_badge_singular_before_number,
+    @StringRes oneAfterRes: Int = R.string.requests_badge_singular_after_number,
+    @StringRes otherBeforeRes: Int = R.string.requests_badge_plural_before_number,
+    @StringRes otherAfterRes: Int = R.string.requests_badge_plural_after_number,
+) {
+    val description = quantityNumberSentenceResource(
+        count = count,
+        oneBeforeRes = oneBeforeRes,
+        oneAfterRes = oneAfterRes,
+        otherBeforeRes = otherBeforeRes,
+        otherAfterRes = otherAfterRes,
+    )
+    val badgeText = if (count > 99) {
+        numberSentenceResource(
+            R.string.main_count_badge_cap_before_number,
+            formatLocalizedInt(99),
+            R.string.main_count_badge_cap_after_number,
+        )
+    } else {
+        formatLocalizedInt(count)
+    }
     Badge(Modifier.testTag(tag).semantics { contentDescription = description }) {
-        Text(if (count > 99) "99+" else count.toString())
+        Text(badgeText)
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -43,13 +44,15 @@ internal fun RandomEmotionSoundDialog(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val busy = downloading || saving
+    val categoryOptions = localizedEmotionSoundCategories()
+    val languageOptions = localizedEmotionSoundLanguages()
     val categoryLabel = candidate?.first?.let { sound ->
-        if (sound.category in 1 until emotionSoundCategories.size) emotionSoundCategories[sound.category] else "Unknown"
-    } ?: emotionSoundCategories[category]
+        localizedEmotionSoundCategory(sound.category)
+    } ?: categoryOptions.getOrElse(category) { stringResource(R.string.common_unknown) }
 
     fun download() {
         val activeService = soundService ?: run {
-            error = "Online emotion sounds are not configured for this service."
+            error = context.getString(R.string.emotion_sound_not_configured)
             return
         }
         player.stop()
@@ -63,7 +66,7 @@ internal fun RandomEmotionSoundDialog(
                 player.checkAccount()
                 candidate = result
             } catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { error = failure.message ?: "The sound could not be downloaded." }
+            catch (failure: Exception) { error = failure.message ?: context.getString(R.string.emotion_sound_download_failed) }
             finally { downloading = false }
         }
     }
@@ -71,25 +74,28 @@ internal fun RandomEmotionSoundDialog(
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         modifier = Modifier.testTag("emotion_sound_random_dialog"),
-        title = { Text("Random sound") },
+        title = { Text(stringResource(R.string.random_sound_title)) },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Find a sound, preview it, then choose whether to keep it.")
-                Text("Category: $categoryLabel", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.random_sound_instructions))
+                Text(stringResource(R.string.random_sound_category_format, categoryLabel), style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Language", Modifier.weight(1f))
-                    EmotionSoundDropdown(language, emotionSoundLanguages, "Sound language", "emotion_sound_language",
+                    Text(stringResource(R.string.random_sound_language_label), Modifier.weight(1f))
+                    EmotionSoundDropdown(language, languageOptions, stringResource(R.string.random_sound_language_desc), "emotion_sound_language",
                         enabled = !busy, onSelected = {
                             player.stop(); language = it; candidate = null; error = null
                         })
                 }
                 OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = ::download, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("emotion_sound_random_fetch")) {
-                    Text(if (candidate == null) "Download" else "Try another")
+                    Text(stringResource(if (candidate == null) R.string.common_download else R.string.random_sound_try_another))
                 }
                 if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
                 candidate?.let { (sound, bytes) ->
-                    Text(sound.name.messengerPlusPlainText(), style = MaterialTheme.typography.titleMedium)
-                    Text("#${sound.id}", style = MaterialTheme.typography.labelSmall)
+                    Text(localizedEmotionSoundName(sound.name).messengerPlusPlainText(), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        numberSentenceResource(R.string.emotion_sound_id_before_number, sound.id, R.string.emotion_sound_id_after_number),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                     val active = player.activeId == sound.id
                     OutlinedButton(
                         shapes = ButtonDefaults.shapes(),
@@ -99,10 +105,10 @@ internal fun RandomEmotionSoundDialog(
                     ) {
                         Icon(if (active) Icons.Default.Stop else Icons.Default.PlayArrow, null)
                         Spacer(Modifier.width(8.dp))
-                        Text(if (active) "Stop" else "Preview")
+                        Text(stringResource(if (active) R.string.common_stop else R.string.common_preview))
                     }
                 }
-                (error ?: player.error)?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                (error ?: player.error)?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         },
         confirmButton = {
@@ -118,11 +124,11 @@ internal fun RandomEmotionSoundDialog(
                         player.checkAccount()
                         onKept(sound)
                     } catch (cancel: CancellationException) { throw cancel }
-                    catch (failure: Exception) { error = failure.message ?: "The sound could not be saved." }
+                    catch (failure: Exception) { error = failure.message ?: context.getString(R.string.emotion_sound_save_failed) }
                     finally { saving = false }
                 }
-            }, modifier = Modifier.testTag("emotion_sound_random_keep")) { Text("Keep") }
+            }, modifier = Modifier.testTag("emotion_sound_random_keep")) { Text(stringResource(R.string.random_sound_keep)) }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(if (candidate == null) "Cancel" else "Discard") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(stringResource(if (candidate == null) R.string.common_cancel else R.string.random_sound_discard)) } },
     )
 }

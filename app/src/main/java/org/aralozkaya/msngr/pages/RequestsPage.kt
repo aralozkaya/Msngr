@@ -66,6 +66,7 @@ import org.aralozkaya.msngr.MessengerPlusText
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.ContactRequest
 import org.aralozkaya.msngr.data.GroupInvitation
+import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 
@@ -138,7 +139,7 @@ internal fun RequestsPage(
                     }
                 }
                 if (requests.isNotEmpty()) item(key = "contact-heading") {
-                    RequestSectionHeading(stringResource(R.string.contact_requests_title), requests.size)
+                    RequestSectionHeading(stringResource(R.string.contact_requests_title_plural), requests.size)
                 }
                 items(requests, key = { "contact:${it.id}" }) { request ->
                     RequestCard(Modifier.animateItem().testTag("contact-request-${request.id}"),
@@ -149,12 +150,12 @@ internal fun RequestsPage(
                             }
                             Text(request.email, style = MaterialTheme.typography.bodyLarge)
                         }) {
-                        Text(stringResource(R.string.contact_request_message))
+                        Text(stringResource(R.string.contact_request_message_you_singular))
                         request.message?.takeIf(String::isNotBlank)?.let {
                             Text(it, modifier = Modifier.testTag("contact-request-message-${request.id}"))
                         }
                         contactError?.takeIf { it.first == request.id }?.let {
-                            Text(it.second, color = MaterialTheme.colorScheme.error,
+                            Text(localizeUserMessage(it.second), color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.testTag("contact-request-error-${request.id}")
                                     .semantics { liveRegion = LiveRegionMode.Polite })
                         }
@@ -210,7 +211,7 @@ internal fun RequestsPage(
                     }
                 }
                 if (invitations.isNotEmpty()) item(key = "group-heading") {
-                    RequestSectionHeading(stringResource(R.string.group_invitations_title), invitations.size)
+                    RequestSectionHeading(stringResource(R.string.group_invitations_title_plural), invitations.size)
                 }
                 items(invitations, key = { "group:${it.id}" }) { invitation ->
                     RequestCard(Modifier.animateItem().testTag("group-invitation-${invitation.id}"),
@@ -222,12 +223,12 @@ internal fun RequestsPage(
                                 ?: stringResource(R.string.group_invitation_unknown_inviter)
                             Text(inviter, style = MaterialTheme.typography.bodyLarge)
                         }) {
-                        Text(stringResource(R.string.group_invitation_message))
+                        Text(stringResource(R.string.group_invitation_message_you_singular))
                         invitation.message?.takeIf(String::isNotBlank)?.let {
                             Text(it, modifier = Modifier.testTag("group-invitation-message-${invitation.id}"))
                         }
                         groupError?.takeIf { it.first == invitation.id }?.let {
-                            Text(it.second, color = MaterialTheme.colorScheme.error,
+                            Text(localizeUserMessage(it.second), color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.testTag("group-invitation-error-${invitation.id}")
                                     .semantics { liveRegion = LiveRegionMode.Polite })
                         }

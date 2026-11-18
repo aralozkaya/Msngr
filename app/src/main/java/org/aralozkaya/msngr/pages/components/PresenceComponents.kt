@@ -15,7 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.ui.theme.pill
 
@@ -49,7 +51,7 @@ fun PresenceBadge(
                 modifier = Modifier.size(8.dp),
             )
             Text(
-                text = if (isBlocked) "Blocked" else presence.label,
+                text = if (isBlocked) stringResource(R.string.common_blocked) else presence.displayLabel(),
                 style = MaterialTheme.typography.labelMedium,
                 color = if (isBlocked) {
                     MaterialTheme.colorScheme.onErrorContainer
@@ -79,7 +81,7 @@ fun PresenceLabel(presence: Presence) {
                 .background(presenceColor(presence)),
         )
         Text(
-            text = presence.label,
+            text = presence.displayLabel(),
             style = MaterialTheme.typography.labelLarge,
         )
     }

@@ -57,12 +57,12 @@ internal fun GroupBlockingDialog(
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(if (blocked) R.string.group_block_title else R.string.group_unblock_title),
                     style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(if (blocked) R.string.group_block_message else R.string.group_unblock_message,
+                Text(stringResource(if (blocked) R.string.group_block_message_you_singular else R.string.group_unblock_message,
                     group.displayName.messengerPlusPlainText()))
                 if (failed) Text(stringResource(R.string.group_block_failed), color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("group-block-error").semantics { liveRegion = LiveRegionMode.Polite })
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End)) {
-                    TextButton(onDismiss, enabled = !busy) { Text("Cancel") }
+                    TextButton(onDismiss, enabled = !busy) { Text(stringResource(R.string.common_cancel)) }
                     Button(onClick = {
                         if (!busy) {
                             busy = true
