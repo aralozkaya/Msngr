@@ -1271,9 +1271,44 @@
     <string name="profile_save_button"></string>
     <!-- Reference (en): Sign-in address -->
     <string name="profile_sign_in_address_label"></string>
+    <!-- Reference (en): What I\'m listening to -->
+    <string name="now_playing_service_label"></string>
+    <!-- Reference (en): Listening to -->
+    <string name="current_media_listening_label"></string>
+    <!-- Reference (en): Playing -->
+    <string name="current_media_playing_game_label"></string>
+    <!-- Reference (en): Working on -->
+    <string name="current_media_office_label"></string>
+    <!-- Reference (en): Listening to %1$s -->
+    <string name="current_media_listening_description"></string>
+    <!-- Reference (en): Playing %1$s -->
+    <string name="current_media_playing_game_description"></string>
+    <!-- Reference (en): Working on %1$s -->
+    <string name="current_media_office_description"></string>
+    <!-- Reference (en): Show what I\'m listening to -->
+    <string name="profile_now_playing_title"></string>
+    <!-- Reference (en): Sharing now -->
+    <string name="profile_now_playing_currently_sharing"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <!-- Reference (en): Managed by your selected community service -->
-    <string name="profile_sign_in_address_supporting_you_singular"></string>
+    <!-- Reference (en): Nothing is playing right now. Your personal message will stay visible until music starts. -->
+    <string name="profile_now_playing_nothing_playing_you_singular"></string>
+    <!-- Reference (en): Notification access is off, so music cannot be detected. -->
+    <string name="profile_now_playing_access_missing"></string>
+    <!-- Reference (en): Allow notification access -->
+    <string name="profile_now_playing_grant_access"></string>
+    <!-- Reference (en): Allow notification access -->
+    <string name="profile_now_playing_permission_title"></string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <!-- Reference (en): Android requires Notification access so Msngr can read the song title and artist from active media players on your device. Other notifications are ignored and never stored. -->
+    <string name="profile_now_playing_permission_body_you_singular"></string>
+    <!-- Reference (en): If Android marks Notification access as a restricted setting, open App info, tap the top-right menu, and choose Allow restricted settings. -->
+    <string name="profile_now_playing_permission_restricted_hint"></string>
+    <!-- Reference (en): Open App info -->
+    <string name="profile_now_playing_open_app_info"></string>
+    <!-- Reference (en): Open settings -->
+    <string name="profile_now_playing_open_settings"></string>
+    <!-- Reference (en): Could not open system settings on this device. -->
+    <string name="profile_now_playing_settings_unavailable"></string>
     <!-- Reference (en): Display picture changed -->
     <string name="display_picture_conflict_title"></string>
     <!-- Reference (en): Messenger has a different display picture. Choose which one to keep. -->

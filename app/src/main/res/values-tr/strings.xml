@@ -687,8 +687,26 @@
     <string name="profile_error_save_picture_server">Görüntü resmi sunucuya kaydedilemedi.</string>
     <string name="profile_save_button">Profili kaydet</string>
     <string name="profile_sign_in_address_label">Oturum açma adresi</string>
+    <string name="now_playing_service_label">Ne dinliyorum</string>
+    <string name="current_media_listening_label">Dinliyor</string>
+    <string name="current_media_playing_game_label">Oynuyor</string>
+    <string name="current_media_office_label">Çalışıyor</string>
+    <string name="current_media_listening_description">Dinliyor: %1$s</string>
+    <string name="current_media_playing_game_description">Oynuyor: %1$s</string>
+    <string name="current_media_office_description">Çalışıyor: %1$s</string>
+    <string name="profile_now_playing_title">Ne dinlediğimi göster</string>
+    <string name="profile_now_playing_currently_sharing">Şu anda paylaşılıyor</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="profile_sign_in_address_supporting_you_singular">Seçilen topluluk hizmeti tarafından yönetilir</string>
+    <string name="profile_now_playing_nothing_playing_you_singular">Şu anda hiçbir şey çalmıyor. Müzik başlayana kadar kişisel iletiniz görünmeye devam eder.</string>
+    <string name="profile_now_playing_access_missing">Bildirim erişimi kapalı olduğu için çalan müzik algılanamıyor.</string>
+    <string name="profile_now_playing_grant_access">Bildirim erişimine izin ver</string>
+    <string name="profile_now_playing_permission_title">Bildirim erişimine izin verin</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="profile_now_playing_permission_body_you_singular">Android, Msngr\'ın cihazınızdaki etkin medya oynatıcılardan şarkı adını ve sanatçıyı okuyabilmesi için Bildirim erişimi gerektirir. Diğer bildirimler yok sayılır ve hiçbir zaman saklanmaz.</string>
+    <string name="profile_now_playing_permission_restricted_hint">Android, Bildirim erişimini kısıtlanmış ayar olarak işaretlerse Uygulama bilgilerini açın, sağ üst menüye dokunun ve Kısıtlanmış ayarlara izin ver seçeneğini seçin.</string>
+    <string name="profile_now_playing_open_app_info">Uygulama bilgilerini aç</string>
+    <string name="profile_now_playing_open_settings">Ayarları aç</string>
+    <string name="profile_now_playing_settings_unavailable">Bu cihazda sistem ayarları açılamadı.</string>
     <string name="display_picture_conflict_title">Görüntü resmi değişti</string>
     <string name="display_picture_conflict_body">Messenger\'da farklı bir görüntü resmi var. Hangisinin tutulacağını seçin.</string>
     <string name="display_picture_conflict_old">Eski resim</string>

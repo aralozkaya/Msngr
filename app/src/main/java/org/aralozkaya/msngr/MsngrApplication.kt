@@ -45,10 +45,15 @@ class MsngrApplication : Application() {
         }
     }
     internal val displayPictureSync by lazy { DisplayPictureSync(this) }
+    internal val nowPlayingController by lazy { NowPlayingController(this) }
     val updateManager by lazy { org.aralozkaya.msngr.updates.UpdateManager(this) }
     internal val visibilityTracker: AppVisibilityTracker = AppVisibilityTracker { isForeground ->
-        if (isForeground) notificationManager.dismissContactSignedInNotifications()
-        else inAppNotifications.dismiss()
+        if (isForeground) {
+            notificationManager.dismissContactSignedInNotifications()
+            nowPlayingController.refreshState()
+        } else {
+            inAppNotifications.dismiss()
+        }
         runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
             repository.setAppInForeground(isForeground)
             displayPictureSync.setForeground(isForeground)
@@ -86,6 +91,7 @@ class MsngrApplication : Application() {
                 transferAutomation.attach(repository)
                 realtimeNotificationBridge.attach(repository)
                 displayPictureSync.attach(repository)
+                nowPlayingController.attach(repository)
                 displayPictureSync.setForeground(visibilityTracker.isForeground)
                 repository.setAppInForeground(visibilityTracker.isForeground)
             },

@@ -58,6 +58,10 @@ Made by **Aral Özkaya**, with AI assistance. [More on that below.](#made-with-a
   Plus! formatting supports styled text and both text and background colors in names and personal
   messages, including preset colors, custom colors, and gradients.
   Rendering on other clients depends on their support for Messenger Plus! formatting.
+- **Show what you're listening to.** Optionally share the song currently playing on your device
+  using classic MSNP `<CurrentMedia>` presence (off by default, per account, in **Edit profile**).
+  Your saved personal message stays intact and reappears automatically when playback pauses or
+  stops. See the [Notification access note](#what-im-listening-to-and-notification-access) below.
 - **Manage your contacts.** Add people by Messenger email address, handle contact requests,
   view profiles, block or unblock contacts, delete contacts, and erase saved conversations.
 - **Stay connected on Android.** Receive message, nudge, presence, request, and invitation
@@ -337,6 +341,35 @@ The **Use mock server** switch shown in the screenshots is available in debug bu
 Background delivery uses a direct Messenger connection. Android notification permissions,
 channel settings, and process restrictions affect delivery; force-stopping the app requires
 opening it again. See [background behavior and device setup](docs/PUSH_NOTIFICATIONS.md).
+
+### "What I'm listening to?" and Notification access
+
+Enabling **Show what I'm listening to** in **Edit profile** asks for Android's **Notification
+access** permission, which understandably looks broad. Android does not provide a narrower
+permission for third-party apps to read active playback metadata from arbitrary music players
+(`MEDIA_CONTENT_CONTROL` is restricted to system apps): calling `MediaSessionManager` for active
+sessions requires an enabled `NotificationListenerService`.
+
+Msngr narrows this permission to the least privilege Android allows:
+
+- **Off by default:** The feature is opt-in per account. If you do not enable it, Msngr never asks
+  for Notification access and never monitors media playback.
+- **Media sessions only — notifications are never read:** `NowPlayingListenerService` exists only
+  to satisfy Android's `MediaSessionManager` authorization check and react if access is revoked.
+  Msngr never inspects, logs, stores, or transmits your notifications; it reads only active track
+  metadata (title, artist, album, and playback state) from `MediaSessionManager` while signed in
+  with the toggle enabled.
+- **All notification categories disabled at the OS level (Android 12+ / API 31+):** In
+  `AndroidManifest.xml`, `NowPlayingListenerService` declares `default_filter_types=""` and
+  `disabled_filter_types="conversations|alerting|silent|ongoing"`, opting out of all four Android
+  notification categories (`Real-time`, `Conversations`, `Notifications`, and `Silent`) so Android
+  locks them off in **Notification access** settings and withholds notification payloads.
+- **Ephemeral presence:** Active track metadata is sent only as MSNP `<CurrentMedia>` presence
+  (never saved into your personal message or stored on disk) and clears automatically when playback
+  pauses or stops, when you turn the toggle off, or when you sign out.
+
+On Android 13+ sideloaded installs, Android may mark **Notification access** as a restricted
+setting until you choose **Allow restricted settings** from the top-right menu in **App info**.
 
 ## Build from source
 
