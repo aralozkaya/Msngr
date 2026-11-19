@@ -687,8 +687,26 @@
     <string name="profile_error_save_picture_server">The display picture could not be saved to the server.</string>
     <string name="profile_save_button">Save profile</string>
     <string name="profile_sign_in_address_label">Sign-in address</string>
+    <string name="now_playing_service_label">What I\'m listening to</string>
+    <string name="current_media_listening_label">Listening to</string>
+    <string name="current_media_playing_game_label">Playing</string>
+    <string name="current_media_office_label">Working on</string>
+    <string name="current_media_listening_description">Listening to %1$s</string>
+    <string name="current_media_playing_game_description">Playing %1$s</string>
+    <string name="current_media_office_description">Working on %1$s</string>
+    <string name="profile_now_playing_title">Show what I\'m listening to</string>
+    <string name="profile_now_playing_currently_sharing">Sharing now</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
-    <string name="profile_sign_in_address_supporting_you_singular">Managed by your selected community service</string>
+    <string name="profile_now_playing_nothing_playing_you_singular">Nothing is playing right now. Your personal message will stay visible until music starts.</string>
+    <string name="profile_now_playing_access_missing">Notification access is off, so music cannot be detected.</string>
+    <string name="profile_now_playing_grant_access">Allow notification access</string>
+    <string name="profile_now_playing_permission_title">Allow notification access</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="profile_now_playing_permission_body_you_singular">Android requires Notification access so Msngr can read the song title and artist from active media players on your device. Other notifications are ignored and never stored.</string>
+    <string name="profile_now_playing_permission_restricted_hint">If Android marks Notification access as a restricted setting, open App info, tap the top-right menu, and choose Allow restricted settings.</string>
+    <string name="profile_now_playing_open_app_info">Open App info</string>
+    <string name="profile_now_playing_open_settings">Open settings</string>
+    <string name="profile_now_playing_settings_unavailable">Could not open system settings on this device.</string>
     <string name="display_picture_conflict_title">Display picture changed</string>
     <string name="display_picture_conflict_body">Messenger has a different display picture. Choose which one to keep.</string>
     <string name="display_picture_conflict_old">Old picture</string>

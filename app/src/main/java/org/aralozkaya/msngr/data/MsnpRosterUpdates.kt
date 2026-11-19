@@ -12,6 +12,7 @@ internal fun mergeBlockedContactUpdate(current: List<Contact>, blocked: List<Con
         contact.copy(
             isBlocked = isBlocked,
             presence = if (isBlocked) Presence.Offline else contact.presence,
+            currentMedia = if (isBlocked) null else contact.currentMedia,
             unreadCount = if (isBlocked) 0 else contact.unreadCount,
             isMarkedUnread = !isBlocked && contact.isMarkedUnread,
             clientCapabilities = if (isBlocked) 0L else contact.clientCapabilities,
@@ -54,6 +55,7 @@ internal fun mergeAddressBookUpdate(
             isBlocked = if (snapshot.failedBlockedLookup) previous?.isBlocked ?: fresh.isBlocked else fresh.isBlocked,
             presence = previous?.presence ?: fresh.presence,
             statusMessage = previous?.statusMessage ?: fresh.statusMessage,
+            currentMedia = previous?.currentMedia ?: fresh.currentMedia,
             avatarUri = previous?.avatarUri ?: fresh.avatarUri,
             unreadCount = previous?.unreadCount ?: fresh.unreadCount,
             isMarkedUnread = previous?.isMarkedUnread ?: fresh.isMarkedUnread,

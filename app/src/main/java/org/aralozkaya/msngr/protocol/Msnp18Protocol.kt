@@ -281,28 +281,48 @@ object Msnp18Protocol {
     }
 
     /**
-     * Publishes the user's personal status message through the MSNP18 UUX command.
+     * Publishes the user's personal status message and optional current media through the MSNP18 UUX command.
      * The payload shape mirrors the protocol 16+ Pidgin implementation.
      */
     fun personalMessage(
         transactionId: Int,
         statusMessage: String,
         machineGuid: String = "",
+        currentMedia: CurrentMedia? = null,
     ): MsnpCommand {
+        val encodedMedia = MsnCurrentMedia.encode(currentMedia)
         return uux(transactionId, buildString {
             append("<Data><PSM>")
             append(statusMessage.trim().escapeXml())
-            append("</PSM><CurrentMedia></CurrentMedia><MachineGuid>")
+            append("</PSM><CurrentMedia>")
+            append(encodedMedia.escapeXml())
+            append("</CurrentMedia><MachineGuid>")
             append(machineGuid.escapeXml())
             append("</MachineGuid><DDP></DDP></Data>")
         })
     }
+
+    /** Returns true if an incoming UBX XML payload explicitly includes a `<PSM>` element. */
+    fun hasPersonalMessageElement(payload: ByteArray): Boolean =
+        PSM_TAG.containsMatchIn(String(payload, StandardCharsets.UTF_8))
 
     /** Extracts a contact's personal message from an incoming UBX XML payload. */
     fun parsePersonalMessage(payload: ByteArray): String {
         val xml = String(payload, StandardCharsets.UTF_8)
         if (SELF_CLOSING_PSM.containsMatchIn(xml)) return ""
         return PSM_VALUE.find(xml)?.groupValues?.get(1)?.unescapeXml().orEmpty()
+    }
+
+    /** Returns true if an incoming UBX XML payload explicitly includes a `<CurrentMedia>` element. */
+    fun hasCurrentMediaElement(payload: ByteArray): Boolean =
+        CURRENT_MEDIA_TAG.containsMatchIn(String(payload, StandardCharsets.UTF_8))
+
+    /** Extracts a contact's "What I'm listening to?" metadata from an incoming UBX XML payload. */
+    fun parseCurrentMedia(payload: ByteArray): CurrentMedia? {
+        val xml = String(payload, StandardCharsets.UTF_8)
+        if (SELF_CLOSING_CURRENT_MEDIA.containsMatchIn(xml)) return null
+        val raw = CURRENT_MEDIA_VALUE.find(xml)?.groupValues?.get(1)?.unescapeXml() ?: return null
+        return MsnCurrentMedia.parse(raw)
     }
 
     fun typingPayload(email: String): ByteArray = mimePayload(
@@ -494,12 +514,28 @@ object Msnp18Protocol {
 
     private val XML_ENTITY = Regex("&(lt|gt|quot|apos|amp|#[0-9]+|#x[0-9a-fA-F]+);")
 
+    private val PSM_TAG = Regex(
+        pattern = "<PSM(?:>|\\s|/)",
+        option = RegexOption.IGNORE_CASE,
+    )
     private val PSM_VALUE = Regex(
         pattern = "<PSM(?:\\s[^>]*)?>(.*?)</PSM>",
         options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
     )
     private val SELF_CLOSING_PSM = Regex(
         pattern = "<PSM(?:\\s[^>]*)?\\s*/>",
+        option = RegexOption.IGNORE_CASE,
+    )
+    private val CURRENT_MEDIA_TAG = Regex(
+        pattern = "<CurrentMedia(?:>|\\s|/)",
+        option = RegexOption.IGNORE_CASE,
+    )
+    private val CURRENT_MEDIA_VALUE = Regex(
+        pattern = "<CurrentMedia(?:\\s[^>]*)?>(.*?)</CurrentMedia>",
+        options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+    )
+    private val SELF_CLOSING_CURRENT_MEDIA = Regex(
+        pattern = "<CurrentMedia(?:\\s[^>]*)?\\s*/>",
         option = RegexOption.IGNORE_CASE,
     )
 

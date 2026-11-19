@@ -123,17 +123,29 @@ fun LoggedInUserProfileCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    MsnEmoticonText(
-                        text = profile.statusMessage.ifBlank {
-                            stringResource(R.string.profile_no_personal_message)
-                        }.let { localizeUserMessage(it) },
-                        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                        sceneGlow = scene != null,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    val currentMedia = profile.currentMedia
+                    if (currentMedia != null) {
+                        CurrentMediaLine(
+                            media = currentMedia,
+                            modifier = Modifier.testTag("own-profile-current-media"),
+                            sceneGlow = scene != null,
+                            textColor = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                            iconTint = if (scene != null) sceneInk else MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        MsnEmoticonText(
+                            text = profile.statusMessage.ifBlank {
+                                stringResource(R.string.profile_no_personal_message)
+                            }.let { localizeUserMessage(it) },
+                            useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                            sceneGlow = scene != null,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Box {
                         FilledTonalButton(
                             onClick = { presenceMenuExpanded = true },
@@ -289,7 +301,7 @@ fun ContactRow(
                                     maxLines = 1,
                                 )
                             }
-                        } else {
+                        } else if (supportingText != null || contact.isGroup || contact.currentMedia == null || !contact.presence.isOnline) {
                             MsnEmoticonText(
                                 text = supportingText ?: if (contact.isGroup) {
                                     quantityNumberSentenceResource(
@@ -307,6 +319,11 @@ fun ContactRow(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                            )
+                        } else {
+                            CurrentMediaLine(
+                                media = contact.currentMedia,
+                                modifier = Modifier.testTag("contact-current-media-${contact.id}"),
                             )
                         }
                     }

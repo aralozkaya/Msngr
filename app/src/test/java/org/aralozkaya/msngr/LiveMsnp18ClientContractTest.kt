@@ -34,6 +34,7 @@ import org.aralozkaya.msngr.data.SwitchboardMimeMessage
 import org.aralozkaya.msngr.data.parseSwitchboardMime
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.MsnCurrentMedia
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
@@ -2464,6 +2465,126 @@ class LiveMsnp18ClientContractTest {
         } finally {
             client.close()
             directory.deleteRecursively()
+        }
+    }
+
+    @Test fun currentMediaPublishesViaUuxPreservesPsmAcrossEditsAndSyncsContactAndOwnUbx(): Unit = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val storageUpdates = CopyOnWriteArrayList<Pair<String, String>>()
+        val client = LiveMsnp18Client(
+            transport = notification,
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact.copy(presence = Presence.Online))) },
+            fetchStorageProfile = { _, _ ->
+                StorageProfile(
+                    profileResourceId = "123!101",
+                    photoResourceId = "photo-1",
+                    personalStatus = "Original PSM",
+                )
+            },
+            updateStorageDisplayPicture = { _, _, _, _ -> },
+            updateStoragePersonalStatus = { _, _, profileResourceId, personalStatus ->
+                storageUpdates += profileResourceId to personalStatus
+            },
+        )
+        val repository = MessengerRepository(client)
+        val track = MsnCurrentMedia.music("Bohemian Rhapsody", "Queen", "A Night at the Opera")!!
+        val desktopTrack = MsnCurrentMedia.music("Desktop Track", "Artist")!!
+        val contactTrack = MsnCurrentMedia.music("Peer Song", "Peer Artist")!!
+        try {
+            repository.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+
+            // Publishing CurrentMedia sends UUX with both <PSM> and <CurrentMedia> and skips roaming storage.
+            repository.updateCurrentMedia(track).getOrThrow()
+            assertTrue(storageUpdates.isEmpty())
+            val mediaUux = notification.sent.last { it.verb == "UUX" }.payload!!
+            assertEquals("Original PSM", Msnp18Protocol.parsePersonalMessage(mediaUux))
+            assertEquals(track, Msnp18Protocol.parseCurrentMedia(mediaUux))
+
+            // Updating PSM and display picture preserves active <CurrentMedia>.
+            repository.updateStatusMessage("Updated PSM").getOrThrow()
+            val psmUux = notification.sent.last { it.verb == "UUX" }.payload!!
+            assertEquals("Updated PSM", Msnp18Protocol.parsePersonalMessage(psmUux))
+            assertEquals(track, Msnp18Protocol.parseCurrentMedia(psmUux))
+
+            client.changeDisplayPicture(mockDisplayPictureBytes())
+            val pictureUux = notification.sent.last { it.verb == "UUX" }.payload!!
+            assertEquals(track, Msnp18Protocol.parseCurrentMedia(pictureUux))
+
+            // Clearing CurrentMedia sends empty <CurrentMedia></CurrentMedia> while preserving PSM.
+            repository.updateCurrentMedia(null).getOrThrow()
+            val clearedUux = notification.sent.last { it.verb == "UUX" }.payload!!
+            assertEquals("Updated PSM", Msnp18Protocol.parsePersonalMessage(clearedUux))
+            assertNull(Msnp18Protocol.parseCurrentMedia(clearedUux))
+
+            // Incoming contact UBX sets currentMedia, preserves across endpoint-only UBX, and clears on disabled/empty/FLN.
+            val encodedContactMedia = MsnCurrentMedia.encode(contactTrack)
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:${contact.email}"),
+                    payload = "<Data><PSM>Contact PSM</PSM><CurrentMedia>$encodedContactMedia</CurrentMedia></Data>".toByteArray(),
+                ),
+            )
+            withTimeout(2_000) {
+                repository.contacts.first { it.single().currentMedia == contactTrack }
+            }
+            assertEquals("Contact PSM", repository.contacts.value.single().statusMessage)
+
+            // Endpoint-only UBX without <PSM> or <CurrentMedia> preserves contact currentMedia.
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:${contact.email}"),
+                    payload = "<Data><EndpointData id=\"{11111111-1111-1111-1111-111111111111}\"><Capabilities>${Msnp18Protocol.ENDPOINT_CAPABILITIES}</Capabilities></EndpointData></Data>".toByteArray(),
+                ),
+            )
+            delay(50)
+            assertEquals(contactTrack, repository.contacts.value.single().currentMedia)
+
+            // Disabled CurrentMedia flag clears contact media.
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:${contact.email}"),
+                    payload = "<Data><PSM>Contact PSM</PSM><CurrentMedia>\\0Music\\00\\0{0} - {1}\\0Peer Song\\0Peer Artist\\0\\0</CurrentMedia></Data>".toByteArray(),
+                ),
+            )
+            withTimeout(2_000) {
+                repository.contacts.first { it.single().currentMedia == null }
+            }
+
+            // Re-enable then verify FLN clears contact media.
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:${contact.email}"),
+                    payload = "<Data><PSM>Contact PSM</PSM><CurrentMedia>$encodedContactMedia</CurrentMedia></Data>".toByteArray(),
+                ),
+            )
+            withTimeout(2_000) {
+                repository.contacts.first { it.single().currentMedia == contactTrack }
+            }
+            notification.deliver(MsnpCommand("FLN", parameters = listOf("1:${contact.email}")))
+            withTimeout(2_000) {
+                repository.contacts.first { !it.single().presence.isOnline && it.single().currentMedia == null }
+            }
+
+            // Own-account UBX from another MPoP endpoint updates repository.profile.value.currentMedia.
+            val encodedDesktopMedia = MsnCurrentMedia.encode(desktopTrack)
+            notification.deliver(
+                MsnpCommand(
+                    verb = "UBX",
+                    parameters = listOf("1:$email"),
+                    payload = "<Data><PSM>Updated PSM</PSM><CurrentMedia>$encodedDesktopMedia</CurrentMedia></Data>".toByteArray(),
+                ),
+            )
+            withTimeout(2_000) {
+                repository.profile.first { it.currentMedia == desktopTrack }
+            }
+            assertEquals(desktopTrack, repository.profile.value.currentMedia)
+        } finally {
+            repository.logout()
         }
     }
 }

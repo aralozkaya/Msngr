@@ -68,6 +68,8 @@ import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.PresenceLabel
 import org.aralozkaya.msngr.pages.components.ProfileDetailCard
+import org.aralozkaya.msngr.pages.components.icon
+import org.aralozkaya.msngr.pages.components.labelRes
 import org.aralozkaya.msngr.ui.theme.avatar
 
 @Composable
@@ -163,6 +165,18 @@ fun ContactProfilePage(
                                 useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
                                 style = MaterialTheme.typography.bodyLarge,
                             )
+                        }
+                        contact.currentMedia?.let { media ->
+                            ProfileDetailCard(
+                                icon = media.icon(),
+                                label = stringResource(media.labelRes()),
+                                modifier = Modifier.testTag("contact-profile-current-media"),
+                                supportingText = media.album.takeIf {
+                                    it.isNotBlank() && !media.displayText.contains(it, ignoreCase = true)
+                                },
+                            ) {
+                                Text(media.displayText, style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
                 }

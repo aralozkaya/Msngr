@@ -38,6 +38,7 @@ import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.deviceEndpointName
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.CurrentMedia
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
@@ -271,6 +272,7 @@ internal class LiveMsnp18Client(
     private var switchboardFallbackPort = DEFAULT_SWITCHBOARD_PORT
     private var currentPresence = Presence.Online
     private var currentPersonalMessage = ""
+    private var currentMedia: CurrentMedia? = null
     private var storagePersonalStatus: String? = null
     private var storagePersonalStatusConfirmed = false
     private var receivedLivePersonalMessage = false
@@ -522,6 +524,7 @@ internal class LiveMsnp18Client(
             statusMessage = if (receivedLivePersonalMessage) currentPersonalMessage else storagePersonalStatus.orEmpty(),
             displayPictureFetched = signInData.storage.available && storageProfile != null && storageProfile.displayPictureStateKnown &&
                 (storageProfile.displayPictureUrl == null || storedDisplayPicture?.isNotEmpty() == true),
+            currentMedia = currentMedia,
         )
     }.onFailure {
         val accountId = AccountIdentity.forServer(request.email, request.serverConfig, false).storageId
@@ -566,6 +569,16 @@ internal class LiveMsnp18Client(
             if (isRoamingProfileEnabled()) {
                 persistStoragePersonalStatusLocked(endpoint, normalized)
             }
+        }
+    }
+
+    override suspend fun changeCurrentMedia(media: CurrentMedia?) {
+        if (signedInEmail.isEmpty()) return
+        personalMessageMutex.withLock {
+            if (signedInEmail.isEmpty()) return@withLock
+            if (currentMedia == media) return@withLock
+            currentMedia = media
+            sendCurrentPersonalMessage()
         }
     }
 
@@ -900,6 +913,7 @@ internal class LiveMsnp18Client(
                 transactionId = nextTransactionId(),
                 statusMessage = currentPersonalMessage,
                 machineGuid = machineGuid,
+                currentMedia = currentMedia,
             ),
         )
     }
@@ -2719,6 +2733,7 @@ internal class LiveMsnp18Client(
         updateContact(email) { existing ->
             existing?.copy(
                 presence = Presence.Offline,
+                currentMedia = null,
                 clientCapabilities = 0L,
                 extendedCapabilities = 0L,
             )
@@ -2750,10 +2765,17 @@ internal class LiveMsnp18Client(
             }
             ownPictureSourceEndpoint = firstEndpoint
             ownPresencePicturePending = false
+            if (Msnp18Protocol.hasCurrentMediaElement(payload)) {
+                val incomingMedia = Msnp18Protocol.parseCurrentMedia(payload)
+                currentMedia = incomingMedia
+                signedInIdentity?.let {
+                    mutableEvents.tryEmit(MessengerEvent.OwnCurrentMediaChanged(it, incomingMedia))
+                }
+            }
             // PSM is account-wide when roaming is enabled. Retain a change from another place
             // when a later picture update republishes UUX, instead of restoring our stale message.
             if (isRoamingProfileEnabled()) {
-                val personalMessage = if (Regex("<PSM(?:>|\\s|/)").containsMatchIn(payload.toString(Charsets.UTF_8)))
+                val personalMessage = if (Msnp18Protocol.hasPersonalMessageElement(payload))
                     Msnp18Protocol.parsePersonalMessage(payload) else null
                 if (personalMessage != null) {
                     val normalized = normalizePersonalStatus(personalMessage).orEmpty()
@@ -2782,10 +2804,15 @@ internal class LiveMsnp18Client(
         val endpointCapabilities = parseEndpointCapabilities(payload)
         val networkId = command.parameters.firstOrNull()?.identityNetworkId()
             ?: command.parameters.takeIf { it.size >= 3 }?.getOrNull(1)?.toIntOrNull()
+        val hasPsm = Msnp18Protocol.hasPersonalMessageElement(payload)
+        val hasMedia = Msnp18Protocol.hasCurrentMediaElement(payload)
+        val shouldUpdateMedia = hasMedia || hasPsm || payload.isEmpty()
+        val incomingMedia = if (shouldUpdateMedia) Msnp18Protocol.parseCurrentMedia(payload) else null
         val personalMessage = Msnp18Protocol.parsePersonalMessage(payload)
         updateContact(email) { existing ->
             existing?.copy(
                 statusMessage = personalMessage,
+                currentMedia = if (shouldUpdateMedia) incomingMedia else existing.currentMedia,
                 networkId = networkId ?: existing.networkId,
                 clientCapabilities = if (existing.presence.isOnline && endpointCapabilities != null) {
                     mergeEndpointBaseCapabilities(existing.clientCapabilities, endpointCapabilities.base)
@@ -3818,6 +3845,7 @@ internal class LiveMsnp18Client(
         mutableSessions.value = emptyList()
         currentPresence = Presence.Online
         currentPersonalMessage = ""
+        currentMedia = null
         storagePersonalStatus = null
         storagePersonalStatusConfirmed = false
         receivedLivePersonalMessage = false

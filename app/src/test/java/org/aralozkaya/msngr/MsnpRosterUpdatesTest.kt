@@ -9,6 +9,7 @@ import org.aralozkaya.msngr.data.mergeAddressBookUpdate
 import org.aralozkaya.msngr.data.mergeBlockedMemberships
 import org.aralozkaya.msngr.data.mergeBlockedContactUpdate
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.MsnCurrentMedia
 import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -111,5 +112,28 @@ class MsnpRosterUpdatesTest {
         assertNull(frames.first().transactionId)
         assertTrue(isAddressBookNotification(frames.first().payload!!))
         assertFalse(isAddressBookNotification("<NOTIFICATION siteid=\"1\"/>".toByteArray()))
+    }
+
+    @Test fun rosterRefreshesPreserveCurrentMediaAndBlockingClearsIt() {
+        val media = MsnCurrentMedia.music("Song", "Artist")!!
+        val peer = Contact(
+            "peer@example.com",
+            "Peer",
+            "peer@example.com",
+            Presence.Online,
+            currentMedia = media,
+        )
+        val refreshed = mergeAddressBookUpdate(
+            listOf(peer),
+            AddressBookSnapshot(listOf(peer.copy(nickname = "Peer Updated", currentMedia = null))),
+            "me@example.com",
+        ).single()
+        assertEquals(media, refreshed.currentMedia)
+
+        val blocked = mergeBlockedContactUpdate(
+            listOf(refreshed),
+            listOf(refreshed.copy(isBlocked = true)),
+        ).single()
+        assertNull(blocked.currentMedia)
     }
 }

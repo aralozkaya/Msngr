@@ -3,6 +3,7 @@
 package org.aralozkaya.msngr.pages
 
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,20 +15,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,7 +55,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
@@ -58,6 +72,8 @@ import org.aralozkaya.msngr.MessengerPlusColorSheet
 import org.aralozkaya.msngr.MessengerPlusEditorController
 import org.aralozkaya.msngr.MessengerPlusEditorSyntax
 import org.aralozkaya.msngr.MessengerPlusProfileField
+import org.aralozkaya.msngr.NowPlayingAccess
+import org.aralozkaya.msngr.NowPlayingController
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.createDisplayPictureCaptureUri
@@ -68,10 +84,12 @@ import org.aralozkaya.msngr.inspectDisplayPicture
 import org.aralozkaya.msngr.loadDisplayPictureBytes
 import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.nowPlayingController
 import org.aralozkaya.msngr.pages.components.Avatar
+import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.pages.components.PageContentList
-import org.aralozkaya.msngr.pages.components.ProfileDetailCard
+import org.aralozkaya.msngr.pages.components.icon
 import org.aralozkaya.msngr.rememberEmoticonSheetState
 import org.aralozkaya.msngr.rememberMessengerPlusColorSheetState
 import org.aralozkaya.msngr.resizeDisplayPicture
@@ -80,18 +98,67 @@ import org.aralozkaya.msngr.withExpandedMsnMenuTokens
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 
 @Composable
-fun ProfilePage(
+internal fun ProfilePage(
     innerPadding: PaddingValues,
     scrollBehavior: TopAppBarScrollBehavior,
     onProfileSaved: () -> Unit,
+    nowPlayingController: NowPlayingController? = null,
+    onOpenNotificationAccessSettings: (() -> Unit)? = null,
+    onOpenAppInfoSettings: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val messengerPlusEnabled = LocalMessengerPlusEnabled.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     val scope = rememberCoroutineScope()
     val repository = remember(context) { context.appContainer.messengerRepository }
+    val activeNowPlayingController = nowPlayingController ?: remember(context) { context.nowPlayingController }
+    val nowPlayingState by activeNowPlayingController.uiState.collectAsState()
     val initial = remember(repository) { repository.profile.value }
+    var showNowPlayingPermissionDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingEnableNowPlaying by rememberSaveable { mutableStateOf(false) }
+    var nowPlayingSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
+    DisposableEffect(lifecycleOwner, activeNowPlayingController) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                activeNowPlayingController.refreshState()
+                if (pendingEnableNowPlaying) {
+                    pendingEnableNowPlaying = false
+                    if (activeNowPlayingController.hasNotificationAccess()) {
+                        activeNowPlayingController.setEnabled(true)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    fun openNotificationAccess() {
+        nowPlayingSettingsError = null
+        if (onOpenNotificationAccessSettings != null) {
+            onOpenNotificationAccessSettings()
+        } else {
+            runCatching {
+                context.startActivity(NowPlayingAccess.createNotificationAccessIntent(context))
+            }.onFailure {
+                nowPlayingSettingsError = context.getString(R.string.profile_now_playing_settings_unavailable)
+            }
+        }
+    }
+    fun openAppInfo() {
+        nowPlayingSettingsError = null
+        if (onOpenAppInfoSettings != null) {
+            onOpenAppInfoSettings()
+        } else {
+            runCatching {
+                context.startActivity(NowPlayingAccess.createAppDetailsIntent(context))
+            }.onFailure {
+                showNowPlayingPermissionDialog = false
+                nowPlayingSettingsError = context.getString(R.string.profile_now_playing_settings_unavailable)
+            }
+        }
+    }
     var usernameEditorValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(initial.username))
     }
@@ -258,6 +325,50 @@ fun ProfilePage(
         )
     }
 
+    if (showNowPlayingPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNowPlayingPermissionDialog = false },
+            title = { Text(stringResource(R.string.profile_now_playing_permission_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.profile_now_playing_permission_body_you_singular))
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Text(
+                            text = stringResource(R.string.profile_now_playing_permission_restricted_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = { openAppInfo() },
+                            shapes = ButtonDefaults.shapes(),
+                            modifier = Modifier.testTag("profile-now-playing-open-app-info"),
+                        ) {
+                            Text(stringResource(R.string.profile_now_playing_open_app_info))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNowPlayingPermissionDialog = false
+                        pendingEnableNowPlaying = true
+                        openNotificationAccess()
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier.testTag("profile-now-playing-open-settings"),
+                ) {
+                    Text(stringResource(R.string.profile_now_playing_open_settings))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNowPlayingPermissionDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             PageContentList(
@@ -421,14 +532,161 @@ fun ProfilePage(
                         }
                     }
                 }
-                item(key = "account") {
-                    ProfileDetailCard(
-                        icon = Icons.Default.Email,
-                        label = stringResource(R.string.profile_sign_in_address_label),
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        supportingText = stringResource(R.string.profile_sign_in_address_supporting_you_singular),
+                item(key = "profile_cards") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(initial.email, style = MaterialTheme.typography.bodyLarge)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("profile-now-playing-card"),
+                        ) {
+                            val nowPlayingExpanded =
+                                nowPlayingState.enabled || nowPlayingSettingsError != null
+                            ExpandableSettingsGroup(
+                                expanded = nowPlayingExpanded,
+                                highlighted = nowPlayingState.enabled,
+                                master = { shapes ->
+                                    SegmentedListItem(
+                                        checked = nowPlayingState.enabled,
+                                        onCheckedChange = { wantEnabled ->
+                                            nowPlayingSettingsError = null
+                                            if (wantEnabled) {
+                                                if (activeNowPlayingController.hasNotificationAccess()) {
+                                                    activeNowPlayingController.setEnabled(true)
+                                                } else {
+                                                    showNowPlayingPermissionDialog = true
+                                                }
+                                            } else {
+                                                pendingEnableNowPlaying = false
+                                                activeNowPlayingController.setEnabled(false)
+                                            }
+                                        },
+                                        shapes = shapes,
+                                        enabled = !savingProfile,
+                                        modifier = Modifier.testTag("profile-now-playing-toggle"),
+                                        leadingContent = {
+                                            Icon(
+                                                imageVector = Icons.Default.MusicNote,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        },
+                                        trailingContent = {
+                                            Switch(
+                                                checked = nowPlayingState.enabled,
+                                                onCheckedChange = null,
+                                                enabled = !savingProfile,
+                                            )
+                                        },
+                                    ) {
+                                        Text(stringResource(R.string.profile_now_playing_title))
+                                    }
+                                },
+                                content = { shapes, colors ->
+                                    val errorSupportingContent: (@Composable () -> Unit)? =
+                                        nowPlayingSettingsError?.let { errorMessage ->
+                                            {
+                                                Text(
+                                                    text = errorMessage,
+                                                    color = MaterialTheme.colorScheme.error,
+                                                )
+                                            }
+                                        }
+                                    when {
+                                        !nowPlayingState.enabled && nowPlayingSettingsError != null -> {
+                                            SegmentedListItem(
+                                                shapes = shapes,
+                                                colors = colors,
+                                            ) {
+                                                errorSupportingContent?.invoke()
+                                            }
+                                        }
+                                        !nowPlayingState.hasNotificationAccess -> {
+                                            SegmentedListItem(
+                                                onClick = {
+                                                    pendingEnableNowPlaying = true
+                                                    openNotificationAccess()
+                                                },
+                                                shapes = shapes,
+                                                colors = colors,
+                                                modifier = Modifier.testTag("profile-now-playing-grant-access"),
+                                                supportingContent = {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(
+                                                            text = stringResource(R.string.profile_now_playing_access_missing),
+                                                            color = MaterialTheme.colorScheme.error,
+                                                        )
+                                                        errorSupportingContent?.invoke()
+                                                    }
+                                                },
+                                            ) {
+                                                Text(stringResource(R.string.profile_now_playing_grant_access))
+                                            }
+                                        }
+                                        else -> {
+                                            val detectedMedia = nowPlayingState.detectedMedia
+                                            if (detectedMedia != null) {
+                                                SegmentedListItem(
+                                                    shapes = shapes,
+                                                    colors = colors,
+                                                    modifier = Modifier.testTag("profile-now-playing-preview"),
+                                                    leadingContent = {
+                                                        Icon(
+                                                            imageVector = detectedMedia.icon(),
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                        )
+                                                    },
+                                                    overlineContent = {
+                                                        Text(stringResource(R.string.profile_now_playing_currently_sharing))
+                                                    },
+                                                    supportingContent = errorSupportingContent,
+                                                ) {
+                                                    Text(
+                                                        text = detectedMedia.displayText,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                }
+                                            } else {
+                                                SegmentedListItem(
+                                                    shapes = shapes,
+                                                    colors = colors,
+                                                    modifier = Modifier.testTag("profile-now-playing-empty"),
+                                                    supportingContent = errorSupportingContent,
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.profile_now_playing_nothing_playing_you_singular),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        SegmentedListItem(
+                            shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            overlineContent = {
+                                Text(stringResource(R.string.profile_sign_in_address_label))
+                            },
+                        ) {
+                            SelectionContainer {
+                                Text(initial.email)
+                            }
+                        }
                     }
                 }
             }

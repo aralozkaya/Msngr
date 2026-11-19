@@ -71,7 +71,8 @@ internal class RealtimeNotificationBridge(
             repository.events.collect { event ->
                 val notificationEvent = when (event) {
                     is MessengerEvent.OwnDisplayPictureChanged,
-                    is MessengerEvent.OwnPersonalStatusChanged -> return@collect
+                    is MessengerEvent.OwnPersonalStatusChanged,
+                    is MessengerEvent.OwnCurrentMediaChanged -> return@collect
                     MessengerEvent.OfflineMessagesReceived -> {
                         if (!visibilityTracker.isForeground) notificationManager.showOfflineMessagesReceived()
                         return@collect

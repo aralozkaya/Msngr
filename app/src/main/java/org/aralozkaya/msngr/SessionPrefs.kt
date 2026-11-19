@@ -10,6 +10,7 @@ import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.CurrentMedia
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -158,6 +159,8 @@ data class UserProfileSnapshot(
     val statusMessage: String = "",
     /** False when sign-in could not fetch the server's display picture (including its removal). */
     val displayPictureFetched: Boolean = true,
+    /** Ephemeral "What I'm listening to?" metadata from MSNP `<CurrentMedia>`. */
+    val currentMedia: CurrentMedia? = null,
 )
 
 object ProviderOptions {

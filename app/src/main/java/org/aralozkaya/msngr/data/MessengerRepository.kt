@@ -31,6 +31,7 @@ import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.messengerPlusPlainText
+import org.aralozkaya.msngr.protocol.CurrentMedia
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.InkPoint
 import org.aralozkaya.msngr.protocol.InkStroke
@@ -52,6 +53,7 @@ data class Contact(
     val email: String,
     val presence: Presence,
     val statusMessage: String = "",
+    val currentMedia: CurrentMedia? = null,
     val avatarUri: String? = null,
     val unreadCount: Int = 0,
     val isBlocked: Boolean = false,
@@ -105,6 +107,7 @@ internal fun List<Contact>.resolveContact(contactId: String, profile: UserProfil
             profile.email,
             profile.presence,
             statusMessage = profile.statusMessage,
+            currentMedia = profile.currentMedia,
             avatarUri = profile.avatarUri,
             isForwardListContact = false,
             clientCapabilities = if (profile.presence.isOnline) org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID else 0L,
@@ -180,6 +183,7 @@ sealed interface MessengerEvent {
     data class SignedOut(val reason: String) : MessengerEvent
     data class OwnDisplayPictureChanged(val account: AccountIdentity, val personalMessage: String? = null) : MessengerEvent
     data class OwnPersonalStatusChanged(val account: AccountIdentity, val statusMessage: String) : MessengerEvent
+    data class OwnCurrentMediaChanged(val account: AccountIdentity, val currentMedia: CurrentMedia?) : MessengerEvent
 }
 
 data class PortalState(
@@ -227,6 +231,7 @@ interface MsnpClient {
     suspend fun changePresence(presence: Presence)
     suspend fun changeNickname(nickname: String)
     suspend fun changePersonalMessage(statusMessage: String)
+    suspend fun changeCurrentMedia(media: CurrentMedia?) = Unit
     suspend fun changeDisplayPicture(image: ByteArray?)
     suspend fun fetchOwnDisplayPicture(): org.aralozkaya.msngr.IncomingDisplayPicture =
         org.aralozkaya.msngr.IncomingDisplayPicture()
@@ -373,6 +378,8 @@ class MockMsnp18Client(
     private var presenceJob: Job? = null
     private var signedInEmail = ""
     private var ownDisplayPicture: ByteArray? = null
+    internal var currentMedia: CurrentMedia? = null
+        private set
     private var sessionGeneration = 0L
     private val contactAdditionMutex = Mutex()
 
@@ -402,6 +409,7 @@ class MockMsnp18Client(
         if (!signedInEmail.equals(request.email, true)) mutableContactRequests.value = requestFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) mutableGroupInvitations.value = groupInvitationFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) ownDisplayPicture = null
+        currentMedia = null
         signedInEmail = request.email
         mutableContacts.value = MockServerData.contacts()
         mutableSessions.value = listOf(AccountSession("mock-current", "This device", isCurrent = true,
@@ -539,6 +547,10 @@ class MockMsnp18Client(
     override suspend fun changePersonalMessage(statusMessage: String) {
         // A live client sends UUX <trid> <payload-length> with the MSNP personal-message XML.
         delay(80)
+    }
+
+    override suspend fun changeCurrentMedia(media: CurrentMedia?) {
+        currentMedia = media
     }
 
     override suspend fun changeDisplayPicture(image: ByteArray?) {
@@ -899,6 +911,7 @@ class MockMsnp18Client(
         mutableGroupInvitations.value = emptyList()
         sessionGeneration++
         signedInEmail = ""
+        currentMedia = null
         mutableSessions.value = emptyList()
         presenceJob?.cancel()
         presenceJob = null
@@ -1034,6 +1047,8 @@ class MessengerRepository(
                     event.personalMessage?.let { status -> mutableProfile.update { it.copy(statusMessage = status) } }
                 } else if (event is MessengerEvent.OwnPersonalStatusChanged && event.account == signedInAccountIdentity) {
                     mutableProfile.update { it.copy(statusMessage = event.statusMessage) }
+                } else if (event is MessengerEvent.OwnCurrentMediaChanged && event.account == signedInAccountIdentity) {
+                    mutableProfile.update { it.copy(currentMedia = event.currentMedia) }
                 } else if (event is MessengerEvent.SignedOut) {
                     scope.launch {
                         connectionMutex.withLock {
@@ -1184,7 +1199,14 @@ class MessengerRepository(
         publishDisplayPicture: Boolean = true,
         publishStatusMessage: Boolean = publishStoredSettings,
     ) {
-        mutableProfile.value = profile
+        mutableProfile.value = if (
+            profile.email.equals(mutableProfile.value.email, ignoreCase = true) &&
+            profile.currentMedia == null
+        ) {
+            profile.copy(currentMedia = mutableProfile.value.currentMedia)
+        } else {
+            profile
+        }
         if (publishStoredSettings) {
             nicknameJob?.cancel()
             nicknameJob = scope.launch {
@@ -1248,6 +1270,22 @@ class MessengerRepository(
         result.onFailure {
             mutableProfile.update { current ->
                 if (current.statusMessage == normalized) current.copy(statusMessage = previous) else current
+            }
+        }
+        return result
+    }
+
+    /** Updates and awaits publication of the signed-in user's MSNP `<CurrentMedia>` state. */
+    suspend fun updateCurrentMedia(media: CurrentMedia?): Result<Unit> {
+        if (!hasSignedInSession) return Result.success(Unit)
+        val previous = mutableProfile.value.currentMedia
+        mutableProfile.update { it.copy(currentMedia = media) }
+        val result = runCatching {
+            client.changeCurrentMedia(media)
+        }
+        result.onFailure {
+            mutableProfile.update { current ->
+                if (current.currentMedia == media) current.copy(currentMedia = previous) else current
             }
         }
         return result
