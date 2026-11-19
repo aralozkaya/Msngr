@@ -1,6 +1,15 @@
 package org.aralozkaya.msngr
 
+import android.content.pm.PackageManager
+import android.media.MediaMetadata
+import android.media.session.MediaController
+import android.media.session.MediaSession
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.os.SystemClock
+import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TopAppBarDefaults
@@ -18,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MockServerData
@@ -32,6 +42,7 @@ import org.aralozkaya.msngr.protocol.MsnCurrentMedia
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -258,6 +269,98 @@ class NowPlayingUiInstrumentedTest {
         ).assertIsDisplayed()
         compose.onNodeWithText("Everything In Its Right Place - Radiohead").assertIsDisplayed()
         compose.onNodeWithText("Kid A").assertIsDisplayed()
+    }
+
+    @Test
+    fun listenerFiltersOutAllNotificationTypesWhileMediaSessionAccessStillWorks() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val component = NowPlayingAccess.listenerComponent(context)
+        val serviceInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getServiceInfo(
+                component,
+                PackageManager.ComponentInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
+        }
+        val metaData = serviceInfo.metaData
+        assertNotNull(metaData)
+        assertTrue(metaData!!.containsKey(NotificationListenerService.META_DATA_DEFAULT_FILTER_TYPES))
+        assertEquals("", metaData.getString(NotificationListenerService.META_DATA_DEFAULT_FILTER_TYPES))
+        assertEquals(
+            "conversations|alerting|silent|ongoing",
+            metaData.getString(NotificationListenerService.META_DATA_DISABLED_FILTER_TYPES),
+        )
+
+        val wasGranted = NowPlayingAccess.isNotificationAccessGranted(context)
+        var session: MediaSession? = null
+        try {
+            if (!wasGranted) {
+                runNotificationShellCommand(
+                    "cmd notification allow_listener ${component.flattenToString()}",
+                )
+            }
+            val grantDeadline = SystemClock.elapsedRealtime() + 3_000L
+            while (!NowPlayingAccess.isNotificationAccessGranted(context) &&
+                SystemClock.elapsedRealtime() < grantDeadline
+            ) {
+                SystemClock.sleep(100)
+            }
+            assertTrue(NowPlayingAccess.isNotificationAccessGranted(context))
+
+            compose.runOnUiThread {
+                session = MediaSession(context, "now-playing-filter-test").apply {
+                    setMetadata(
+                        MediaMetadata.Builder()
+                            .putString(MediaMetadata.METADATA_KEY_TITLE, "Paranoid Android")
+                            .putString(MediaMetadata.METADATA_KEY_ARTIST, "Radiohead")
+                            .build(),
+                    )
+                    setPlaybackState(
+                        PlaybackState.Builder()
+                            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+                            .build(),
+                    )
+                    isActive = true
+                }
+            }
+
+            val mediaSessionManager = context.getSystemService(MediaSessionManager::class.java)!!
+            var matchingController: MediaController? = null
+            val sessionDeadline = SystemClock.elapsedRealtime() + 3_000L
+            while (SystemClock.elapsedRealtime() < sessionDeadline) {
+                val candidate = mediaSessionManager.getActiveSessions(component).firstOrNull { controller ->
+                    controller.packageName == context.packageName &&
+                        controller.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) == "Paranoid Android" &&
+                        controller.playbackState?.state == PlaybackState.STATE_PLAYING
+                }
+                if (candidate != null) {
+                    matchingController = candidate
+                    break
+                }
+                SystemClock.sleep(100)
+            }
+            assertNotNull(matchingController)
+            assertEquals("Radiohead", matchingController?.metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST))
+        } finally {
+            compose.runOnUiThread {
+                session?.run {
+                    isActive = false
+                    release()
+                }
+            }
+            if (!wasGranted) {
+                runNotificationShellCommand(
+                    "cmd notification disallow_listener ${component.flattenToString()}",
+                )
+            }
+        }
+    }
+
+    private fun runNotificationShellCommand(command: String) {
+        val pfd = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
     }
 
     private class FakeInstrumentedSessionSource : NowPlayingSessionSource {
