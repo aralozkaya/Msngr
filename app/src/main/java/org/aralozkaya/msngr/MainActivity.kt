@@ -523,6 +523,7 @@ private fun MsngrApp(
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
+                verticalAlignment = Alignment.Top,
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("main_pager"),

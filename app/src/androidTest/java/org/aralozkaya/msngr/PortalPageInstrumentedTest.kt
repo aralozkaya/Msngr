@@ -44,6 +44,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performFirstLinkClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.test.performTouchInput
@@ -95,9 +96,7 @@ class PortalPageInstrumentedTest {
         mockContext = null
     }
 
-    @Test
-    fun mainActivityStartsOnContactsAndSwipesRightToPortalPage() {
-        runBlocking {
+    private suspend fun launchMockMainActivity(): Context {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         mockContext = context
@@ -145,6 +144,13 @@ class PortalPageInstrumentedTest {
 
         scenario = ActivityScenario.launch(Intent(context, MainActivity::class.java))
         compose.waitForIdle()
+        return context
+    }
+
+    @Test
+    fun mainActivityStartsOnContactsAndSwipesRightToPortalPage() {
+        runBlocking {
+        val context = launchMockMainActivity()
 
         // Default landing page is Contacts (page 1).
         compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
@@ -157,7 +163,7 @@ class PortalPageInstrumentedTest {
         compose.waitForIdle()
 
         compose.onNodeWithTag("portal_page").assertIsDisplayed()
-        compose.onNodeWithText("What's new").assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.portal_whats_new_title)).assertIsDisplayed()
         compose.onNodeWithTag("portal_ad_card").assertDoesNotExist()
         compose.onNodeWithTag("main_pager_dot_0").assertIsSelected()
         compose.onNodeWithTag("main_pager_dot_1").assertIsNotSelected()
@@ -189,6 +195,46 @@ class PortalPageInstrumentedTest {
             compose.onAllNodes(hasTestTag("main_pager_indicator")).fetchSemanticsNodes().isEmpty()
         }
         compose.onNodeWithTag("main_pager_indicator").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun contactsPageStaysTopAlignedWhenContentDoesNotFillScreen() {
+        runBlocking {
+            val context = launchMockMainActivity()
+            val contactsListMatcher =
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                    hasAnyDescendant(hasTestTag("contacts_search_bar"))
+
+            val pagerBounds = compose.onNodeWithTag("main_pager").fetchSemanticsNode().boundsInRoot
+            val initialListBounds = compose.onNode(contactsListMatcher).fetchSemanticsNode().boundsInRoot
+            assertEquals(pagerBounds.top, initialListBounds.top, 1f)
+            assertEquals(pagerBounds.height, initialListBounds.height, 1f)
+
+            val profileName = MockServerData.ACCOUNT_EMAIL.substringBefore('@')
+            val initialProfileTop = compose.onNodeWithText(profileName).fetchSemanticsNode().boundsInRoot.top
+            val initialSearchTop = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.top
+
+            compose.onNodeWithText(context.getString(R.string.contacts_section_groups_plural)).performClick()
+            compose.waitForIdle()
+            compose.onNodeWithText(context.getString(R.string.contacts_section_other))
+                .performScrollTo()
+                .performClick()
+            compose.waitForIdle()
+
+            val collapsedListBounds = compose.onNode(contactsListMatcher).fetchSemanticsNode().boundsInRoot
+            val collapsedProfileTop = compose.onNodeWithText(profileName).fetchSemanticsNode().boundsInRoot.top
+            val collapsedSearchTop = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.top
+
+            assertEquals(pagerBounds.top, collapsedListBounds.top, 1f)
+            assertEquals(pagerBounds.height, collapsedListBounds.height, 1f)
+            assertEquals(initialProfileTop, collapsedProfileTop, 1f)
+            assertEquals(initialSearchTop, collapsedSearchTop, 1f)
+
+            compose.onNodeWithTag("main_pager").performTouchInput { swipeRight() }
+            compose.waitForIdle()
+            val portalBounds = compose.onNodeWithTag("portal_page").fetchSemanticsNode().boundsInRoot
+            assertEquals(pagerBounds.top, portalBounds.top, 1f)
         }
     }
 
@@ -370,7 +416,9 @@ class PortalPageInstrumentedTest {
         try {
             var openedTarget by mutableStateOf<PortalWebTarget?>(null)
             var externalBrowserUrl by mutableStateOf<String?>(null)
+            lateinit var expectedTodayTitle: String
             activityScenario.onActivity { activity ->
+                expectedTodayTitle = activity.getString(R.string.portal_today_title)
                 activity.setContent {
                     MsngrTheme {
                         Box(
@@ -409,7 +457,7 @@ class PortalPageInstrumentedTest {
 
             compose.onNodeWithTag("portal_site_today").performClick()
             compose.waitForIdle()
-            assertEquals("Today", openedTarget?.title)
+            assertEquals(expectedTodayTitle, openedTarget?.title)
             assertEquals("https://today.msgrsvcs.ctsrv.xyz/start?wlm=1", openedTarget?.url)
             compose.onNodeWithTag("portal_webview_dialog").assertIsDisplayed()
             compose.onNodeWithTag("portal_webview_pull_refresh").assertIsDisplayed()
