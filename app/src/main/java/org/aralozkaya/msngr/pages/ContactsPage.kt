@@ -4,13 +4,12 @@ package org.aralozkaya.msngr.pages
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.TextFieldState
@@ -172,9 +172,9 @@ fun ContactsPage(
             )
         }
         item {
-            val focusTransition = updateTransition(searchFocused, label = "Search focus")
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SearchBar(
@@ -192,29 +192,26 @@ fun ContactsPage(
                         )
                     },
                 )
-                focusTransition.AnimatedVisibility(
-                    visible = { !it },
-                    enter = expandHorizontally(
-                        MaterialTheme.motionScheme.defaultSpatialSpec(),
-                        expandFrom = Alignment.Start,
-                    ) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
-                    exit = shrinkHorizontally(
-                        MaterialTheme.motionScheme.defaultSpatialSpec(),
-                        shrinkTowards = Alignment.Start,
-                    ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                val iconSize = ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight)
+                FilledTonalButton(
+                    onClick = { showSortOptions = true },
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier
+                        .testTag("contacts_sort_button")
+                        .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec())
+                        .widthIn(min = ButtonDefaults.MinHeight),
+                    contentPadding = if (searchFocused) {
+                        PaddingValues(horizontal = (ButtonDefaults.MinHeight - iconSize) / 2)
+                    } else {
+                        ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight, hasStartIcon = true)
+                    },
                 ) {
-                    FilledTonalButton(
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.padding(start = ButtonGroupDefaults.HorizontalArrangement.spacing),
-                        onClick = { showSortOptions = true },
-                        contentPadding =
-                            ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight, hasStartIcon = true),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = stringResource(R.string.contacts_sort_action),
-                            modifier = Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight)),
-                        )
+                    Icon(
+                        Icons.AutoMirrored.Filled.Sort,
+                        contentDescription = stringResource(R.string.contacts_sort_action),
+                        modifier = Modifier.size(iconSize),
+                    )
+                    if (!searchFocused) {
                         Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(ButtonDefaults.MinHeight)))
                         Text(stringResource(R.string.contacts_sort_action))
                     }
