@@ -17,6 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -31,7 +35,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.data.ChatMessage
+import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessageAuthor
+import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -405,6 +412,255 @@ class ChatMessageListInstrumentedTest {
         compose.runOnIdle { assertEquals(surface, barColor) }
         compose.runOnIdle { messages.value = emptyList() }
         compose.runOnIdle { assertEquals(surface, barColor) }
+    }
+
+    @Test
+    fun incomingMessageWhileScrolledUpShowsBadgeOnScrollButtonWithoutAutoscrolling() {
+        val messages = mutableStateListOf<ChatMessage>().apply { addAll((0L..999L).map(::message)) }
+        lateinit var state: LazyListState
+        lateinit var scope: CoroutineScope
+        compose.setContent {
+            MaterialTheme {
+                state = rememberLazyListState()
+                scope = rememberCoroutineScope()
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = messages,
+                        listState = state,
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(bottom = 64.dp),
+                    )
+                }
+            }
+        }
+        compose.runOnIdle { scope.launch { state.scrollToItem(400) } }
+        compose.waitForIdle()
+
+        try {
+            compose.mainClock.autoAdvance = false
+            compose.mainClock.advanceTimeBy(CHAT_SCROLL_TO_LATEST_LINGER_MILLIS + 500L)
+            compose.waitForIdle()
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+
+            val (anchorKeyBefore, indexBefore) = compose.runOnIdle {
+                state.layoutInfo.visibleItemsInfo.first().key to state.firstVisibleItemIndex
+            }
+            compose.runOnIdle { messages += message(1000L) }
+            compose.mainClock.advanceTimeBy(500L)
+            compose.waitForIdle()
+            compose.runOnIdle {
+                assertEquals(anchorKeyBefore, state.layoutInfo.visibleItemsInfo.first().key)
+                assertTrue(state.firstVisibleItemIndex >= indexBefore)
+            }
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertIsDisplayed()
+            assertScrollBadgeText("1")
+
+            compose.mainClock.advanceTimeBy(CHAT_SCROLL_TO_LATEST_LINGER_MILLIS * 2)
+            compose.waitForIdle()
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertIsDisplayed()
+            assertScrollBadgeText("1")
+
+            compose.runOnIdle { messages.addAll(listOf(message(1001L), message(1002L))) }
+            compose.mainClock.advanceTimeBy(500L)
+            compose.waitForIdle()
+            compose.runOnIdle {
+                assertEquals(anchorKeyBefore, state.layoutInfo.visibleItemsInfo.first().key)
+                assertTrue(state.firstVisibleItemIndex >= indexBefore)
+            }
+            assertScrollBadgeText("3")
+
+            compose.runOnIdle { messages.add(0, message(-1L)) }
+            compose.mainClock.advanceTimeBy(500L)
+            compose.waitForIdle()
+            compose.runOnIdle {
+                assertEquals(anchorKeyBefore, state.layoutInfo.visibleItemsInfo.first().key)
+            }
+            assertScrollBadgeText("3")
+
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).performClick()
+            compose.mainClock.autoAdvance = true
+            compose.waitUntil(5_000) {
+                state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
+            }
+            compose.onNodeWithText("Message 1002").assertIsDisplayed()
+            compose.waitUntil(5_000) {
+                compose.onAllNodes(hasTestTag(CHAT_SCROLL_TO_LATEST_TAG)).fetchSemanticsNodes().isEmpty()
+            }
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+            compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertDoesNotExist()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun incomingMessagesAtBottomAutoscrollWithoutShowingBadgeOrButton() {
+        val messages = mutableStateListOf<ChatMessage>().apply { addAll((0L..99L).map(::message)) }
+        lateinit var state: LazyListState
+        compose.setContent {
+            MaterialTheme {
+                state = rememberLazyListState()
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = messages,
+                        listState = state,
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(bottom = 64.dp),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Message 99").assertIsDisplayed()
+
+        compose.runOnIdle { messages += message(100L) }
+        compose.waitUntil(5_000) {
+            state.firstVisibleItemIndex == 0 &&
+                state.firstVisibleItemScrollOffset == 0 &&
+                state.layoutInfo.visibleItemsInfo.firstOrNull()?.key == 100L
+        }
+        compose.onNodeWithText("Message 100").assertIsDisplayed()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertDoesNotExist()
+
+        compose.runOnIdle { messages += message(101L) }
+        compose.waitUntil(5_000) {
+            state.firstVisibleItemIndex == 0 &&
+                state.firstVisibleItemScrollOffset == 0 &&
+                state.layoutInfo.visibleItemsInfo.firstOrNull()?.key == 101L
+        }
+        compose.onNodeWithText("Message 101").assertIsDisplayed()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun manualScrollDownDecrementsAndClearsBadgeAndOutgoingMessageAutoscrolls() {
+        val messages = mutableStateListOf<ChatMessage>().apply { addAll((0L..99L).map(::message)) }
+        lateinit var state: LazyListState
+        lateinit var scope: CoroutineScope
+        compose.setContent {
+            MaterialTheme {
+                state = rememberLazyListState()
+                scope = rememberCoroutineScope()
+                Box(Modifier.height(400.dp)) {
+                    ChatMessageList(
+                        messages = messages,
+                        listState = state,
+                        emoticonSettings = EmoticonSettings(),
+                        innerPadding = PaddingValues(bottom = 64.dp),
+                    )
+                }
+            }
+        }
+        compose.runOnIdle { scope.launch { state.scrollToItem(40) } }
+        compose.waitForIdle()
+
+        compose.runOnIdle { messages.addAll(listOf(message(100L), message(101L))) }
+        compose.waitForIdle()
+        assertScrollBadgeText("2")
+
+        compose.runOnIdle { scope.launch { state.scrollToItem(1) } }
+        compose.waitForIdle()
+        compose.onNodeWithText("Message 100").assertIsDisplayed()
+        assertScrollBadgeText("1")
+
+        compose.runOnIdle { scope.launch { state.scrollToItem(0, 0) } }
+        compose.waitForIdle()
+        compose.waitUntil(5_000) {
+            compose.onAllNodes(hasTestTag(CHAT_SCROLL_TO_LATEST_TAG)).fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertDoesNotExist()
+
+        compose.runOnIdle { scope.launch { state.scrollToItem(40) } }
+        compose.waitForIdle()
+        compose.runOnIdle { messages += message(102L) }
+        compose.waitForIdle()
+        assertScrollBadgeText("1")
+
+        compose.runOnIdle {
+            messages += ChatMessage(
+                id = 103L,
+                contactId = "contact",
+                author = MessageAuthor.Me,
+                text = "Outgoing 103",
+                timestampMillis = 103_000L,
+            )
+        }
+        compose.waitUntil(5_000) {
+            state.firstVisibleItemIndex == 0 &&
+                state.firstVisibleItemScrollOffset == 0 &&
+                state.layoutInfo.visibleItemsInfo.firstOrNull()?.key == 103L
+        }
+        compose.onNodeWithText("Outgoing 103").assertIsDisplayed()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun chatScreenTypingDoesNotAutoscrollWhileScrolledUpAndBadgeCapsAt99Plus() {
+        val messages = mutableStateListOf<ChatMessage>().apply { addAll((0L..99L).map(::message)) }
+        val isTyping = mutableStateOf(false)
+        lateinit var state: LazyListState
+        lateinit var scope: CoroutineScope
+        compose.setContent {
+            MsngrTheme {
+                state = rememberLazyListState()
+                scope = rememberCoroutineScope()
+                ChatScreen(
+                    draft = "",
+                    onDraftChange = {},
+                    contact = Contact("peer", "Peer", "peer@example.com", Presence.Online),
+                    messages = messages,
+                    isHistoryLoaded = true,
+                    canLoadOlderMessages = false,
+                    isTyping = isTyping.value,
+                    onBack = {},
+                    onSendMessage = { _, _ -> },
+                    onRetryMessage = {},
+                    onSendTyping = {},
+                    onSendNudge = {},
+                    onLoadOlderMessages = {},
+                    listState = state,
+                )
+            }
+        }
+        compose.runOnIdle { scope.launch { state.scrollToItem(40) } }
+        compose.waitForIdle()
+        val anchorKeyBefore = compose.runOnIdle { state.layoutInfo.visibleItemsInfo.first().key }
+
+        compose.runOnIdle { isTyping.value = true }
+        compose.waitForIdle()
+        compose.onNodeWithText(compose.activity.getString(R.string.chat_typing_status)).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(40, state.firstVisibleItemIndex) }
+
+        compose.runOnIdle { isTyping.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(40, state.firstVisibleItemIndex) }
+
+        compose.runOnIdle { messages.addAll((100L..199L).map(::message)) }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(anchorKeyBefore, state.layoutInfo.visibleItemsInfo.first().key)
+            assertTrue(state.firstVisibleItemIndex >= 40)
+        }
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).assertIsDisplayed()
+        assertScrollBadgeText("99+")
+
+        val rootBounds = compose.onNode(isRoot()).fetchSemanticsNode().boundsInRoot
+        val badgeBounds = compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(badgeBounds.left >= rootBounds.left)
+        assertTrue(badgeBounds.right <= rootBounds.right)
+        assertTrue(badgeBounds.top >= rootBounds.top)
+        assertTrue(badgeBounds.bottom <= rootBounds.bottom)
+    }
+
+    private fun assertScrollBadgeText(expected: String) {
+        compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(
+            hasText(expected) and hasAnyAncestor(hasTestTag(CHAT_SCROLL_TO_LATEST_BADGE_TAG)),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
     }
 
     private fun message(id: Long) = ChatMessage(
