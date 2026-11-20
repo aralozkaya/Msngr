@@ -11,7 +11,15 @@ internal suspend fun Context.restoreSignedInProfile(
 ) {
     val roamingEnabled = DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(this)
     val merged = SessionPrefs.mergeSignedInProfile(this, serverProfile)
-    val mergedProfile = merged.profile.copy(presence = presence)
+    val livePresence = if (
+        repository.hasSignedInSession &&
+        repository.profile.value.email.equals(serverProfile.email, ignoreCase = true)
+    ) {
+        repository.profile.value.presence
+    } else {
+        presence
+    }
+    val mergedProfile = merged.profile.copy(presence = livePresence)
     repository.setLocalProfile(
         profile = mergedProfile,
         publishStoredSettings = true,
@@ -36,7 +44,7 @@ internal suspend fun Context.restoreSignedInProfile(
     SessionPrefs.saveUserProfile(
         context = this,
         username = localProfile.username,
-        presence = presence,
+        presence = localProfile.presence,
         avatarUri = localProfile.avatarUri,
         statusMessage = localProfile.statusMessage,
         saveDisplayPicture = false,

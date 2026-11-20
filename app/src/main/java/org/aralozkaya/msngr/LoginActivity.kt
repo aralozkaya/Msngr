@@ -348,7 +348,7 @@ private fun LoginReadyRoute(
                 context.restoreSignedInProfile(
                     repository = repository,
                     serverProfile = serverProfile,
-                    presence = requestedPresence,
+                    presence = serverProfile.presence,
                 )
                 onLoginComplete()
             }.onFailure { error ->

@@ -675,6 +675,94 @@ class LiveMsnp18ClientContractTest {
         }
     }
 
+    @Test fun desktopPresenceChangesUpdateOwnPresenceWithoutRePublishingChg() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val client = LiveMsnp18Client(
+            transport = notification,
+            endpointName = { "Phone" },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(emptyList(), ownerDisplayName = "You") },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            useRoamingProfile = { false },
+        )
+        val account = AccountIdentity.forServer(email, serverConfig, useMockServer = false)
+        val ownPresenceEvents = Channel<MessengerEvent.OwnPresenceChanged>(Channel.UNLIMITED)
+        val contactPresenceEvents = mutableListOf<MessengerEvent.PresenceChanged>()
+        val collector = launch(Dispatchers.Unconfined) {
+            client.events.collect { event ->
+                when (event) {
+                    is MessengerEvent.OwnPresenceChanged -> ownPresenceEvents.send(event)
+                    is MessengerEvent.PresenceChanged -> contactPresenceEvents += event
+                    else -> Unit
+                }
+            }
+        }
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig, Presence.Online)).getOrThrow()
+            val initialChgCount = notification.sent.count { it.verb == "CHG" }
+
+            // Desktop changes to Busy, then duplicate Busy, then BRB (Away), HDN (Offline), NLN (Online).
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BSY", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Busy),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+            assertEquals(Presence.Busy, client.sessions.value.single().presence)
+
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BSY", "1:$email", "You", "0:0", "0")))
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BRB", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Away),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("HDN", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Offline),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Online),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+
+            // Unknown status code or another endpoint's FLN must not mark this session offline.
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("UNKNOWN", "1:$email", "You", "0:0", "0")))
+            notification.deliver(
+                MsnpCommand("FLN", parameters = listOf("1:$email;{12345678-90ab-cdef-0123-456789abcdef}")),
+            )
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BSY", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Busy),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+
+            // Account-wide FLN transitions own presence to Offline without emitting a contact event.
+            notification.deliver(MsnpCommand("FLN", parameters = listOf("1:$email")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Offline),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+
+            // Switch back to Busy from desktop and verify a local picture change preserves Busy in CHG.
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("BSY", "1:$email", "You", "0:0", "0")))
+            assertEquals(
+                MessengerEvent.OwnPresenceChanged(account, Presence.Busy),
+                withTimeout(1_000) { ownPresenceEvents.receive() },
+            )
+            assertEquals(initialChgCount, notification.sent.count { it.verb == "CHG" })
+            assertTrue(contactPresenceEvents.isEmpty())
+
+            client.changeDisplayPicture(mockDisplayPictureBytes())
+            assertEquals(Presence.Busy.msnpCode, notification.sent.last { it.verb == "CHG" }.parameters.first())
+        } finally {
+            collector.cancel()
+            client.close()
+        }
+    }
+
     private val email = MockServerData.ACCOUNT_EMAIL
     private val password = MockServerData.ACCOUNT_PASSWORD
     private val contact = MockServerData.contacts().first().let {

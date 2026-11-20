@@ -738,6 +738,41 @@ class MessengerRepositoryTest {
         assertEquals("Pending offline edit", repository.profile.value.statusMessage)
         repository.logout()
     }
+
+    @Test
+    fun ownPresenceChangedEventUpdatesProfileAndCallbackWithoutRePublishing() = runBlocking {
+        val client = RecordingMsnpClient()
+        val persisted = mutableListOf<Pair<AccountIdentity, Presence>>()
+        val repository = MessengerRepository(
+            client = client,
+            onOwnPresenceChanged = { account, presence -> persisted += account to presence },
+        )
+        val serverConfig = ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides())
+        val account = AccountIdentity.forServer(MockServerData.ACCOUNT_EMAIL, serverConfig, useMockServer = false)
+        val otherAccount = AccountIdentity.forServer("other@example.com", serverConfig, useMockServer = false)
+        repository.signIn(
+            SignInRequest(
+                MockServerData.ACCOUNT_EMAIL,
+                MockServerData.ACCOUNT_PASSWORD,
+                serverConfig,
+                initialPresence = Presence.Online,
+            ),
+        ).getOrThrow()
+
+        client.events.emit(MessengerEvent.OwnPresenceChanged(account, Presence.Busy))
+        withTimeout(1_000) {
+            repository.profile.first { it.presence == Presence.Busy }
+        }
+        client.events.emit(MessengerEvent.OwnPresenceChanged(otherAccount, Presence.Offline))
+        client.events.emit(MessengerEvent.OwnPresenceChanged(account, Presence.Offline))
+        withTimeout(1_000) {
+            repository.profile.first { it.presence == Presence.Offline }
+        }
+
+        assertEquals(listOf(account to Presence.Busy, account to Presence.Offline), persisted)
+        assertTrue(client.presenceUpdates.isEmpty)
+        repository.logout()
+    }
 }
 
 private class RecordingMsnpClient : MsnpClient {
@@ -751,6 +786,7 @@ private class RecordingMsnpClient : MsnpClient {
     val sessionActions = mutableListOf<String>()
     var logoutFailure: Exception? = null
     val nicknameUpdates = Channel<String>(Channel.UNLIMITED)
+    val presenceUpdates = Channel<Presence>(Channel.UNLIMITED)
     val statusMessageUpdates = Channel<String>(Channel.UNLIMITED)
     val displayPictureUpdates = Channel<DisplayPictureUpdate>(Channel.UNLIMITED)
     val sentMessages = Channel<SentMessage>(Channel.UNLIMITED)
@@ -774,7 +810,9 @@ private class RecordingMsnpClient : MsnpClient {
         )
     }
 
-    override suspend fun changePresence(presence: Presence) = Unit
+    override suspend fun changePresence(presence: Presence) {
+        presenceUpdates.send(presence)
+    }
 
     override suspend fun changeNickname(nickname: String) {
         nicknameUpdates.send(nickname)

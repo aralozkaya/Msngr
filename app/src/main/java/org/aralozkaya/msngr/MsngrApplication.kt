@@ -117,6 +117,9 @@ class MsngrApplication : Application() {
             signOutOtherSessionsOnSignIn = { account ->
                 SessionPrefs.signsOutOtherSessionsOnSignIn(this, account)
             },
+            onOwnPresenceChanged = { account, presence ->
+                SessionPrefs.savePresence(this, presence, account)
+            },
         )
     }
 
@@ -149,6 +152,7 @@ class AppContainer(
     private val onRemoteSignOut: () -> Unit = {},
     private val signOutOtherSessionsOnSignIn: (AccountIdentity) -> Boolean = { false },
     private val conversationStyleStore: ConversationStyleStore = ConversationStyleStore(),
+    private val onOwnPresenceChanged: (AccountIdentity, org.aralozkaya.msngr.enums.Presence) -> Unit = { _, _ -> },
 ) {
     private var repository: MessengerRepository? = null
     private var repositoryUsesMockServer: Boolean? = null
@@ -170,6 +174,7 @@ class AppContainer(
             useMockServer = useMockServer,
             onRemoteSignOut = onRemoteSignOut,
             signOutOtherSessionsOnSignIn = signOutOtherSessionsOnSignIn,
+            onOwnPresenceChanged = onOwnPresenceChanged,
         ).also {
             repository = it
             repositoryUsesMockServer = useMockServer

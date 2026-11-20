@@ -270,7 +270,7 @@ internal class LiveMsnp18Client(
     private var signedInIdentity: AccountIdentity? = null
     private var machineGuid = ""
     private var switchboardFallbackPort = DEFAULT_SWITCHBOARD_PORT
-    private var currentPresence = Presence.Online
+    @Volatile private var currentPresence = Presence.Online
     private var currentPersonalMessage = ""
     private var currentMedia: CurrentMedia? = null
     private var storagePersonalStatus: String? = null
@@ -519,7 +519,7 @@ internal class LiveMsnp18Client(
                 ?.takeIf(String::isNotBlank)
                 ?: email.substringBefore('@').ifBlank { "You" },
             email = email,
-            presence = request.initialPresence,
+            presence = currentPresence,
             avatarUri = storedDisplayPicture?.toImageDataUri(),
             statusMessage = if (receivedLivePersonalMessage) currentPersonalMessage else storagePersonalStatus.orEmpty(),
             displayPictureFetched = signInData.storage.available && storageProfile != null && storageProfile.displayPictureStateKnown &&
@@ -857,12 +857,13 @@ internal class LiveMsnp18Client(
         val advertisedHash = localDisplayPicture?.metadata?.sha1d
         val pictureContentChanged = advertisedHash != lastAdvertisedDisplayPictureHash
         if (advertisedHash == lastAdvertisedDisplayPictureHash) return
+        val targetPresence = currentPresence
         if (pictureContentChanged) {
             // Escargot stores a new MSNObject from a same-status CHG without notifying contacts.
             // Briefly transition to another online state and immediately restore the real state
             // so its presence worker broadcasts the new MSNObject. The back-to-back commands are
             // coalesced by Escargot, while the final CHG contains the user's actual state.
-            displayPictureRefreshPresence()?.let { refreshPresence ->
+            displayPictureRefreshPresence(targetPresence)?.let { refreshPresence ->
                 send(
                     Msnp18Protocol.changePresence(
                         nextTransactionId(),
@@ -875,7 +876,7 @@ internal class LiveMsnp18Client(
         send(
             Msnp18Protocol.changePresence(
                 nextTransactionId(),
-                currentPresence,
+                targetPresence,
                 localDisplayPicture?.metadata,
             ),
         )
@@ -901,7 +902,7 @@ internal class LiveMsnp18Client(
         fetchStorageProfile?.invoke(storageServer, storageTicket)
             ?: MsnpStorageService.fetchProfile(storageServer, storageTicket, storageOwnerCid)
 
-    private fun displayPictureRefreshPresence(): Presence? = when (currentPresence) {
+    private fun displayPictureRefreshPresence(presence: Presence = currentPresence): Presence? = when (presence) {
         Presence.Online -> Presence.Away
         Presence.Busy, Presence.Away -> Presence.Online
         Presence.Offline -> null
@@ -2516,11 +2517,16 @@ internal class LiveMsnp18Client(
     }
 
     private suspend fun updateContactPresence(command: MsnpCommand) {
-        val presence = Presence.fromMsnpCode(command.parameters.getOrNull(0).orEmpty())
+        val rawPresence = command.parameters.getOrNull(0).orEmpty()
+        val parsedPresence = Presence.fromMsnpCodeOrNull(rawPresence)
+        val presence = parsedPresence ?: Presence.Offline
         val rawIdentity = command.parameters.getOrNull(1).orEmpty()
         val email = rawIdentity.normalizedIdentity()
         if (email.isEmpty()) return
         if (email.equals(signedInEmail, ignoreCase = true)) {
+            if (parsedPresence != null) {
+                applyOwnPresenceFromServer(parsedPresence)
+            }
             val hasNetworkId = hasSeparateIlnNetworkId(command)
             val raw = command.parameters.getOrNull(if (hasNetworkId) 5 else 4)
             val picture = MsnDisplayPicture.parse(raw)
@@ -2734,6 +2740,13 @@ internal class LiveMsnp18Client(
     private fun setContactOffline(rawIdentity: String?) {
         val email = rawIdentity?.normalizedIdentity().orEmpty()
         if (email.isEmpty()) return
+        if (email.equals(signedInEmail, ignoreCase = true)) {
+            val endpoint = rawIdentity.orEmpty().substringAfter(';', "").let(::normalizeEndpointId)
+            if (endpoint == null || endpoint == machineGuid) {
+                applyOwnPresenceFromServer(Presence.Offline)
+            }
+            return
+        }
         val id = email.lowercase()
         val previousPresence = knownContactPresences.put(id, Presence.Offline)
         contactDisplayPictureJobs.remove(id)?.cancel()
@@ -2836,6 +2849,13 @@ internal class LiveMsnp18Client(
                 },
             )
         }
+    }
+
+    private fun applyOwnPresenceFromServer(presence: Presence) {
+        if (currentPresence == presence) return
+        currentPresence = presence
+        mutableSessions.update { list -> list.map { if (it.isCurrent) it.copy(presence = presence) else it } }
+        signedInIdentity?.let { mutableEvents.tryEmit(MessengerEvent.OwnPresenceChanged(it, presence)) }
     }
 
     private fun notifyOwnDisplayPictureChanged(personalMessage: String? = null) {

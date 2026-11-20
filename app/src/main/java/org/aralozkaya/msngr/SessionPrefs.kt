@@ -516,6 +516,17 @@ object SessionPrefs {
         }
     }
 
+    fun savePresence(
+        context: Context,
+        presence: Presence,
+        account: AccountIdentity? = preferenceAccount(context),
+    ) {
+        val target = account ?: return
+        AccountPreferences.forAccount(context, PROFILE_PREFS, target).edit {
+            putString(KEY_PRESENCE, presence.name)
+        }
+    }
+
     internal data class SignedInProfileMerge(
         val profile: UserProfileSnapshot,
         val shouldPublishStatusMessage: Boolean,
