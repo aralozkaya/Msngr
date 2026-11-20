@@ -1375,6 +1375,7 @@
     <string name="update_skip_version">Skip this version</string>
     <string name="update_unskip">Stop skipping this version</string>
     <string name="update_view_release">View release on GitHub</string>
+    <string name="update_more_options">More update options</string>
     <string name="update_all_releases">All releases on GitHub</string>
     <string name="update_automatic">Check automatically</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->

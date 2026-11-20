@@ -13,16 +13,26 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -30,16 +40,26 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +70,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -57,6 +78,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -98,6 +120,7 @@ fun UpdateSettingsScreen(
     val scope = rememberCoroutineScope()
     var intervalDialog by rememberSaveable { mutableStateOf(false) }
     var downloadDialog by rememberSaveable { mutableStateOf(false) }
+    var releaseMenuExpanded by rememberSaveable(release?.version?.tag) { mutableStateOf(false) }
     var pendingAction by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingVersion by rememberSaveable { mutableStateOf<Int?>(null) }
     var externalActionVersion by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -160,6 +183,10 @@ fun UpdateSettingsScreen(
                     "package:${context.packageName}".toUri()))
             }.onFailure { manager.reportError(resources.getString(R.string.update_install_failed)) }
         } else install()
+    }
+
+    LaunchedEffect(state.downloading) {
+        if (state.downloading) releaseMenuExpanded = false
     }
 
     LaunchedEffect(state.downloading, state.downloadedVersion, state.error, pendingAction) {
@@ -229,21 +256,99 @@ fun UpdateSettingsScreen(
                             Text(stringResource(android.R.string.cancel))
                         }
                     } else {
-                        Button(onClick = { downloadDialog = true },
-                            enabled = state.supported && release.apkUrl != null && !fileActionBusy && !state.checking,
-                            shapes = ButtonDefaults.shapes(), modifier = Modifier.fillMaxWidth().testTag("download-update")) {
-                            Text(stringResource(if (state.downloadedVersion == release.version.code) R.string.update_apk_ready else R.string.update_download))
-                        }
+                        val isSkipped = settings.skippedTag == release.version.tag
+                        val moreOptionsDescription = stringResource(R.string.update_more_options)
+                        val menuState = stringResource(
+                            if (releaseMenuExpanded) R.string.contacts_actions_expanded else R.string.contacts_actions_collapsed,
+                        )
+                        val menuInteractionSource = remember { MutableInteractionSource() }
+                        SplitButtonLayout(
+                            modifier = Modifier.fillMaxWidth().testTag("update-split-button"),
+                            leadingButton = {
+                                SplitButtonDefaults.LeadingButton(
+                                    onClick = { downloadDialog = true },
+                                    enabled = state.supported && release.apkUrl != null && !fileActionBusy && !state.checking,
+                                    contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
+                                    modifier = Modifier.fillMaxWidth().testTag("download-update"),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                                    )
+                                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                    Text(stringResource(if (state.downloadedVersion == release.version.code) R.string.update_apk_ready else R.string.update_download))
+                                }
+                            },
+                            trailingButton = {
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                    tooltip = { PlainTooltip { Text(moreOptionsDescription) } },
+                                    state = rememberTooltipState(),
+                                ) {
+                                    SplitButtonDefaults.TrailingButton(
+                                        checked = releaseMenuExpanded,
+                                        onCheckedChange = { releaseMenuExpanded = it },
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .testTag("update-more-options")
+                                            .semantics {
+                                                contentDescription = moreOptionsDescription
+                                                stateDescription = menuState
+                                            },
+                                    ) {
+                                        val rotation by animateFloatAsState(
+                                            targetValue = if (releaseMenuExpanded) 180f else 0f,
+                                            label = "UpdateOptionsIconRotation",
+                                        )
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(SplitButtonDefaults.TrailingIconSize)
+                                                .graphicsLayer { rotationZ = rotation },
+                                        )
+                                    }
+                                }
+                                DropdownMenuPopup(
+                                    expanded = releaseMenuExpanded,
+                                    onDismissRequest = { releaseMenuExpanded = false },
+                                ) {
+                                    DropdownMenuGroup(
+                                        shapes = MenuDefaults.groupShape(0, 1),
+                                        interactionSource = menuInteractionSource,
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(if (isSkipped) R.string.update_unskip else R.string.update_skip_version)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    if (isSkipped) Icons.Default.Restore else Icons.Default.SkipNext,
+                                                    contentDescription = null,
+                                                )
+                                            },
+                                            shape = MenuDefaults.itemShape(0, 2).shape,
+                                            enabled = !state.downloading && !fileActionBusy,
+                                            modifier = Modifier.testTag("skip-update"),
+                                            onClick = {
+                                                releaseMenuExpanded = false
+                                                manager.configure(settings.copy(skippedTag = if (isSkipped) null else release.version.tag))
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.update_view_release)) },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                                            shape = MenuDefaults.itemShape(1, 2).shape,
+                                            modifier = Modifier.testTag("view-release-on-github"),
+                                            onClick = {
+                                                releaseMenuExpanded = false
+                                                context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri()))
+                                            },
+                                        )
+                                    }
+                                }
+                            },
+                        )
                         if (release.apkUrl == null) Text(stringResource(R.string.update_apk_not_available))
-                    }
-                    FilledTonalButton(onClick = {
-                        manager.configure(settings.copy(skippedTag = if (settings.skippedTag == release.version.tag) null else release.version.tag))
-                    }, enabled = !state.downloading && !fileActionBusy,
-                        shapes = ButtonDefaults.shapes(), modifier = Modifier.testTag("skip-update")) {
-                        Text(stringResource(if (settings.skippedTag == release.version.tag) R.string.update_unskip else R.string.update_skip_version))
-                    }
-                    OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, release.pageUrl.toUri())) }) {
-                        Text(stringResource(R.string.update_view_release))
                     }
                 }
             }

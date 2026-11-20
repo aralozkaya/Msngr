@@ -1375,6 +1375,7 @@
     <string name="update_skip_version">Bu sürümü atla</string>
     <string name="update_unskip">Bu sürümü atlamayı durdur</string>
     <string name="update_view_release">Sürümü GitHub\'da görüntüle</string>
+    <string name="update_more_options">Diğer güncelleme seçenekleri</string>
     <string name="update_all_releases">GitHub\'daki tüm sürümler</string>
     <string name="update_automatic">Otomatik denetle</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
