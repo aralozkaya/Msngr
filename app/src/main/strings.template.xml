@@ -2561,6 +2561,8 @@
     <string name="update_unskip"></string>
     <!-- Reference (en): View release on GitHub -->
     <string name="update_view_release"></string>
+    <!-- Reference (en): More update options -->
+    <string name="update_more_options"></string>
     <!-- Reference (en): All releases on GitHub -->
     <string name="update_all_releases"></string>
     <!-- Reference (en): Check automatically -->
