@@ -110,6 +110,29 @@ class LiveCircleClientTest {
         } finally { client.close(); scope.cancel() }
     }
 
+    @Test fun officialWlm2009CircleMembersEnableGroupNudgesWinksAndHandwriting() = runBlocking {
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(scope = scope, transport = transport,
+            switchboardTransportFactory = { error("Group nudges must not open a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() })
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com", "bob@example.com"))
+            transport.incoming.send(memberPresence("alice@example.com", "2688319548:48"))
+            transport.incoming.send(memberPresence("bob@example.com", "2688319548:48"))
+            withTimeout(2_000) {
+                client.contacts.first {
+                    it.single().groupFeatures(me) == org.aralozkaya.msngr.data.GroupFeatures(GroupInkFormat.Isf, winks = true, nudges = true)
+                }
+            }
+            client.sendNudgeWithResult(groupId).getOrThrow()
+            assertEquals(1, transport.sent.count { it.verb == "SDG" })
+        } finally { client.close(); scope.cancel() }
+    }
+
     @Test fun groupNudgeFloodIsSilentPerSenderAndKeepsItsHistory() = runBlocking {
         var time = 0L
         val transport = CircleTransport()

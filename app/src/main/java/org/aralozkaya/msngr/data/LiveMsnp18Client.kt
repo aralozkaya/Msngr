@@ -2451,6 +2451,17 @@ internal class LiveMsnp18Client(
         ) }
     }
 
+    private fun hasSeparateIlnNetworkId(command: MsnpCommand): Boolean {
+        if (command.verb != "ILN") return false
+        if (command.parameters.getOrNull(2)?.toIntOrNull() == null) return false
+        if (command.parameters.size >= 6) return true
+        val rawIdentity = command.parameters.getOrNull(1).orEmpty()
+        if (rawIdentity.identityNetworkId() != null) {
+            return parseClientCapabilitiesPairOrNull(command.parameters.getOrNull(3)) == null
+        }
+        return true
+    }
+
     /** Circle member presence must never create a direct contact or overwrite its status. */
     private fun handleCirclePresence(command: MsnpCommand): Boolean {
         val raw = when (command.verb) {
@@ -2467,7 +2478,7 @@ internal class LiveMsnp18Client(
             "FLN" -> Presence.Offline
             else -> null
         }
-        val hasNetworkId = command.verb == "ILN" && command.parameters.getOrNull(2)?.toIntOrNull() != null
+        val hasNetworkId = hasSeparateIlnNetworkId(command)
         val networkId = raw.identityNetworkId()
             ?: if (hasNetworkId) command.parameters.getOrNull(2)?.toIntOrNull() else null
         val nicknameIndex = if (hasNetworkId) 3 else 2
@@ -2510,7 +2521,7 @@ internal class LiveMsnp18Client(
         val email = rawIdentity.normalizedIdentity()
         if (email.isEmpty()) return
         if (email.equals(signedInEmail, ignoreCase = true)) {
-            val hasNetworkId = command.verb == "ILN" && command.parameters.getOrNull(2)?.toIntOrNull() != null
+            val hasNetworkId = hasSeparateIlnNetworkId(command)
             val raw = command.parameters.getOrNull(if (hasNetworkId) 5 else 4)
             val picture = MsnDisplayPicture.parse(raw)
             if (raw == "0" || picture?.creator?.normalizedIdentity()?.equals(email, true) == true) {
@@ -2530,8 +2541,7 @@ internal class LiveMsnp18Client(
         }
         val previousContact = mutableContacts.value.firstOrNull { it.id == email.lowercase() }
         if (previousContact?.isBlocked == true) return
-        val hasNetworkId = command.verb == "ILN" &&
-            command.parameters.getOrNull(2)?.toIntOrNull() != null
+        val hasNetworkId = hasSeparateIlnNetworkId(command)
         val networkId = rawIdentity.identityNetworkId()
             ?: (if (hasNetworkId) command.parameters.getOrNull(2)?.toIntOrNull() else null)
             ?: MSNP_WINDOWS_LIVE_NETWORK_ID

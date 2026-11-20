@@ -15,6 +15,8 @@ internal const val WEB_WATCH_CAPABILITY = 0x80L
 internal const val ACTIVITIES_CAPABILITY = 0x100L
 internal const val WEB_IM_CAPABILITY = 0x200L
 internal const val MOBILE_CLIENT_CAPABILITY = 0x400L
+internal const val FEDERATED_CLIENT_CAPABILITY = 0x800L
+internal const val DIRECT_IM_CAPABILITY = 0x4000L
 internal const val WINK_CAPABILITY = 0x8000L
 internal const val BOT_CAPABILITY = 0x20000L
 internal const val VOICE_CLIP_CAPABILITY = 0x40000L
@@ -24,9 +26,9 @@ internal const val EXTENDED_VOICE_OVER_MSNP_CAPABILITY = 0x02L
 internal const val EXTENDED_APPLICATION_MSG_CAPABILITY = 0x08L
 internal const val EXTENDED_RTC_VIDEO_CAPABILITY = 0x10L
 internal const val EXTENDED_P2PV2_CAPABILITY = 0x20L
-internal const val EXTENDED_NUDGE_CAPABILITY = 0x400L
-internal const val EXTENDED_PHOTO_SHARE_CAPABILITY = 0x1000L
-internal const val EXTENDED_FILE_TRANSFER_CAPABILITY = 0x20000L
+
+private const val MSNC_VERSION_MASK = 0xF000_0000L
+private const val BASE_FLAGS_MASK = 0x0FFF_FFFFL
 
 private const val INCOMPATIBLE_BASE_CAPABILITIES =
     ONLINE_VIA_MOBILE_CAPABILITY or
@@ -34,6 +36,7 @@ private const val INCOMPATIBLE_BASE_CAPABILITIES =
         WEB_WATCH_CAPABILITY or
         WEB_IM_CAPABILITY or
         MOBILE_CLIENT_CAPABILITY or
+        FEDERATED_CLIENT_CAPABILITY or
         BOT_CAPABILITY
 
 private const val INCOMPATIBLE_EXTENDED_CAPABILITIES = EXTENDED_SMS_ONLY_CAPABILITY
@@ -51,7 +54,7 @@ internal data class ParsedClientCapabilities(
 internal fun parseClientCapabilitiesPair(value: String?): ParsedClientCapabilities =
     parseClientCapabilitiesPairOrNull(value) ?: ParsedClientCapabilities()
 
-private fun parseClientCapabilitiesPairOrNull(value: String?): ParsedClientCapabilities? {
+internal fun parseClientCapabilitiesPairOrNull(value: String?): ParsedClientCapabilities? {
     val trimmed = value?.trim().orEmpty()
     if (trimmed.isEmpty()) return null
     val parts = trimmed.split(':')
@@ -96,8 +99,10 @@ internal fun parseEndpointCapabilities(payload: ByteArray): ParsedClientCapabili
         if (endpoints.isEmpty()) return@runCatching null
         val compatible = endpoints.filterNot { isIncompatibleClientCapabilities(it.base, it.extended) }
         val selected = compatible.ifEmpty { endpoints }
+        val maxMsnc = selected.maxOf { it.base and MSNC_VERSION_MASK }
+        val combinedFlags = selected.fold(0L) { acc, item -> acc or (item.base and BASE_FLAGS_MASK) }
         ParsedClientCapabilities(
-            base = selected.fold(0L) { acc, item -> acc or item.base },
+            base = maxMsnc or combinedFlags,
             extended = selected.fold(0L) { acc, item -> acc or item.extended },
         )
     }.getOrNull()
@@ -107,7 +112,7 @@ internal fun parseEndpointCapabilities(payload: ByteArray): ParsedClientCapabili
 internal fun mergeEndpointBaseCapabilities(existingBase: Long, endpointBase: Long): Long = when {
     endpointBase == 0L -> 0L
     endpointBase ushr 28 != 0L -> endpointBase
-    else -> (existingBase and 0xF000_0000L) or endpointBase
+    else -> (existingBase and MSNC_VERSION_MASK) or endpointBase
 }
 
 internal enum class GroupInkFormat { Isf, Gif }
@@ -128,11 +133,23 @@ internal data class RecipientFeatures(
     val activities: Boolean = false,
 )
 
+private fun effectiveMsncVersion(base: Long, extended: Long): Long {
+    val msncVersion = base ushr 28
+    if (msncVersion != 0L) return msncVersion
+    // MSNP18 EndpointData <Capabilities> can omit the MSNC high nibble; P2Pv2 (0x20) implies MSNC10+.
+    return if ((extended and EXTENDED_P2PV2_CAPABILITY) != 0L) 10L else 0L
+}
+
 private fun supportsWinkCapabilities(base: Long, extended: Long, networkId: Int): Boolean {
     if (networkId != MSNP_WINDOWS_LIVE_NETWORK_ID || isIncompatibleClientCapabilities(base, extended)) return false
-    val msncVersion = base ushr 28
+    val msncVersion = effectiveMsncVersion(base, extended)
     return (base and WINK_CAPABILITY) != 0L &&
         (msncVersion == 0L || (base and CHUNKING_CAPABILITY) != 0L)
+}
+
+private fun supportsNudgeCapabilities(base: Long, extended: Long, networkId: Int): Boolean {
+    if (networkId != MSNP_WINDOWS_LIVE_NETWORK_ID || isIncompatibleClientCapabilities(base, extended)) return false
+    return (base and CHUNKING_CAPABILITY) != 0L && effectiveMsncVersion(base, extended) >= 4L
 }
 
 /** Members come from the accepted membership/connected circle roster, not the contact list. */
@@ -148,7 +165,6 @@ internal fun Contact.groupFeatures(ownEmail: String): GroupFeatures {
         return GroupFeatures()
     }
     fun allSupport(mask: Long) = recipients.all { it.clientCapabilities and mask != 0L }
-    fun allSupportExtended(mask: Long) = recipients.all { it.extendedCapabilities and mask != 0L }
     return GroupFeatures(
         inkFormat = when {
             allSupport(INK_ISF_CAPABILITY) -> GroupInkFormat.Isf
@@ -156,11 +172,22 @@ internal fun Contact.groupFeatures(ownEmail: String): GroupFeatures {
             else -> null
         },
         winks = recipients.all { supportsWinkCapabilities(it.clientCapabilities, it.extendedCapabilities, it.networkId) },
-        nudges = allSupportExtended(EXTENDED_NUDGE_CAPABILITY),
+        nudges = recipients.all { supportsNudgeCapabilities(it.clientCapabilities, it.extendedCapabilities, it.networkId) },
     )
 }
 
-/** Computes supported interactive features for either a 1:1 contact or an MSNP18 circle group. */
+/**
+ * Computes supported interactive features for either a 1:1 contact or an MSNP18 circle group.
+ *
+ * Capability evaluation targets MSNP8–MSNP18 (up to WLM 2009 / MSNC10) and ignores post-WLM 2009
+ * extended flags while remaining backwards compatible with newer clients (such as WLM 2011/2012)
+ * through standard base capability bits and the MSNC version nibble:
+ * - MSNP8–MSNP15 (MSNC1–MSNC8): P2Pv1 files (`MSNC1+`), P4 games/activities (`MSNC2+`), nudges
+ *   (`MSNC4+`), winks (`0x8000`), voice clips (`0x40000`), and GIF/ISF ink (`0x04`/`0x08`).
+ * - MSNP16–MSNP18 (MSNC9–MSNC10, e.g. WLM 2009 `2688319548:48`): adds
+ *   `EXTENDED_P2PV2_CAPABILITY` (`0x20`) and WLM 2009+ Photo Sharing (`msncVersion >= 10` with
+ *   P2Pv2 or rich desktop capabilities).
+ */
 internal fun Contact.recipientFeatures(ownEmail: String): RecipientFeatures {
     if (isBlocked || !presence.isOnline) return RecipientFeatures()
     if (isGroup) {
@@ -176,13 +203,19 @@ internal fun Contact.recipientFeatures(ownEmail: String): RecipientFeatures {
     if (networkId != MSNP_WINDOWS_LIVE_NETWORK_ID || isIncompatibleClientCapabilities(base, extended)) {
         return RecipientFeatures()
     }
-    val msncVersion = base ushr 28
+    val msncVersion = effectiveMsncVersion(base, extended)
     val supportsChunking = (base and CHUNKING_CAPABILITY) != 0L
-    val supportsP2pActivities = supportsChunking &&
-        msncVersion >= 2L &&
-        ((base and ACTIVITIES_CAPABILITY) != 0L ||
-            (extended and EXTENDED_APPLICATION_MSG_CAPABILITY) != 0L ||
-            (extended and EXTENDED_P2PV2_CAPABILITY) != 0L)
+    val supportsRichDesktop = (base and (WINK_CAPABILITY or VOICE_CLIP_CAPABILITY)) != 0L
+    val explicitActivitySupport =
+        (base and (ACTIVITIES_CAPABILITY or DIRECT_IM_CAPABILITY)) != 0L ||
+            (extended and (EXTENDED_APPLICATION_MSG_CAPABILITY or EXTENDED_P2PV2_CAPABILITY)) != 0L
+    val legacyOfficialDesktopActivities =
+        (msncVersion in 2L..3L && (base and (INK_GIF_CAPABILITY or INK_ISF_CAPABILITY)) != 0L) ||
+            (msncVersion >= 4L && supportsRichDesktop)
+    val supportsP2pActivities = supportsChunking && (
+        (msncVersion != 1L && explicitActivitySupport) ||
+            legacyOfficialDesktopActivities
+        )
     return RecipientFeatures(
         inkFormat = when {
             (base and INK_ISF_CAPABILITY) != 0L -> GroupInkFormat.Isf
@@ -191,9 +224,11 @@ internal fun Contact.recipientFeatures(ownEmail: String): RecipientFeatures {
         },
         winks = supportsWinkCapabilities(base, extended, networkId),
         voiceClips = supportsChunking && (base and VOICE_CLIP_CAPABILITY) != 0L,
-        nudges = (extended and EXTENDED_NUDGE_CAPABILITY) != 0L,
-        files = supportsChunking && (extended and EXTENDED_FILE_TRANSFER_CAPABILITY) != 0L,
-        photos = supportsChunking && (extended and EXTENDED_PHOTO_SHARE_CAPABILITY) != 0L,
+        nudges = supportsNudgeCapabilities(base, extended, networkId),
+        files = supportsChunking && msncVersion >= 1L,
+        photos = supportsChunking &&
+            msncVersion >= 10L &&
+            ((extended and EXTENDED_P2PV2_CAPABILITY) != 0L || supportsRichDesktop),
         activities = supportsP2pActivities,
     )
 }
