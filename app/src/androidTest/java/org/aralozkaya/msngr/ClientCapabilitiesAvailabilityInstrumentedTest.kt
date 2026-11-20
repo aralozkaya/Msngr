@@ -16,17 +16,11 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.aralozkaya.msngr.data.CHUNKING_CAPABILITY
 import org.aralozkaya.msngr.data.Contact
-import org.aralozkaya.msngr.data.EXTENDED_FILE_TRANSFER_CAPABILITY
-import org.aralozkaya.msngr.data.EXTENDED_NUDGE_CAPABILITY
-import org.aralozkaya.msngr.data.EXTENDED_PHOTO_SHARE_CAPABILITY
 import org.aralozkaya.msngr.data.INK_GIF_CAPABILITY
 import org.aralozkaya.msngr.data.INK_ISF_CAPABILITY
 import org.aralozkaya.msngr.data.ONLINE_VIA_MOBILE_CAPABILITY
-import org.aralozkaya.msngr.data.VOICE_CLIP_CAPABILITY
-import org.aralozkaya.msngr.data.WINK_CAPABILITY
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.components.KeyboardSheetScaffold
-import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Rule
 import org.junit.Test
@@ -38,16 +32,20 @@ class ClientCapabilitiesAvailabilityInstrumentedTest {
 
     @Test
     fun oneToOneChatDisablesAndEnablesFeaturesAccordingToRecipientCapabilities() {
-        val fullBase = Msnp18Protocol.CLIENT_ID
-        val fullExt = Msnp18Protocol.EXTENDED_CAPABILITIES.toLong()
+        val wlm2009Base = 2_688_319_548L
+        val wlm2009Ext = 48L
+        val wlm85Base = 2_153_611_324L
+        val msn70Base = 0x4000_802CL
+        val pidginBase = 0x7000_0024L
+        val msn60Base = 0x1000_002CL
         val contact = mutableStateOf(
             Contact(
                 id = "peer@example.com",
                 nickname = "Peer",
                 email = "peer@example.com",
                 presence = Presence.Online,
-                clientCapabilities = fullBase,
-                extendedCapabilities = fullExt,
+                clientCapabilities = wlm2009Base,
+                extendedCapabilities = wlm2009Ext,
             ),
         )
         val draft = mutableStateOf("")
@@ -73,7 +71,7 @@ class ClientCapabilitiesAvailabilityInstrumentedTest {
             }
         }
 
-        // Full client support enables voice clips, nudges, handwriting, winks, photos, files, and activities.
+        // Official WLM 2009 (2688319548:48) enables voice clips, nudges, handwriting, winks, photos, files, and activities.
         compose.onNodeWithContentDescription("Record voice clip").assertIsEnabled()
         compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
         compose.onNodeWithContentDescription("Share or start an activity").assertIsEnabled().performClick()
@@ -82,98 +80,127 @@ class ClientCapabilitiesAvailabilityInstrumentedTest {
         compose.onNodeWithTag("sharing_menu_games").assertIsEnabled()
         Espresso.pressBack()
 
-        // Removing only voice clip support disables the voice clip microphone button on the chat window.
-        compose.runOnIdle {
-            contact.value = contact.value.copy(clientCapabilities = fullBase and VOICE_CLIP_CAPABILITY.inv())
-        }
-        compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
-
-        // Removing only file transfers, photos, or activities toggles individual sharing menu items.
+        // Official WLM 8.5 (2153611324:0) supports voice clips, nudges, files, games/activities, handwriting, and winks, but not photos.
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                clientCapabilities = fullBase,
-                extendedCapabilities = fullExt and EXTENDED_FILE_TRANSFER_CAPABILITY.inv(),
+                clientCapabilities = wlm85Base,
+                extendedCapabilities = 0L,
             )
         }
+        compose.onNodeWithContentDescription("Record voice clip").assertIsEnabled()
+        compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
         compose.onNodeWithContentDescription("Share or start an activity").assertIsEnabled().performClick()
-        compose.onNodeWithTag("sharing_menu_photos").assertIsEnabled()
-        compose.onNodeWithTag("sharing_menu_files").assertIsNotEnabled()
+        compose.onNodeWithTag("sharing_menu_photos").assertIsNotEnabled()
+        compose.onNodeWithTag("sharing_menu_files").assertIsEnabled()
         compose.onNodeWithTag("sharing_menu_games").assertIsEnabled()
         Espresso.pressBack()
 
+        // MSN 7.0 (0x4000802C:0) enables nudges, files, games/activities, handwriting, and winks, while disabling voice clips and photos.
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                extendedCapabilities = fullExt and EXTENDED_PHOTO_SHARE_CAPABILITY.inv(),
+                clientCapabilities = msn70Base,
+                extendedCapabilities = 0L,
             )
         }
+        compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
         compose.onNodeWithContentDescription("Share or start an activity").assertIsEnabled().performClick()
         compose.onNodeWithTag("sharing_menu_photos").assertIsNotEnabled()
         compose.onNodeWithTag("sharing_menu_files").assertIsEnabled()
         compose.onNodeWithTag("sharing_menu_games").assertIsEnabled()
 
-        // Open Games & activities dialog and verify removing activities support closes it.
+        // Open Games & activities dialog on WLM 2009, then switch to Pidgin (0x70000024:0) and verify the dialog closes cleanly.
+        compose.runOnIdle {
+            contact.value = contact.value.copy(
+                clientCapabilities = wlm2009Base,
+                extendedCapabilities = wlm2009Ext,
+            )
+        }
         compose.onNodeWithTag("sharing_menu_games").performClick()
         compose.onNodeWithTag("game_catalog_dialog").assertIsDisplayed()
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                clientCapabilities = fullBase,
-                extendedCapabilities = EXTENDED_NUDGE_CAPABILITY,
+                clientCapabilities = pidginBase,
+                extendedCapabilities = 0L,
             )
         }
         compose.onNodeWithTag("game_catalog_dialog").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Share or start an activity").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
+        compose.onNodeWithContentDescription("Share or start an activity").assertIsEnabled().performClick()
+        compose.onNodeWithTag("sharing_menu_photos").assertIsNotEnabled()
+        compose.onNodeWithTag("sharing_menu_files").assertIsEnabled()
+        compose.onNodeWithTag("sharing_menu_games").assertIsNotEnabled()
+        Espresso.pressBack()
+        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
+        compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).assertIsEnabled()
+        compose.onNodeWithTag("wink_menu_item").assertIsNotEnabled()
+        compose.onNodeWithTag("emotion_sound_menu_item").assertIsEnabled()
+        Espresso.pressBack()
 
-        // Removing nudge support disables Send nudge while text and emoticons stay enabled.
+        // MSN 6.0 (0x1000002C:0) keeps files & handwriting enabled while disabling nudges, winks, voice clips, photos, and activities; text stays enabled.
         compose.runOnIdle {
-            contact.value = contact.value.copy(extendedCapabilities = 0L)
+            contact.value = contact.value.copy(
+                clientCapabilities = msn60Base,
+                extendedCapabilities = 0L,
+            )
         }
+        compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Send nudge").assertIsNotEnabled()
         compose.onNode(hasSetTextAction()).assertIsEnabled()
+        compose.onNodeWithContentDescription("Share or start an activity").assertIsEnabled().performClick()
+        compose.onNodeWithTag("sharing_menu_photos").assertIsNotEnabled()
+        compose.onNodeWithTag("sharing_menu_files").assertIsEnabled()
+        compose.onNodeWithTag("sharing_menu_games").assertIsNotEnabled()
+        Espresso.pressBack()
 
-        // Opening handwriting and losing ink support closes handwriting mode cleanly.
+        // Opening handwriting on WLM 2009 and losing ink support closes handwriting mode cleanly.
+        compose.runOnIdle {
+            contact.value = contact.value.copy(
+                clientCapabilities = wlm2009Base,
+                extendedCapabilities = wlm2009Ext,
+            )
+        }
         compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
         compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).assertIsEnabled().performClick()
         compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).assertIsDisplayed()
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                clientCapabilities = fullBase and (INK_GIF_CAPABILITY or INK_ISF_CAPABILITY).inv(),
+                clientCapabilities = wlm2009Base and (INK_GIF_CAPABILITY or INK_ISF_CAPABILITY).inv(),
             )
         }
         compose.onNodeWithTag(HANDWRITING_CANVAS_TAG).assertDoesNotExist()
-
         compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
         compose.onNodeWithTag(EMOTICON_MENU_HANDWRITING_ITEM_TAG).assertIsNotEnabled()
         compose.onNodeWithTag("wink_menu_item").assertIsEnabled()
         compose.onNodeWithTag("emotion_sound_menu_item").assertIsEnabled()
         Espresso.pressBack()
 
-        // Removing wink support disables Winks in the menu.
+        // Minimal (0:0), removing chunking (0x20), and mobile clients disable interactive MSNP features cleanly.
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                clientCapabilities = contact.value.clientCapabilities and WINK_CAPABILITY.inv(),
-            )
-        }
-        compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performTouchInput { longClick() }
-        compose.onNodeWithTag("wink_menu_item").assertIsNotEnabled()
-        compose.onNodeWithTag("emotion_sound_menu_item").assertIsEnabled()
-        Espresso.pressBack()
-
-        // Removing chunking or switching to a mobile/non-Live client disables all interactive MSNP features cleanly.
-        compose.runOnIdle {
-            contact.value = contact.value.copy(
-                clientCapabilities = fullBase and CHUNKING_CAPABILITY.inv(),
-                extendedCapabilities = fullExt,
+                clientCapabilities = 0L,
+                extendedCapabilities = 0L,
             )
         }
         compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Send nudge").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Share or start an activity").assertIsNotEnabled()
 
         compose.runOnIdle {
             contact.value = contact.value.copy(
-                clientCapabilities = fullBase or ONLINE_VIA_MOBILE_CAPABILITY,
-                extendedCapabilities = fullExt,
+                clientCapabilities = wlm2009Base and CHUNKING_CAPABILITY.inv(),
+                extendedCapabilities = wlm2009Ext,
+            )
+        }
+        compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Send nudge").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Share or start an activity").assertIsNotEnabled()
+
+        compose.runOnIdle {
+            contact.value = contact.value.copy(
+                clientCapabilities = wlm2009Base or ONLINE_VIA_MOBILE_CAPABILITY,
+                extendedCapabilities = wlm2009Ext,
             )
         }
         compose.onNodeWithContentDescription("Record voice clip").assertIsNotEnabled()
