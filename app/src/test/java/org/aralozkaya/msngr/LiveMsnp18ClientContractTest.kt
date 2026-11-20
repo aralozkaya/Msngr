@@ -2468,6 +2468,88 @@ class LiveMsnp18ClientContractTest {
         }
     }
 
+    @Test fun officialDesktopCapabilitiesAndNumericNicknamesEnableExpectedFeatures() = runBlocking {
+        var time = 0L
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val directory = java.nio.file.Files.createTempDirectory("cap-desktop").toFile()
+        val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
+        val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
+            MsnDisplayPicture.create(email, winkBytes, 8),
+            "Screen Punch",
+        )
+        val voiceBytes = javaClass.getResourceAsStream("/voice-clips/native-siren.wav")!!.use { it.readBytes() }
+        val voiceClip = requireNotNull(org.aralozkaya.msngr.protocol.MsnVoiceClip.parse(voiceBytes))
+        val drawing = org.aralozkaya.msngr.protocol.InkDrawing(
+            strokes = listOf(org.aralozkaya.msngr.protocol.InkStroke(listOf(
+                org.aralozkaya.msngr.protocol.InkPoint(10f, 20f),
+                org.aralozkaya.msngr.protocol.InkPoint(80f, 60f),
+            ))),
+            canvasWidthPx = 220f,
+            canvasHeightPx = 90f,
+        )
+        val fileToShare = java.io.File(directory, "note.txt").apply { writeText("hello") }
+        val photo = org.aralozkaya.msngr.data.PhotoToShare("photo.png", "hash", ByteArray(4), ByteArray(4))
+        val game = org.aralozkaya.msngr.data.MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        val client = LiveMsnp18Client(
+            transport = notification,
+            switchboardTransportFactory = { switchboard },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "proof", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(contact.copy(presence = Presence.Offline))) },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            fileTransferDirectory = directory,
+            nudgeLimiter = NudgeRateLimiter { time },
+        )
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+
+            // MSNP18 ILN with an all-digit nickname must not mistake the nickname for a separate network ID.
+            notification.deliver(MsnpCommand("ILN", transactionId = 0, parameters = listOf("NLN", "1:${contact.email}", "12345", "2688319548:48", "0")))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline && it.single().nickname == "12345" } }
+            assertEquals(2_688_319_548L, client.contacts.value.single().clientCapabilities)
+            assertEquals(48L, client.contacts.value.single().extendedCapabilities)
+
+            // Live-format WLM 8.5 NLN + empty-EndpointData UBX enables desktop features except photo sharing.
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:${contact.email}", "WLM%208.5", "2153611324:0", "0")))
+            notification.deliver(MsnpCommand("UBX", parameters = listOf("1:${contact.email}"),
+                payload = "<Data><PSM>On 8.5</PSM><CurrentMedia></CurrentMedia></Data>".toByteArray()))
+            withTimeout(2_000) {
+                client.contacts.first {
+                    it.single().statusMessage == "On 8.5" && !it.single().recipientFeatures(email).photos
+                }
+            }
+            client.sendNudgeWithResult(contact.id).getOrThrow()
+            client.sendVoiceClip(contact.id, voiceClip).getOrThrow()
+            client.sendWink(contact.id, winkRef, winkBytes).getOrThrow()
+            client.sendInkMessage(contact.id, drawing).getOrThrow()
+            client.sendFile(contact.id, fileToShare, "note.txt").getOrThrow()
+            client.startGame(contact.id, game).getOrThrow()
+            client.stopGame(contact.id, client.gameSessions.value.getValue(contact.id).id).getOrThrow()
+            assertTrue(client.sharePhotos(contact.id, listOf(photo)).isFailure)
+
+            // Live-format WLM 2009 NLN + UBX enables all 7 interactive desktop features.
+            time += 11_000L
+            notification.deliver(MsnpCommand("NLN", parameters = listOf("NLN", "1:${contact.email}", "WLM%202009", "2688319548:48", "0")))
+            notification.deliver(MsnpCommand("UBX", parameters = listOf("1:${contact.email}"),
+                payload = "<Data><PSM>On 2009</PSM><EndpointData id=\"{11111111-1111-1111-1111-111111111111}\"><Capabilities>2688319548:48</Capabilities></EndpointData></Data>".toByteArray()))
+            withTimeout(2_000) {
+                client.contacts.first {
+                    it.single().statusMessage == "On 2009" && it.single().recipientFeatures(email).photos
+                }
+            }
+            client.sendNudgeWithResult(contact.id).getOrThrow()
+            client.sendVoiceClip(contact.id, voiceClip).getOrThrow()
+            client.sendWink(contact.id, winkRef, winkBytes).getOrThrow()
+            client.sendInkMessage(contact.id, drawing).getOrThrow()
+            client.sendFile(contact.id, fileToShare, "note.txt").getOrThrow()
+            client.sharePhotos(contact.id, listOf(photo)).getOrThrow()
+            client.startGame(contact.id, game).getOrThrow()
+        } finally {
+            client.close()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun currentMediaPublishesViaUuxPreservesPsmAcrossEditsAndSyncsContactAndOwnUbx(): Unit = runBlocking {
         val notification = ContractNotificationTransport(email)
         val storageUpdates = CopyOnWriteArrayList<Pair<String, String>>()
