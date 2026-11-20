@@ -37,7 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -159,7 +159,7 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
             }.getOrDefault(emptyList())
         }
     }
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(clip, lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) job?.cancel() }
@@ -177,7 +177,7 @@ internal fun VoiceClipPlayer(clip: VoiceClip, modifier: Modifier = Modifier, com
                         progress = 0f
                         try { VoicePlayback.play(clip) { progress = it } }
                         catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { error = context.getString(R.string.voice_clip_cant_play) }
+                        catch (_: Exception) { error = resources.getString(R.string.voice_clip_cant_play) }
                         finally {
                             progress = 0f
                             if (job === currentCoroutineContext()[Job]) job = null

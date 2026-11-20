@@ -30,7 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -52,7 +52,7 @@ internal fun SessionsDialog(
     onCurrentSessionLoggedOut: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var busyTarget by remember { mutableStateOf<String?>(null) }
     val busy = busyTarget != null
@@ -74,14 +74,14 @@ internal fun SessionsDialog(
             if (result.isSuccess && selected.any(AccountSession::isCurrent)) {
                 onCurrentSessionLoggedOut()
             } else {
-                feedback = result.exceptionOrNull()?.message?.let(context::localizeUserMessage)
+                feedback = result.exceptionOrNull()?.message?.let(resources::localizeUserMessage)
                     ?: if (selected.size == 1) {
-                        context.getString(
+                        resources.getString(
                             R.string.sessions_logged_out_singular,
-                            context.localizeUserMessage(selected.single().deviceName),
+                            resources.localizeUserMessage(selected.single().deviceName),
                         )
                     } else {
-                        context.getString(R.string.sessions_logged_out_plural)
+                        resources.getString(R.string.sessions_logged_out_plural)
                     }
             }
         }

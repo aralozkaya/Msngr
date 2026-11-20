@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
@@ -67,6 +68,7 @@ internal fun SharingMenu(
     activitiesEnabled: Boolean = enabled,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
     var gamesOpen by rememberSaveable(contactId) { mutableStateOf(false) }
@@ -81,7 +83,7 @@ internal fun SharingMenu(
                 val result = context.sharingRepository().sendFile(contactId, selected.first, selected.second)
                 error = result.exceptionOrNull()?.message
                 if (result.isFailure) selected.first.delete()
-            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.file_sharing_open_selected_file_failed) }
+            } catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.file_sharing_open_selected_file_failed) }
             finally { busy = false }
         }
     }
@@ -89,10 +91,10 @@ internal fun SharingMenu(
         if (uris.isNotEmpty()) scope.launch {
             busy = true
             try {
-                require(uris.size <= 32) { context.getNumberSentence(R.string.photo_sharing_limit_before_number, 32, R.string.photo_sharing_limit_after_number) }
+                require(uris.size <= 32) { resources.getNumberSentence(R.string.photo_sharing_limit_before_number, 32, R.string.photo_sharing_limit_after_number) }
                 val prepared = withContext(Dispatchers.IO) { prepareSharedPhotos(context, uris) }
                 error = context.sharingRepository().sharePhotos(contactId, prepared).exceptionOrNull()?.message
-            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_open_selected_failed) }
+            } catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.photo_sharing_open_selected_failed) }
             finally { busy = false }
         }
     }
@@ -165,6 +167,7 @@ internal fun FileTransferMessage(message: ChatMessage,
 ) {
     val transfer = message.fileTransfer ?: return
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var error by remember(transfer.id) { mutableStateOf<String?>(null) }
     var saved by remember(transfer.id) { mutableStateOf(false) }
@@ -188,7 +191,7 @@ internal fun FileTransferMessage(message: ChatMessage,
             }
             saved = true
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-        catch (_: Exception) { error = context.getString(R.string.file_sharing_save_failed) }
+        catch (_: Exception) { error = resources.getString(R.string.file_sharing_save_failed) }
         finally { busy = false }
     }
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -249,7 +252,7 @@ internal fun FileTransferMessage(message: ChatMessage,
                         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW)
                             .setDataAndType(uri, FileSharingProvider.mime(transfer.name))
                             .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                    } catch (_: Exception) { error = context.getString(R.string.file_sharing_no_open_app_you_singular) }
+                    } catch (_: Exception) { error = resources.getString(R.string.file_sharing_no_open_app_you_singular) }
                 }) { Text(stringResource(R.string.common_open)) }
         }
     }
@@ -284,6 +287,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
     onRequestOriginal: (suspend (String) -> Result<Unit>)? = null,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val ongoing = share?.status in listOf(PhotoShareStatus.Invited, PhotoShareStatus.Active)
     var visible by rememberSaveable(contactId, share?.id) {
@@ -302,7 +306,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             try {
                 val prepared = withContext(Dispatchers.IO) { prepareSharedPhotos(context, uris) }
                 error = context.sharingRepository().sharePhotos(contactId, prepared).exceptionOrNull()?.message
-            } catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_open_selected_failed) }
+            } catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.photo_sharing_open_selected_failed) }
             finally { preparing = false }
         }
     }
@@ -321,7 +325,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
         }
     }
     val savePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        if (allowed) requestSave() else error = context.getNumberSentence(R.string.transfer_storage_access_photos_before_number, 9, R.string.transfer_storage_access_photos_after_number)
+        if (allowed) requestSave() else error = resources.getNumberSentence(R.string.transfer_storage_access_photos_before_number, 9, R.string.transfer_storage_access_photos_after_number)
     }
     val requestedOriginal = share?.photos?.firstOrNull { it.id == savePhotoId }
     LaunchedEffect(requestedOriginal?.originalPath, requestedOriginal?.originalError, requestedOriginal?.originalPending, saveRequested, requestingOriginal) {
@@ -332,7 +336,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 context.receivedTransferStorage.savePhoto(SessionPrefs.preferenceAccount(context), share.id, requestedOriginal).getOrThrow()
                 savedPhotoId = savePhotoId
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: context.getString(R.string.photo_sharing_save_failed) }
+            catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.photo_sharing_save_failed) }
             finally { saveRequested = false }
         }
     }

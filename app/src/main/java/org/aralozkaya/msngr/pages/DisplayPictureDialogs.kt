@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -189,6 +190,7 @@ private const val DP_FILTER_ALL_KEY = "__all__"
 @Composable
 internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val screenHeight = LocalConfiguration.current.screenHeightDp
     val compact = screenHeight < 500
     val filterState = rememberLazyListState()
@@ -208,7 +210,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
         try {
             pictures = context.loadDefaultDisplayPictures()
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = context.getString(R.string.display_picture_defaults_load_failed) }
+        catch (_: Exception) { error = resources.getString(R.string.display_picture_defaults_load_failed) }
     }
     BasicAlertDialog(
         onDismissRequest = onDismiss,

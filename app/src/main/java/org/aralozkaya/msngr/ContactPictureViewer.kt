@@ -69,9 +69,7 @@ internal fun ContactPictureViewer(pictureUri: String, name: String, onDismiss: (
                 saving = false
                 Toast.makeText(
                     context,
-                    context.getString(
-                        if (saved) R.string.picture_viewer_saved else R.string.picture_viewer_save_failed,
-                    ),
+                    if (saved) R.string.picture_viewer_saved else R.string.picture_viewer_save_failed,
                     Toast.LENGTH_LONG,
                 ).show()
             }

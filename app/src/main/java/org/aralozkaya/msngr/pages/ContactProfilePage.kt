@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -84,6 +85,7 @@ fun ContactProfilePage(
     onAddContact: ((Contact) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     // Keep the opened photo stable if the contact changes it while it is being viewed.
     var expandedPictureUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -278,7 +280,7 @@ fun ContactProfilePage(
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
-                                eraseError = context.getString(R.string.contact_erase_history_failed)
+                                eraseError = resources.getString(R.string.contact_erase_history_failed)
                             } finally {
                                 isErasing = false
                             }

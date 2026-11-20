@@ -74,6 +74,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -108,6 +109,7 @@ internal fun VoiceClipComposer(
     sendButton: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val actionInteractions = remember { MutableInteractionSource() }
@@ -208,12 +210,12 @@ internal fun VoiceClipComposer(
                 finishRecording()
                 locked = false
                 processing = true
-                check(pcm.isNotEmpty()) { context.getString(R.string.voice_clip_hold_to_record) }
+                check(pcm.isNotEmpty()) { resources.getString(R.string.voice_clip_hold_to_record) }
                 clip = withContext(Dispatchers.Default) { MsnVoiceClip.encode(pcm) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.voice_clip_record_failed)
+                error = e.message ?: resources.getString(R.string.voice_clip_record_failed)
             } finally {
                 if (recorder === capture) {
                     finishRecording()
@@ -227,7 +229,7 @@ internal fun VoiceClipComposer(
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         // The permission sheet interrupts the press. A fresh hold starts capture after granting access.
-        error = if (granted) null else context.getString(R.string.voice_clip_mic_permission)
+        error = if (granted) null else resources.getString(R.string.voice_clip_mic_permission)
     }
     fun requestStart(handsFree: Boolean) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -243,11 +245,11 @@ internal fun VoiceClipComposer(
             try {
                 val result = onSend(ready)
                 if (result.isSuccess) discard()
-                else error = result.exceptionOrNull()?.message ?: context.getString(R.string.voice_clip_send_failed)
+                else error = result.exceptionOrNull()?.message ?: resources.getString(R.string.voice_clip_send_failed)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.voice_clip_send_failed)
+                error = e.message ?: resources.getString(R.string.voice_clip_send_failed)
             } finally { sending = false }
         }
     }

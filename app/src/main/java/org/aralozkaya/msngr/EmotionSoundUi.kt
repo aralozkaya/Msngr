@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -210,6 +211,7 @@ internal fun EmotionSoundDropdown(
 internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
     onSend: suspend (EmotionSound) -> Result<Unit>, catalogService: EmotionSoundService? = null) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val player = rememberEmotionSoundController()
     val scope = rememberCoroutineScope()
     val store = context.emotionSoundStore()
@@ -248,13 +250,13 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
         if (visible && online && onlineEnabled && soundService != null && popular == null && catalogError == null) {
             try { popular = soundService.popular() }
             catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { catalogError = failure.message ?: context.getString(R.string.emotion_sound_load_failed) }
+            catch (failure: Exception) { catalogError = failure.message ?: resources.getString(R.string.emotion_sound_load_failed) }
         }
     }
     fun action(block: suspend () -> Unit) { scope.launch {
         actionBusy = true; error = null; status = null
         try { block() } catch (cancel: CancellationException) { throw cancel }
-        catch (failure: Exception) { error = failure.message ?: context.getString(R.string.emotion_sound_download_failed) }
+        catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.emotion_sound_download_failed) }
         finally { actionBusy = false }
     } }
     KeyboardPickerSheet(visible, onDismiss, stringResource(R.string.chat_menu_emotion_sounds_plural), "emotion_sound_picker", expandable = true,
@@ -300,10 +302,10 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                 Spacer(Modifier.weight(1f))
                 if (onlineEnabled) {
                     if (hash != null) Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { action {
-                        val (sound, _) = player.load(EmotionSound(hash, context.getString(R.string.emotion_sound_fallback_name_singular)), save = true)
-                        status = context.getString(
+                        val (sound, _) = player.load(EmotionSound(hash, resources.getString(R.string.emotion_sound_fallback_name_singular)), save = true)
+                        status = resources.getString(
                             R.string.emotion_sound_added_status,
-                            context.localizeEmotionSoundName(sound.name).messengerPlusPlainText(),
+                            resources.localizeEmotionSoundName(sound.name).messengerPlusPlainText(),
                         )
                         online = false
                     } }) { Icon(Icons.Default.Download, null); Text(stringResource(R.string.common_download)) }
@@ -362,7 +364,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
                         }
                         if (online) IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { action {
                             val (saved, _) = player.load(sound, save = true)
-                            status = context.getString(R.string.emotion_sound_added_status, context.localizeEmotionSoundName(saved.name).messengerPlusPlainText())
+                            status = resources.getString(R.string.emotion_sound_added_status, resources.localizeEmotionSoundName(saved.name).messengerPlusPlainText())
                         } }) {
                             Icon(Icons.Default.Download, stringResource(R.string.emotion_sound_download_desc, name))
                         } else if (sound.builtInCode == null) IconButton(modifier = Modifier.size(iconButtonSize), enabled = !busy, onClick = { action {
@@ -376,7 +378,7 @@ internal fun EmotionSoundPicker(visible: Boolean, enabled: Boolean, onDismiss: (
     }
     if (visible && randomDialog && onlineEnabled) {
         RandomEmotionSoundDialog(category, onDismiss = { randomDialog = false }, onKept = { sound ->
-            status = context.getString(R.string.emotion_sound_added_status, context.localizeEmotionSoundName(sound.name).messengerPlusPlainText()); online = false; randomDialog = false
+            status = resources.getString(R.string.emotion_sound_added_status, resources.localizeEmotionSoundName(sound.name).messengerPlusPlainText()); online = false; randomDialog = false
         })
     }
 }

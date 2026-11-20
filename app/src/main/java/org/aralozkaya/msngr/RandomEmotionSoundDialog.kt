@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -33,6 +34,7 @@ internal fun RandomEmotionSoundDialog(
     service: EmotionSoundService? = null,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val player = rememberEmotionSoundController()
     val scope = rememberCoroutineScope()
     val soundService = remember(player.server, service) {
@@ -52,7 +54,7 @@ internal fun RandomEmotionSoundDialog(
 
     fun download() {
         val activeService = soundService ?: run {
-            error = context.getString(R.string.emotion_sound_not_configured)
+            error = resources.getString(R.string.emotion_sound_not_configured)
             return
         }
         player.stop()
@@ -66,7 +68,7 @@ internal fun RandomEmotionSoundDialog(
                 player.checkAccount()
                 candidate = result
             } catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { error = failure.message ?: context.getString(R.string.emotion_sound_download_failed) }
+            catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.emotion_sound_download_failed) }
             finally { downloading = false }
         }
     }
@@ -124,7 +126,7 @@ internal fun RandomEmotionSoundDialog(
                         player.checkAccount()
                         onKept(sound)
                     } catch (cancel: CancellationException) { throw cancel }
-                    catch (failure: Exception) { error = failure.message ?: context.getString(R.string.emotion_sound_save_failed) }
+                    catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.emotion_sound_save_failed) }
                     finally { saving = false }
                 }
             }, modifier = Modifier.testTag("emotion_sound_random_keep")) { Text(stringResource(R.string.random_sound_keep)) }

@@ -43,7 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -80,7 +80,7 @@ internal fun AddContactDialog(
     val busy = submitting || closingAction != null
     var error by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val fallbackError = stringResource(R.string.contact_add_failed)
     var focusManager by remember { mutableStateOf<FocusManager?>(null) }
@@ -100,7 +100,7 @@ internal fun AddContactDialog(
         val address = try {
             validateContactAddress(email, ownEmail, contacts)
         } catch (failure: IllegalArgumentException) {
-            error = failure.message?.let(context::localizeUserMessage)
+            error = failure.message?.let(resources::localizeUserMessage)
             return
         }
         submitting = true
@@ -112,7 +112,7 @@ internal fun AddContactDialog(
                 val result = onAddContact(address, message)
                 if (result.isSuccess) close(onAdded)
                 else scope.launch {
-                    val localizedMsg = result.exceptionOrNull()?.message?.let(context::localizeUserMessage) ?: fallbackError
+                    val localizedMsg = result.exceptionOrNull()?.message?.let(resources::localizeUserMessage) ?: fallbackError
                     snackbarHostState.showActionSnackbar(localizedMsg, isError = true)
                 }
             } catch (failure: CancellationException) {

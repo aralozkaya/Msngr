@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -54,11 +55,12 @@ import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 @Composable
 internal fun DisplayPictureSyncHost(repository: MessengerRepository) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val sync = remember(context) { context.displayPictureSync }
     val state by sync.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.notice) {
         state.notice?.let { notice ->
-            Toast.makeText(context, context.localizeUserMessage(notice), Toast.LENGTH_LONG).show()
+            Toast.makeText(context, resources.localizeUserMessage(notice), Toast.LENGTH_LONG).show()
             sync.consumeNotice(notice)
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -39,6 +40,7 @@ import org.aralozkaya.msngr.pages.components.PageContentList
 @Composable
 internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior: TopAppBarScrollBehavior) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val settings by remember(context) { TransferPrefs.state(context) }.collectAsState()
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var permissionAction by rememberSaveable { mutableStateOf<String?>(null) }
@@ -48,7 +50,7 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
             "photos" -> TransferPrefs.update(context) { it.copy(autoSavePhotos = true) }
             "default" -> TransferPrefs.update(context) { it.copy(fileTree = null, fileTreeName = null) }
             "photo_default" -> TransferPrefs.update(context) { it.copy(photoTree = null, photoTreeName = null) }
-        } else error = context.getNumberSentence(
+        } else error = resources.getNumberSentence(
             R.string.transfers_storage_access_default_folders_you_singular_before_number,
             9,
             R.string.transfers_storage_access_default_folders_you_singular_after_number,
@@ -69,7 +71,7 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
                 if (photo) it.copy(photoTree = uri.toString(), photoTreeName = name)
                 else it.copy(fileTree = uri.toString(), fileTreeName = name)
             }
-        } catch (_: Exception) { error = context.getString(R.string.transfers_folder_authorize_failed) }
+        } catch (_: Exception) { error = resources.getString(R.string.transfers_folder_authorize_failed) }
     }
     val fileFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { authorizeFolder(it, photo = false) }
     val photoFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { authorizeFolder(it, photo = true) }

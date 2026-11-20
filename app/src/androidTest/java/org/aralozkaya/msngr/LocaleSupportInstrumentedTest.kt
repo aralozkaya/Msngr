@@ -8,7 +8,9 @@ import android.os.LocaleList
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -115,6 +117,21 @@ class LocaleSupportInstrumentedTest {
         compose.onNodeWithText("Uzakta").assertIsDisplayed()
         compose.onNodeWithText("Çevrim dışı görün").assertIsDisplayed()
         compose.onNodeWithText("Çevrim dışı").assertIsDisplayed()
+    }
+
+    @Test fun visibleMessagesFollowTheSelectedResourcesWhenTheActivityContextStaysTheSame() {
+        val english = localizedContext("en").resources
+        val turkish = localizedContext("tr").resources
+        val selected = mutableStateOf(english)
+        compose.setContent {
+            CompositionLocalProvider(LocalResources provides selected.value) {
+                Text(localizeUserMessage("Wink"))
+            }
+        }
+
+        compose.onNodeWithText(english.getString(R.string.wink_fallback_name_singular)).assertIsDisplayed()
+        compose.runOnIdle { selected.value = turkish }
+        compose.onNodeWithText(turkish.getString(R.string.wink_fallback_name_singular)).assertIsDisplayed()
     }
 
     @Test fun splitNumberSentencesAssembleCleanlyAcrossLocales() {
