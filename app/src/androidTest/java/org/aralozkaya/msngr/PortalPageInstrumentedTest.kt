@@ -15,11 +15,17 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,19 +63,27 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
+import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessengerBannerAd
+import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MessengerTabSite
 import org.aralozkaya.msngr.data.MessengerTextAd
+import org.aralozkaya.msngr.data.MockMsnp18Client
 import org.aralozkaya.msngr.data.MockServerData
 import org.aralozkaya.msngr.data.MsgrClientConfig
+import org.aralozkaya.msngr.data.MsnpClient
 import org.aralozkaya.msngr.data.PortalState
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.WhatsNewActivity
@@ -512,6 +526,164 @@ class PortalPageInstrumentedTest {
             compose.onNodeWithTag("portal_webview_dialog").assertDoesNotExist()
         } finally {
             activityScenario.close()
+        }
+    }
+
+    @Test
+    fun switchingMainPagerPagesResetsDepartedPageScrollAndTopBar() {
+        SessionPrefs.logout()
+        val baseClient = MockMsnp18Client()
+        val seededContacts = List(25) { index ->
+            Contact(
+                id = "contact-$index",
+                nickname = "Contact $index",
+                email = "contact$index@example.com",
+                presence = Presence.Online,
+            )
+        }
+        val seededWhatsNew = List(25) { index ->
+            WhatsNewActivity(
+                id = "activity-$index",
+                kind = WhatsNewKind.Status,
+                publisherCid = "$index",
+                publisherName = "Publisher $index",
+                text = "Status update number $index",
+                publishedAtMillis = System.currentTimeMillis() - index * 60_000L,
+            )
+        }
+        val fakeClient = object : MsnpClient by baseClient {
+            override val contacts: StateFlow<List<Contact>> = MutableStateFlow(seededContacts)
+            override val portalState: StateFlow<PortalState> = MutableStateFlow(
+                PortalState(whatsNew = seededWhatsNew),
+            )
+        }
+        val repository = MessengerRepository(client = fakeClient, useMockServer = false)
+        val activityScenario = ActivityScenario.launch(androidx.activity.ComponentActivity::class.java)
+        try {
+            lateinit var pagerState: PagerState
+            lateinit var scrollBehavior: TopAppBarScrollBehavior
+            lateinit var contactsListState: LazyListState
+            lateinit var portalListState: LazyListState
+            activityScenario.onActivity { activity ->
+                activity.setContent {
+                    MsngrTheme {
+                        pagerState = rememberPagerState(initialPage = 1) { 2 }
+                        scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+                        contactsListState = rememberLazyListState()
+                        portalListState = rememberLazyListState()
+                        MsngrApp(
+                            repository = repository,
+                            snackbarHostState = remember { SnackbarHostState() },
+                            onOpenProfile = {},
+                            onOpenSettings = {},
+                            onOpenBlockedContacts = {},
+                            onOpenRequests = {},
+                            onOpenGroup = { _, _ -> },
+                            onOpenChat = {},
+                            onOpenContactProfile = {},
+                            onSimulateReconnect = {},
+                            onLogout = {},
+                            pagerState = pagerState,
+                            scrollBehavior = scrollBehavior,
+                            contactsListState = contactsListState,
+                            portalListState = portalListState,
+                        )
+                    }
+                }
+            }
+            compose.waitForIdle()
+
+            val pager = compose.onNodeWithTag("main_pager")
+            val shortDrag = with(compose.density) { 32.dp.toPx() }
+
+            // Scroll Contacts down and verify a short drag that snaps back keeps its position.
+            repeat(2) {
+                pager.performTouchInput { swipeUp() }
+                compose.waitForIdle()
+            }
+            assertTrue(
+                contactsListState.firstVisibleItemIndex > 0 ||
+                    contactsListState.firstVisibleItemScrollOffset > 0,
+            )
+            assertTrue(scrollBehavior.state.heightOffset < 0f)
+
+            pager.performTouchInput { swipeRight(center.x, center.x + shortDrag, durationMillis = 500) }
+            compose.waitForIdle()
+            assertEquals(1, pagerState.settledPage)
+            assertTrue(
+                contactsListState.firstVisibleItemIndex > 0 ||
+                    contactsListState.firstVisibleItemScrollOffset > 0,
+            )
+
+            // Swipe right to Portal: Portal lands at top with expanded top bar, Contacts resets off-screen.
+            pager.performTouchInput { swipeRight() }
+            compose.waitForIdle()
+            assertEquals(0, pagerState.settledPage)
+            assertEquals(0, portalListState.firstVisibleItemIndex)
+            assertEquals(0, portalListState.firstVisibleItemScrollOffset)
+            assertEquals(0, contactsListState.firstVisibleItemIndex)
+            assertEquals(0, contactsListState.firstVisibleItemScrollOffset)
+            assertEquals(0f, scrollBehavior.state.heightOffset, 0.01f)
+            assertEquals(0f, scrollBehavior.state.contentOffset, 0.01f)
+
+            // Scroll Portal down and verify a short drag back keeps its position.
+            repeat(2) {
+                compose.onNodeWithTag("portal_page").performTouchInput { swipeUp() }
+                compose.waitForIdle()
+            }
+            assertTrue(
+                portalListState.firstVisibleItemIndex > 0 ||
+                    portalListState.firstVisibleItemScrollOffset > 0,
+            )
+            assertTrue(scrollBehavior.state.heightOffset < 0f)
+
+            pager.performTouchInput { swipeLeft(center.x, center.x - shortDrag, durationMillis = 500) }
+            compose.waitForIdle()
+            assertEquals(0, pagerState.settledPage)
+            assertTrue(
+                portalListState.firstVisibleItemIndex > 0 ||
+                    portalListState.firstVisibleItemScrollOffset > 0,
+            )
+
+            // Go BACK from Portal to Contacts: Contacts lands at top with expanded top bar, Portal resets off-screen.
+            pressBack()
+            compose.waitForIdle()
+            assertEquals(1, pagerState.settledPage)
+            assertEquals(0, contactsListState.firstVisibleItemIndex)
+            assertEquals(0, contactsListState.firstVisibleItemScrollOffset)
+            assertEquals(0, portalListState.firstVisibleItemIndex)
+            assertEquals(0, portalListState.firstVisibleItemScrollOffset)
+            assertEquals(0f, scrollBehavior.state.heightOffset, 0.01f)
+            assertEquals(0f, scrollBehavior.state.contentOffset, 0.01f)
+
+            // Swiping back to Portal and then swiping left to Contacts also resets Portal's position.
+            pager.performTouchInput { swipeRight() }
+            compose.waitForIdle()
+            assertEquals(0, pagerState.settledPage)
+            assertEquals(0, portalListState.firstVisibleItemIndex)
+            assertEquals(0, portalListState.firstVisibleItemScrollOffset)
+
+            repeat(2) {
+                compose.onNodeWithTag("portal_page").performTouchInput { swipeUp() }
+                compose.waitForIdle()
+            }
+            assertTrue(
+                portalListState.firstVisibleItemIndex > 0 ||
+                    portalListState.firstVisibleItemScrollOffset > 0,
+            )
+
+            pager.performTouchInput { swipeLeft() }
+            compose.waitForIdle()
+            assertEquals(1, pagerState.settledPage)
+            assertEquals(0, portalListState.firstVisibleItemIndex)
+            assertEquals(0, portalListState.firstVisibleItemScrollOffset)
+            assertEquals(0, contactsListState.firstVisibleItemIndex)
+            assertEquals(0, contactsListState.firstVisibleItemScrollOffset)
+            assertEquals(0f, scrollBehavior.state.heightOffset, 0.01f)
+            assertEquals(0f, scrollBehavior.state.contentOffset, 0.01f)
+        } finally {
+            activityScenario.close()
+            repository.logout()
         }
     }
 }

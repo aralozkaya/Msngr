@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -65,6 +66,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -264,7 +266,7 @@ class MainActivity : MsngrActivity() {
 }
 
 @Composable
-private fun MsngrApp(
+internal fun MsngrApp(
     repository: MessengerRepository,
     snackbarHostState: SnackbarHostState,
     onOpenProfile: () -> Unit,
@@ -276,6 +278,10 @@ private fun MsngrApp(
     onOpenContactProfile: (String) -> Unit,
     onSimulateReconnect: () -> Unit,
     onLogout: () -> Unit,
+    pagerState: PagerState = rememberPagerState(initialPage = 1) { 2 },
+    scrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
+    contactsListState: LazyListState = rememberLazyListState(),
+    portalListState: LazyListState = rememberLazyListState(),
 ) {
     val context = LocalContext.current
     val updateState by context.updateManager.state.collectAsState()
@@ -301,14 +307,10 @@ private fun MsngrApp(
     var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
     var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = 1) { 2 }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var showPagerIndicator by remember { mutableStateOf(true) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val groupInteractionSource = remember { MutableInteractionSource() }
-    val contactsListState = rememberLazyListState()
-    val portalListState = rememberLazyListState()
     var topBarHeight by remember { mutableIntStateOf(0) }
     val showProfileButton by remember {
         derivedStateOf {
@@ -346,6 +348,19 @@ private fun MsngrApp(
         val activeList = if (pagerState.currentPage == 0) portalListState else contactsListState
         if (activeList.firstVisibleItemIndex == 0 && activeList.firstVisibleItemScrollOffset == 0) {
             scrollBehavior.state.heightOffset = 0f
+            scrollBehavior.state.contentOffset = 0f
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage) {
+        val activeList = if (pagerState.settledPage == 0) portalListState else contactsListState
+        val inactiveList = if (pagerState.settledPage == 0) contactsListState else portalListState
+        if (inactiveList.firstVisibleItemIndex != 0 || inactiveList.firstVisibleItemScrollOffset != 0) {
+            inactiveList.scrollToItem(0)
+        }
+        if (activeList.firstVisibleItemIndex == 0 && activeList.firstVisibleItemScrollOffset == 0) {
+            scrollBehavior.state.heightOffset = 0f
+            scrollBehavior.state.contentOffset = 0f
         }
     }
 
