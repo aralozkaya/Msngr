@@ -258,6 +258,14 @@
     <string name="chat_message_retry">Yeniden dene</string>
     <string name="chat_text_size_local_notice">Metin boyutu yalnızca bu cihazda, hem gelen hem de giden mesajlar için değişir.</string>
     <string name="chat_scroll_to_latest">En son mesaja kaydır</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_scroll_to_latest_new_messages_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="chat_scroll_to_latest_new_messages_singular_after_number">yeni mesaj</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_scroll_to_latest_new_messages_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_scroll_to_latest_new_messages_plural_after_number">yeni mesaj</string>
     <string name="chat_error_emotion_sounds_unavailable">Duygu sesleri kullanılamıyor.</string>
     <string name="chat_error_winks_unavailable">Göz kırpmaları kullanılamıyor.</string>
     <string name="chat_error_voice_clips_unavailable">Ses klipleri kullanılamıyor.</string>
