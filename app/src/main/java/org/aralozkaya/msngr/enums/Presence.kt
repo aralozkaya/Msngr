@@ -38,12 +38,14 @@ enum class Presence(
             else -> entries.firstOrNull { it.name == value } ?: Online
         }
 
-        fun fromMsnpCode(value: String): Presence = when (value.uppercase()) {
+        fun fromMsnpCodeOrNull(value: String): Presence? = when (value.uppercase()) {
             "NLN" -> Online
             "BSY" -> Busy
             "IDL", "BRB", "AWY", "PHN", "LUN" -> Away
             "HDN", "FLN" -> Offline
-            else -> Offline
+            else -> null
         }
+
+        fun fromMsnpCode(value: String): Presence = fromMsnpCodeOrNull(value) ?: Offline
     }
 }
