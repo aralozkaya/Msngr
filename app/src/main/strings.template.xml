@@ -479,6 +479,18 @@
     <string name="chat_text_size_local_notice"></string>
     <!-- Reference (en): Scroll to latest message -->
     <string name="chat_scroll_to_latest"></string>
+    <!-- Note: singular text variant -->
+    <!-- Reference (en):  -->
+    <string name="chat_scroll_to_latest_new_messages_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <!-- Reference (en): new message -->
+    <string name="chat_scroll_to_latest_new_messages_singular_after_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <!-- Reference (en):  -->
+    <string name="chat_scroll_to_latest_new_messages_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <!-- Reference (en): new messages -->
+    <string name="chat_scroll_to_latest_new_messages_plural_after_number"></string>
     <!-- Reference (en): Emotion sounds are unavailable. -->
     <string name="chat_error_emotion_sounds_unavailable"></string>
     <!-- Reference (en): Winks are unavailable. -->

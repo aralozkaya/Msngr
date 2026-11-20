@@ -382,6 +382,7 @@ internal fun ChatScreen(
     ownName: String = "",
     photoShare: org.aralozkaya.msngr.data.PhotoShare? = null,
     gameSession: org.aralozkaya.msngr.data.GameSession? = null,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val recipientFeatures = contact?.recipientFeatures(ownEmail) ?: RecipientFeatures()
     val sharingBaseEnabled = isConversationAvailable && contact != null && !contact.isGroup &&
@@ -394,7 +395,6 @@ internal fun ChatScreen(
             nudgeShakeState.trigger()
         }
     }
-    val listState = rememberLazyListState()
     val topBarColor = chatTopBarContainerColor(listState)
     val scenePresentation = LocalScenePresentation.current
     val scene = LocalMessengerScene.current.takeIf { scenePresentation.showInConversations }
@@ -409,9 +409,6 @@ internal fun ChatScreen(
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     val messengerPlusEnabled = LocalMessengerPlusEnabled.current
-    LaunchedEffect(messages.lastOrNull()?.id, isTyping) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(0)
-    }
     LaunchedEffect(listState, canLoadOlderMessages, isHistoryLoaded) {
         if (!isHistoryLoaded || !canLoadOlderMessages) return@LaunchedEffect
         snapshotFlow {
@@ -716,6 +713,12 @@ internal fun ChatMessageList(
     val timeline by remember(messages, dayLabels.timeZone) {
         derivedStateOf { chatTimeline(messages, dayLabels.timeZone) }
     }
+    val newMessageScroll = rememberChatNewMessageScrollController(
+        messages = messages,
+        timeline = timeline,
+        listState = listState,
+        isHistoryLoaded = isHistoryLoaded,
+    )
     val stickyDayAlpha = rememberChatStickyDayAlpha(listState)
     Box(
         modifier = modifier
@@ -794,6 +797,8 @@ internal fun ChatMessageList(
         ChatStickyDay(timeline, listState, dayLabels, stickyDayAlpha)
         ChatScrollToLatestButton(
             listState = listState,
+            newMessageCount = newMessageScroll.unseenCount,
+            isAutoScrolling = newMessageScroll.isAutoScrolling,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(

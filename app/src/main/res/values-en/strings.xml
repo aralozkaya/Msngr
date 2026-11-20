@@ -258,6 +258,14 @@
     <string name="chat_message_retry">Retry</string>
     <string name="chat_text_size_local_notice">Text size changes only on this device, for both incoming and outgoing messages.</string>
     <string name="chat_scroll_to_latest">Scroll to latest message</string>
+    <!-- Note: singular text variant -->
+    <string name="chat_scroll_to_latest_new_messages_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="chat_scroll_to_latest_new_messages_singular_after_number">new message</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_scroll_to_latest_new_messages_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="chat_scroll_to_latest_new_messages_plural_after_number">new messages</string>
     <string name="chat_error_emotion_sounds_unavailable">Emotion sounds are unavailable.</string>
     <string name="chat_error_winks_unavailable">Winks are unavailable.</string>
     <string name="chat_error_voice_clips_unavailable">Voice clips are unavailable.</string>
