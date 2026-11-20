@@ -8,6 +8,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
+import android.view.View
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,14 +32,20 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -46,11 +53,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeRight
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -196,6 +207,35 @@ class PortalPageInstrumentedTest {
         }
         compose.onNodeWithTag("main_pager_indicator").assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun swipingAwayFromContactsDismissesSearchFocusAndKeyboard() {
+        val context = runBlocking { launchMockMainActivity() }
+        lateinit var decorView: View
+        checkNotNull(scenario).onActivity { decorView = it.window.decorView }
+        fun imeVisible() = ViewCompat.getRootWindowInsets(decorView)?.isVisible(WindowInsetsCompat.Type.ime())
+
+        val searchField = hasContentDescription(context.getString(R.string.contacts_search_placeholder))
+        val search = compose.onNode(searchField)
+        search.performTouchInput { click() }.assertIsFocused()
+        search.performTextReplacement("Selin")
+        compose.waitUntil(5_000) { imeVisible() == true }
+
+        val pager = compose.onNodeWithTag("main_pager")
+        val shortDrag = with(compose.density) { 32.dp.toPx() }
+        pager.performTouchInput { swipeRight(center.x, center.x + shortDrag, durationMillis = 500) }
+        search.assertIsDisplayed().assertIsFocused()
+
+        pager.performTouchInput { swipeRight() }
+        compose.onNodeWithTag("portal_page").assertIsDisplayed()
+        compose.onNode(searchField and isFocused()).assertDoesNotExist()
+        compose.waitUntil(5_000) { imeVisible() == false }
+
+        pressBack()
+        search.assertIsDisplayed().assertIsNotFocused().assertTextEquals("Selin")
+        search.performTouchInput { click() }.assertIsFocused()
+        compose.waitUntil(5_000) { imeVisible() == true }
     }
 
     @Test

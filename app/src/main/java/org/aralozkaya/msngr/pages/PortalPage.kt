@@ -94,6 +94,7 @@ fun PortalPage(
     onRefresh: () -> Unit,
     onOpenWebTarget: (PortalWebTarget) -> Unit,
     onOpenContactProfile: (String) -> Unit,
+    modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val context = LocalContext.current
@@ -150,7 +151,7 @@ fun PortalPage(
                         .padding(top = innerPadding.calculateTopPadding()),
                 )
             },
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .testTag("portal_pull_refresh"),
         ) {

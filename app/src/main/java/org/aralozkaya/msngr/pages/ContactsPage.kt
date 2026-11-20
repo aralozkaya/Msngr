@@ -101,6 +101,8 @@ fun ContactsPage(
     onOpenChat: (Contact) -> Unit,
     onBlockContact: (Contact) -> Unit,
     onReadStateChange: (Contact, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    isCurrentPage: Boolean = true,
     listState: LazyListState = rememberLazyListState(),
     drafts: Map<String, String> = emptyMap(),
     onDeleteContact: ((Contact) -> Unit)? = null,
@@ -118,7 +120,7 @@ fun ContactsPage(
     var leaveSearchRequested by remember { mutableStateOf(false) }
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val focusManager = LocalFocusManager.current
-    BackHandler(enabled = searchFocused || searchFieldState.text.isNotEmpty()) {
+    BackHandler(enabled = isCurrentPage && (searchFocused || searchFieldState.text.isNotEmpty())) {
         leaveSearchRequested = true
         searchEditorController.hideKeyboard()
     }
@@ -156,7 +158,7 @@ fun ContactsPage(
     val groups = sorted.filter(Contact::isGroup)
     val visible = sorted.filterNot(Contact::isGroup)
     PageContentList(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         listState = listState,
         innerPadding = innerPadding,
         scrollBehavior = scrollBehavior,
