@@ -65,7 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -111,7 +111,7 @@ internal fun GroupEditorDialog(
     var invitationAction by rememberSaveable { mutableStateOf(group != null) }
     var error by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var focusManager by remember { mutableStateOf<FocusManager?>(null) }
     // Match the space reserved above the outlined field for its floating label.
@@ -154,10 +154,10 @@ internal fun GroupEditorDialog(
                 group?.members.orEmpty().any { it.email.equals(email, true) }
             } else requested, ownEmail, group?.members.orEmpty())
             if (group != null && !attemptedInvites) {
-                require(addresses.isNotEmpty()) { context.getString(R.string.group_invite_at_least_one) }
+                require(addresses.isNotEmpty()) { resources.getString(R.string.group_invite_at_least_one) }
             }
         } catch (failure: IllegalArgumentException) {
-            error = failure.message?.let(context::localizeUserMessage)
+            error = failure.message?.let(resources::localizeUserMessage)
             return
         }
         submitting = true; error = null
@@ -174,14 +174,14 @@ internal fun GroupEditorDialog(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 if (group == null && createdId != null) invitationAction = true
-                val localizedFailure = failure.message?.let(context::localizeUserMessage)
+                val localizedFailure = failure.message?.let(resources::localizeUserMessage)
                 val snackbarMessage = if (group == null && createdId != null) {
-                    context.getString(
+                    resources.getString(
                         R.string.group_created_invites_failed_you_singular,
-                        localizedFailure ?: context.getString(R.string.group_invites_failed_default),
+                        localizedFailure ?: resources.getString(R.string.group_invites_failed_default),
                     )
                 } else {
-                    localizedFailure ?: context.getString(R.string.group_update_failed_default)
+                    localizedFailure ?: resources.getString(R.string.group_update_failed_default)
                 }
                 scope.launch { snackbarHostState.showActionSnackbar(snackbarMessage, isError = true) }
             } finally { submitting = false }

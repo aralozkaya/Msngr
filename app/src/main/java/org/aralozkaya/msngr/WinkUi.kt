@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -41,6 +42,7 @@ import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
     onSend: suspend (WinkReference, ByteArray) -> Result<Unit>) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val account = context.winkAccount()
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -81,7 +83,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                                 try {
                                     val bytes = withContext(Dispatchers.IO) { context.winkStore().bytes(account, reference.metadata) }
                                     val result = if (bytes != null) onSend(reference, bytes)
-                                        else Result.failure(IllegalStateException(context.getString(R.string.wink_unavailable)))
+                                        else Result.failure(IllegalStateException(resources.getString(R.string.wink_unavailable)))
                                     error = result.exceptionOrNull()?.message
                                     if (result.isSuccess) onDismiss()
                                 } finally { busy = false }
@@ -91,12 +93,12 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                                 busy = true
                                 try {
                                     withContext(Dispatchers.IO) {
-                                        check(context.winkAccount() == account) { context.getString(R.string.wink_account_changed) }
+                                        check(context.winkAccount() == account) { resources.getString(R.string.wink_account_changed) }
                                         context.winkStore().remove(account, reference.metadata)
                                     }
                                     error = null
                                 } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-                                catch (failure: Exception) { error = failure.message ?: context.getString(R.string.wink_delete_failed) }
+                                catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.wink_delete_failed) }
                                 finally { busy = false }
                             }
                         }))
@@ -184,6 +186,7 @@ private enum class WinkLibraryState { Default, Saved, Unsaved }
 internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRetry: () -> Unit) {
     val reference = message.wink ?: return
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val account = context.winkAccount()
     var play by remember(account, message.id) { mutableStateOf(false) }
@@ -249,18 +252,18 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
                         error = null
                         try {
                             withContext(Dispatchers.IO) {
-                                check(context.winkAccount() == owner) { context.getString(R.string.wink_account_changed) }
+                                check(context.winkAccount() == owner) { resources.getString(R.string.wink_account_changed) }
                                 if (remove) {
                                     // Keep this message playable after removing its library copy.
                                     store.bytes(owner, reference.metadata)?.let { store.receive(owner, message.contactId, reference, it) }
                                     store.remove(owner, reference.metadata)
                                 } else if (!store.isSaved(owner, reference.metadata)) {
-                                    val bytes = store.bytes(owner, reference.metadata) ?: error(context.getString(R.string.wink_not_cached))
+                                    val bytes = store.bytes(owner, reference.metadata) ?: error(resources.getString(R.string.wink_not_cached))
                                     store.install(owner, reference, bytes)
                                 }
                             }
                         } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-                        catch (failure: Exception) { error = failure.message ?: context.getString(R.string.wink_update_saved_failed) }
+                        catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.wink_update_saved_failed) }
                         finally { busy = false }
                     }
                 }, enabled = optionsEnabled, shapes = ListItemDefaults.segmentedShapes(1, actionCount),

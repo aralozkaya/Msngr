@@ -70,6 +70,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -246,6 +247,7 @@ private fun LoginReadyRoute(
     signOutReason: String? = null,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var email by rememberSaveable { mutableStateOf(initial.email) }
     val passwordState = rememberTextFieldState(initial.password)
@@ -356,7 +358,7 @@ private fun LoginReadyRoute(
                     automaticSignInEnabled = false
                 }
                 errorMessage =
-                    error.message ?: context.getString(R.string.login_error_service_default_you_singular)
+                    error.message ?: resources.getString(R.string.login_error_service_default_you_singular)
             }
             submitting = false
         }

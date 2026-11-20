@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +97,7 @@ import org.aralozkaya.msngr.resizeDisplayPicture
 import org.aralozkaya.msngr.ui.theme.ownDisplayPicture
 import org.aralozkaya.msngr.withExpandedMsnMenuTokens
 import org.aralozkaya.msngr.withoutUnicodeEmoji
+import java.io.Serializable
 
 @Composable
 internal fun ProfilePage(
@@ -118,7 +120,7 @@ internal fun ProfilePage(
     val initial = remember(repository) { repository.profile.value }
     var showNowPlayingPermissionDialog by rememberSaveable { mutableStateOf(false) }
     var pendingEnableNowPlaying by rememberSaveable { mutableStateOf(false) }
-    var nowPlayingSettingsError by rememberSaveable { mutableStateOf<String?>(null) }
+    var showNowPlayingSettingsError by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(lifecycleOwner, activeNowPlayingController) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -135,19 +137,19 @@ internal fun ProfilePage(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     fun openNotificationAccess() {
-        nowPlayingSettingsError = null
+        showNowPlayingSettingsError = false
         if (onOpenNotificationAccessSettings != null) {
             onOpenNotificationAccessSettings()
         } else {
             runCatching {
                 context.startActivity(NowPlayingAccess.createNotificationAccessIntent(context))
             }.onFailure {
-                nowPlayingSettingsError = context.getString(R.string.profile_now_playing_settings_unavailable)
+                showNowPlayingSettingsError = true
             }
         }
     }
     fun openAppInfo() {
-        nowPlayingSettingsError = null
+        showNowPlayingSettingsError = false
         if (onOpenAppInfoSettings != null) {
             onOpenAppInfoSettings()
         } else {
@@ -155,7 +157,7 @@ internal fun ProfilePage(
                 context.startActivity(NowPlayingAccess.createAppDetailsIntent(context))
             }.onFailure {
                 showNowPlayingPermissionDialog = false
-                nowPlayingSettingsError = context.getString(R.string.profile_now_playing_settings_unavailable)
+                showNowPlayingSettingsError = true
             }
         }
     }
@@ -178,7 +180,7 @@ internal fun ProfilePage(
     var processingDisplayPicture by remember { mutableStateOf(false) }
     var pendingPictureResize by remember { mutableStateOf<DisplayPictureSelection?>(null) }
     var savingProfile by remember { mutableStateOf(false) }
-    var profileSaveError by rememberSaveable { mutableStateOf<String?>(null) }
+    var profileSaveError by rememberSaveable { mutableStateOf<ProfileSaveError?>(null) }
     val usernameEditorController = remember {
         MessengerPlusEditorController(MessengerPlusEditorSyntax.PROFILE_MARKUP)
     }
@@ -228,7 +230,7 @@ internal fun ProfilePage(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                profileSaveError = error.message ?: context.getString(R.string.profile_error_read_image)
+                profileSaveError = ProfileSaveError(R.string.profile_error_read_image, error.message)
             } finally {
                 if (captured) context.deleteDisplayPictureCapture(Uri.parse(uri))
                 processingDisplayPicture = false
@@ -260,7 +262,7 @@ internal fun ProfilePage(
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
-                        profileSaveError = error.message?.let(context::localizeUserMessage) ?: context.getString(R.string.profile_error_resize_picture)
+                        profileSaveError = ProfileSaveError(R.string.profile_error_resize_picture, error.message)
                     } finally {
                         processingDisplayPicture = false
                     }
@@ -283,7 +285,7 @@ internal fun ProfilePage(
                 } catch (_: Exception) {
                     pendingCameraUri?.let { context.deleteDisplayPictureCapture(Uri.parse(it)) }
                     pendingCameraUri = null
-                    profileSaveError = context.getString(R.string.profile_error_open_camera)
+                    profileSaveError = ProfileSaveError(R.string.profile_error_open_camera)
                 }
             },
             onSelectPhoto = {
@@ -293,7 +295,7 @@ internal fun ProfilePage(
                     // ImageOnly includes image/gif; do not limit this to JPEG/PNG.
                     imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 } catch (_: Exception) {
-                    profileSaveError = context.getString(R.string.profile_error_open_picker)
+                    profileSaveError = ProfileSaveError(R.string.profile_error_open_picker)
                 }
             },
             onDefaultPhoto = { showDisplayPictureOptions = false; showDefaultDisplayPictures = true },
@@ -496,7 +498,7 @@ internal fun ProfilePage(
                                         null
                                     }
                                     if (displayPictureChanged && avatarUri != null && bytesToUpload == null) {
-                                        profileSaveError = context.getString(R.string.profile_error_read_image)
+                                        profileSaveError = ProfileSaveError(R.string.profile_error_read_image)
                                         savingProfile = false
                                         return@launch
                                     }
@@ -511,8 +513,10 @@ internal fun ProfilePage(
                                         savingProfile = false
                                         onProfileSaved()
                                     }.onFailure { error ->
-                                        profileSaveError = error.message
-                                            ?: context.getString(R.string.profile_error_save_picture_server)
+                                        profileSaveError = ProfileSaveError(
+                                            R.string.profile_error_save_picture_server,
+                                            error.message,
+                                        )
                                         savingProfile = false
                                     }
                                 }
@@ -527,8 +531,11 @@ internal fun ProfilePage(
                                 Text(stringResource(R.string.profile_save_button))
                             }
                         }
-                        profileSaveError?.let { message ->
-                            Text(localizeUserMessage(message), color = MaterialTheme.colorScheme.error)
+                        profileSaveError?.let { error ->
+                            Text(
+                                error.detail?.let { localizeUserMessage(it) } ?: stringResource(error.fallback),
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 }
@@ -545,7 +552,7 @@ internal fun ProfilePage(
                                 .testTag("profile-now-playing-card"),
                         ) {
                             val nowPlayingExpanded =
-                                nowPlayingState.enabled || nowPlayingSettingsError != null
+                                nowPlayingState.enabled || showNowPlayingSettingsError
                             ExpandableSettingsGroup(
                                 expanded = nowPlayingExpanded,
                                 highlighted = nowPlayingState.enabled,
@@ -553,7 +560,7 @@ internal fun ProfilePage(
                                     SegmentedListItem(
                                         checked = nowPlayingState.enabled,
                                         onCheckedChange = { wantEnabled ->
-                                            nowPlayingSettingsError = null
+                                            showNowPlayingSettingsError = false
                                             if (wantEnabled) {
                                                 if (activeNowPlayingController.hasNotificationAccess()) {
                                                     activeNowPlayingController.setEnabled(true)
@@ -588,16 +595,16 @@ internal fun ProfilePage(
                                 },
                                 content = { shapes, colors ->
                                     val errorSupportingContent: (@Composable () -> Unit)? =
-                                        nowPlayingSettingsError?.let { errorMessage ->
+                                        if (showNowPlayingSettingsError) {
                                             {
                                                 Text(
-                                                    text = errorMessage,
+                                                    text = stringResource(R.string.profile_now_playing_settings_unavailable),
                                                     color = MaterialTheme.colorScheme.error,
                                                 )
                                             }
-                                        }
+                                        } else null
                                     when {
-                                        !nowPlayingState.enabled && nowPlayingSettingsError != null -> {
+                                        !nowPlayingState.enabled && showNowPlayingSettingsError -> {
                                             SegmentedListItem(
                                                 shapes = shapes,
                                                 colors = colors,
@@ -693,6 +700,11 @@ internal fun ProfilePage(
         }
     }
 }
+
+private data class ProfileSaveError(
+    @param:StringRes val fallback: Int,
+    val detail: String? = null,
+) : Serializable
 
 private fun TextFieldValue.sanitizeProfileValue(
     transform: (String) -> String,

@@ -12,10 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
-import java.util.Locale
 
 @Composable
 internal fun ContactPresenceSnackbar(
@@ -23,7 +21,6 @@ internal fun ContactPresenceSnackbar(
     isConversationAvailable: Boolean = true,
     ownPresence: Presence = Presence.Online,
 ) {
-    val context = LocalContext.current
     val hostState = remember { SnackbarHostState() }
     val showAppearOfflineNotice = contact?.isGroup == false &&
         contact.presence.isOnline && ownPresence == Presence.Offline
@@ -41,7 +38,7 @@ internal fun ContactPresenceSnackbar(
         Presence.Busy, Presence.Away -> stringResource(
             R.string.chat_contact_unavailable,
             name,
-            context.getString(contact.presence.labelRes).lowercase(context.currentAppLocale()),
+            stringResource(contact.presence.labelRes).lowercase(currentAppLocale()),
         )
         Presence.Offline -> stringResource(R.string.chat_contact_offline_you_singular, name)
         Presence.Online, null -> null

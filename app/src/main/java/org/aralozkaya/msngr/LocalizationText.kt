@@ -1,10 +1,11 @@
 package org.aralozkaya.msngr
 
 import android.content.Context
+import android.content.res.Resources
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.MessageAuthor
@@ -63,15 +64,18 @@ fun formatTwoNumbersSentence(
     return formatNumberSentence(withFirst, secondNumber, afterSecond)
 }
 
-fun Context.currentAppLocale(): Locale =
-    resources.configuration.locales.takeIf { !it.isEmpty }?.get(0) ?: Locale.getDefault()
+private fun Resources.currentAppLocale(): Locale =
+    configuration.locales.takeIf { !it.isEmpty }?.get(0) ?: Locale.getDefault()
+
+fun Context.currentAppLocale(): Locale = resources.currentAppLocale()
 
 @Composable
-fun currentAppLocale(): Locale =
-    LocalConfiguration.current.locales.takeIf { !it.isEmpty }?.get(0) ?: Locale.getDefault()
+fun currentAppLocale(): Locale = LocalLocale.current.platformLocale
 
-fun Context.formatLocalizedInt(value: Int): String =
+private fun Resources.formatLocalizedInt(value: Int): String =
     NumberFormat.getIntegerInstance(currentAppLocale()).format(value)
+
+fun Context.formatLocalizedInt(value: Int): String = resources.formatLocalizedInt(value)
 
 @Composable
 fun formatLocalizedInt(value: Int): String =
@@ -88,6 +92,12 @@ fun Context.getNumberSentence(
     @StringRes beforeRes: Int,
     number: Any,
     @StringRes afterRes: Int,
+): String = resources.getNumberSentence(beforeRes, number, afterRes)
+
+fun Resources.getNumberSentence(
+    @StringRes beforeRes: Int,
+    number: Any,
+    @StringRes afterRes: Int,
 ): String = formatNumberSentence(getString(beforeRes), number, getString(afterRes))
 
 @Composable
@@ -95,9 +105,17 @@ fun numberSentenceResource(
     @StringRes beforeRes: Int,
     number: Any,
     @StringRes afterRes: Int,
-): String = formatNumberSentence(stringResource(beforeRes), number, stringResource(afterRes))
+): String = LocalResources.current.getNumberSentence(beforeRes, number, afterRes)
 
 fun Context.getQuantityNumberSentence(
+    count: Int,
+    @StringRes oneBeforeRes: Int,
+    @StringRes oneAfterRes: Int,
+    @StringRes otherBeforeRes: Int,
+    @StringRes otherAfterRes: Int,
+): String = resources.getQuantityNumberSentence(count, oneBeforeRes, oneAfterRes, otherBeforeRes, otherAfterRes)
+
+private fun Resources.getQuantityNumberSentence(
     count: Int,
     @StringRes oneBeforeRes: Int,
     @StringRes oneAfterRes: Int,
@@ -116,13 +134,17 @@ fun quantityNumberSentenceResource(
     @StringRes oneAfterRes: Int,
     @StringRes otherBeforeRes: Int,
     @StringRes otherAfterRes: Int,
-): String = if (count == 1) {
-    numberSentenceResource(oneBeforeRes, count, oneAfterRes)
-} else {
-    numberSentenceResource(otherBeforeRes, count, otherAfterRes)
-}
+): String = LocalResources.current.getQuantityNumberSentence(count, oneBeforeRes, oneAfterRes, otherBeforeRes, otherAfterRes)
 
 fun Context.getTwoNumbersSentence(
+    @StringRes beforeFirstRes: Int,
+    firstNumber: Any,
+    @StringRes betweenRes: Int,
+    secondNumber: Any,
+    @StringRes afterSecondRes: Int,
+): String = resources.getTwoNumbersSentence(beforeFirstRes, firstNumber, betweenRes, secondNumber, afterSecondRes)
+
+private fun Resources.getTwoNumbersSentence(
     @StringRes beforeFirstRes: Int,
     firstNumber: Any,
     @StringRes betweenRes: Int,
@@ -143,13 +165,7 @@ fun twoNumbersSentenceResource(
     @StringRes betweenRes: Int,
     secondNumber: Any,
     @StringRes afterSecondRes: Int,
-): String = formatTwoNumbersSentence(
-    stringResource(beforeFirstRes),
-    firstNumber,
-    stringResource(betweenRes),
-    secondNumber,
-    stringResource(afterSecondRes),
-)
+): String = LocalResources.current.getTwoNumbersSentence(beforeFirstRes, firstNumber, betweenRes, secondNumber, afterSecondRes)
 
 @StringRes
 fun providerDisplayNameRes(provider: String): Int? = when (provider) {
@@ -326,7 +342,9 @@ private val BUILTIN_WINK_NAME_RES: Map<String, Int> = mapOf(
     "Wink" to R.string.wink_fallback_name_singular,
 )
 
-fun Context.localizeWinkName(name: String): String =
+fun Context.localizeWinkName(name: String): String = resources.localizeWinkName(name)
+
+private fun Resources.localizeWinkName(name: String): String =
     BUILTIN_WINK_NAME_RES[name]?.let(::getString) ?: name
 
 @Composable
@@ -356,7 +374,9 @@ private val BUILTIN_SOUND_NAME_RES: Map<String, Int> = mapOf(
 
 private val EMOTION_SOUND_NUMBERED_REGEX = Regex("""^Emotion sound (\d+)$""")
 
-fun Context.localizeEmotionSoundName(name: String): String {
+fun Context.localizeEmotionSoundName(name: String): String = resources.localizeEmotionSoundName(name)
+
+fun Resources.localizeEmotionSoundName(name: String): String {
     BUILTIN_SOUND_NAME_RES[name]?.let { return getString(it) }
     EMOTION_SOUND_NUMBERED_REGEX.matchEntire(name)?.let { match ->
         return getNumberSentence(
@@ -370,7 +390,7 @@ fun Context.localizeEmotionSoundName(name: String): String {
 
 @Composable
 fun localizedEmotionSoundName(name: String): String =
-    LocalContext.current.localizeEmotionSoundName(name)
+    LocalResources.current.localizeEmotionSoundName(name)
 
 private val EMOTION_SOUND_CATEGORY_RES: List<Int> = listOf(
     R.string.emotion_sound_cat_any,
@@ -469,7 +489,9 @@ private val GAME_DESC_RES: Map<String, Int> = mapOf(
     "Draw together in real time!" to R.string.game_whiteboard_desc,
 )
 
-fun Context.localizeGameName(name: String): String =
+fun Context.localizeGameName(name: String): String = resources.localizeGameName(name)
+
+private fun Resources.localizeGameName(name: String): String =
     GAME_NAME_RES[name]?.let(::getString) ?: name
 
 @Composable
@@ -892,7 +914,9 @@ private val REGEX_GAME_CLOSED_LOCAL = Regex("""^You closed (.+)\.$""")
 private val REGEX_GAME_DECLINED = Regex("""^(.+) invitation declined\.$""")
 private val REGEX_GAME_FAILED = Regex("""^(.+) failed\.$""")
 
-fun Context.localizeUserMessage(message: String): String {
+fun Context.localizeUserMessage(message: String): String = resources.localizeUserMessage(message)
+
+fun Resources.localizeUserMessage(message: String): String {
     EXACT_USER_MESSAGE_RES[message]?.let { return getString(it) }
     REGEX_EMOTION_SOUND_HTTP.matchEntire(message)?.let {
         return getNumberSentence(R.string.emotion_sound_service_http_error_before_number, it.groupValues[1], R.string.emotion_sound_service_http_error_after_number)
@@ -1050,9 +1074,11 @@ fun Context.localizeUserMessage(message: String): String {
 
 @Composable
 fun localizeUserMessage(message: String): String =
-    LocalContext.current.localizeUserMessage(message)
+    LocalResources.current.localizeUserMessage(message)
 
-fun Context.localizeChatMessageText(message: ChatMessage): String {
+fun Context.localizeChatMessageText(message: ChatMessage): String = resources.localizeChatMessageText(message)
+
+private fun Resources.localizeChatMessageText(message: ChatMessage): String {
     if (message.author == MessageAuthor.System ||
         message.isNudge ||
         message.wink != null ||
@@ -1071,4 +1097,4 @@ fun Context.localizeChatMessageText(message: ChatMessage): String {
 
 @Composable
 fun localizedChatMessageText(message: ChatMessage): String =
-    LocalContext.current.localizeChatMessageText(message)
+    LocalResources.current.localizeChatMessageText(message)
