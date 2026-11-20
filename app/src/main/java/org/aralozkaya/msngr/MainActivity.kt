@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,11 +79,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -298,6 +302,8 @@ private fun MsngrApp(
     var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 1) { 2 }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var showPagerIndicator by remember { mutableStateOf(true) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val groupInteractionSource = remember { MutableInteractionSource() }
@@ -343,7 +349,7 @@ private fun MsngrApp(
         }
     }
 
-    BackHandler(enabled = pagerState.currentPage == 0 && activeWebTarget == null) {
+    BackHandler(enabled = pagerState.settledPage == 0 && activeWebTarget == null) {
         scope.launch { pagerState.animateScrollToPage(1) }
     }
 
@@ -528,8 +534,20 @@ private fun MsngrApp(
                     .fillMaxSize()
                     .testTag("main_pager"),
             ) { page ->
+                val isCurrentPage = pagerState.settledPage == page
+                var pageHasFocus by remember { mutableStateOf(false) }
+                val pageModifier = Modifier
+                    .onFocusChanged { pageHasFocus = it.hasFocus }
+                    .focusGroup()
+                LaunchedEffect(isCurrentPage) {
+                    if (!isCurrentPage && pageHasFocus) {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    }
+                }
                 if (page == 0) {
                     PortalPage(
+                        modifier = pageModifier,
                         listState = portalListState,
                         // Let the final feed item scroll clear of the floating action button.
                         innerPadding = innerPadding.plus(PaddingValues(bottom = 56.dp)),
@@ -548,6 +566,8 @@ private fun MsngrApp(
                     )
                 } else {
                     ContactsPage(
+                        modifier = pageModifier,
+                        isCurrentPage = isCurrentPage,
                         drafts = drafts,
                         listState = contactsListState,
                         // Let the final contact scroll clear of the floating action button.
