@@ -181,7 +181,7 @@ class KeyboardSheetScaffoldInstrumentedTest {
                     value = "",
                     onValueChange = {},
                     convertTypedShortcuts = false,
-                    useOriginalEmoticons = false,
+                    emoticonStyle = EmoticonStyle.AndroidEmoji,
                     controller = editor,
                 )
             }

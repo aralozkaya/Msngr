@@ -60,8 +60,8 @@ class MessengerPlusCombinationInstrumentedTest {
         compose.setContent {
             MaterialTheme {
                 Column {
-                    MessageBubble(ChatMessage(1, "test", author.value, source.value, 0), false)
-                    MsnEmoticonEditor(source.value, { source.value = it }, false, false)
+                    MessageBubble(ChatMessage(1, "test", author.value, source.value, 0), EmoticonStyle.AndroidEmoji)
+                    MsnEmoticonEditor(source.value, { source.value = it }, false, EmoticonStyle.AndroidEmoji)
                 }
             }
         }

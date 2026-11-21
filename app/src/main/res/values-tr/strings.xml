@@ -610,6 +610,11 @@
     <string name="settings_convert_shortcuts_title">Yazılan kısayolları dönüştür</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="settings_convert_shortcuts_supporting_you_singular">Yazarken :D gibi klavye kısayollarını ifade olarak gösterin. Gelen mesajlar her zaman simgeleri kullanır.</string>
+    <string name="settings_emoticon_style_header">İfade stili</string>
+    <string name="settings_emoticon_behavior_header">Davranış</string>
+    <string name="settings_emoticon_style_wlm_2009_title">WLM 8.1 - 2009</string>
+    <string name="settings_emoticon_style_wlm_2012_title">WLM 2011 - 2012</string>
+    <string name="settings_emoticon_style_android_title">Android emojileri</string>
     <string name="settings_original_emoticons_title">Orijinal Messenger ifadelerini kullan</string>
     <string name="settings_original_emoticons_supporting">Modern Unicode emojiler yerine klasik MSN görsellerini göster.</string>
     <string name="settings_play_winks_auto_title">Göz kırpmalarını otomatik oynat</string>

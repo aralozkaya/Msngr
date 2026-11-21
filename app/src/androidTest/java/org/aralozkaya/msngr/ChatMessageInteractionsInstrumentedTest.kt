@@ -59,7 +59,7 @@ class ChatMessageInteractionsInstrumentedTest {
         var retryCount = 0
         compose.setContent {
             MaterialTheme {
-                MessageBubble(message.value, useOriginalEmoticons = true, onRetry = {
+                MessageBubble(message.value, emoticonStyle = EmoticonStyle.Wlm2009, onRetry = {
                     retryCount++
                     message.value = message.value.copy(isSending = true, deliveryError = null)
                 })
@@ -108,7 +108,7 @@ class ChatMessageInteractionsInstrumentedTest {
             MaterialTheme {
                 MsnEmoticonText(
                     text = ":-) ${MessengerPlusTextCodec.BOLD_CONTROL}$url${MessengerPlusTextCodec.BOLD_CONTROL}",
-                    useOriginalEmoticons = false,
+                    emoticonStyle = EmoticonStyle.AndroidEmoji,
                     messengerPlusEnabled = true,
                     linkify = true,
                 )
@@ -179,7 +179,7 @@ class ChatMessageInteractionsInstrumentedTest {
             base.copy(fileTransfer = FileTransfer("photo", "photo.png", 100, false)),
         )
         val message = mutableStateOf(base)
-        compose.setContent { MaterialTheme { MessageBubble(message.value, useOriginalEmoticons = true) } }
+        compose.setContent { MaterialTheme { MessageBubble(message.value, emoticonStyle = EmoticonStyle.Wlm2009) } }
         val timestamp = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(0L))
         compose.runOnIdle {
             compose.activity.getSystemService(ClipboardManager::class.java)
@@ -216,7 +216,7 @@ class ChatMessageInteractionsInstrumentedTest {
         val text = "Read $url now"
         compose.setContent { MaterialTheme { CompositionLocalProvider(LocalUriHandler provides uriHandler) {
             MessageBubble(ChatMessage(1, "contact", MessageAuthor.Me, text, 0L, deliveryError = "Send failed"),
-                useOriginalEmoticons = true, containerInteractionEnabled = false)
+                emoticonStyle = EmoticonStyle.Wlm2009, containerInteractionEnabled = false)
         } } }
         compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick), useUnmergedTree = true)
             .assertCountEquals(0)
@@ -239,7 +239,7 @@ class ChatMessageInteractionsInstrumentedTest {
                         messages.forEachIndexed { index, (author, text) ->
                             MessageBubble(
                                 ChatMessage(index.toLong(), "contact", author, text, 0L),
-                                useOriginalEmoticons = true,
+                                emoticonStyle = EmoticonStyle.Wlm2009,
                             )
                         }
                     }
