@@ -25,6 +25,7 @@ import org.aralozkaya.msngr.data.FAVORITES_CATEGORY_ID
 import org.aralozkaya.msngr.data.GROUPS_CATEGORY_ID
 import org.aralozkaya.msngr.data.OTHER_CONTACTS_CATEGORY_ID
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.pages.ContactProfilePage
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.components.CategoryEditorDialog
 import org.aralozkaya.msngr.pages.components.CategoryOrderDialog
@@ -176,15 +177,22 @@ class ContactCategoriesInstrumentedTest {
         assertEquals(listOf("alice", "grp-1"), createdMembers)
     }
 
-    @Test fun contactCategoriesDialogAssignsFavoritesAndCustomCategories() {
+    @Test fun contactCategoriesDialogUsesDropdownForSingleCategoryAndPreservesFavorite() {
         var savedSet: Set<String>? = null
         val work = ContactCategory(id = "work", name = "Work")
-        val contact = Contact("alice", "Alice", "alice@example.com", Presence.Online)
+        val family = ContactCategory(id = "family", name = "Family")
+        val contact = Contact(
+            "alice",
+            "Alice",
+            "alice@example.com",
+            Presence.Online,
+            categoryIds = setOf(FAVORITES_CATEGORY_ID, "work"),
+        )
         compose.setContent {
             MsngrTheme {
                 ContactCategoriesDialog(
                     contact = contact,
-                    categories = listOf(work),
+                    categories = listOf(work, family),
                     onSave = {
                         savedSet = it
                         Result.success(Unit)
@@ -195,11 +203,46 @@ class ContactCategoriesInstrumentedTest {
             }
         }
 
-        compose.onNodeWithTag("assign-category-$FAVORITES_CATEGORY_ID").performClick()
-        compose.onNodeWithTag("assign-category-work").performClick()
+        compose.onNodeWithTag("contact-category-dropdown").performClick()
+        compose.onNodeWithTag("assign-category-family").performClick()
         compose.onNodeWithTag("contact-categories-save").performClick()
         compose.waitForIdle()
 
-        assertEquals(setOf(FAVORITES_CATEGORY_ID, "work"), savedSet)
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, "family"), savedSet)
+    }
+
+    @Test fun contactProfilePageShowsSingularCategoryCardOnlyForCustomCategory() {
+        val work = ContactCategory(id = "work", name = "Work")
+        val contactState = mutableStateOf(
+            Contact(
+                id = "alice",
+                nickname = "Alice",
+                email = "alice@example.com",
+                presence = Presence.Online,
+                categoryIds = setOf(FAVORITES_CATEGORY_ID),
+            ),
+        )
+        compose.setContent {
+            MsngrTheme {
+                ContactProfilePage(
+                    contact = contactState.value,
+                    innerPadding = PaddingValues(),
+                    scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
+                    onBlockContact = {},
+                    onEraseHistory = { Result.success(Unit) },
+                    categories = listOf(work),
+                    onManageCategories = {},
+                )
+            }
+        }
+
+        compose.onNodeWithTag("contact-profile-categories").assertDoesNotExist()
+        compose.onNodeWithTag("contact_manage_categories").performScrollTo().assertIsDisplayed()
+
+        contactState.value = contactState.value.copy(categoryIds = setOf(FAVORITES_CATEGORY_ID, "work"))
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("contact-profile-categories").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Work").assertIsDisplayed()
     }
 }

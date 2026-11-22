@@ -325,4 +325,30 @@ class ContactCategoriesTest {
         repository.deleteCategory(emptyId).getOrThrow()
         assertTrue(repository.categories.value.isEmpty())
     }
+
+    @Test fun singleCustomCategoryPerContactReplacesPreviousCategoryWhilePreservingFavorite() = runBlocking {
+        val client = MockMsnp18Client(signInDelayMillis = 0L, addContactDelayMillis = 0L)
+        val repository = MessengerRepository(client)
+        repository.signIn(
+            SignInRequest("user@example.com", "pw", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides())),
+        ).getOrThrow()
+
+        val workId = repository.createCategory("Work", listOf("selin")).getOrThrow()
+        repository.setContactFavorite("selin", true).getOrThrow()
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+
+        // Creating another category with the same contact moves it out of Work while keeping Favorites
+        val familyId = repository.createCategory("Family", listOf("selin")).getOrThrow()
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, familyId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+
+        // Updating Work's members to include selin moves selin back to Work
+        repository.updateCategoryMembers(workId, setOf("selin")).getOrThrow()
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+
+        // Passing multiple custom categories to setContactCategories keeps only one custom category
+        repository.setContactCategories("selin", setOf(FAVORITES_CATEGORY_ID, familyId, workId)).getOrThrow()
+        val customOnly = repository.contacts.value.first { it.id == "selin" }.categoryIds - FAVORITES_CATEGORY_ID
+        assertEquals(1, customOnly.size)
+        assertTrue(repository.contacts.value.first { it.id == "selin" }.isFavorite)
+    }
 }

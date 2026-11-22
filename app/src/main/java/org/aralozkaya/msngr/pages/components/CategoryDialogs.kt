@@ -5,7 +5,9 @@
 
 package org.aralozkaya.msngr.pages.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,15 +17,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
@@ -249,27 +257,21 @@ internal fun ContactCategoriesDialog(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val customCategories = remember(categories) { categories.filterNot(ContactCategory::isBuiltIn) }
-    var selected by rememberSaveable(contact.id) {
-        mutableStateOf(contact.categoryIds.filterNot { it == OTHER_CONTACTS_CATEGORY_ID })
+    val validCustomIds = remember(customCategories) { customCategories.map(ContactCategory::id).toSet() }
+    var selectedCategoryId by rememberSaveable(contact.id) {
+        mutableStateOf(contact.categoryIds.firstOrNull { it in validCustomIds })
     }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    val menuInteractionSource = remember { MutableInteractionSource() }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val showOtherContactsOption = !contact.isGroup
-    val totalCount = 1 + customCategories.size + (if (showOtherContactsOption) 1 else 0)
-
-    fun toggle(categoryId: String, checked: Boolean) {
-        val next = selected.toMutableSet()
-        if (categoryId == OTHER_CONTACTS_CATEGORY_ID) {
-            if (checked) {
-                // Other Contacts means categoryless: remove all custom categories while keeping Favorites as-is.
-                next.removeAll { it != FAVORITES_CATEGORY_ID }
-            }
-        } else {
-            if (checked) next.add(categoryId) else next.remove(categoryId)
-        }
-        selected = next.toList()
-        error = null
+    val uncategorizedLabel = stringResource(
+        if (contact.isGroup) R.string.contact_category_none else R.string.contacts_section_other,
+    )
+    val selectedLabel = customCategories.firstOrNull { it.id == selectedCategoryId }?.name ?: uncategorizedLabel
+    val dropdownOptions: List<Pair<String?, String>> = remember(customCategories, uncategorizedLabel) {
+        listOf(null to uncategorizedLabel) + customCategories.map { it.id to it.name }
     }
 
     AlertDialog(
@@ -288,74 +290,67 @@ internal fun ContactCategoriesDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 320.dp),
-                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-                ) {
-                    item(key = FAVORITES_CATEGORY_ID) {
-                        val isChecked = FAVORITES_CATEGORY_ID in selected
-                        SegmentedListItem(
-                            checked = isChecked,
-                            onCheckedChange = { toggle(FAVORITES_CATEGORY_ID, it) },
-                            enabled = !saving,
-                            shapes = ListItemDefaults.segmentedShapes(0, totalCount),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("assign-category-$FAVORITES_CATEGORY_ID"),
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            },
-                            trailingContent = {
-                                Checkbox(checked = isChecked, onCheckedChange = null, enabled = !saving)
-                            },
-                            content = { Text(stringResource(R.string.contacts_section_favorites)) },
+                Text(
+                    text = stringResource(R.string.contact_category_select_label),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { dropdownExpanded = true },
+                        shapes = ButtonDefaults.shapes(),
+                        enabled = !saving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("contact-category-dropdown"),
+                    ) {
+                        Text(
+                            text = selectedLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
                         )
                     }
-                    itemsIndexed(customCategories, key = { _, cat -> cat.id }) { index, category ->
-                        val isChecked = category.id in selected
-                        SegmentedListItem(
-                            checked = isChecked,
-                            onCheckedChange = { toggle(category.id, it) },
-                            enabled = !saving,
-                            shapes = ListItemDefaults.segmentedShapes(index + 1, totalCount),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("assign-category-${category.id}"),
-                            trailingContent = {
-                                Checkbox(checked = isChecked, onCheckedChange = null, enabled = !saving)
-                            },
-                            content = {
-                                Text(
-                                    text = category.name,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                    DropdownMenuPopup(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                    ) {
+                        DropdownMenuGroup(
+                            shapes = MenuDefaults.groupShape(0, 1),
+                            interactionSource = menuInteractionSource,
+                        ) {
+                            dropdownOptions.forEachIndexed { index, (categoryId, label) ->
+                                val isSelected = selectedCategoryId == categoryId
+                                val itemTag = "assign-category-${categoryId ?: OTHER_CONTACTS_CATEGORY_ID}"
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = label,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    trailingContent = if (isSelected) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    } else null,
+                                    shape = MenuDefaults.itemShape(index, dropdownOptions.size).shape,
+                                    modifier = Modifier.testTag(itemTag),
+                                    onClick = {
+                                        selectedCategoryId = categoryId
+                                        dropdownExpanded = false
+                                        error = null
+                                    },
                                 )
-                            },
-                        )
-                    }
-                    if (showOtherContactsOption) {
-                        item(key = OTHER_CONTACTS_CATEGORY_ID) {
-                            val isChecked = selected.none { it != FAVORITES_CATEGORY_ID }
-                            SegmentedListItem(
-                                checked = isChecked,
-                                onCheckedChange = { toggle(OTHER_CONTACTS_CATEGORY_ID, it) },
-                                enabled = !saving,
-                                shapes = ListItemDefaults.segmentedShapes(totalCount - 1, totalCount),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("assign-category-$OTHER_CONTACTS_CATEGORY_ID"),
-                                trailingContent = {
-                                    Checkbox(checked = isChecked, onCheckedChange = null, enabled = !saving)
-                                },
-                                content = { Text(stringResource(R.string.contacts_section_other)) },
-                            )
+                            }
                         }
                     }
                 }
@@ -376,7 +371,13 @@ internal fun ContactCategoriesDialog(
                     error = null
                     scope.launch {
                         try {
-                            onSave(selected.toSet() - OTHER_CONTACTS_CATEGORY_ID).getOrThrow()
+                            val nextCategories = buildSet {
+                                if (FAVORITES_CATEGORY_ID in contact.categoryIds) {
+                                    add(FAVORITES_CATEGORY_ID)
+                                }
+                                selectedCategoryId?.let(::add)
+                            }
+                            onSave(nextCategories).getOrThrow()
                             onSaved()
                         } catch (cancelled: CancellationException) {
                             throw cancelled
