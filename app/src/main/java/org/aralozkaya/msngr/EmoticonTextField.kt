@@ -12,7 +12,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.TextFieldValue
+import org.aralozkaya.msngr.pages.components.snapToVisibleWhenActive
 
 /** Retains selection information that the String overload of OutlinedTextField hides. */
 @Composable
@@ -32,6 +34,7 @@ internal fun EmoticonOutlinedTextField(
     singleLine: Boolean = false,
 ) {
     var editorValue by remember { mutableStateOf(TextFieldValue(value)) }
+    var focused by remember { mutableStateOf(false) }
     val currentValue = editorValue.copy(text = value)
     SideEffect {
         if (currentValue.selection != editorValue.selection || currentValue.composition != editorValue.composition) {
@@ -45,7 +48,9 @@ internal fun EmoticonOutlinedTextField(
     OutlinedTextField(
         value = currentValue,
         onValueChange = updateValue,
-        modifier = modifier,
+        modifier = modifier
+            .onFocusChanged { focused = it.isFocused }
+            .snapToVisibleWhenActive(focused),
         enabled = enabled,
         label = label,
         placeholder = placeholder,

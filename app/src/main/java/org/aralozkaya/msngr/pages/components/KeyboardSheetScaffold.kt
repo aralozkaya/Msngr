@@ -571,6 +571,13 @@ internal class KeyboardSheetHostState(
         return (layoutHeightPx - offset.roundToInt()).coerceIn(0, sheetLayoutHeight(density))
     }
 
+    /** How far the sheet has expanded above its initial keyboard-slot height. */
+    internal fun sheetExpansionHeight(density: Density): Int {
+        val visible = visibleSheetHeight(density)
+        if (visible <= 0) return 0
+        return (visible - sheetBaseHeight(density)).coerceAtLeast(0)
+    }
+
     internal fun isKeyboardRising(density: Density): Boolean {
         val target = insets.imeTarget.getBottom(density)
         return target > 0 && insets.ime.getBottom(density) < target

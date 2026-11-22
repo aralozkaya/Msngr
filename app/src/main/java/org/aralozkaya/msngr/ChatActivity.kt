@@ -422,19 +422,21 @@ internal fun ChatScreen(
             .collect { onLoadOlderMessages() }
     }
     val imeInsets = WindowInsets.ime
+    val sheetInsets = keyboardSheetWindowInsets()
+    val bottomObstacleInsets = remember(imeInsets, sheetInsets) { imeInsets.union(sheetInsets) }
     val density = LocalDensity.current
-    LaunchedEffect(listState, imeInsets, density) {
-        var previousImeHeight = 0
+    LaunchedEffect(listState, bottomObstacleInsets, density) {
+        var previousObstacleHeight = 0
         var previousViewportHeight = 0
         snapshotFlow {
-            imeInsets.getBottom(density) to listState.layoutInfo.viewportSize.height
-        }.collectLatest { (imeHeight, viewportHeight) ->
-            val keyboardOpening = imeHeight > previousImeHeight ||
-                    (imeHeight > 0 && viewportHeight < previousViewportHeight)
-            previousImeHeight = imeHeight
+            bottomObstacleInsets.getBottom(density) to listState.layoutInfo.viewportSize.height
+        }.collectLatest { (obstacleHeight, viewportHeight) ->
+            val obstacleOpening = obstacleHeight > previousObstacleHeight ||
+                    (obstacleHeight > 0 && viewportHeight < previousViewportHeight)
+            previousObstacleHeight = obstacleHeight
             previousViewportHeight = viewportHeight
-            if (keyboardOpening) {
-                // Follow the keyboard directly; index zero is the newest message.
+            if (obstacleOpening) {
+                // Follow the keyboard or sheet directly; index zero is the newest message.
                 listState.scrollToItem(0)
             }
         }

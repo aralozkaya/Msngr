@@ -6,11 +6,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,11 +37,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.first
 import org.aralozkaya.msngr.pages.components.DefaultKeyboardSheetHeight
 import org.aralozkaya.msngr.pages.components.KeyboardSheet
+import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.keyboardSheetWindowInsets
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 import org.junit.Assert.assertEquals
@@ -291,12 +300,161 @@ class KeyboardSheetScaffoldInstrumentedTest {
         assertEquals(root.bottom.value, sheetTop(), 1f)
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun pageContentListShiftsUpWhenExpandableSheetExpandsFromInitialPosition() {
+        showScaffold {
+            PageContentList(
+                modifier = Modifier.fillMaxSize(),
+                innerPadding = PaddingValues(),
+                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
+            ) {
+                item(key = "top_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(320.dp))
+                }
+                item(key = "tracked_item") {
+                    Box(Modifier.fillMaxWidth().height(80.dp).testTag(TRACKED_ITEM_TAG))
+                }
+                item(key = "bottom_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(320.dp))
+                }
+            }
+        }
+        compose.runOnIdle { expandableVisible = true }
+        compose.waitUntil(5_000) { exists(EXPANDABLE_TAG) }
+        compose.waitForIdle()
+        val initialItemTop = bounds(TRACKED_ITEM_TAG).top.value
+
+        compose.onNodeWithContentDescription(DRAG_HANDLE).performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        val expandedItemTop = bounds(TRACKED_ITEM_TAG).top.value
+        assertTrue(
+            "Expected content to shift upward when sheet expands (initial=$initialItemTop, expanded=$expandedItemTop)",
+            expandedItemTop < initialItemTop - 100f,
+        )
+
+        Espresso.pressBack()
+        compose.waitForIdle()
+        val collapsedItemTop = bounds(TRACKED_ITEM_TAG).top.value
+        assertEquals(initialItemTop, collapsedItemTop, 4f)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun textFieldInPageContentListSnapsIntoVisibleAreaWhenBottomSheetOpensAndExpands() {
+        val editor = MessengerPlusEditorController()
+        showScaffold {
+            PageContentList(
+                modifier = Modifier.fillMaxSize(),
+                innerPadding = PaddingValues(top = 56.dp),
+                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
+            ) {
+                item(key = "top_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(480.dp))
+                }
+                item(key = "editor") {
+                    MsnEmoticonEditor(
+                        value = "Hello",
+                        onValueChange = {},
+                        convertTypedShortcuts = false,
+                        emoticonStyle = EmoticonStyle.AndroidEmoji,
+                        controller = editor,
+                        modifier = Modifier.fillMaxWidth().testTag(SNAP_EDITOR_TAG),
+                    )
+                }
+                item(key = "bottom_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(200.dp))
+                }
+            }
+        }
+        compose.runOnIdle { editor.requestFocus() }
+        compose.waitForIdle()
+        compose.runOnIdle { expandableVisible = true }
+        compose.waitUntil(5_000) { exists(EXPANDABLE_TAG) }
+        compose.waitForIdle()
+
+        val initialFieldBounds = bounds(SNAP_EDITOR_TAG)
+        val initialSheetTop = sheetTop()
+        assertTrue(
+            "Expected focused text field to snap above open sheet (fieldBottom=${initialFieldBounds.bottom.value}, sheetTop=$initialSheetTop)",
+            initialFieldBounds.bottom.value <= initialSheetTop + 1f,
+        )
+        assertTrue(initialFieldBounds.top.value >= 55f)
+
+        compose.onNodeWithContentDescription(DRAG_HANDLE).performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        val expandedFieldBounds = bounds(SNAP_EDITOR_TAG)
+        val expandedSheetTop = sheetTop()
+        assertTrue(
+            "Expected focused text field to snap above expanded sheet (fieldBottom=${expandedFieldBounds.bottom.value}, sheetTop=$expandedSheetTop)",
+            expandedFieldBounds.bottom.value <= expandedSheetTop + 1f,
+        )
+        assertTrue(expandedFieldBounds.top.value >= 55f)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun textFieldInPageContentListSnapsIntoVisibleAreaWhenKeyboardOpens() {
+        compose.runOnUiThread {
+            compose.activity.enableEdgeToEdge()
+            @Suppress("DEPRECATION")
+            compose.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        val editor = MessengerPlusEditorController()
+        var imeBottomDp by mutableStateOf(0f)
+        showScaffold {
+            val density = LocalDensity.current
+            val ime = WindowInsets.ime
+            LaunchedEffect(ime, density) {
+                snapshotFlow { ime.getBottom(density) }.collect { px ->
+                    imeBottomDp = with(density) { px.toDp().value }
+                }
+            }
+            PageContentList(
+                modifier = Modifier.fillMaxSize(),
+                innerPadding = PaddingValues(top = 56.dp),
+                scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(),
+            ) {
+                item(key = "top_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(520.dp))
+                }
+                item(key = "editor") {
+                    MsnEmoticonEditor(
+                        value = "Hello",
+                        onValueChange = {},
+                        convertTypedShortcuts = false,
+                        emoticonStyle = EmoticonStyle.AndroidEmoji,
+                        controller = editor,
+                        modifier = Modifier.fillMaxWidth().testTag(SNAP_EDITOR_TAG),
+                    )
+                }
+                item(key = "bottom_spacer") {
+                    Spacer(Modifier.fillMaxWidth().height(200.dp))
+                }
+            }
+        }
+        compose.runOnIdle { editor.requestFocusAndShowKeyboard() }
+        compose.waitUntil(5_000) { imeBottomDp > 150f }
+        compose.waitForIdle()
+
+        val root = compose.onRoot().getBoundsInRoot()
+        val keyboardTop = root.bottom.value - imeBottomDp
+        val fieldBounds = bounds(SNAP_EDITOR_TAG)
+        assertTrue(
+            "Expected focused text field to snap above keyboard (fieldBottom=${fieldBounds.bottom.value}, keyboardTop=$keyboardTop)",
+            fieldBounds.bottom.value <= keyboardTop + 1f,
+        )
+        assertTrue(fieldBounds.top.value >= 55f)
+    }
+
     private companion object {
         const val PAGE_TAG = "keyboard_sheet_page"
         const val INSET_TAG = "keyboard_sheet_inset"
         const val FIRST_TAG = "keyboard_sheet_first"
         const val SECOND_TAG = "keyboard_sheet_second"
         const val EXPANDABLE_TAG = "keyboard_sheet_expandable"
+        const val TRACKED_ITEM_TAG = "keyboard_sheet_tracked_item"
+        const val SNAP_EDITOR_TAG = "keyboard_sheet_snap_editor"
         const val DRAG_HANDLE = "Drag handle"
     }
 }

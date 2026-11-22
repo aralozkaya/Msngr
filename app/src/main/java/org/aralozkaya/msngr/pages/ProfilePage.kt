@@ -431,6 +431,7 @@ internal fun ProfilePage(
                             emoticonSettings = emoticonSettings,
                             messengerPlusEnabled = messengerPlusEnabled,
                             emoticonSheet = emoticonSheet,
+                            colorSheet = colorSheet,
                             onColors = if (messengerPlusEnabled) {
                                 { colorSheet.open(usernameEditorController) }
                             } else {
@@ -473,6 +474,7 @@ internal fun ProfilePage(
                                 null
                             },
                             emoticonSheet = emoticonSheet,
+                            colorSheet = colorSheet,
                             onColors = if (messengerPlusEnabled) {
                                 { colorSheet.open(statusMessageEditorController) }
                             } else {
