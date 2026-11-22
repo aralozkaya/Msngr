@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -41,19 +42,22 @@ internal fun GroupDetailsMenu(
     ownEmail: String,
     onInviteMembers: () -> Unit,
     onLeaveGroup: () -> Unit,
+    onManageCategories: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onChangeBlocking: (() -> Unit)? = null,
 ) {
     val canInvite = group?.canInviteGroupMembers(ownEmail) == true
     val canLeave = group?.canLeaveGroup(ownEmail) == true
+    val canCategories = group != null && onManageCategories != null
     val canCustomize = group != null && onOpenNotifications != null
     val canBlock = group?.isGroup == true && onChangeBlocking != null
-    val groupCount = (if (canInvite) 1 else 0) + (if (canLeave) 1 else 0) +
+    val groupCount = (if (canInvite) 1 else 0) + (if (canCategories) 1 else 0) + (if (canLeave) 1 else 0) +
         (if (canCustomize) 1 else 0) + (if (canBlock) 1 else 0)
     if (groupCount == 0) return
 
     var expanded by remember(group?.id, ownEmail) { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
+    var currentGroupIndex = 0
     Box {
         IconButton(
             onClick = { expanded = true },
@@ -66,35 +70,46 @@ internal fun GroupDetailsMenu(
         ) {
             if (canInvite) {
                 DropdownMenuGroup(
-                    shapes = MenuDefaults.groupShape(0, groupCount),
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, groupCount),
                     modifier = Modifier.testTag("group-invite-menu-group"),
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.group_invite_contacts), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                        shape = if (canCustomize || canBlock || canLeave) MenuDefaults.leadingItemShape else MenuDefaults.standaloneItemShape,
+                        shape = MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group-invite"),
                         onClick = { expanded = false; onInviteMembers() },
                     )
                 }
             }
-            if (canInvite && (canCustomize || canBlock || canLeave)) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            if (canInvite && (canCategories || canCustomize || canBlock || canLeave)) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            if (canCategories) {
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, groupCount),
+                    modifier = Modifier.testTag("group-categories-menu-group"),
+                    interactionSource = interactionSource,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.contact_manage_categories)) },
+                        leadingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+                        shape = MenuDefaults.standaloneItemShape,
+                        modifier = Modifier.testTag("group-categories"),
+                        onClick = { expanded = false; onManageCategories.invoke() },
+                    )
+                }
+            }
+            if (canCategories && (canCustomize || canBlock || canLeave)) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
             if (canCustomize) {
                 DropdownMenuGroup(
-                    shapes = MenuDefaults.groupShape(if (canInvite) 1 else 0, groupCount),
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, groupCount),
                     modifier = Modifier.testTag("group-notifications-menu-group"),
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.group_custom_notifications)) },
                         leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-                        shape = when {
-                            canInvite && (canBlock || canLeave) -> MenuDefaults.middleItemShape
-                            canInvite -> MenuDefaults.trailingItemShape
-                            canBlock || canLeave -> MenuDefaults.leadingItemShape
-                            else -> MenuDefaults.standaloneItemShape
-                        },
+                        shape = MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group_notification_settings"),
                         onClick = { expanded = false; onOpenNotifications.invoke() },
                     )
@@ -103,19 +118,14 @@ internal fun GroupDetailsMenu(
             if (canCustomize && (canBlock || canLeave)) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
             if (canBlock) {
                 DropdownMenuGroup(
-                    shapes = MenuDefaults.groupShape((if (canInvite) 1 else 0) + (if (canCustomize) 1 else 0), groupCount),
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, groupCount),
                     modifier = Modifier.testTag("group-block-menu-group"),
                     interactionSource = interactionSource,
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(if (group.isBlocked) R.string.group_unblock_action else R.string.group_block_action)) },
                         leadingIcon = { Icon(if (group.isBlocked) Icons.Default.CheckCircle else Icons.Default.Block, contentDescription = null) },
-                        shape = when {
-                            (canInvite || canCustomize) && canLeave -> MenuDefaults.middleItemShape
-                            canInvite || canCustomize -> MenuDefaults.trailingItemShape
-                            canLeave -> MenuDefaults.leadingItemShape
-                            else -> MenuDefaults.standaloneItemShape
-                        },
+                        shape = MenuDefaults.standaloneItemShape,
                         modifier = Modifier.testTag("group-block"),
                         onClick = { expanded = false; onChangeBlocking.invoke() },
                     )

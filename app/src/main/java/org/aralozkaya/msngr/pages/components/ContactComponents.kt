@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuGroup
@@ -72,6 +74,7 @@ import org.aralozkaya.msngr.UiDensity
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.avatarInitial
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -244,6 +247,8 @@ fun ContactRow(
     profileActionLabel: String? = null,
     isOwnContact: Boolean = false,
     isPendingMember: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+    onManageCategories: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
@@ -254,7 +259,11 @@ fun ContactRow(
     val compact = layout.isCompact
     val inlineStatus = compact && layout.compactInlineStatusMessage
     val hidePresenceText = compact && layout.compactHidePresenceText
-    val hasLongClickActions = contextActionLabel != null || onReadStateChange != null || onDeleteContact != null
+    val hasLongClickActions = contextActionLabel != null ||
+        onReadStateChange != null ||
+        onDeleteContact != null ||
+        onToggleFavorite != null ||
+        onManageCategories != null
     val longClickLabel = stringResource(R.string.contact_long_click_actions)
     val rowSpacing = when (density) {
         UiDensity.Minimal -> 8.dp
@@ -577,41 +586,99 @@ fun ContactRow(
             expanded = contextMenuExpanded,
             onDismissRequest = { contextMenuExpanded = false },
         ) {
-            DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, if (onDeleteContact != null) 2 else 1),
-                interactionSource = groupInteractionSource,
-            ) {
+            val primaryActions = buildList<Pair<String, () -> Unit>> {
                 onReadStateChange?.let { changeReadState ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (contact.isUnread) R.string.contact_mark_as_read else R.string.contact_mark_as_unread,
-                                ),
-                            )
-                        },
-                        onClick = {
-                            contextMenuExpanded = false
-                            changeReadState(!contact.isUnread)
-                        },
-                        shape = MenuDefaults.leadingItemShape
+                    add(
+                        stringResource(
+                            if (contact.isUnread) R.string.contact_mark_as_read else R.string.contact_mark_as_unread,
+                        ) to { changeReadState(!contact.isUnread) },
                     )
                 }
                 contextActionLabel?.let { label ->
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = {
-                            contextMenuExpanded = false
-                            onContextAction()
-                        },
-                        shape = if (onDeleteContact != null) MenuDefaults.middleItemShape else MenuDefaults.trailingItemShape
+                    add(label to onContextAction)
+                }
+            }
+            val categoryActions = buildList<Triple<String, (@Composable () -> Unit)?, () -> Unit>> {
+                onToggleFavorite?.let { toggleFavorite ->
+                    val isFav = contact.isFavorite
+                    add(
+                        Triple(
+                            stringResource(
+                                if (isFav) R.string.contact_remove_from_favorites else R.string.contact_add_to_favorites,
+                            ),
+                            {
+                                Icon(
+                                    imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = null,
+                                )
+                            },
+                            toggleFavorite,
+                        ),
+                    )
+                }
+                onManageCategories?.let { manageCategories ->
+                    add(
+                        Triple(
+                            stringResource(R.string.contact_manage_categories),
+                            null,
+                            manageCategories,
+                        ),
                     )
                 }
             }
-            onDeleteContact?.let { delete ->
-                Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            val totalGroups = (if (categoryActions.isNotEmpty()) 1 else 0) +
+                (if (primaryActions.isNotEmpty()) 1 else 0) +
+                (if (onDeleteContact != null) 1 else 0)
+            var currentGroupIndex = 0
+
+            if (categoryActions.isNotEmpty()) {
                 DropdownMenuGroup(
-                    shapes = MenuDefaults.groupShape(1, 2),
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, totalGroups),
+                    interactionSource = groupInteractionSource,
+                ) {
+                    categoryActions.forEachIndexed { actionIndex, (label, leading, action) ->
+                        val itemShape = MenuDefaults.itemShape(actionIndex, categoryActions.size).shape
+                        val isFavoriteAction = leading != null
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            leadingIcon = leading,
+                            colors = if (isFavoriteAction) MenuDefaults.itemVibrantColors() else MenuDefaults.itemColors(),
+                            modifier = if (isFavoriteAction) {
+                                Modifier.background(MenuDefaults.groupVibrantContainerColor, itemShape)
+                            } else {
+                                Modifier
+                            },
+                            onClick = {
+                                contextMenuExpanded = false
+                                action()
+                            },
+                            shape = itemShape,
+                        )
+                    }
+                }
+            }
+            if (primaryActions.isNotEmpty()) {
+                if (currentGroupIndex > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(currentGroupIndex++, totalGroups),
+                    interactionSource = groupInteractionSource,
+                ) {
+                    primaryActions.forEachIndexed { actionIndex, (label, action) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                contextMenuExpanded = false
+                                action()
+                            },
+                            shape = MenuDefaults.itemShape(actionIndex, primaryActions.size).shape,
+                        )
+                    }
+                }
+            }
+            onDeleteContact?.let { delete ->
+                if (currentGroupIndex > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(currentGroupIndex, totalGroups),
                     interactionSource = groupInteractionSource,
                 ) {
                     DropdownMenuItem(
@@ -621,7 +688,7 @@ fun ContactRow(
                             contextMenuExpanded = false
                             delete()
                         },
-                        shape = MenuDefaults.trailingItemShape
+                        shape = MenuDefaults.standaloneItemShape,
                     )
                 }
             }

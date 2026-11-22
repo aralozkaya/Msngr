@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.AppearanceColorOption
 import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.BuildConfig
+import org.aralozkaya.msngr.CategoryPrefs
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.ContactInvitationPrefs
 import org.aralozkaya.msngr.DisplayPictureSyncBehavior
@@ -69,6 +70,7 @@ import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
 import org.aralozkaya.msngr.numberSentenceResource
+import org.aralozkaya.msngr.pages.components.CategoryOrderDialog
 import org.aralozkaya.msngr.pages.components.PageContentList
 import org.aralozkaya.msngr.pages.components.ExpandableSettingsGroup
 import org.aralozkaya.msngr.providerDisplayName
@@ -570,6 +572,13 @@ fun AppearanceSettingsScreen(
 ) {
     val context = LocalContext.current
     val savedAppearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
+    val categoryOrder by remember(context) { CategoryPrefs.orderState(context) }.collectAsState()
+    val hiddenCategories by remember(context) { CategoryPrefs.hiddenState(context) }.collectAsState()
+    val categoriesFlow = remember(context) {
+        runCatching { context.appContainer.messengerRepository.categories }.getOrNull()
+    }
+    val customCategories = categoriesFlow?.collectAsState()?.value.orEmpty()
+    var showCategoryOrderDialog by rememberSaveable { mutableStateOf(false) }
     val appearance = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && savedAppearance.colorMode == ColorMode.Dynamic)
         savedAppearance.copy(colorMode = ColorMode.Default) else savedAppearance
 
@@ -611,10 +620,19 @@ fun AppearanceSettingsScreen(
         item(key = "layout-destination") {
             SegmentedListItem(
                 onClick = onLayoutClick,
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
                 modifier = Modifier.settingsRow().testTag("layout_settings"),
                 supportingContent = { Text(appearance.uiDensity.displayLabel()) },
                 content = { Text(stringResource(R.string.settings_destination_layout)) },
+            )
+        }
+        item(key = "category-order-destination") {
+            SegmentedListItem(
+                onClick = { showCategoryOrderDialog = true },
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+                modifier = Modifier.settingsRow().testTag("category_order_settings"),
+                supportingContent = { Text(stringResource(R.string.settings_category_order_supporting)) },
+                content = { Text(stringResource(R.string.settings_category_order_title)) },
             )
         }
         settingsSectionSpacer()
@@ -639,6 +657,21 @@ fun AppearanceSettingsScreen(
                 content = { Text(stringResource(R.string.settings_show_ads_title)) },
             )
         }
+    }
+
+    if (showCategoryOrderDialog) {
+        CategoryOrderDialog(
+            initialOrder = categoryOrder,
+            initialHidden = hiddenCategories,
+            customCategories = customCategories,
+            onSave = { nextOrder, nextHidden ->
+                CategoryPrefs.setOrder(context, nextOrder)
+                CategoryPrefs.setHiddenCategories(context, nextHidden)
+                showCategoryOrderDialog = false
+            },
+            onReset = { CategoryPrefs.resetOrder(context) },
+            onDismiss = { showCategoryOrderDialog = false },
+        )
     }
 }
 

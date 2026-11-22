@@ -1960,4 +1960,47 @@
     <string name="mock_reply_1_you_singular">Hey! Great to see you online 👋</string>
     <string name="mock_reply_2">I think so — just like the old Messenger days.</string>
     <string name="mock_reply_3">Got it! This mock reply arrived through the MSNP event stream.</string>
+
+    <!-- Contact categories and favorites -->
+    <string name="contacts_section_favorites">Favorites</string>
+    <string name="contacts_favorites_empty">No favorites yet.</string>
+    <string name="contacts_favorites_empty_search_you_singular">No favorites match your search.</string>
+    <string name="contacts_favorites_empty_online">No favorites are online.</string>
+    <string name="contacts_category_empty">No contacts in this category yet.</string>
+    <string name="contacts_category_empty_search_you_singular">No contacts in this category match your search.</string>
+    <string name="contacts_category_empty_online">No contacts in this category are online.</string>
+    <string name="contacts_action_create_category">Create category</string>
+    <string name="contact_add_to_favorites">Add to Favorites</string>
+    <string name="contact_remove_from_favorites">Remove from Favorites</string>
+    <string name="contact_manage_categories">Categories</string>
+    <string name="contact_categories_dialog_title">Categories for %1$s</string>
+    <string name="contact_categories_updated">Categories updated.</string>
+    <string name="contact_favorites_added">Added to Favorites.</string>
+    <string name="contact_favorites_removed">Removed from Favorites.</string>
+    <string name="contact_categories_update_failed">Couldn’t update categories. Try again.</string>
+    <string name="category_options_description">Category options</string>
+    <string name="category_create_title">Create category</string>
+    <string name="category_edit_title">Edit category</string>
+    <string name="category_edit_action">Edit category</string>
+    <string name="category_delete_action">Delete category</string>
+    <string name="category_name_label">Category name</string>
+    <string name="category_members_header">Members (optional)</string>
+    <string name="category_members_empty">No contacts or groups available to add.</string>
+    <string name="category_create_action">Create</string>
+    <string name="category_created">Category created.</string>
+    <string name="category_updated">Category updated.</string>
+    <string name="category_deleted">Category deleted.</string>
+    <string name="category_delete_dialog_title">Delete category?</string>
+    <string name="category_delete_dialog_message">Delete “%1$s”? Contacts in this category won’t be deleted and will move to Other Contacts if they aren’t in another category.</string>
+    <string name="category_save_failed">Couldn’t save this category. Try again.</string>
+    <string name="category_delete_failed">Couldn’t delete this category. Try again.</string>
+    <string name="settings_category_order_title">Category order</string>
+    <string name="settings_category_order_supporting">Reorder or hide categories shown on the contacts screen</string>
+    <string name="settings_category_order_instructions">Drag categories up or down to reorder them, or toggle switches to show or hide them on the contacts screen.</string>
+    <string name="settings_category_order_reset">Reset</string>
+    <string name="settings_category_order_drag_handle">Drag to reorder %1$s</string>
+    <string name="settings_category_order_toggle_visibility">Show or hide %1$s</string>
+    <string name="settings_layout_favorites_header">Favorites</string>
+    <string name="settings_layout_favorites_separate_title">Separate layout for Favorites</string>
+    <string name="settings_layout_favorites_separate_supporting">Choose a different density and compact options for Favorites</string>
 </resources>

@@ -51,6 +51,7 @@ data class LayoutSettings(
 }
 
 val LocalLayoutSettings = staticCompositionLocalOf { LayoutSettings() }
+val LocalFavoritesLayoutSettings = staticCompositionLocalOf { LayoutSettings() }
 
 data class AppAppearance(
     val themeMode: ThemeMode = ThemeMode.System,
@@ -58,6 +59,10 @@ data class AppAppearance(
     val uiDensity: UiDensity = UiDensity.Regular,
     val compactInlineStatusMessage: Boolean = false,
     val compactHidePresenceText: Boolean = false,
+    val useSeparateFavoritesLayout: Boolean = false,
+    val favoritesUiDensity: UiDensity = UiDensity.Regular,
+    val favoritesCompactInlineStatusMessage: Boolean = false,
+    val favoritesCompactHidePresenceText: Boolean = false,
     val sceneId: String = "daisyhill",
     val customColorArgb: Int? = null,
     val sceneColorArgb: Int? = null,
@@ -71,6 +76,17 @@ data class AppAppearance(
             compactInlineStatusMessage = compactInlineStatusMessage,
             compactHidePresenceText = compactHidePresenceText,
         )
+
+    val favoritesLayoutSettings: LayoutSettings
+        get() = if (useSeparateFavoritesLayout) {
+            LayoutSettings(
+                density = favoritesUiDensity,
+                compactInlineStatusMessage = favoritesCompactInlineStatusMessage,
+                compactHidePresenceText = favoritesCompactHidePresenceText,
+            )
+        } else {
+            layoutSettings
+        }
 }
 
 object AppearancePrefs {
@@ -80,6 +96,10 @@ object AppearancePrefs {
     private const val KEY_UI_DENSITY = "ui_density"
     private const val KEY_COMPACT_INLINE_STATUS = "compact_inline_status"
     private const val KEY_COMPACT_HIDE_PRESENCE_TEXT = "compact_hide_presence_text"
+    private const val KEY_FAVORITES_SEPARATE_LAYOUT = "favorites_separate_layout"
+    private const val KEY_FAVORITES_UI_DENSITY = "favorites_ui_density"
+    private const val KEY_FAVORITES_COMPACT_INLINE_STATUS = "favorites_compact_inline_status"
+    private const val KEY_FAVORITES_COMPACT_HIDE_PRESENCE_TEXT = "favorites_compact_hide_presence_text"
     private const val KEY_SCENE = "scene"
     private const val KEY_CUSTOM_COLOR = "custom_color"
     private const val KEY_SCENE_COLOR = "scene_color"
@@ -153,6 +173,26 @@ object AppearancePrefs {
         update(context, mutableAppearance.value.copy(compactHidePresenceText = enabled))
     }
 
+    fun setUseSeparateFavoritesLayout(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(useSeparateFavoritesLayout = enabled))
+    }
+
+    fun setFavoritesUiDensity(context: Context, density: UiDensity) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(favoritesUiDensity = density))
+    }
+
+    fun setFavoritesCompactInlineStatusMessage(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(favoritesCompactInlineStatusMessage = enabled))
+    }
+
+    fun setFavoritesCompactHidePresenceText(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(favoritesCompactHidePresenceText = enabled))
+    }
+
     private fun update(context: Context, appearance: AppAppearance) {
         mutableAppearance.value = appearance
         persist(context, appearance)
@@ -172,6 +212,10 @@ object AppearancePrefs {
             uiDensity = uiDensity,
             compactInlineStatusMessage = prefs.getBoolean(KEY_COMPACT_INLINE_STATUS, false),
             compactHidePresenceText = prefs.getBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, false),
+            useSeparateFavoritesLayout = prefs.getBoolean(KEY_FAVORITES_SEPARATE_LAYOUT, false),
+            favoritesUiDensity = enumValueOrDefault(prefs.getString(KEY_FAVORITES_UI_DENSITY, null), UiDensity.Regular),
+            favoritesCompactInlineStatusMessage = prefs.getBoolean(KEY_FAVORITES_COMPACT_INLINE_STATUS, false),
+            favoritesCompactHidePresenceText = prefs.getBoolean(KEY_FAVORITES_COMPACT_HIDE_PRESENCE_TEXT, false),
             sceneId = messengerScene(prefs.getString(KEY_SCENE, null) ?: "daisyhill").id,
             customColorArgb = if (prefs.contains(KEY_CUSTOM_COLOR)) prefs.getInt(KEY_CUSTOM_COLOR, 0) else null,
             sceneColorArgb = if (prefs.contains(KEY_SCENE_COLOR)) prefs.getInt(KEY_SCENE_COLOR, 0) else null,
@@ -188,6 +232,10 @@ object AppearancePrefs {
             putString(KEY_UI_DENSITY, appearance.uiDensity.name)
             putBoolean(KEY_COMPACT_INLINE_STATUS, appearance.compactInlineStatusMessage)
             putBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, appearance.compactHidePresenceText)
+            putBoolean(KEY_FAVORITES_SEPARATE_LAYOUT, appearance.useSeparateFavoritesLayout)
+            putString(KEY_FAVORITES_UI_DENSITY, appearance.favoritesUiDensity.name)
+            putBoolean(KEY_FAVORITES_COMPACT_INLINE_STATUS, appearance.favoritesCompactInlineStatusMessage)
+            putBoolean(KEY_FAVORITES_COMPACT_HIDE_PRESENCE_TEXT, appearance.favoritesCompactHidePresenceText)
             putString(KEY_SCENE, appearance.sceneId)
             putBoolean(KEY_SCENE_IN_CONVERSATIONS, appearance.showSceneInConversations)
             putBoolean(KEY_DARKEN_SCENES, appearance.darkenScenesInDarkMode)

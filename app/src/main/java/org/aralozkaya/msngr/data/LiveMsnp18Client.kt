@@ -156,6 +156,13 @@ internal class LiveMsnp18Client(
     private val respondAddressBookGroupInvitation: suspend (String, String, String, Boolean) -> Unit = MsnpAddressBookService::respondToGroupInvitation,
     private val leaveAddressBookGroup: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::leaveGroup,
     private val fetchAddressBookGroupMembers: suspend (String, String, String) -> List<GroupMember> = MsnpAddressBookService::fetchGroupMembers,
+    private val createAddressBookCategory: suspend (String, String, String, Boolean) -> String = MsnpAddressBookService::createCategory,
+    private val renameAddressBookCategory: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::renameCategory,
+    private val deleteAddressBookCategory: suspend (String, String, String) -> Unit = MsnpAddressBookService::deleteCategory,
+    private val addContactToAddressBookCategory: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::addContactToCategory,
+    private val removeContactFromAddressBookCategory: suspend (String, String, String, String) -> Unit = MsnpAddressBookService::removeContactFromCategory,
+    private val setAddressBookContactFavorite: suspend (String, String, String, Boolean) -> Unit = MsnpAddressBookService::setContactFavoriteFlag,
+    private val categoryMembershipOverlayStore: CategoryMembershipOverlayStore = InMemoryCategoryMembershipOverlayStore,
     private val nudgeLimiter: NudgeRateLimiter = NudgeRateLimiter(),
     private val useRoamingProfile: (AccountIdentity) -> Boolean = { true },
     private val fetchClientConfig: suspend (ServerConfig) -> MsgrClientConfig =
@@ -168,8 +175,11 @@ internal class LiveMsnp18Client(
         MsnpWhatsNewService::fetchContactsRecentActivity,
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
+    private val mutableCategories = MutableStateFlow<List<ContactCategory>>(emptyList())
     private val mutableContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList())
     private val mutableGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList())
+    private var favoriteCategoryGuid: String? = null
+    private var localCategoryOverlay: Map<String, Set<String>> = emptyMap()
     // Escargot's personal roster may lag behind successful create/join responses until reconnect.
     private val pendingRosterGroups = ConcurrentHashMap<String, Contact>()
     private val leftGroupIds = ConcurrentHashMap.newKeySet<String>()
@@ -304,6 +314,7 @@ internal class LiveMsnp18Client(
     private var ownPictureDownload: CompletableDeferred<ByteArray>? = null
 
     override val contacts = mutableContacts.asStateFlow()
+    override val categories = mutableCategories.asStateFlow()
     override val contactRequests = mutableContactRequests.asStateFlow()
     override val groupInvitations = mutableGroupInvitations.asStateFlow()
     override val messages = mutableMessages.asStateFlow()
@@ -441,12 +452,20 @@ internal class LiveMsnp18Client(
         displayedContactDisplayPictureHashes.putAll(
             cachedPictures.mapValues { (_, cached) -> cached.picture.sha1d },
         )
+        favoriteCategoryGuid = addressBook.favoriteCategoryGuid
+        mutableCategories.value = addressBook.categories
+        localCategoryOverlay = categoryMembershipOverlayStore.load(signedInStorageAccount)
+        val validCategoryIds = addressBook.categories.map(ContactCategory::id).toSet()
         mutableContacts.value = addressBook.contacts.map { contact ->
+            val overlay = localCategoryOverlay[contact.id].orEmpty().filter {
+                it == FAVORITES_CATEGORY_ID || it in validCategoryIds
+            }.toSet()
             contact.copy(
                 avatarUri = cachedPictures[contact.email.lowercase()]?.bytes?.toImageDataUri() ?: contact.avatarUri,
                 members = contact.members.map { member ->
                     member.copy(avatarUri = cachedPictures[member.email.lowercase()]?.bytes?.toImageDataUri() ?: member.avatarUri)
                 },
+                categoryIds = contact.categoryIds + overlay,
             ).withGroupPresence(email)
         }
         mutableMessages.value = emptyMap()
@@ -1644,6 +1663,229 @@ internal class LiveMsnp18Client(
         addressBookRefreshRequests?.trySend(Unit)
     }
 
+    override suspend fun createCategory(name: String, memberIds: List<String>): String = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before creating a category." }
+        val normalized = validateCategoryName(name, mutableCategories.value)
+        val guid = createAddressBookCategory(addressBookServer, addressBookTicket, normalized, false).lowercase()
+        checkGroupSession(owner, endpoint)
+        val created = ContactCategory(id = guid, name = normalized, serverGuid = guid)
+        mutableCategories.update { list -> list.filterNot { it.id == guid } + created }
+        val targetIds = memberIds.map(String::lowercase).distinct()
+        targetIds.forEach { contactId ->
+            syncSingleCategoryMembership(contactId, guid, add = true)
+            checkGroupSession(owner, endpoint)
+        }
+        if (targetIds.isNotEmpty()) {
+            val targetSet = targetIds.toSet()
+            mutableContacts.update { list ->
+                list.map { contact ->
+                    if (contact.id.lowercase() in targetSet) {
+                        contact.copy(categoryIds = (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + guid)
+                    } else contact
+                }
+            }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+        guid
+    }
+
+    override suspend fun renameCategory(categoryId: String, newName: String): Unit = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before editing a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isEditable) { "This category cannot be edited." }
+        val normalized = validateCategoryName(newName, mutableCategories.value, excludeCategoryId = categoryId)
+        val serverGuid = existing.serverGuid ?: existing.id
+        renameAddressBookCategory(addressBookServer, addressBookTicket, serverGuid, normalized)
+        checkGroupSession(owner, endpoint)
+        mutableCategories.update { list ->
+            list.map { if (it.id == categoryId) it.copy(name = normalized) else it }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+    }
+
+    override suspend fun updateCategoryMembers(categoryId: String, memberIds: Set<String>): Unit = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before updating a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isEditable) { "This category cannot be edited." }
+        val targetSet = memberIds.map(String::lowercase).toSet()
+        val currentContacts = mutableContacts.value
+        val toAdd = currentContacts.filter { it.id.lowercase() in targetSet && categoryId !in it.categoryIds }
+        val toRemove = currentContacts.filter { it.id.lowercase() !in targetSet && categoryId in it.categoryIds }
+        toAdd.forEach { contact ->
+            syncSingleCategoryMembership(contact.id, categoryId, add = true)
+            checkGroupSession(owner, endpoint)
+        }
+        toRemove.forEach { contact ->
+            syncSingleCategoryMembership(contact.id, categoryId, add = false)
+            checkGroupSession(owner, endpoint)
+        }
+        mutableContacts.update { list ->
+            list.map { contact ->
+                val shouldContain = contact.id.lowercase() in targetSet
+                val next = if (shouldContain) {
+                    (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + categoryId
+                } else {
+                    contact.categoryIds - categoryId
+                }
+                if (next == contact.categoryIds) contact else contact.copy(categoryIds = next)
+            }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+    }
+
+    override suspend fun deleteCategory(categoryId: String): Unit = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before deleting a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isDeletable) { "This category cannot be deleted." }
+        val serverGuid = existing.serverGuid ?: existing.id
+        // Remove all contacts from the group before deleting it so the server never drops them from the forward list.
+        mutableContacts.value.filter { categoryId in it.categoryIds }.forEach { contact ->
+            val contactGuid = contactStorageIds[contact.id.lowercase()]
+            if (contactGuid != null) {
+                runCatching {
+                    removeContactFromAddressBookCategory(addressBookServer, addressBookTicket, serverGuid, contactGuid)
+                }
+            }
+            checkGroupSession(owner, endpoint)
+        }
+        deleteAddressBookCategory(addressBookServer, addressBookTicket, serverGuid)
+        checkGroupSession(owner, endpoint)
+        mutableCategories.update { list -> list.filterNot { it.id == categoryId } }
+        mutableContacts.update { list ->
+            list.map { contact ->
+                if (categoryId in contact.categoryIds) {
+                    contact.copy(categoryIds = contact.categoryIds - categoryId)
+                } else contact
+            }
+        }
+        updateLocalOverlay { current ->
+            current.mapValues { (_, set) -> set - categoryId }.filterValues { it.isNotEmpty() }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+    }
+
+    override suspend fun setContactCategories(contactId: String, categoryIds: Set<String>): Unit = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before updating categories." }
+        val normalizedContactId = contactId.lowercase()
+        val contact = mutableContacts.value.firstOrNull { it.id.equals(normalizedContactId, ignoreCase = true) }
+            ?: error("This contact is no longer available.")
+        val validCustomIds = mutableCategories.value.map(ContactCategory::id).toSet()
+        val effective = categoryIds.filter {
+            it == FAVORITES_CATEGORY_ID || it in validCustomIds
+        }.toSet()
+        val current = contact.categoryIds
+        val toAdd = effective - current
+        val toRemove = current - effective
+        toAdd.forEach { catId ->
+            syncSingleCategoryMembership(contact.id, catId, add = true)
+            checkGroupSession(owner, endpoint)
+        }
+        toRemove.forEach { catId ->
+            syncSingleCategoryMembership(contact.id, catId, add = false)
+            checkGroupSession(owner, endpoint)
+        }
+        mutableContacts.update { list ->
+            list.map { if (it.id.equals(contact.id, ignoreCase = true)) it.copy(categoryIds = effective) else it }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+    }
+
+    override suspend fun setContactFavorite(contactId: String, favorite: Boolean): Unit = rosterMutationMutex.withLock {
+        val owner = signedInEmail
+        val endpoint = machineGuid
+        check(owner.isNotBlank() && addressBookTicket.isNotBlank()) { "Sign in before updating favorites." }
+        val normalizedContactId = contactId.lowercase()
+        val contact = mutableContacts.value.firstOrNull { it.id.equals(normalizedContactId, ignoreCase = true) }
+            ?: error("This contact is no longer available.")
+        val alreadyFavorite = FAVORITES_CATEGORY_ID in contact.categoryIds
+        if (alreadyFavorite == favorite) return@withLock
+        syncSingleCategoryMembership(contact.id, FAVORITES_CATEGORY_ID, add = favorite)
+        checkGroupSession(owner, endpoint)
+        mutableContacts.update { list ->
+            list.map {
+                if (!it.id.equals(contact.id, ignoreCase = true)) it
+                else it.copy(
+                    categoryIds = if (favorite) it.categoryIds + FAVORITES_CATEGORY_ID
+                    else it.categoryIds - FAVORITES_CATEGORY_ID,
+                )
+            }
+        }
+        addressBookRefreshRequests?.trySend(Unit)
+    }
+
+    private suspend fun syncSingleCategoryMembership(contactId: String, categoryId: String, add: Boolean) {
+        val normalizedContactId = contactId.lowercase()
+        if (categoryId == OTHER_CONTACTS_CATEGORY_ID) return
+        val contact = mutableContacts.value.firstOrNull { it.id.equals(normalizedContactId, ignoreCase = true) }
+        val contactGuid = contactStorageIds[normalizedContactId]
+        var syncedOnServer = false
+        if (categoryId == FAVORITES_CATEGORY_ID) {
+            // Always use MSN's existing server Favorites group when present; never create a duplicate "Favorites" group.
+            val serverFavGuid = favoriteCategoryGuid
+            if (contactGuid != null) {
+                val result = runCatching {
+                    if (serverFavGuid != null) {
+                        if (add) {
+                            addContactToAddressBookCategory(addressBookServer, addressBookTicket, serverFavGuid, contactGuid)
+                        } else {
+                            removeContactFromAddressBookCategory(addressBookServer, addressBookTicket, serverFavGuid, contactGuid)
+                        }
+                    } else {
+                        setAddressBookContactFavorite(addressBookServer, addressBookTicket, contactGuid, add)
+                    }
+                }
+                if (result.isSuccess) syncedOnServer = true
+            }
+        } else {
+            val serverGroupGuid = mutableCategories.value.firstOrNull { it.id == categoryId }?.serverGuid ?: categoryId
+            if (contactGuid != null) {
+                val result = runCatching {
+                    if (add) {
+                        addContactToAddressBookCategory(addressBookServer, addressBookTicket, serverGroupGuid, contactGuid)
+                    } else {
+                        removeContactFromAddressBookCategory(addressBookServer, addressBookTicket, serverGroupGuid, contactGuid)
+                    }
+                }
+                if (result.isSuccess) {
+                    syncedOnServer = true
+                } else if (contact?.isGroup != true) {
+                    throw result.exceptionOrNull()!!
+                }
+            }
+        }
+        // Persist locally if the server could not store this membership (e.g. circles or Favorites without server group).
+        updateLocalOverlay { current ->
+            val existing = current[normalizedContactId].orEmpty()
+            val updated = when {
+                !add -> existing - categoryId
+                !syncedOnServer || contact?.isGroup == true -> existing + categoryId
+                else -> existing - categoryId
+            }
+            if (updated.isEmpty()) current - normalizedContactId else current + (normalizedContactId to updated)
+        }
+    }
+
+    private fun updateLocalOverlay(transform: (Map<String, Set<String>>) -> Map<String, Set<String>>) {
+        val updated = transform(localCategoryOverlay)
+        localCategoryOverlay = updated
+        if (signedInStorageAccount.isNotBlank()) {
+            categoryMembershipOverlayStore.save(signedInStorageAccount, updated)
+        }
+    }
+
     private fun checkGroupSession(owner: String, endpoint: String) {
         check(signedInEmail == owner && machineGuid == endpoint) { "This session ended while updating the group." }
     }
@@ -2115,7 +2357,20 @@ internal class LiveMsnp18Client(
                             }
                             contactStorageIds.putAll(snapshot.contactStorageIds)
                             deletedContactIds.removeAll(snapshot.contacts.filter { it.isForwardListContact && !it.isGroup }.map(Contact::id).toSet())
-                            mutableContacts.update { mergeAddressBookUpdate(it, snapshot, email) }
+                            if (snapshot.favoriteCategoryGuid != null) {
+                                favoriteCategoryGuid = snapshot.favoriteCategoryGuid
+                            }
+                            mutableCategories.value = snapshot.categories
+                            val validCatIds = snapshot.categories.map(ContactCategory::id).toSet()
+                            val snapshotWithOverlay = snapshot.copy(
+                                contacts = snapshot.contacts.map { contact ->
+                                    val overlay = localCategoryOverlay[contact.id].orEmpty().filter {
+                                        it == FAVORITES_CATEGORY_ID || it in validCatIds
+                                    }.toSet()
+                                    if (overlay.isEmpty()) contact else contact.copy(categoryIds = contact.categoryIds + overlay)
+                                },
+                            )
+                            mutableContacts.update { mergeAddressBookUpdate(it, snapshotWithOverlay, email) }
                             if (!snapshot.failedBlockedLookup) mutableContactRequests.value = snapshot.contactRequests
                             updateGroupInvitations(snapshot.groupInvitations)
                             val refreshed = mutableContacts.value
@@ -3834,6 +4089,11 @@ internal class LiveMsnp18Client(
         leftGroupIds.clear()
         handledGroupInvitations.clear()
         deletedContactIds.clear()
+        if (!preserveRequests) {
+            mutableCategories.value = emptyList()
+            favoriteCategoryGuid = null
+            localCategoryOverlay = emptyMap()
+        }
         circleAuthenticated = false
         receiverJob?.cancel()
         receiverJob = null

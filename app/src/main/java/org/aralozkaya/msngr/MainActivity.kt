@@ -105,8 +105,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.ContactCategory
 import org.aralozkaya.msngr.data.ContactRequestInbox
 import org.aralozkaya.msngr.data.MessengerRepository
+import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.DisplayPictureSyncHost
@@ -114,7 +116,10 @@ import org.aralozkaya.msngr.pages.PortalPage
 import org.aralozkaya.msngr.pages.UpdateBadge
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
+import org.aralozkaya.msngr.pages.components.CategoryEditorDialog
+import org.aralozkaya.msngr.pages.components.ContactCategoriesDialog
 import org.aralozkaya.msngr.pages.components.ContactsActionMenu
+import org.aralozkaya.msngr.pages.components.DeleteCategoryDialog
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
 import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
@@ -288,6 +293,9 @@ internal fun MsngrApp(
     val appearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
     val resources = LocalResources.current
     val contacts by repository.contacts.collectAsState()
+    val categories by repository.categories.collectAsState()
+    val categoryOrder by remember(context) { CategoryPrefs.orderState(context) }.collectAsState()
+    val hiddenCategories by remember(context) { CategoryPrefs.hiddenState(context) }.collectAsState()
     val drafts by repository.drafts.collectAsState()
     val profile by repository.profile.collectAsState()
     val portalState by repository.portalState.collectAsState()
@@ -303,6 +311,10 @@ internal fun MsngrApp(
     var addContactBounds by remember { mutableStateOf<Rect?>(null) }
     var showCreateGroup by rememberSaveable { mutableStateOf(false) }
     var createGroupBounds by remember { mutableStateOf<Rect?>(null) }
+    var showCreateCategory by rememberSaveable { mutableStateOf(false) }
+    var editCategoryTarget by remember { mutableStateOf<ContactCategory?>(null) }
+    var deleteCategoryTarget by remember { mutableStateOf<ContactCategory?>(null) }
+    var assignCategoriesTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<Contact?>(null) }
     var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
     var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
@@ -532,6 +544,7 @@ internal fun MsngrApp(
                         contactInvitationVisible = showAddContact,
                         onAddContactBoundsChanged = { addContactBounds = it },
                         onCreateGroup = { showCreateGroup = true },
+                        onCreateCategory = { showCreateCategory = true },
                         groupCreationVisible = showCreateGroup,
                         onCreateGroupBoundsChanged = { createGroupBounds = it },
                     )
@@ -607,6 +620,32 @@ internal fun MsngrApp(
                         onReadStateChange = { contact, unread ->
                             if (unread) repository.markUnread(contact.id) else repository.markRead(contact.id)
                         },
+                        categories = categories,
+                        categoryOrder = categoryOrder,
+                        hiddenCategoryIds = hiddenCategories,
+                        onToggleFavorite = { contact ->
+                            val nextFavorite = !contact.isFavorite
+                            scope.launch {
+                                val result = repository.setContactFavorite(contact.id, nextFavorite)
+                                if (result.isSuccess) {
+                                    snackbarHostState.showActionSnackbar(
+                                        resources.getString(
+                                            if (nextFavorite) R.string.contact_favorites_added
+                                            else R.string.contact_favorites_removed,
+                                        ),
+                                    )
+                                } else {
+                                    snackbarHostState.showActionSnackbar(
+                                        result.exceptionOrNull()?.message
+                                            ?: resources.getString(R.string.contact_categories_update_failed),
+                                        isError = true,
+                                    )
+                                }
+                            }
+                        },
+                        onManageCategories = { contact -> assignCategoriesTargetId = contact.id },
+                        onEditCategory = { category -> editCategoryTarget = category },
+                        onDeleteCategory = { category -> deleteCategoryTarget = category },
                     )
                 }
             }
@@ -648,6 +687,71 @@ internal fun MsngrApp(
             onInvite = repository::inviteGroupMembers,
             onFinished = { id, invitationsSent -> showCreateGroup = false; onOpenGroup(id, invitationsSent) },
             onDismiss = { showCreateGroup = false })
+    }
+
+    if (showCreateCategory || editCategoryTarget != null) {
+        val editing = editCategoryTarget
+        CategoryEditorDialog(
+            existingCategories = categories,
+            contacts = contacts,
+            category = editing,
+            onCreate = repository::createCategory,
+            onUpdate = { categoryId, newName, memberIds ->
+                val renameResult = if (editing != null && editing.name != newName) {
+                    repository.renameCategory(categoryId, newName)
+                } else Result.success(Unit)
+                if (renameResult.isFailure) renameResult
+                else repository.updateCategoryMembers(categoryId, memberIds)
+            },
+            onSaved = { isEdit ->
+                showCreateCategory = false
+                editCategoryTarget = null
+                scope.launch {
+                    snackbarHostState.showActionSnackbar(
+                        resources.getString(if (isEdit) R.string.category_updated else R.string.category_created),
+                    )
+                }
+            },
+            onDismiss = {
+                showCreateCategory = false
+                editCategoryTarget = null
+            },
+        )
+    }
+
+    deleteCategoryTarget?.let { target ->
+        DeleteCategoryDialog(
+            category = target,
+            onDelete = { repository.deleteCategory(target.id) },
+            onDeleted = {
+                CategoryPrefs.removeFromOrder(context, target.id)
+                deleteCategoryTarget = null
+                scope.launch {
+                    snackbarHostState.showActionSnackbar(resources.getString(R.string.category_deleted))
+                }
+            },
+            onDismiss = { deleteCategoryTarget = null },
+        )
+    }
+
+    assignCategoriesTargetId?.let { targetId ->
+        val target = contacts.firstOrNull { it.id == targetId }
+        if (target == null) {
+            assignCategoriesTargetId = null
+        } else {
+            ContactCategoriesDialog(
+                contact = target,
+                categories = categories,
+                onSave = { next -> repository.setContactCategories(target.id, next) },
+                onSaved = {
+                    assignCategoriesTargetId = null
+                    scope.launch {
+                        snackbarHostState.showActionSnackbar(resources.getString(R.string.contact_categories_updated))
+                    }
+                },
+                onDismiss = { assignCategoriesTargetId = null },
+            )
+        }
     }
 
     if (showAddContact) {

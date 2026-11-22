@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,16 +35,25 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.RadioButton
@@ -56,9 +66,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -81,11 +93,18 @@ import androidx.compose.ui.res.stringResource
 import org.aralozkaya.msngr.CompactSearchField
 import org.aralozkaya.msngr.ContactProfileActivity
 import org.aralozkaya.msngr.GroupDetailsActivity
+import org.aralozkaya.msngr.LocalFavoritesLayoutSettings
 import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.MessengerPlusEditorController
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.ContactCategory
+import org.aralozkaya.msngr.data.FAVORITES_CATEGORY_ID
+import org.aralozkaya.msngr.data.GROUPS_CATEGORY_ID
+import org.aralozkaya.msngr.data.OTHER_CONTACTS_CATEGORY_ID
+import org.aralozkaya.msngr.data.belongsToCategory
+import org.aralozkaya.msngr.data.resolveOrderedCategoryIds
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.hasMessengerPlusVisibleContent
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -114,13 +133,19 @@ fun ContactsPage(
     listState: LazyListState = rememberLazyListState(),
     drafts: Map<String, String> = emptyMap(),
     onDeleteContact: ((Contact) -> Unit)? = null,
+    categories: List<ContactCategory> = emptyList(),
+    categoryOrder: List<String> = emptyList(),
+    hiddenCategoryIds: Set<String> = emptySet(),
+    onToggleFavorite: ((Contact) -> Unit)? = null,
+    onManageCategories: ((Contact) -> Unit)? = null,
+    onEditCategory: ((ContactCategory) -> Unit)? = null,
+    onDeleteCategory: ((ContactCategory) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var sort by rememberSaveable { mutableStateOf(ContactSort.Status) }
     var hideOffline by rememberSaveable { mutableStateOf(false) }
     var showSortOptions by rememberSaveable { mutableStateOf(false) }
-    var groupsExpanded by rememberSaveable { mutableStateOf(true) }
-    var contactsExpanded by rememberSaveable { mutableStateOf(true) }
+    val expandedSections = remember { mutableStateMapOf<String, Boolean>() }
     val searchFieldState = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState() }
     val searchBarState = rememberSearchBarState()
     val searchEditorController = remember { MessengerPlusEditorController() }
@@ -142,14 +167,17 @@ fun ContactsPage(
         }
     }
     val search = searchFieldState.text.toString().withExpandedMsnMenuTokens().trim()
-    LaunchedEffect(search) {
+    val orderedCategoryIds = remember(categoryOrder, categories, hiddenCategoryIds) {
+        resolveOrderedCategoryIds(categoryOrder, categories).filterNot { it in hiddenCategoryIds }
+    }
+    val customCategoriesById = remember(categories) {
+        categories.filterNot(ContactCategory::isBuiltIn).associateBy(ContactCategory::id)
+    }
+    LaunchedEffect(search, orderedCategoryIds) {
         if (search.isNotEmpty()) {
-            groupsExpanded = true
-            contactsExpanded = true
+            orderedCategoryIds.forEach { expandedSections[it] = true }
         }
     }
-    val groupsTransition = updateTransition(groupsExpanded, label = "Groups expansion")
-    val contactsTransition = updateTransition(contactsExpanded, label = "Other contacts expansion")
     val comparator = when (sort) {
         ContactSort.Name -> compareBy<Contact, String>(String.CASE_INSENSITIVE_ORDER) {
             it.displayName.messengerPlusPlainText()
@@ -163,9 +191,8 @@ fun ContactsPage(
             it.displayName.messengerPlusPlainText().contains(search, ignoreCase = true) ||
                 it.email.contains(search, ignoreCase = true)
         }.sortedWith(comparator)
-    val groups = sorted.filter(Contact::isGroup)
-    val visible = sorted.filterNot(Contact::isGroup)
     val compact = LocalLayoutSettings.current.isCompact
+    val favoritesLayout = LocalFavoritesLayoutSettings.current
     PageContentList(
         modifier = modifier.fillMaxSize(),
         listState = listState,
@@ -252,60 +279,175 @@ fun ContactsPage(
                 }
             }
         }
-        item(key = "groups-section") {
-            ExpandableContactSection(stringResource(R.string.contacts_section_groups_plural), groups.size, groupsTransition, { groupsExpanded = !groupsExpanded }) {
-                groups.forEachIndexed { index, group ->
-                    key(group.id) {
-                        ContactRow(index = index + 1, count = groups.size + 1, contact = group,
-                            onClick = { onOpenChat(group) }, onOpenProfile = {
-                                context.startActivity(GroupDetailsActivity.createIntent(context, group.id))
-                            },
-                            contextActionLabel = stringResource(R.string.contacts_block_action), onContextAction = { onBlockContact(group) },
-                            onReadStateChange = { onReadStateChange(group, it) },
-                            hasDraft = drafts[group.id]?.hasMessengerPlusVisibleContent() == true)
-                    }
-                }
-                if (groups.isEmpty()) {
-                    EmptySectionItem {
-                        Text(stringResource(when {
-                            search.isNotEmpty() -> R.string.contacts_groups_empty_search_you_singular
-                            hideOffline -> R.string.contacts_groups_empty_online
-                            else -> R.string.contacts_groups_empty
-                        }))
-                    }
-                }
+        orderedCategoryIds.forEach { categoryId ->
+            val sectionKey = when (categoryId) {
+                FAVORITES_CATEGORY_ID -> "favorites-section"
+                GROUPS_CATEGORY_ID -> "groups-section"
+                OTHER_CONTACTS_CATEGORY_ID -> "contacts-section"
+                else -> "category-section-$categoryId"
             }
-        }
-        item(key = "contacts-section") {
-            ExpandableContactSection(stringResource(R.string.contacts_section_other), visible.size, contactsTransition, { contactsExpanded = !contactsExpanded }) {
-                if (visible.isEmpty()) {
-                    EmptySectionItem {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(stringResource(if (search.isNotEmpty()) R.string.contacts_empty_search else R.string.contacts_empty))
-                            Text(stringResource(when {
-                                search.isNotEmpty() -> R.string.contacts_empty_search_subtitle
-                                hideOffline -> R.string.contacts_empty_offline_subtitle
-                                else -> R.string.contacts_empty_list_subtitle_you_singular
-                            }))
+            item(key = sectionKey) {
+                val expanded = expandedSections[categoryId] ?: true
+                val transition = updateTransition(expanded, label = "Section $categoryId expansion")
+                val onToggle = { expandedSections[categoryId] = !expanded }
+                val sectionItems = sorted.filter { it.belongsToCategory(categoryId) }
+                val renderRow: @Composable (Int, Int, Contact) -> Unit = { index, count, contact ->
+                    key("$categoryId-${contact.id}") {
+                        ContactRow(
+                            index = index,
+                            count = count,
+                            contact = contact,
+                            hasDraft = drafts[contact.id]?.hasMessengerPlusVisibleContent() == true,
+                            onClick = { onOpenChat(contact) },
+                            onOpenProfile = {
+                                context.startActivity(
+                                    if (contact.isGroup) GroupDetailsActivity.createIntent(context, contact.id)
+                                    else ContactProfileActivity.createIntent(context, contact.id),
+                                )
+                            },
+                            contextActionLabel = stringResource(R.string.contacts_block_action),
+                            onContextAction = { onBlockContact(contact) },
+                            onReadStateChange = { unread -> onReadStateChange(contact, unread) },
+                            onDeleteContact = if (contact.isGroup) null else onDeleteContact?.let { delete -> { delete(contact) } },
+                            onToggleFavorite = onToggleFavorite?.let { toggle -> { toggle(contact) } },
+                            onManageCategories = onManageCategories?.let { manage -> { manage(contact) } },
+                        )
+                    }
+                }
+
+                when (categoryId) {
+                    FAVORITES_CATEGORY_ID -> {
+                        CompositionLocalProvider(LocalLayoutSettings provides favoritesLayout) {
+                            ExpandableContactSection(
+                                title = stringResource(R.string.contacts_section_favorites),
+                                count = sectionItems.size,
+                                transition = transition,
+                                onToggle = onToggle,
+                                modifier = Modifier.testTag("section-$FAVORITES_CATEGORY_ID"),
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(if (LocalLayoutSettings.current.isCompact) 18.dp else 22.dp),
+                                    )
+                                },
+                            ) {
+                                if (sectionItems.isEmpty()) {
+                                    EmptySectionItem {
+                                        Text(
+                                            stringResource(
+                                                when {
+                                                    search.isNotEmpty() -> R.string.contacts_favorites_empty_search_you_singular
+                                                    hideOffline -> R.string.contacts_favorites_empty_online
+                                                    else -> R.string.contacts_favorites_empty
+                                                },
+                                            ),
+                                        )
+                                    }
+                                } else {
+                                    sectionItems.forEachIndexed { index, contact ->
+                                        renderRow(index + 1, sectionItems.size + 1, contact)
+                                    }
+                                }
+                            }
                         }
                     }
-                } else {
-                    visible.forEachIndexed { index, contact ->
-                        key(contact.id) {
-                            ContactRow(
-                                index = index + 1,
-                                count = visible.size + 1,
-                                contact = contact,
-                                hasDraft = drafts[contact.id]?.hasMessengerPlusVisibleContent() == true,
-                                onClick = { onOpenChat(contact) },
-                                onOpenProfile = {
-                                    context.startActivity(ContactProfileActivity.createIntent(context, contact.id))
-                                },
-                                contextActionLabel = stringResource(R.string.contacts_block_action),
-                                onContextAction = { onBlockContact(contact) },
-                                onReadStateChange = { unread -> onReadStateChange(contact, unread) },
-                                onDeleteContact = onDeleteContact?.let { delete -> { delete(contact) } },
-                            )
+
+                    GROUPS_CATEGORY_ID -> {
+                        ExpandableContactSection(
+                            title = stringResource(R.string.contacts_section_groups_plural),
+                            count = sectionItems.size,
+                            transition = transition,
+                            onToggle = onToggle,
+                            modifier = Modifier.testTag("section-$GROUPS_CATEGORY_ID"),
+                        ) {
+                            sectionItems.forEachIndexed { index, group ->
+                                renderRow(index + 1, sectionItems.size + 1, group)
+                            }
+                            if (sectionItems.isEmpty()) {
+                                EmptySectionItem {
+                                    Text(
+                                        stringResource(
+                                            when {
+                                                search.isNotEmpty() -> R.string.contacts_groups_empty_search_you_singular
+                                                hideOffline -> R.string.contacts_groups_empty_online
+                                                else -> R.string.contacts_groups_empty
+                                            },
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OTHER_CONTACTS_CATEGORY_ID -> {
+                        ExpandableContactSection(
+                            title = stringResource(R.string.contacts_section_other),
+                            count = sectionItems.size,
+                            transition = transition,
+                            onToggle = onToggle,
+                            modifier = Modifier.testTag("section-$OTHER_CONTACTS_CATEGORY_ID"),
+                        ) {
+                            if (sectionItems.isEmpty()) {
+                                EmptySectionItem {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(stringResource(if (search.isNotEmpty()) R.string.contacts_empty_search else R.string.contacts_empty))
+                                        Text(
+                                            stringResource(
+                                                when {
+                                                    search.isNotEmpty() -> R.string.contacts_empty_search_subtitle
+                                                    hideOffline -> R.string.contacts_empty_offline_subtitle
+                                                    else -> R.string.contacts_empty_list_subtitle_you_singular
+                                                },
+                                            ),
+                                        )
+                                    }
+                                }
+                            } else {
+                                sectionItems.forEachIndexed { index, contact ->
+                                    renderRow(index + 1, sectionItems.size + 1, contact)
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        val category = customCategoriesById[categoryId] ?: return@item
+                        val showCategoryMenu = category.isEditable && (onEditCategory != null || onDeleteCategory != null)
+                        ExpandableContactSection(
+                            title = category.name,
+                            count = sectionItems.size,
+                            transition = transition,
+                            onToggle = onToggle,
+                            modifier = Modifier.testTag("section-${category.id}"),
+                            headerActions = if (showCategoryMenu) {
+                                {
+                                    CategoryHeaderMenu(
+                                        category = category,
+                                        onEdit = onEditCategory?.let { edit -> { edit(category) } },
+                                        onDelete = onDeleteCategory?.let { delete -> { delete(category) } },
+                                    )
+                                }
+                            } else null,
+                        ) {
+                            if (sectionItems.isEmpty()) {
+                                EmptySectionItem {
+                                    Text(
+                                        stringResource(
+                                            when {
+                                                search.isNotEmpty() -> R.string.contacts_category_empty_search_you_singular
+                                                hideOffline -> R.string.contacts_category_empty_online
+                                                else -> R.string.contacts_category_empty
+                                            },
+                                        ),
+                                    )
+                                }
+                            } else {
+                                sectionItems.forEachIndexed { index, contact ->
+                                    renderRow(index + 1, sectionItems.size + 1, contact)
+                                }
+                            }
                         }
                     }
                 }
@@ -325,7 +467,83 @@ fun ContactsPage(
 }
 
 @Composable
-internal fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+private fun CategoryHeaderMenu(
+    category: ContactCategory,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
+) {
+    var expanded by remember(category.id) { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val compact = LocalLayoutSettings.current.isCompact
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .size(if (compact) 28.dp else 36.dp)
+                .testTag("category-options-${category.id}"),
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.category_options_description),
+                modifier = Modifier.size(if (compact) 18.dp else 20.dp),
+            )
+        }
+        DropdownMenuPopup(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            if (onEdit != null) {
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(0, if (onDelete != null) 2 else 1),
+                    interactionSource = interactionSource,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.category_edit_action)) },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                        onClick = {
+                            expanded = false
+                            onEdit()
+                        },
+                        shape = MenuDefaults.standaloneItemShape,
+                    )
+                }
+            }
+            if (onEdit != null && onDelete != null) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            if (onDelete != null) {
+                DropdownMenuGroup(
+                    shapes = MenuDefaults.groupShape(if (onEdit != null) 1 else 0, if (onEdit != null) 2 else 1),
+                    interactionSource = interactionSource,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.category_delete_action), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.DeleteOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onDelete()
+                        },
+                        shape = MenuDefaults.standaloneItemShape,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ContactSectionHeader(
+    title: String,
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    headerActions: (@Composable () -> Unit)? = null,
+) {
     val stateLabel = stringResource(if (expanded) R.string.contacts_section_expanded else R.string.contacts_section_collapsed)
     val toggleDesc = stringResource(
         if (expanded) R.string.contacts_section_collapse else R.string.contacts_section_expand,
@@ -346,12 +564,14 @@ internal fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, 
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            leadingIcon?.invoke()
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
+            headerActions?.invoke()
             Text(
                 text = count.toString(),
                 style = MaterialTheme.typography.labelMedium,
@@ -379,9 +599,12 @@ internal fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, 
                 role = Role.Button
                 stateDescription = stateLabel
             },
+        leadingContent = leadingIcon,
         trailingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                headerActions?.invoke()
                 Text(count.toString(), style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.size(4.dp))
                 Column(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -442,11 +665,21 @@ private fun ExpandableContactSection(
     count: Int,
     transition: Transition<Boolean>,
     onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    headerActions: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val compact = LocalLayoutSettings.current.isCompact
-    Column(Modifier.fillMaxWidth()) {
-        ContactSectionHeader(title, count, transition.targetState, onToggle)
+    Column(modifier.fillMaxWidth()) {
+        ContactSectionHeader(
+            title = title,
+            count = count,
+            expanded = transition.targetState,
+            onToggle = onToggle,
+            leadingIcon = leadingIcon,
+            headerActions = headerActions,
+        )
         // Bottom alignment slides the entire child block out from behind the parent.
         // Child rows retain their size and spacing throughout the container transform.
         transition.AnimatedVisibility(

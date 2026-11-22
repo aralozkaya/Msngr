@@ -3687,4 +3687,88 @@
     <string name="mock_reply_2"></string>
     <!-- Reference (en): Got it! This mock reply arrived through the MSNP event stream. -->
     <string name="mock_reply_3"></string>
+
+    <!-- Contact categories and favorites -->
+    <!-- Reference (en): Favorites -->
+    <string name="contacts_section_favorites"></string>
+    <!-- Reference (en): No favorites yet. -->
+    <string name="contacts_favorites_empty"></string>
+    <!-- Reference (en): No favorites match your search. -->
+    <string name="contacts_favorites_empty_search_you_singular"></string>
+    <!-- Reference (en): No favorites are online. -->
+    <string name="contacts_favorites_empty_online"></string>
+    <!-- Reference (en): No contacts in this category yet. -->
+    <string name="contacts_category_empty"></string>
+    <!-- Reference (en): No contacts in this category match your search. -->
+    <string name="contacts_category_empty_search_you_singular"></string>
+    <!-- Reference (en): No contacts in this category are online. -->
+    <string name="contacts_category_empty_online"></string>
+    <!-- Reference (en): Create category -->
+    <string name="contacts_action_create_category"></string>
+    <!-- Reference (en): Add to Favorites -->
+    <string name="contact_add_to_favorites"></string>
+    <!-- Reference (en): Remove from Favorites -->
+    <string name="contact_remove_from_favorites"></string>
+    <!-- Reference (en): Categories -->
+    <string name="contact_manage_categories"></string>
+    <!-- Reference (en): Categories for %1$s -->
+    <string name="contact_categories_dialog_title"></string>
+    <!-- Reference (en): Categories updated. -->
+    <string name="contact_categories_updated"></string>
+    <!-- Reference (en): Added to Favorites. -->
+    <string name="contact_favorites_added"></string>
+    <!-- Reference (en): Removed from Favorites. -->
+    <string name="contact_favorites_removed"></string>
+    <!-- Reference (en): Couldn’t update categories. Try again. -->
+    <string name="contact_categories_update_failed"></string>
+    <!-- Reference (en): Category options -->
+    <string name="category_options_description"></string>
+    <!-- Reference (en): Create category -->
+    <string name="category_create_title"></string>
+    <!-- Reference (en): Edit category -->
+    <string name="category_edit_title"></string>
+    <!-- Reference (en): Edit category -->
+    <string name="category_edit_action"></string>
+    <!-- Reference (en): Delete category -->
+    <string name="category_delete_action"></string>
+    <!-- Reference (en): Category name -->
+    <string name="category_name_label"></string>
+    <!-- Reference (en): Members (optional) -->
+    <string name="category_members_header"></string>
+    <!-- Reference (en): No contacts or groups available to add. -->
+    <string name="category_members_empty"></string>
+    <!-- Reference (en): Create -->
+    <string name="category_create_action"></string>
+    <!-- Reference (en): Category created. -->
+    <string name="category_created"></string>
+    <!-- Reference (en): Category updated. -->
+    <string name="category_updated"></string>
+    <!-- Reference (en): Category deleted. -->
+    <string name="category_deleted"></string>
+    <!-- Reference (en): Delete category? -->
+    <string name="category_delete_dialog_title"></string>
+    <!-- Reference (en): Delete “%1$s”? Contacts in this category won’t be deleted and will move to Other Contacts if they aren’t in another category. -->
+    <string name="category_delete_dialog_message"></string>
+    <!-- Reference (en): Couldn’t save this category. Try again. -->
+    <string name="category_save_failed"></string>
+    <!-- Reference (en): Couldn’t delete this category. Try again. -->
+    <string name="category_delete_failed"></string>
+    <!-- Reference (en): Category order -->
+    <string name="settings_category_order_title"></string>
+    <!-- Reference (en): Reorder or hide categories shown on the contacts screen -->
+    <string name="settings_category_order_supporting"></string>
+    <!-- Reference (en): Drag categories up or down to reorder them, or toggle switches to show or hide them on the contacts screen. -->
+    <string name="settings_category_order_instructions"></string>
+    <!-- Reference (en): Reset -->
+    <string name="settings_category_order_reset"></string>
+    <!-- Reference (en): Drag to reorder %1$s -->
+    <string name="settings_category_order_drag_handle"></string>
+    <!-- Reference (en): Show or hide %1$s -->
+    <string name="settings_category_order_toggle_visibility"></string>
+    <!-- Reference (en): Favorites -->
+    <string name="settings_layout_favorites_header"></string>
+    <!-- Reference (en): Separate layout for Favorites -->
+    <string name="settings_layout_favorites_separate_title"></string>
+    <!-- Reference (en): Choose a different density and compact options for Favorites -->
+    <string name="settings_layout_favorites_separate_supporting"></string>
 </resources>

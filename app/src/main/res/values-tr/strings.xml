@@ -1960,4 +1960,47 @@
     <string name="mock_reply_1_you_singular">Selam! Seni çevrim içi görmek harika 👋</string>
     <string name="mock_reply_2">Bence de — tıpkı eski Messenger günleri gibi.</string>
     <string name="mock_reply_3">Anlaşıldı! Bu temsili yanıt MSNP olay akışı üzerinden ulaştı.</string>
+
+    <!-- Contact categories and favorites -->
+    <string name="contacts_section_favorites">Favoriler</string>
+    <string name="contacts_favorites_empty">Henüz favori yok.</string>
+    <string name="contacts_favorites_empty_search_you_singular">Aramanızla eşleşen favori yok.</string>
+    <string name="contacts_favorites_empty_online">Çevrim içi favori yok.</string>
+    <string name="contacts_category_empty">Bu kategoride henüz kişi yok.</string>
+    <string name="contacts_category_empty_search_you_singular">Bu kategoride aramanızla eşleşen kişi yok.</string>
+    <string name="contacts_category_empty_online">Bu kategoride çevrim içi kişi yok.</string>
+    <string name="contacts_action_create_category">Kategori oluştur</string>
+    <string name="contact_add_to_favorites">Favorilere ekle</string>
+    <string name="contact_remove_from_favorites">Favorilerden çıkar</string>
+    <string name="contact_manage_categories">Kategoriler</string>
+    <string name="contact_categories_dialog_title">%1$s için kategoriler</string>
+    <string name="contact_categories_updated">Kategoriler güncellendi.</string>
+    <string name="contact_favorites_added">Favorilere eklendi.</string>
+    <string name="contact_favorites_removed">Favorilerden çıkarıldı.</string>
+    <string name="contact_categories_update_failed">Kategoriler güncellenemedi. Tekrar deneyin.</string>
+    <string name="category_options_description">Kategori seçenekleri</string>
+    <string name="category_create_title">Kategori oluştur</string>
+    <string name="category_edit_title">Kategoriyi düzenle</string>
+    <string name="category_edit_action">Kategoriyi düzenle</string>
+    <string name="category_delete_action">Kategoriyi sil</string>
+    <string name="category_name_label">Kategori adı</string>
+    <string name="category_members_header">Üyeler (isteğe bağlı)</string>
+    <string name="category_members_empty">Eklenecek kişi veya grup yok.</string>
+    <string name="category_create_action">Oluştur</string>
+    <string name="category_created">Kategori oluşturuldu.</string>
+    <string name="category_updated">Kategori güncellendi.</string>
+    <string name="category_deleted">Kategori silindi.</string>
+    <string name="category_delete_dialog_title">Kategori silinsin mi?</string>
+    <string name="category_delete_dialog_message">“%1$s” silinsin mi? Bu kategorideki kişiler silinmez ve başka bir kategoride değillerse Diğer Kişiler bölümüne taşınır.</string>
+    <string name="category_save_failed">Kategori kaydedilemedi. Tekrar deneyin.</string>
+    <string name="category_delete_failed">Kategori silinemedi. Tekrar deneyin.</string>
+    <string name="settings_category_order_title">Kategori sırası</string>
+    <string name="settings_category_order_supporting">Kişiler ekranındaki kategorileri sıralayın veya gizleyin</string>
+    <string name="settings_category_order_instructions">Sırayı değiştirmek için kategorileri yukarı veya aşağı sürükleyin, göstermek ya da gizlemek için anahtarları kullanın.</string>
+    <string name="settings_category_order_reset">Sıfırla</string>
+    <string name="settings_category_order_drag_handle">%1$s sırasını değiştirmek için sürükleyin</string>
+    <string name="settings_category_order_toggle_visibility">%1$s kategorisini göster veya gizle</string>
+    <string name="settings_layout_favorites_header">Favoriler</string>
+    <string name="settings_layout_favorites_separate_title">Favoriler için ayrı düzen</string>
+    <string name="settings_layout_favorites_separate_supporting">Favoriler için farklı bir boyut ve kompakt seçenekler belirleyin</string>
 </resources>

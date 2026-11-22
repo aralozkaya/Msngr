@@ -81,6 +81,7 @@ class MsngrApplication : Application() {
                         contactDisplayPictureCache = FileContactDisplayPictureCache(
                             File(filesDir, "contact_display_pictures"),
                         ),
+                        categoryMembershipOverlayStore = CategoryPrefs.overlayStore(this),
                         useRoamingProfile = { account ->
                             DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(this, account)
                         },

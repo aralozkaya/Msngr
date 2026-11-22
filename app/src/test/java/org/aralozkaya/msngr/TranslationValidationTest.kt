@@ -230,7 +230,9 @@ class TranslationValidationTest {
                 declared += node.getAttribute("android:name")
             }
         }
-        assertEquals(setOf("en", "tr"), declared)
+        assertEquals(setOf("en", "en-GB", "tr"), declared)
+        val (enGbMap, _) = parseStringsXml(File(mainDir, "res/values-en-rGB/strings.xml"))
+        assertEquals("Favourites", enGbMap["contacts_section_favorites"])
     }
 
     @Test fun singularPluralAndYouConventionsAreEnforced() {
