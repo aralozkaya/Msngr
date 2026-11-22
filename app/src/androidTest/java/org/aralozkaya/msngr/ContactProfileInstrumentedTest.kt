@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -45,6 +47,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class ContactProfileInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 

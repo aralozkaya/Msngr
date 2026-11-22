@@ -16,7 +16,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 import kotlin.math.abs
 
 class MsnInkCodecTest {
@@ -240,7 +239,7 @@ class MsnInkCodecTest {
 
     @Test
     fun conversationHistoryStorePersistsAndRestoresInkMessages() {
-        val directory = Files.createTempDirectory("msngr-ink-history").toFile()
+        val directory = createTestTempDir("msngr-ink-history")
         try {
             val drawing = requireNotNull(
                 MsnInkCodec.decodeIsf(requireNotNull(MsnBase64.decode(CAPTURED_MSG1_3STROKES_ISF))),

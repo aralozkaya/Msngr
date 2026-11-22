@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
@@ -43,6 +45,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class ContactInvitationSettingsInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private lateinit var context: Context

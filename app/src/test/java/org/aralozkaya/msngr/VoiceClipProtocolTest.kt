@@ -21,7 +21,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.file.Files
 
 class VoiceClipProtocolTest {
     private fun wave() = javaClass.getResourceAsStream("/voice-clips/native-siren.wav")!!.use { it.readBytes() }
@@ -107,7 +106,7 @@ class VoiceClipProtocolTest {
     }
 
     @Test fun keepsVoiceHistoryAndTurnsInterruptedDownloadsIntoAnError() {
-        val directory = Files.createTempDirectory("msngr-voice-history").toFile()
+        val directory = createTestTempDir("msngr-voice-history")
         try {
             val store = FileConversationHistoryStore(directory)
             store.selectAccount("account@example.test")

@@ -167,7 +167,7 @@ class UpdateInstrumentedTest {
         val notifications = context.getSystemService(NotificationManager::class.java)
         val manager = UpdateManager(context, supported = true, installedCode = 1,
             releaseSource = { listOf(checkNotNull(parseGitHubRelease(fixture()))) })
-        fun activeUpdate() = notifications.activeNotifications.firstOrNull { it.notification.channelId == NotificationChannels.APP_UPDATES }
+        fun activeUpdate() = notifications.activeNotifications.firstOrNull { androidx.core.app.NotificationCompat.getChannelId(it.notification) == NotificationChannels.APP_UPDATES }
         try {
             manager.dismissNotification()
             manager.configure(UpdatePreferences(includePrereleases = true))

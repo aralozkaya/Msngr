@@ -60,9 +60,9 @@ class GroupInvitationNotificationInstrumentedTest {
             val contactId = MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID
             withTimeout(3000) { while (!manager.activeNotifications.map { it.id }.containsAll(listOf(notificationId, contactId))) delay(20) }
             val notification = manager.activeNotifications.first { it.id == notificationId }.notification
-            assertEquals(NotificationChannels.GROUP_INVITATIONS, notification.channelId)
+            assertEquals(NotificationChannels.GROUP_INVITATIONS, androidx.core.app.NotificationCompat.getChannelId(notification))
             assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
-            assertEquals(NotificationChannels.CONTACT_REQUESTS, manager.activeNotifications.first { it.id == contactId }.notification.channelId)
+            assertEquals(NotificationChannels.CONTACT_REQUESTS, androidx.core.app.NotificationCompat.getChannelId(manager.activeNotifications.first { it.id == contactId }.notification))
             invitations.value = invitations.value + GroupInvitation("00000000-0000-0000-0009-123456789abd@live.com", "Online invitation")
             withTimeout(3000) { while (manager.activeNotifications.firstOrNull { it.id == notificationId }?.notification?.number != 2) delay(20) }
             assertEquals(1, manager.activeNotifications.count { it.id == notificationId })

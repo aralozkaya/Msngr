@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class MsnpSwitchboardTest {
     @Test fun nativeOfferResolvesAnOwnSessionBridgeAndSurvivesClosingItBeforeAcceptance() = runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("msngr-incoming-file").toFile()
+        val directory = createTestTempDir("msngr-incoming-file")
         val events = CopyOnWriteArrayList<SwitchboardEvent>()
         val peers = java.util.concurrent.ConcurrentHashMap<String, MsnpP2pSession>()
         val endpoint = "11111111-1111-1111-1111-111111111111"
@@ -67,7 +67,7 @@ class MsnpSwitchboardTest {
         } finally { b.closeFileTransfers(); a.close(); b.close(); remote.closeFileTransfers(); directory.deleteRecursively() }
     }
     @Test fun fileAcceptanceOnAnotherSwitchboardUsesTheOriginalTransferAndStreamsWithoutBlockingAcks() = runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("msngr-migrated-file").toFile()
+        val directory = createTestTempDir("msngr-migrated-file")
         val events = CopyOnWriteArrayList<SwitchboardEvent>()
         val remoteEvents = CopyOnWriteArrayList<org.aralozkaya.msngr.data.FileTransfer>()
         val peers = java.util.concurrent.ConcurrentHashMap<String, MsnpP2pSession>()

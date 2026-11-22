@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.notifications
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
@@ -57,6 +59,7 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.ui.test.ExperimentalTestApi::class,
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class InAppNotificationUiInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val haptics = mutableListOf<HapticFeedbackType>()

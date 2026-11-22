@@ -70,7 +70,7 @@ class ContactSignedInNotificationInstrumentedTest {
 
                     withTimeout(3000) {
                         while (manager.activeNotifications.any {
-                            it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
+                            androidx.core.app.NotificationCompat.getChannelId(it.notification) == NotificationChannels.CONTACT_SIGNED_IN
                         }) delay(50)
                     }
                     assertTrue(manager.activeNotifications.map { it.id }.containsAll(retainedIds))
@@ -123,7 +123,7 @@ class ContactSignedInNotificationInstrumentedTest {
             }
 
             val signedInNotifications = manager.activeNotifications.filter {
-                it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
+                androidx.core.app.NotificationCompat.getChannelId(it.notification) == NotificationChannels.CONTACT_SIGNED_IN
             }
             val expectedIds = Presence.entries.filter { it != Presence.Offline }.map {
                 MsngrNotificationManager.notificationId(

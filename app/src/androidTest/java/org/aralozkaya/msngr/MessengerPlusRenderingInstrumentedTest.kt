@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
@@ -33,6 +35,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class MessengerPlusRenderingInstrumentedTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()

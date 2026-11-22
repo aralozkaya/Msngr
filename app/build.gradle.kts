@@ -392,6 +392,22 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
     }
 }
 
+abstract class SyncSharedTestSourcesTask : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val inputDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun sync() {
+        val out = outputDir.get().asFile
+        if (out.exists()) out.deleteRecursively()
+        inputDir.get().asFile.copyRecursively(out, overwrite = true)
+    }
+}
+
 androidComponents {
     onVariants { variant ->
         val capName = variant.name.replaceFirstChar { it.uppercase() }
@@ -411,6 +427,17 @@ androidComponents {
             aliasTask,
             GenerateLocaleAliasResourcesTask::outputDir,
         )
+        variant.androidTest?.let { androidTest ->
+            val syncSharedTestTask = tasks.register<SyncSharedTestSourcesTask>(
+                "sync${capName}SharedAndroidTestSources",
+            ) {
+                inputDir.set(layout.projectDirectory.dir("src/sharedTest/java"))
+            }
+            androidTest.sources.kotlin?.addGeneratedSourceDirectory(
+                syncSharedTestTask,
+                SyncSharedTestSourcesTask::outputDir,
+            )
+        }
     }
 }
 
@@ -573,7 +600,6 @@ android {
     }
     sourceSets {
         getByName("test").kotlin.directories.add("src/sharedTest/java")
-        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
     }
     lint {
         checkGeneratedSources = true

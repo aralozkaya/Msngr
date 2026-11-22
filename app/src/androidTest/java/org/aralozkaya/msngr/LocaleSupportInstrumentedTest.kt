@@ -57,7 +57,9 @@ class LocaleSupportInstrumentedTest {
         assertTrue("Expected 'en' in LocaleConfig ($tags)", "en" in tags)
         assertTrue("Expected 'tr' in LocaleConfig ($tags)", "tr" in tags)
         assertEquals(setOf("en", "tr"), tags)
-        assertEquals("en", localeConfig.defaultLocale?.toLanguageTag())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            assertEquals("en", localeConfig.defaultLocale?.toLanguageTag())
+        }
     }
 
     @Test fun regionalLocalesLanguageDefaultAndUnsupportedFallbackResolveCorrectly() {

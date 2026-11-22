@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.notifications
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
@@ -41,6 +43,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class InAppNotificationHostInstrumentedTest {
     @get:Rule val compose = createEmptyComposeRule()
 

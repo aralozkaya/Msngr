@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.widget.EditText
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TopAppBarDefaults
@@ -37,6 +39,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class ContactsSectionsInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val contacts = listOf(

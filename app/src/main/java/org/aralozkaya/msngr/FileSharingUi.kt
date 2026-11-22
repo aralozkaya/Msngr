@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.rounded.DashboardCustomize
@@ -125,7 +125,7 @@ internal fun SharingMenu(
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.chat_share_menu_files_plural)) },
-                    leadingIcon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null) },
                     shape = MenuDefaults.middleItemShape,
                     enabled = enabled && filesEnabled,
                     modifier = Modifier.testTag("sharing_menu_files"),
@@ -272,7 +272,7 @@ private fun FileTransferThumbnail(transfer: FileTransfer) {
         Box(contentAlignment = Alignment.Center) {
             if (imageFile && bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = null,
                 modifier = Modifier.fillMaxSize().testTag("file_thumbnail_${transfer.id}"), contentScale = ContentScale.Fit)
-            else Icon(Icons.Default.InsertDriveFile, contentDescription = stringResource(R.string.file_sharing_file_icon_desc_singular),
+            else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = stringResource(R.string.file_sharing_file_icon_desc_singular),
                 modifier = Modifier.size(32.dp).testTag("file_icon_${transfer.id}"))
         }
     }

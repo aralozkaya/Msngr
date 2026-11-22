@@ -3409,7 +3409,7 @@ internal class LiveMsnp18Client(
                         if (event.share.outgoing) "Photo sharing invitation sent." else "Photo sharing invitation received.", System.currentTimeMillis())
                     appendMessage(message)
                     if (!event.share.outgoing) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id)) }
-                } else if (previous?.status != merged.status && merged.status in listOf(PhotoShareStatus.Stopped, PhotoShareStatus.Declined, PhotoShareStatus.Failed)) {
+                } else if (previous.status != merged.status && merged.status in listOf(PhotoShareStatus.Stopped, PhotoShareStatus.Declined, PhotoShareStatus.Failed)) {
                     val text = when (merged.status) {
                         PhotoShareStatus.Stopped -> if (merged.remoteStopped) "The other person stopped sharing photos." else "You stopped sharing photos."
                         PhotoShareStatus.Declined -> "Photo sharing invitation declined."

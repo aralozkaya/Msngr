@@ -63,6 +63,7 @@ class NativeTextRenderingInstrumentedTest {
         var upright: Bitmap? = null
         for (option in NativeFontStyle.entries) {
             compose.runOnIdle { style.value = NativeTextStyle().withFontStyle(option) }
+            lateinit var rendered: Bitmap
             onView(withContentDescription("Message input")).check { view, error ->
                 if (error != null) throw error
                 val editor = view as android.widget.EditText
@@ -70,9 +71,10 @@ class NativeTextRenderingInstrumentedTest {
                 editor.text.getSpans(0, 1, CharacterStyle::class.java).forEach { it.updateDrawState(paint) }
                 val bitmap = Bitmap.createBitmap(1200, 160, Bitmap.Config.ARGB_8888)
                 Canvas(bitmap).drawText(editor.text.toString(), 20f, 100f, paint)
-                if (option.italic) assertFalse("${option.label} renders upright", bitmap.sameAs(upright))
-                else upright = bitmap
+                rendered = bitmap
             }
+            if (option.italic) assertFalse("${option.label} renders upright", rendered.sameAs(upright))
+            else upright = rendered
         }
     }
 

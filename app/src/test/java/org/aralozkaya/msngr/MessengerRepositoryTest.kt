@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package org.aralozkaya.msngr
 
 import kotlinx.coroutines.CoroutineScope

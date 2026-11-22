@@ -45,8 +45,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class InAppNotificationInstrumentedTest {
     private fun hasEventNotifications(manager: NotificationManager): Boolean = manager.activeNotifications.any {
-        it.notification.channelId in NotificationChannels.userConfigurable &&
-            it.notification.channelId != NotificationChannels.APP_UPDATES
+        androidx.core.app.NotificationCompat.getChannelId(it.notification) in NotificationChannels.userConfigurable &&
+            androidx.core.app.NotificationCompat.getChannelId(it.notification) != NotificationChannels.APP_UPDATES
     }
 
     private fun isolatedContext(): Context {
@@ -234,7 +234,7 @@ class InAppNotificationInstrumentedTest {
             val id = MsngrNotificationManager.notificationId(event.type, peer)
             withTimeout(3000) { while (manager.activeNotifications.none { it.id == id }) delay(30) }
             assertEquals(android.app.Notification.GROUP_ALERT_SUMMARY,
-                manager.activeNotifications.first { it.id == id }.notification.groupAlertBehavior)
+                androidx.core.app.NotificationCompat.getGroupAlertBehavior(manager.activeNotifications.first { it.id == id }.notification))
             InAppNotificationPrefs.reset(context, peer)
             assertTrue(InAppNotificationPrefs.read(context).conversations.isEmpty())
         } finally {

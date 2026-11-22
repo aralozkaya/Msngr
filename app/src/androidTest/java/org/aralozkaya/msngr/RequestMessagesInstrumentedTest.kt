@@ -2,6 +2,8 @@
 
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class RequestMessagesInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val owner = "owner@example.test"
