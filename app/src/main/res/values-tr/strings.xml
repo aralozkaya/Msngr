@@ -606,6 +606,21 @@
     <string name="settings_emotion_sounds_auto_supporting">Konuşma açıkken yeni duygu seslerini çal.</string>
     <string name="settings_theme_header">Tema</string>
     <string name="settings_color_scheme_header">Renk düzeni</string>
+    <string name="settings_layout_header">Düzen</string>
+    <string name="settings_destination_layout">Düzen</string>
+    <string name="ui_density_minimal">En küçük</string>
+    <string name="ui_density_small">Küçük</string>
+    <string name="ui_density_medium">Orta</string>
+    <string name="ui_density_regular">Normal</string>
+    <string name="settings_layout_preview_header">Önizleme</string>
+    <string name="settings_layout_size_header">Kişi listesi boyutu</string>
+    <string name="settings_layout_compact_options_header">Kompakt seçenekler</string>
+    <string name="settings_layout_inline_status_title">Durum iletisini adın yanında göster</string>
+    <string name="settings_layout_inline_status_supporting">İkinci satırı kaldırır ve durum iletisini kişi adının yanına ekler.</string>
+    <string name="settings_layout_hide_presence_text_title">Durum metnini gizle</string>
+    <string name="settings_layout_hide_presence_text_supporting">Kompakt modda Çevrimiçi, Meşgul, Dışarıda ve Çevrimdışı etiketlerini gizler.</string>
+    <string name="layout_preview_status_long">Tüm öğleden sonra yeni sürüm üzerinde çalışıyorum</string>
+    <string name="layout_preview_status_short">Toplantıda</string>
     <string name="settings_home_header">Ana Sayfa</string>
     <string name="settings_convert_shortcuts_title">Yazılan kısayolları dönüştür</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->

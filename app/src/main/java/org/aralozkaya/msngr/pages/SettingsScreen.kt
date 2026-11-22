@@ -79,6 +79,7 @@ enum class SettingsDestination(
 ) {
     Root(R.string.settings_destination_root),
     Appearance(R.string.settings_destination_appearance),
+    Layout(R.string.settings_destination_layout),
     Emoticons(R.string.settings_destination_emoticons),
     MessengerPlus(R.string.settings_destination_messenger_plus),
     ContactInvitations(R.string.settings_destination_contact_invitations),
@@ -565,6 +566,7 @@ fun MessengerPlusSettingsScreen(
 fun AppearanceSettingsScreen(
     innerPadding: PaddingValues,
     scrollBehavior: TopAppBarScrollBehavior,
+    onLayoutClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val savedAppearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
@@ -603,6 +605,17 @@ fun AppearanceSettingsScreen(
                     AppearanceColorOption(mode, index, colorModes.size, appearance)
                 }
             }
+        }
+        settingsSectionSpacer()
+        settingsSectionHeader(R.string.settings_layout_header)
+        item(key = "layout-destination") {
+            SegmentedListItem(
+                onClick = onLayoutClick,
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                modifier = Modifier.settingsRow().testTag("layout_settings"),
+                supportingContent = { Text(appearance.uiDensity.displayLabel()) },
+                content = { Text(stringResource(R.string.settings_destination_layout)) },
+            )
         }
         settingsSectionSpacer()
         settingsSectionHeader(R.string.settings_home_header)

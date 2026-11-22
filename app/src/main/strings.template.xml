@@ -1119,6 +1119,36 @@
     <string name="settings_theme_header"></string>
     <!-- Reference (en): Color scheme -->
     <string name="settings_color_scheme_header"></string>
+    <!-- Reference (en): Layout -->
+    <string name="settings_layout_header"></string>
+    <!-- Reference (en): Layout -->
+    <string name="settings_destination_layout"></string>
+    <!-- Reference (en): Minimal -->
+    <string name="ui_density_minimal"></string>
+    <!-- Reference (en): Small -->
+    <string name="ui_density_small"></string>
+    <!-- Reference (en): Medium -->
+    <string name="ui_density_medium"></string>
+    <!-- Reference (en): Regular -->
+    <string name="ui_density_regular"></string>
+    <!-- Reference (en): Preview -->
+    <string name="settings_layout_preview_header"></string>
+    <!-- Reference (en): Contact list size -->
+    <string name="settings_layout_size_header"></string>
+    <!-- Reference (en): Compact options -->
+    <string name="settings_layout_compact_options_header"></string>
+    <!-- Reference (en): Show status message next to name -->
+    <string name="settings_layout_inline_status_title"></string>
+    <!-- Reference (en): Remove the second line and append the status message next to the contact name. -->
+    <string name="settings_layout_inline_status_supporting"></string>
+    <!-- Reference (en): Hide status text -->
+    <string name="settings_layout_hide_presence_text_title"></string>
+    <!-- Reference (en): Hide Available, Busy, Away, and Offline labels in compact mode. -->
+    <string name="settings_layout_hide_presence_text_supporting"></string>
+    <!-- Reference (en): Working on the new release all afternoon -->
+    <string name="layout_preview_status_long"></string>
+    <!-- Reference (en): In a meeting -->
+    <string name="layout_preview_status_short"></string>
     <!-- Reference (en): Home -->
     <string name="settings_home_header"></string>
     <!-- Reference (en): Convert typed shortcuts -->
