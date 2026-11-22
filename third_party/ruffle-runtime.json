@@ -1,15 +1,13 @@
 {
-  "version": "0.7.1",
-  "sourceCommit": "89a7049965f3090e706265670df309a5128233ac",
-  "sourceBuild": "b34cd4df6434411cd34ee0a2344894d5ed6b05210d8f0a647f218d13d7183c4b",
-  "dependencyInventory": "7fcb34a2d6f52f6b5ffe0f97b36c97550f840cd8197f98ea7cca33e7a72fbcee",
+  "version": "0.8.0",
+  "sourceCommit": "cd4cb8f45f144d5a9209f496ee09b60ad136b5b3",
+  "sourceBuild": "0b5474c333396aaf78215e0511e9f68e8d845b1ce5620848005570c0d26db8d0",
+  "dependencyInventory": "18710f5f63920293478f6399e1c8ac9acaa233c7a0329c2dfca5c6f0cbfc5b0d",
   "files": {
-    "219ee882cd61bfc5b208.wasm": "3d713d04946dbaab5d6494863a594ea696229e66f05d70c3d69d46abe7f01017",
     "LICENSE_APACHE": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
     "LICENSE_MIT": "4de9338a7879c68e911742a7d691f0797ff1ef8d8a6fb978b0c711e258fe959c",
-    "b4398e596314a5371e8b.wasm": "66256dc11a5bdacd8292e361e4a05d4790a9fff28aae24716f9fbe16253844fc",
-    "core.ruffle.a84bd9c06d389af76eea.js": "e8bfc31419a51266da4886f141781fa0f7e9081b89778854f60bdef721422bb4",
-    "core.ruffle.d641d5eb723ec084ca79.js": "d8bfd5900587833b5ba55edc9a6f6179433e0c968944731c937cbc2a0f02758a",
-    "ruffle.js": "14e0f6f89cdc80572778244fcf4df4bb58fb8442c59f237b74bc1cca67ca72be"
+    "ruffle.js": "36f5ef8e23e5fe8906c6f74c6e946337feda71c225c2e40ae1c7cdef5f6d4c48",
+    "ruffle_web-wasm_mvp_bg.I7ZNYU3O.wasm": "a0c0e74aaaf028a690e93537c017efe52386edd818a095c1e8967811fa98a44c",
+    "ruffle_web_bg.O7YVBUFW.wasm": "42dd05740fa77baf2c07d364d736fb3a31da189781fb557b9a45350011b5c5cd"
   }
 }
