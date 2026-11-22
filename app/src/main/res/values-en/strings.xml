@@ -610,6 +610,11 @@
     <string name="settings_convert_shortcuts_title">Convert typed shortcuts</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="settings_convert_shortcuts_supporting_you_singular">Show keyboard shortcuts such as :D as emoticons while you type. Incoming messages always use glyphs.</string>
+    <string name="settings_emoticon_style_header">Emoticon style</string>
+    <string name="settings_emoticon_behavior_header">Behavior</string>
+    <string name="settings_emoticon_style_wlm_2009_title">WLM 8.1 - 2009</string>
+    <string name="settings_emoticon_style_wlm_2012_title">WLM 2011 - 2012</string>
+    <string name="settings_emoticon_style_android_title">Android emoji</string>
     <string name="settings_original_emoticons_title">Use original Messenger emoticons</string>
     <string name="settings_original_emoticons_supporting">Show the classic MSN artwork instead of modern Unicode emoji.</string>
     <string name="settings_play_winks_auto_title">Play winks automatically</string>

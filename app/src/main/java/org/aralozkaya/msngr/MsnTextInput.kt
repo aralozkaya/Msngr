@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import java.util.Locale
 
 internal const val EMOTICON_ASSETS_DIR = "emoticons"
+internal const val EMOTICON_2012_ASSETS_DIR = "emoticons_2012"
 
 internal fun formatMsnShortcutDisplay(shortcut: String): String =
     if (shortcut.startsWith("(") && shortcut.endsWith(")") && shortcut.length > 3) {
@@ -34,11 +35,15 @@ internal data class MsnEmoticonShortcut(
         get() = if (alternateShortcuts.isEmpty()) listOf(shortcut) else listOf(shortcut) + alternateShortcuts
 
     /**
-     * Asset candidates for the emoticon selector sheet: always the static SVG version
-     * (`*-static.svg` for animated emoticons, `*.svg` for static emoticons).
+     * Asset candidates for the emoticon selector sheet: always the static version
+     * (`*-static.svg` / `*.svg` for WLM 2009; `*-static.png` / `*.png` for WLM 2012,
+     * falling back to WLM 2009 for emoticons removed in 2012 such as cigarette).
      */
     val selectorAssetCandidates: List<String>
-        get() = if (animated) {
+        get() = selectorAssetCandidates(EmoticonStyle.Wlm2009)
+
+    fun selectorAssetCandidates(style: EmoticonStyle): List<String> {
+        val wlm2009 = if (animated) {
             listOf(
                 "$EMOTICON_ASSETS_DIR/$originalAsset-static.svg",
                 "$EMOTICON_ASSETS_DIR/$originalAsset.svg",
@@ -46,14 +51,27 @@ internal data class MsnEmoticonShortcut(
         } else {
             listOf("$EMOTICON_ASSETS_DIR/$originalAsset.svg")
         }
+        return when (style) {
+            EmoticonStyle.Wlm2012 -> listOf(
+                "$EMOTICON_2012_ASSETS_DIR/$originalAsset-static.png",
+                "$EMOTICON_2012_ASSETS_DIR/$originalAsset.png",
+            ) + wlm2009
+            EmoticonStyle.Wlm2009, EmoticonStyle.AndroidEmoji -> wlm2009
+        }
+    }
 
     /**
      * Asset candidates for rendered messages and editors:
-     * - Animated emoticons use APNG (`.png`), falling back to `.gif` and static `.svg`.
-     * - Static emoticons use `.svg`, falling back to `.png` and `.gif` for future-proofing.
+     * - For WLM 2009: animated emoticons use APNG (`.png`), falling back to `.gif` and static `.svg`;
+     *   static emoticons use `.svg`, falling back to `.png` and `.gif`.
+     * - For WLM 2012: tries `emoticons_2012/<asset>.png` (which is APNG for animated 2012 emoticons
+     *   and static PNG for non-animated ones), falling back to `*-static.png` and then WLM 2009.
      */
     val artworkAssetCandidates: List<String>
-        get() = if (animated) {
+        get() = artworkAssetCandidates(EmoticonStyle.Wlm2009)
+
+    fun artworkAssetCandidates(style: EmoticonStyle): List<String> {
+        val wlm2009 = if (animated) {
             listOf(
                 "$EMOTICON_ASSETS_DIR/$originalAsset.png",
                 "$EMOTICON_ASSETS_DIR/$originalAsset.gif",
@@ -67,6 +85,14 @@ internal data class MsnEmoticonShortcut(
                 "$EMOTICON_ASSETS_DIR/$originalAsset.gif",
             )
         }
+        return when (style) {
+            EmoticonStyle.Wlm2012 -> listOf(
+                "$EMOTICON_2012_ASSETS_DIR/$originalAsset.png",
+                "$EMOTICON_2012_ASSETS_DIR/$originalAsset-static.png",
+            ) + wlm2009
+            EmoticonStyle.Wlm2009, EmoticonStyle.AndroidEmoji -> wlm2009
+        }
+    }
 }
 
 data class MsnEmoticonRange(

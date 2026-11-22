@@ -414,6 +414,72 @@ class MsnTextInputTest {
     fun emoticonSettingsDefaultToBothBehaviorsEnabled() {
         val settings = EmoticonSettings()
         assertTrue(settings.convertTypedShortcuts)
+        assertEquals(EmoticonStyle.Wlm2009, settings.style)
         assertTrue(settings.useOriginalEmoticons)
+        EmoticonStyle.entries.forEach { style ->
+            assertEquals(style, EmoticonStyle.fromStorage(style.storageValue))
+        }
+    }
+
+    @Test
+    fun allBundledWlm2012EmoticonAssetsDecodeTo19x19EmoticonGrid() {
+        val assetsRoot = sequenceOf(
+            File("src/main/assets"),
+            File("app/src/main/assets"),
+        ).firstOrNull(File::isDirectory)
+        assertNotNull("Could not locate src/main/assets directory", assetsRoot)
+        val dir2012 = File(assetsRoot!!, EMOTICON_2012_ASSETS_DIR)
+        assertTrue("Missing $EMOTICON_2012_ASSETS_DIR directory", dir2012.isDirectory)
+
+        val pngFiles = dir2012.listFiles { file -> file.isFile && file.extension == "png" }?.sortedBy(File::getName).orEmpty()
+        assertEquals("Expected all 127 WLM 2012 emoticon PNG/APNG files (103 static + 24 animated)", 127, pngFiles.size)
+
+        var animatedCount = 0
+        var staticCount = 0
+        pngFiles.forEach { file ->
+            val bytes = file.readBytes()
+            val apng = ApngCodec.parse(bytes)
+            if (apng != null) {
+                animatedCount++
+                assertFalse("Static asset should not be animated: ${file.name}", file.name.endsWith("-static.png"))
+                val composited = ApngCodec.composite(apng) { frame ->
+                    val image = ImageIO.read(ByteArrayInputStream(frame.png))
+                    image.getRGB(0, 0, frame.width, frame.height, null, 0, frame.width)
+                }
+                assertEquals(MSN_EMOTICON_GRID_PX, composited.width)
+                assertEquals(MSN_EMOTICON_GRID_PX, composited.height)
+                assertTrue("Expected multiple frames in ${file.name}", composited.frames.size > 1)
+                assertTrue(
+                    "Expected positive frame delays in ${file.name}",
+                    composited.delaysMillis.all { it > 0 },
+                )
+            } else {
+                staticCount++
+                val image = ImageIO.read(ByteArrayInputStream(bytes))
+                assertNotNull("Unable to decode static PNG ${file.name}", image)
+                assertEquals(MSN_EMOTICON_GRID_PX, image.width)
+                assertEquals(MSN_EMOTICON_GRID_PX, image.height)
+                val pixels = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+                assertTrue("Expected non-transparent pixels in ${file.name}", pixels.any { (it ushr 24) != 0 })
+            }
+        }
+        assertEquals(24, animatedCount)
+        assertEquals(103, staticCount)
+
+        MSN_EMOTICON_SHORTCUTS.forEach { emoticon ->
+            val selectorResolved = emoticon.selectorAssetCandidates(EmoticonStyle.Wlm2012)
+                .firstOrNull { File(assetsRoot, it).isFile }
+            val artworkResolved = emoticon.artworkAssetCandidates(EmoticonStyle.Wlm2012)
+                .firstOrNull { File(assetsRoot, it).isFile }
+            assertNotNull("No WLM 2012 selector asset for ${emoticon.name}", selectorResolved)
+            assertNotNull("No WLM 2012 artwork asset for ${emoticon.name}", artworkResolved)
+            if (emoticon.originalAsset == "unused-cigarette") {
+                assertTrue(selectorResolved!!.startsWith("$EMOTICON_ASSETS_DIR/"))
+                assertTrue(artworkResolved!!.startsWith("$EMOTICON_ASSETS_DIR/"))
+            } else {
+                assertTrue("Expected 2012 selector asset for ${emoticon.name}, got $selectorResolved", selectorResolved!!.startsWith("$EMOTICON_2012_ASSETS_DIR/"))
+                assertTrue("Expected 2012 artwork asset for ${emoticon.name}, got $artworkResolved", artworkResolved!!.startsWith("$EMOTICON_2012_ASSETS_DIR/"))
+            }
+        }
     }
 }

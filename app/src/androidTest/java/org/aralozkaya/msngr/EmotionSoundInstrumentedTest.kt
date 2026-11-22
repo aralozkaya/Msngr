@@ -90,7 +90,7 @@ class EmotionSoundInstrumentedTest {
         MessengerPlusPrefs.setPlayEmotionSounds(context, false)
         val message = ChatMessage(22, "peer", MessageAuthor.Contact, "\u0004#[b][c=#FF6600]Styled sound[/c][/b]", 15,
             nativeStyle = NativeTextStyle(italic = true, underline = true))
-        compose.setContent { MaterialTheme { MessageBubble(message, true) } }
+        compose.setContent { MaterialTheme { MessageBubble(message, EmoticonStyle.Wlm2009) } }
         compose.onNodeWithText("Styled sound").assertIsDisplayed()
         compose.onNodeWithTag("emotion_sound_message_22").performClick()
         compose.onNodeWithTag("emotion_sound_message_sheet").assertIsDisplayed()
