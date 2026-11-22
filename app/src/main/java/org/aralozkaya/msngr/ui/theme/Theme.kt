@@ -29,6 +29,7 @@ import org.aralozkaya.msngr.AppearancePrefs
 import org.aralozkaya.msngr.ColorMode
 import org.aralozkaya.msngr.LocalMessengerPlusEnabled
 import org.aralozkaya.msngr.LocalMessengerPlusHideControlCharacters
+import org.aralozkaya.msngr.LocalFavoritesLayoutSettings
 import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.LocalMessengerScene
 import org.aralozkaya.msngr.LocalScenePresentation
@@ -180,6 +181,7 @@ fun MsngrTheme(
         LocalMessengerPlusEnabled provides messengerPlusSettings.enabled,
         LocalMessengerPlusHideControlCharacters provides messengerPlusSettings.shouldHideControlCharacters,
         LocalLayoutSettings provides appearance.layoutSettings,
+        LocalFavoritesLayoutSettings provides appearance.favoritesLayoutSettings,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,

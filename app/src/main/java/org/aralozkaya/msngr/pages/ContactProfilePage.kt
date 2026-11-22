@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
@@ -62,6 +63,10 @@ import org.aralozkaya.msngr.MsnEmoticonText
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.ContactCategory
+import org.aralozkaya.msngr.data.FAVORITES_CATEGORY_ID
+import org.aralozkaya.msngr.data.OTHER_CONTACTS_CATEGORY_ID
+import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
@@ -83,6 +88,8 @@ fun ContactProfilePage(
     onDeleteContact: (suspend (Contact, Boolean) -> Result<Unit>)? = null,
     onContactDeleted: () -> Unit = {},
     onAddContact: ((Contact) -> Unit)? = null,
+    categories: List<ContactCategory> = emptyList(),
+    onManageCategories: ((Contact) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -180,11 +187,48 @@ fun ContactProfilePage(
                                 Text(media.displayText, style = MaterialTheme.typography.bodyLarge)
                             }
                         }
+                        if (contact.isForwardListContact && !contact.isBlocked && !contact.isGroup) {
+                            val favoritesLabel = stringResource(R.string.contacts_section_favorites)
+                            val otherLabel = stringResource(R.string.contacts_section_other)
+                            val customNames = categories.filterNot(ContactCategory::isBuiltIn)
+                                .associate { it.id to it.name }
+                            val assignedNames = buildList {
+                                if (contact.isFavorite) add(favoritesLabel)
+                                val customAssigned = contact.categoryIds.mapNotNull { customNames[it] }
+                                addAll(customAssigned)
+                                if (customAssigned.isEmpty()) {
+                                    add(otherLabel)
+                                }
+                            }
+                            ProfileDetailCard(
+                                icon = Icons.Outlined.Folder,
+                                label = stringResource(R.string.contact_manage_categories),
+                                modifier = Modifier.testTag("contact-profile-categories"),
+                            ) {
+                                Text(assignedNames.joinToString(", "), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
                     }
                 }
             }
         }
         if (contact != null) {
+            if (onManageCategories != null && contact.isForwardListContact && !contact.isBlocked && !contact.isGroup) {
+                item {
+                    FilledTonalButton(
+                        onClick = { onManageCategories(contact) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .testTag("contact_manage_categories"),
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.contact_manage_categories))
+                    }
+                }
+            }
             item {
                 FilledTonalButton(onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
                     context, contact.id, contact.displayName.messengerPlusPlainText(), false)) },

@@ -4,6 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,11 +19,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
+import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.data.resolveContact
 import org.aralozkaya.msngr.pages.GroupDetailsPage
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
+import org.aralozkaya.msngr.pages.components.ContactCategoriesDialog
 import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
 import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
@@ -38,11 +49,13 @@ class GroupDetailsActivity : MsngrActivity() {
         val repository = appContainer.messengerRepository
         setContent {
             val contacts by repository.contacts.collectAsState()
+            val categories by repository.categories.collectAsState()
             val profile by repository.profile.collectAsState()
             val group = contacts.firstOrNull { it.id == groupId && it.isGroup }
             val members = group?.members.orEmpty().mapNotNull { contacts.resolveContact(it.email, profile) }
             var showInvite by rememberSaveable { mutableStateOf(false) }
             var showLeave by rememberSaveable { mutableStateOf(false) }
+            var showManageCategories by rememberSaveable { mutableStateOf(false) }
             var blockingTarget by rememberSaveable { mutableStateOf<Boolean?>(null) }
             var addContactEmail by rememberSaveable { mutableStateOf<String?>(null) }
             val snackbarHostState = remember { SnackbarHostState() }
@@ -58,11 +71,49 @@ class GroupDetailsActivity : MsngrActivity() {
                     title = androidx.compose.ui.res.stringResource(R.string.group_details_title),
                     onBack = ::finish,
                     actions = {
+                        if (group != null && !group.isBlocked) {
+                            val isFav = group.isFavorite
+                            IconButton(
+                                onClick = {
+                                    val nextFav = !isFav
+                                    scope.launch {
+                                        val result = repository.setContactFavorite(group.id, nextFav)
+                                        if (result.isSuccess) {
+                                            snackbarHostState.showActionSnackbar(
+                                                getString(
+                                                    if (nextFav) R.string.contact_favorites_added
+                                                    else R.string.contact_favorites_removed,
+                                                ),
+                                            )
+                                        } else {
+                                            snackbarHostState.showActionSnackbar(
+                                                result.exceptionOrNull()?.message
+                                                    ?: getString(R.string.contact_categories_update_failed),
+                                                isError = true,
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.testTag("group_favorite_button"),
+                            ) {
+                                Icon(
+                                    imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = stringResource(
+                                        if (isFav) R.string.contact_remove_from_favorites
+                                        else R.string.contact_add_to_favorites,
+                                    ),
+                                    tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                         GroupDetailsMenu(
                             group = group,
                             ownEmail = profile.email,
                             onInviteMembers = { showInvite = true },
                             onLeaveGroup = { showLeave = true },
+                            onManageCategories = if (group != null && !group.isBlocked) {
+                                { showManageCategories = true }
+                            } else null,
                             onChangeBlocking = { group?.let { blockingTarget = !it.isBlocked } },
                             onOpenNotifications = {
                                 group?.let { target ->
@@ -123,6 +174,20 @@ class GroupDetailsActivity : MsngrActivity() {
                             snackbarHostState.showActionSnackbar(getString(R.string.group_invitations_sent))
                         }
                     }, onDismiss = { showInvite = false })
+                if (showManageCategories && group != null) {
+                    ContactCategoriesDialog(
+                        contact = group,
+                        categories = categories,
+                        onSave = { next -> repository.setContactCategories(group.id, next) },
+                        onSaved = {
+                            showManageCategories = false
+                            scope.launch {
+                                snackbarHostState.showActionSnackbar(getString(R.string.contact_categories_updated))
+                            }
+                        },
+                        onDismiss = { showManageCategories = false },
+                    )
+                }
                 if (showLeave && group != null) LeaveGroupDialog(
                     groupName = group.displayName.messengerPlusPlainText(),
                     onLeave = { repository.leaveGroup(groupId) },

@@ -25,6 +25,7 @@ internal object AccountPreferences {
         "msngr_transfers",
         "msngr_transfer_saves",
         "msngr_in_app_notifications",
+        "msngr_categories",
         "background_delivery",
     )
 
@@ -68,6 +69,7 @@ internal object AccountPreferences {
         MessengerPlusPrefs.reload(context)
         ContactInvitationPrefs.reload(context)
         TransferPrefs.reload(context)
+        CategoryPrefs.reload(context)
         org.aralozkaya.msngr.notifications.InAppNotificationPrefs.reload(context)
     }
 }

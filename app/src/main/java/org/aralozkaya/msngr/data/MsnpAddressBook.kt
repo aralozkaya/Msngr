@@ -94,6 +94,103 @@ internal object MsnpAddressBookService {
                 buildAddContactRequest(ticket, email, displayName, "ContactMsgrAPI")))
         }
 
+    suspend fun createCategory(
+        host: String,
+        ticket: String,
+        name: String,
+        isFavorite: Boolean = false,
+    ): String = withContext(Dispatchers.IO) {
+        parseCreateCategoryResponse(postSoap(
+            host = host,
+            path = "/abservice/abservice.asmx",
+            soapAction = "http://www.msn.com/webservices/AddressBook/ABGroupAdd",
+            body = buildCreateCategoryRequest(ticket, name, isFavorite),
+        ))
+    }
+
+    suspend fun renameCategory(
+        host: String,
+        ticket: String,
+        groupGuid: String,
+        newName: String,
+    ) = withContext(Dispatchers.IO) {
+        parseCategoryOperationResponse(
+            xml = postSoap(
+                host = host,
+                path = "/abservice/abservice.asmx",
+                soapAction = "http://www.msn.com/webservices/AddressBook/ABGroupUpdate",
+                body = buildRenameCategoryRequest(ticket, groupGuid, newName),
+            ),
+            action = "ABGroupUpdate",
+        )
+    }
+
+    suspend fun deleteCategory(
+        host: String,
+        ticket: String,
+        groupGuid: String,
+    ) = withContext(Dispatchers.IO) {
+        parseCategoryOperationResponse(
+            xml = postSoap(
+                host = host,
+                path = "/abservice/abservice.asmx",
+                soapAction = "http://www.msn.com/webservices/AddressBook/ABGroupDelete",
+                body = buildDeleteCategoryRequest(ticket, groupGuid),
+            ),
+            action = "ABGroupDelete",
+        )
+    }
+
+    suspend fun addContactToCategory(
+        host: String,
+        ticket: String,
+        groupGuid: String,
+        contactGuid: String,
+    ) = withContext(Dispatchers.IO) {
+        parseCategoryOperationResponse(
+            xml = postSoap(
+                host = host,
+                path = "/abservice/abservice.asmx",
+                soapAction = "http://www.msn.com/webservices/AddressBook/ABGroupContactAdd",
+                body = buildAddContactToCategoryRequest(ticket, groupGuid, contactGuid),
+            ),
+            action = "ABGroupContactAdd",
+        )
+    }
+
+    suspend fun removeContactFromCategory(
+        host: String,
+        ticket: String,
+        groupGuid: String,
+        contactGuid: String,
+    ) = withContext(Dispatchers.IO) {
+        parseCategoryOperationResponse(
+            xml = postSoap(
+                host = host,
+                path = "/abservice/abservice.asmx",
+                soapAction = "http://www.msn.com/webservices/AddressBook/ABGroupContactDelete",
+                body = buildRemoveContactFromCategoryRequest(ticket, groupGuid, contactGuid),
+            ),
+            action = "ABGroupContactDelete",
+        )
+    }
+
+    suspend fun setContactFavoriteFlag(
+        host: String,
+        ticket: String,
+        contactGuid: String,
+        isFavorite: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        parseContactUpdateResponse(
+            postSoap(
+                host = host,
+                path = "/abservice/abservice.asmx",
+                soapAction = "http://www.msn.com/webservices/AddressBook/ABContactUpdate",
+                body = buildContactFavoriteUpdateRequest(ticket, contactGuid, isFavorite),
+            ),
+        )
+    }
+
     suspend fun fetchContacts(
         host: String,
         ticket: String,
@@ -176,6 +273,14 @@ internal object MsnpAddressBookService {
                     parseMembershipChangeResponse(responseBody, soapAction.substringAfterLast('/'))
                 if (soapAction.endsWith("/ABContactAdd")) parseAddContactResponse(responseBody)
                 if (soapAction.endsWith("/ABContactUpdate")) parseContactUpdateResponse(responseBody)
+                if (soapAction.endsWith("/ABGroupAdd")) parseCreateCategoryResponse(responseBody)
+                if (soapAction.endsWith("/ABGroupUpdate") ||
+                    soapAction.endsWith("/ABGroupDelete") ||
+                    soapAction.endsWith("/ABGroupContactAdd") ||
+                    soapAction.endsWith("/ABGroupContactDelete")
+                ) {
+                    parseCategoryOperationResponse(responseBody, soapAction.substringAfterLast('/'))
+                }
                 val fault = parseAddressBookFault(responseBody)
                 throw AddressBookException(
                     fault.ifBlank { "The address-book service returned HTTP $status." },
@@ -295,7 +400,289 @@ internal data class AddressBookSnapshot(
     val contactRequests: List<ContactRequest> = emptyList(),
     val groupInvitations: List<GroupInvitation> = emptyList(),
     val ownerCid: String? = null,
+    val categories: List<ContactCategory> = emptyList(),
+    val favoriteCategoryGuid: String? = null,
 )
+
+private const val MESSENGER_CATEGORY_GROUP_TYPE = "C8529CE2-6EAD-434d-881F-341E17DB3FF8"
+private const val MESSENGER_FAVORITE_GROUP_TYPE = "0969E3B1-2D6B-4526-98B2-7A9C48341247"
+
+internal fun buildContactFavoriteUpdateRequest(
+    ticket: String,
+    contactGuid: String,
+    isFavorite: Boolean,
+): String {
+    require(CONTACT_STORAGE_ID.matches(contactGuid)) { "The contact identifier is invalid." }
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Header>
+            <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+              <IsMigration>false</IsMigration>
+              <PartnerScenario>ContactSave</PartnerScenario>
+            </ABApplicationHeader>
+            <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ManagedGroupRequest>false</ManagedGroupRequest>
+              <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+            </ABAuthHeader>
+          </soap:Header>
+          <soap:Body>
+            <ABContactUpdate xmlns="http://www.msn.com/webservices/AddressBook">
+              <abId>00000000-0000-0000-0000-000000000000</abId>
+              <contacts><Contact><contactId>$contactGuid</contactId>
+                <contactInfo><isFavorite>$isFavorite</isFavorite></contactInfo>
+                <propertiesChanged>IsFavorite</propertiesChanged>
+              </Contact></contacts>
+            </ABContactUpdate>
+          </soap:Body>
+        </soap:Envelope>
+    """.trimIndent().trimStart()
+}
+
+internal fun buildCreateCategoryRequest(
+    ticket: String,
+    name: String,
+    isFavorite: Boolean = false,
+): String = """
+    <?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <soap:Header>
+        <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+          <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+          <IsMigration>false</IsMigration>
+          <PartnerScenario>GroupSave</PartnerScenario>
+        </ABApplicationHeader>
+        <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+          <ManagedGroupRequest>false</ManagedGroupRequest>
+          <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+        </ABAuthHeader>
+      </soap:Header>
+      <soap:Body>
+        <ABGroupAdd xmlns="http://www.msn.com/webservices/AddressBook">
+          <abId>00000000-0000-0000-0000-000000000000</abId>
+          <groupAddOptions>
+            <fRenameOnMsgrConflict>false</fRenameOnMsgrConflict>
+          </groupAddOptions>
+          <groupInfo>
+            <GroupInfo>
+              <annotations>
+                <Annotation>
+                  <Name>MSN.IM.Display</Name>
+                  <Value>1</Value>
+                </Annotation>
+              </annotations>
+              <groupType>$MESSENGER_CATEGORY_GROUP_TYPE</groupType>
+              <name>${name.escapeAddressBookXml()}</name>
+              <IsFavorite>$isFavorite</IsFavorite>
+              <fMessenger>false</fMessenger>
+            </GroupInfo>
+          </groupInfo>
+        </ABGroupAdd>
+      </soap:Body>
+    </soap:Envelope>
+""".trimIndent().trimStart()
+
+internal fun parseCreateCategoryResponse(xml: String): String {
+    val document = try {
+        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+    } catch (error: Exception) {
+        throw AddressBookException("The category service returned an invalid response.", error)
+    }
+    val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
+    if (fault != null) {
+        val message = when (fault.descendantText("errorcode")) {
+            "GroupAlreadyExists" -> "A category with this name already exists."
+            else -> fault.descendantText("faultstring").ifBlank { "The server could not create this category. Please try again." }
+        }
+        throw AddressBookException(message)
+    }
+    val result = document.getElementsByTagNameNS("*", "ABGroupAddResult").item(0) as? Element
+    val guid = result?.descendantText("guid").orEmpty().lowercase()
+    if (!CONTACT_STORAGE_ID.matches(guid)) {
+        throw AddressBookException("The category service returned an invalid response.")
+    }
+    return guid
+}
+
+internal fun buildRenameCategoryRequest(
+    ticket: String,
+    groupGuid: String,
+    newName: String,
+): String {
+    require(CONTACT_STORAGE_ID.matches(groupGuid)) { "The category identifier is invalid." }
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Header>
+            <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+              <IsMigration>false</IsMigration>
+              <PartnerScenario>GroupSave</PartnerScenario>
+            </ABApplicationHeader>
+            <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ManagedGroupRequest>false</ManagedGroupRequest>
+              <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+            </ABAuthHeader>
+          </soap:Header>
+          <soap:Body>
+            <ABGroupUpdate xmlns="http://www.msn.com/webservices/AddressBook">
+              <abId>00000000-0000-0000-0000-000000000000</abId>
+              <groups>
+                <Group>
+                  <groupId>${groupGuid.escapeAddressBookXml()}</groupId>
+                  <groupInfo>
+                    <name>${newName.escapeAddressBookXml()}</name>
+                  </groupInfo>
+                  <propertiesChanged>GroupName</propertiesChanged>
+                </Group>
+              </groups>
+            </ABGroupUpdate>
+          </soap:Body>
+        </soap:Envelope>
+    """.trimIndent().trimStart()
+}
+
+internal fun buildDeleteCategoryRequest(ticket: String, groupGuid: String): String {
+    require(CONTACT_STORAGE_ID.matches(groupGuid)) { "The category identifier is invalid." }
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Header>
+            <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+              <IsMigration>false</IsMigration>
+              <PartnerScenario>Timer</PartnerScenario>
+            </ABApplicationHeader>
+            <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ManagedGroupRequest>false</ManagedGroupRequest>
+              <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+            </ABAuthHeader>
+          </soap:Header>
+          <soap:Body>
+            <ABGroupDelete xmlns="http://www.msn.com/webservices/AddressBook">
+              <abId>00000000-0000-0000-0000-000000000000</abId>
+              <groupFilter>
+                <groupIds>
+                  <guid>${groupGuid.escapeAddressBookXml()}</guid>
+                </groupIds>
+              </groupFilter>
+            </ABGroupDelete>
+          </soap:Body>
+        </soap:Envelope>
+    """.trimIndent().trimStart()
+}
+
+internal fun buildAddContactToCategoryRequest(
+    ticket: String,
+    groupGuid: String,
+    contactGuid: String,
+): String {
+    require(CONTACT_STORAGE_ID.matches(groupGuid)) { "The category identifier is invalid." }
+    require(CONTACT_STORAGE_ID.matches(contactGuid)) { "The contact identifier is invalid." }
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Header>
+            <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+              <IsMigration>false</IsMigration>
+              <PartnerScenario>GroupSave</PartnerScenario>
+            </ABApplicationHeader>
+            <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ManagedGroupRequest>false</ManagedGroupRequest>
+              <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+            </ABAuthHeader>
+          </soap:Header>
+          <soap:Body>
+            <ABGroupContactAdd xmlns="http://www.msn.com/webservices/AddressBook">
+              <abId>00000000-0000-0000-0000-000000000000</abId>
+              <groupFilter>
+                <groupIds>
+                  <guid>${groupGuid.escapeAddressBookXml()}</guid>
+                </groupIds>
+              </groupFilter>
+              <contacts>
+                <Contact>
+                  <contactId>${contactGuid.escapeAddressBookXml()}</contactId>
+                </Contact>
+              </contacts>
+            </ABGroupContactAdd>
+          </soap:Body>
+        </soap:Envelope>
+    """.trimIndent().trimStart()
+}
+
+internal fun buildRemoveContactFromCategoryRequest(
+    ticket: String,
+    groupGuid: String,
+    contactGuid: String,
+): String {
+    require(CONTACT_STORAGE_ID.matches(groupGuid)) { "The category identifier is invalid." }
+    require(CONTACT_STORAGE_ID.matches(contactGuid)) { "The contact identifier is invalid." }
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Header>
+            <ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId>
+              <IsMigration>false</IsMigration>
+              <PartnerScenario>GroupSave</PartnerScenario>
+            </ABApplicationHeader>
+            <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook">
+              <ManagedGroupRequest>false</ManagedGroupRequest>
+              <TicketToken>${ticket.escapeAddressBookXml()}</TicketToken>
+            </ABAuthHeader>
+          </soap:Header>
+          <soap:Body>
+            <ABGroupContactDelete xmlns="http://www.msn.com/webservices/AddressBook">
+              <abId>00000000-0000-0000-0000-000000000000</abId>
+              <contacts>
+                <Contact>
+                  <contactId>${contactGuid.escapeAddressBookXml()}</contactId>
+                </Contact>
+              </contacts>
+              <groupFilter>
+                <groupIds>
+                  <guid>${groupGuid.escapeAddressBookXml()}</guid>
+                </groupIds>
+              </groupFilter>
+            </ABGroupContactDelete>
+          </soap:Body>
+        </soap:Envelope>
+    """.trimIndent().trimStart()
+}
+
+internal fun parseCategoryOperationResponse(xml: String, action: String) {
+    val document = try {
+        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+    } catch (error: Exception) {
+        throw AddressBookException("The category service returned an invalid response.", error)
+    }
+    val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
+    if (fault != null) {
+        val errorCode = fault.descendantText("errorcode")
+        val message = when (errorCode) {
+            "GroupAlreadyExists" -> "A category with this name already exists."
+            "GroupDoesNotExist" -> "This category no longer exists."
+            else -> fault.descendantText("faultstring").ifBlank { "The server could not update this category. Please try again." }
+        }
+        throw AddressBookException(message)
+    }
+    if (document.getElementsByTagNameNS("*", "${action}Response").length == 0) {
+        throw AddressBookException("The category service returned an invalid response.")
+    }
+}
 
 /** WLM 2009 ContactMsgrAPI request, including the server's opaque Pending membership ID. */
 internal fun buildMembershipChangeRequest(ticket: String, email: String, role: String,
@@ -427,18 +814,34 @@ internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSn
     val result = document.getElementsByTagNameNS("*", "ABFindContactsPagedResult")
         .item(0) as? Element
         ?: throw AddressBookException("The address-book service returned an invalid response.")
+    val parsedCategories = parseAddressBookCategories(result)
+    val customCategoryIds = parsedCategories.categories.map(ContactCategory::id).toSet()
+    val favoriteCategoryGuid = parsedCategories.favoriteCategoryGuid
     val contactNodes = result.getElementsByTagNameNS("*", "Contact")
     val contacts = LinkedHashMap<String, Contact>()
     val contactStorageIds = LinkedHashMap<String, String>()
+    val circleCategoryIds = LinkedHashMap<String, Set<String>>()
     var ownerDisplayName: String? = null
     var ownerCid: String? = null
     for (index in 0 until contactNodes.length) {
         val element = contactNodes.item(index) as? Element ?: continue
         if (element.descendantText("fDeleted").equals("true", ignoreCase = true)) continue
         val info = element.getElementsByTagNameNS("*", "contactInfo").item(0) as? Element ?: continue
-        if (info.descendantText("contactType").equals("Me", ignoreCase = true)) {
+        val contactType = info.descendantText("contactType")
+        if (contactType.equals("Me", ignoreCase = true)) {
             ownerDisplayName = info.descendantText("displayName").takeIf(String::isNotBlank)
             ownerCid = info.descendantText("CID").takeIf { it.toLongOrNull() != null }
+            continue
+        }
+        val rawCategoryIds = parseContactCategoryIds(info, customCategoryIds, favoriteCategoryGuid)
+        if (contactType.equals("Circle", ignoreCase = true)) {
+            val circleEmail = info.descendantText("passportName").trim().lowercase()
+            if (circleEmail.isNotEmpty()) {
+                element.descendantText("contactId")
+                    .takeIf { CONTACT_STORAGE_ID.matches(it) }
+                    ?.let { contactStorageIds[circleEmail] = it }
+                if (rawCategoryIds.isNotEmpty()) circleCategoryIds[circleEmail] = rawCategoryIds
+            }
             continue
         }
         if (info.descendantText("isMessengerUser").equals("false", ignoreCase = true)) continue
@@ -460,13 +863,14 @@ internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSn
             nickname = annotationNickname.ifBlank { displayName }.takeIf(String::isNotBlank),
             email = email,
             presence = Presence.Offline,
+            categoryIds = rawCategoryIds,
         )
         element.descendantText("contactId")
             .takeIf { CONTACT_STORAGE_ID.matches(it) }
             ?.let { contactStorageIds[id] = it }
     }
     return AddressBookSnapshot(
-        contacts = contacts.values.toList() + parseAddressBookCircles(result),
+        contacts = contacts.values.toList() + parseAddressBookCircles(result, circleCategoryIds),
         ownerDisplayName = ownerDisplayName,
         ownerCid = ownerCid,
         contactStorageIds = contactStorageIds,
@@ -474,10 +878,69 @@ internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSn
         circleTicket = result.getElementsByTagNameNS("*", "CircleTicket")
             .item(0)?.textContent?.takeIf(String::isNotBlank),
         groupInvitations = parseGroupInvitations(result),
+        categories = parsedCategories.categories,
+        favoriteCategoryGuid = favoriteCategoryGuid,
     )
 }
 
-private fun parseAddressBookCircles(result: Element): List<Contact> =
+private data class ParsedAddressBookCategories(
+    val categories: List<ContactCategory>,
+    val favoriteCategoryGuid: String?,
+)
+
+private fun parseAddressBookCategories(result: Element): ParsedAddressBookCategories {
+    val groupsContainer = result.getElementsByTagNameNS("*", "Groups").item(0) as? Element
+        ?: return ParsedAddressBookCategories(emptyList(), null)
+    val categories = LinkedHashMap<String, ContactCategory>()
+    var favoriteCategoryGuid: String? = null
+    groupsContainer.getElementsByTagNameNS("*", "Group").asElementSequence().forEach { group ->
+        if (group.descendantText("fDeleted").equals("true", ignoreCase = true)) return@forEach
+        val guid = group.descendantText("groupId").lowercase()
+        if (!CONTACT_STORAGE_ID.matches(guid) || guid == "00000000-0000-0000-0000-000000000000") return@forEach
+        val info = group.getElementsByTagNameNS("*", "groupInfo").item(0) as? Element ?: group
+        val groupType = info.descendantText("groupType")
+        val isFavorite = info.descendantText("IsFavorite").equals("true", ignoreCase = true) ||
+            info.descendantText("isFavorite").equals("true", ignoreCase = true) ||
+            groupType.equals(MESSENGER_FAVORITE_GROUP_TYPE, ignoreCase = true)
+        if (isFavorite) {
+            if (favoriteCategoryGuid == null) favoriteCategoryGuid = guid
+            return@forEach
+        }
+        val name = info.descendantText("name").trim().ifBlank { return@forEach }
+        categories[guid] = ContactCategory(
+            id = guid,
+            name = name,
+            serverGuid = guid,
+        )
+    }
+    return ParsedAddressBookCategories(categories.values.toList(), favoriteCategoryGuid)
+}
+
+private fun parseContactCategoryIds(
+    info: Element,
+    customCategoryIds: Set<String>,
+    favoriteCategoryGuid: String?,
+): Set<String> = buildSet {
+    if (info.descendantText("isFavorite").equals("true", ignoreCase = true) ||
+        info.descendantText("IsFavorite").equals("true", ignoreCase = true)
+    ) {
+        add(FAVORITES_CATEGORY_ID)
+    }
+    val groupIdsNode = info.getElementsByTagNameNS("*", "groupIds").item(0) as? Element ?: return@buildSet
+    groupIdsNode.getElementsByTagNameNS("*", "guid").asElementSequence().forEach { guidElement ->
+        val guid = guidElement.textContent.orEmpty().trim().lowercase()
+        if (guid.isEmpty()) return@forEach
+        when {
+            favoriteCategoryGuid != null && guid == favoriteCategoryGuid -> add(FAVORITES_CATEGORY_ID)
+            guid in customCategoryIds -> add(guid)
+        }
+    }
+}
+
+private fun parseAddressBookCircles(
+    result: Element,
+    circleCategoryIds: Map<String, Set<String>> = emptyMap(),
+): List<Contact> =
     result.getElementsByTagNameNS("*", "CircleInverseInfo").asElementSequence()
         .filterNot { it.descendantText("Deleted").equals("true", true) }
         .filter { it.descendantText("State").equals("Accepted", true) }
@@ -494,6 +957,7 @@ private fun parseAddressBookCircles(result: Element): List<Contact> =
                 }.ifBlank { "Group" },
                 presence = Presence.Offline,
                 isGroup = true,
+                categoryIds = circleCategoryIds[email].orEmpty(),
             )
         }.distinctBy(Contact::id).toList()
 

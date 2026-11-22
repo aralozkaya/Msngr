@@ -64,6 +64,7 @@ data class Contact(
     val clientCapabilities: Long = 0L,
     val extendedCapabilities: Long = 0L,
     val networkId: Int = MSNP_WINDOWS_LIVE_NETWORK_ID,
+    val categoryIds: Set<String> = emptySet(),
 ) {
     /** Accepted members only; pending invitations do not participate in the conversation. */
     val joinedMembers: List<GroupMember>
@@ -202,6 +203,7 @@ data class PortalState(
 private val emptyAccountSessions = MutableStateFlow<List<AccountSession>>(emptyList()).asStateFlow()
 private val emptyContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList()).asStateFlow()
 private val emptyGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList()).asStateFlow()
+private val emptyCategories = MutableStateFlow<List<ContactCategory>>(emptyList()).asStateFlow()
 private val noPictureStorageIssue = MutableStateFlow<String?>(null).asStateFlow()
 private val emptyPhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap()).asStateFlow()
 private val emptyGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap()).asStateFlow()
@@ -222,6 +224,25 @@ interface MsnpClient {
     val sessions: StateFlow<List<AccountSession>> get() = emptyAccountSessions
     val contactRequests: StateFlow<List<ContactRequest>> get() = emptyContactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> get() = emptyGroupInvitations
+    val categories: StateFlow<List<ContactCategory>> get() = emptyCategories
+
+    suspend fun createCategory(name: String, memberIds: List<String> = emptyList()): String =
+        throw UnsupportedOperationException("Creating categories is not supported by this client.")
+    suspend fun renameCategory(categoryId: String, newName: String) {
+        throw UnsupportedOperationException("Renaming categories is not supported by this client.")
+    }
+    suspend fun updateCategoryMembers(categoryId: String, memberIds: Set<String>) {
+        throw UnsupportedOperationException("Updating categories is not supported by this client.")
+    }
+    suspend fun deleteCategory(categoryId: String) {
+        throw UnsupportedOperationException("Deleting categories is not supported by this client.")
+    }
+    suspend fun setContactCategories(contactId: String, categoryIds: Set<String>) {
+        throw UnsupportedOperationException("Updating contact categories is not supported by this client.")
+    }
+    suspend fun setContactFavorite(contactId: String, favorite: Boolean) {
+        throw UnsupportedOperationException("Updating favorite contacts is not supported by this client.")
+    }
 
     suspend fun createGroup(name: String): String = throw UnsupportedOperationException("Creating groups is not supported by this client.")
     suspend fun inviteGroupMembers(groupId: String, emails: List<String>, message: String = "") { throw UnsupportedOperationException("Group invitations are not supported by this client.") }
@@ -368,6 +389,7 @@ class MockMsnp18Client(
     private val groupInvitationFixtures: (String) -> List<GroupInvitation> = { emptyList() },
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
+    private val mutableCategories = MutableStateFlow<List<ContactCategory>>(emptyList())
     private val mutableContactRequests = MutableStateFlow<List<ContactRequest>>(emptyList())
     private val mutableGroupInvitations = MutableStateFlow<List<GroupInvitation>>(emptyList())
     private val mutableMessages = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
@@ -386,6 +408,7 @@ class MockMsnp18Client(
     private val contactAdditionMutex = Mutex()
 
     override val contacts = mutableContacts.asStateFlow()
+    override val categories = mutableCategories.asStateFlow()
     override val contactRequests = mutableContactRequests.asStateFlow()
     override val groupInvitations = mutableGroupInvitations.asStateFlow()
     override val messages = mutableMessages.asStateFlow()
@@ -410,6 +433,7 @@ class MockMsnp18Client(
         nudgeLimiter.selectAccount(AccountIdentity.forServer(request.email, request.serverConfig, true).storageId)
         if (!signedInEmail.equals(request.email, true)) mutableContactRequests.value = requestFixtures(request.email)
         if (!signedInEmail.equals(request.email, true)) mutableGroupInvitations.value = groupInvitationFixtures(request.email)
+        if (!signedInEmail.equals(request.email, true)) mutableCategories.value = emptyList()
         if (!signedInEmail.equals(request.email, true)) ownDisplayPicture = null
         currentMedia = null
         signedInEmail = request.email
@@ -441,6 +465,97 @@ class MockMsnp18Client(
         org.aralozkaya.msngr.IncomingDisplayPicture(ownDisplayPicture?.copyOf(), fetched = signedInEmail.isNotBlank())
 
     override suspend fun adoptIncomingDisplayPicture(image: ByteArray?) { ownDisplayPicture = image?.copyOf() }
+
+    override suspend fun createCategory(name: String, memberIds: List<String>): String = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before creating a category." }
+        val normalized = validateCategoryName(name, mutableCategories.value)
+        val id = java.util.UUID.randomUUID().toString()
+        mutableCategories.update { it + ContactCategory(id = id, name = normalized, serverGuid = id) }
+        val targetMembers = memberIds.map(String::lowercase).toSet()
+        if (targetMembers.isNotEmpty()) {
+            mutableContacts.update { list ->
+                list.map { contact ->
+                    if (contact.id.lowercase() in targetMembers) {
+                        contact.copy(categoryIds = (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + id)
+                    } else contact
+                }
+            }
+        }
+        id
+    }
+
+    override suspend fun renameCategory(categoryId: String, newName: String) = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before editing a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isEditable) { "This category cannot be edited." }
+        val normalized = validateCategoryName(newName, mutableCategories.value, excludeCategoryId = categoryId)
+        mutableCategories.update { list ->
+            list.map { if (it.id == categoryId) it.copy(name = normalized) else it }
+        }
+    }
+
+    override suspend fun updateCategoryMembers(categoryId: String, memberIds: Set<String>) = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before updating a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isEditable) { "This category cannot be edited." }
+        val normalizedMembers = memberIds.map(String::lowercase).toSet()
+        mutableContacts.update { list ->
+            list.map { contact ->
+                val shouldContain = contact.id.lowercase() in normalizedMembers
+                val next = if (shouldContain) {
+                    (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + categoryId
+                } else {
+                    contact.categoryIds - categoryId
+                }
+                if (next == contact.categoryIds) contact else contact.copy(categoryIds = next)
+            }
+        }
+    }
+
+    override suspend fun deleteCategory(categoryId: String) = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before deleting a category." }
+        val existing = mutableCategories.value.firstOrNull { it.id == categoryId }
+            ?: error("This category no longer exists.")
+        require(existing.isDeletable) { "This category cannot be deleted." }
+        mutableCategories.update { list -> list.filterNot { it.id == categoryId } }
+        mutableContacts.update { list ->
+            list.map { contact ->
+                if (categoryId in contact.categoryIds) {
+                    contact.copy(categoryIds = contact.categoryIds - categoryId)
+                } else contact
+            }
+        }
+    }
+
+    override suspend fun setContactCategories(contactId: String, categoryIds: Set<String>) = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before updating categories." }
+        val validCustomIds = mutableCategories.value.map(ContactCategory::id).toSet()
+        val effective = categoryIds.filter {
+            it == FAVORITES_CATEGORY_ID || it in validCustomIds
+        }.toSet()
+        mutableContacts.update { list ->
+            list.map { contact ->
+                if (!contact.id.equals(contactId, ignoreCase = true)) contact
+                else contact.copy(categoryIds = effective)
+            }
+        }
+    }
+
+    override suspend fun setContactFavorite(contactId: String, favorite: Boolean) = contactAdditionMutex.withLock {
+        check(signedInEmail.isNotBlank()) { "Sign in before updating favorites." }
+        mutableContacts.update { list ->
+            list.map { contact ->
+                if (!contact.id.equals(contactId, ignoreCase = true)) contact
+                else {
+                    val next = if (favorite) contact.categoryIds + FAVORITES_CATEGORY_ID
+                    else contact.categoryIds - FAVORITES_CATEGORY_ID
+                    contact.copy(categoryIds = next)
+                }
+            }
+        }
+    }
 
     override suspend fun createGroup(name: String): String = contactAdditionMutex.withLock {
         check(signedInEmail.isNotBlank()) { "Sign in before creating a group." }
@@ -1021,6 +1136,7 @@ class MessengerRepository(
     val pendingNudgeShakes: StateFlow<Set<String>> = mutablePendingNudgeShakes.asStateFlow()
     val contactRequests: StateFlow<List<ContactRequest>> = client.contactRequests
     val groupInvitations: StateFlow<List<GroupInvitation>> = client.groupInvitations
+    val categories: StateFlow<List<ContactCategory>> = client.categories
     val groupInvitationInbox: StateFlow<GroupInvitationInbox> = combine(client.groupInvitations, mutableRequestAccount) { invitations, account ->
         GroupInvitationInbox(account, if (account == null) emptyList() else invitations)
     }.stateIn(scope, SharingStarted.Eagerly, GroupInvitationInbox())
@@ -1513,6 +1629,24 @@ class MessengerRepository(
             Result.failure(error)
         }
     }
+
+    suspend fun createCategory(name: String, memberIds: List<String> = emptyList()): Result<String> =
+        groupOperation { client.createCategory(name, memberIds) }
+
+    suspend fun renameCategory(categoryId: String, newName: String): Result<Unit> =
+        groupOperation { client.renameCategory(categoryId, newName) }
+
+    suspend fun updateCategoryMembers(categoryId: String, memberIds: Set<String>): Result<Unit> =
+        groupOperation { client.updateCategoryMembers(categoryId, memberIds) }
+
+    suspend fun deleteCategory(categoryId: String): Result<Unit> =
+        groupOperation { client.deleteCategory(categoryId) }
+
+    suspend fun setContactCategories(contactId: String, categoryIds: Set<String>): Result<Unit> =
+        groupOperation { client.setContactCategories(contactId, categoryIds) }
+
+    suspend fun setContactFavorite(contactId: String, favorite: Boolean): Result<Unit> =
+        groupOperation { client.setContactFavorite(contactId, favorite) }
 
     suspend fun createGroup(name: String): Result<String> = groupOperation { client.createGroup(name) }
     suspend fun setGroupBlocked(groupId: String, blocked: Boolean): Result<Unit> = groupOperation {

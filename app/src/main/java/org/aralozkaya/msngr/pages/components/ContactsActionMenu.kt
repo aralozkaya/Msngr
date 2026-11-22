@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -43,6 +44,7 @@ fun ContactsActionMenu(
     modifier: Modifier = Modifier,
     onAddContact: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
+    onCreateCategory: () -> Unit = {},
     groupCreationVisible: Boolean = false,
     onCreateGroupBoundsChanged: (Rect) -> Unit = {},
     contactInvitationVisible: Boolean = false,
@@ -114,6 +116,14 @@ fun ContactsActionMenu(
                 .graphicsLayer { alpha = if (groupCreationVisible) 0f else 1f },
             text = { Text(stringResource(R.string.contacts_action_create_group)) },
             icon = { Icon(Icons.Filled.GroupAdd, contentDescription = null) },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = {
+                expanded = false
+                onCreateCategory()
+            },
+            text = { Text(stringResource(R.string.contacts_action_create_category)) },
+            icon = { Icon(Icons.Filled.CreateNewFolder, contentDescription = null) },
         )
     }
 }
