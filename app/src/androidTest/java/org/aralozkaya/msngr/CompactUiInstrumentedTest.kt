@@ -34,6 +34,7 @@ import androidx.test.filters.SdkSuppress
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.AppearanceSettingsScreen
+import org.aralozkaya.msngr.pages.BlockedContactsPage
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.LayoutSettingsScreen
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
@@ -88,9 +89,10 @@ class CompactUiInstrumentedTest {
 
         compose.onNodeWithTag("layout_preview").assertIsDisplayed()
         compose.onNodeWithTag("layout_size_slider").assertIsDisplayed()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("compact_hide_presence_text_switch"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("compact_search_and_sort_switch"))
         compose.onNodeWithTag("compact_inline_status_switch").assertIsNotEnabled().assertIsOff()
         compose.onNodeWithTag("compact_hide_presence_text_switch").assertIsNotEnabled().assertIsOff()
+        compose.onNodeWithTag("compact_search_and_sort_switch").assertIsEnabled().assertIsOff()
 
         compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("layout_preview"))
         val regularHeight = compose.onNodeWithTag("contact-row-preview-1").fetchSemanticsNode().boundsInRoot.height
@@ -204,12 +206,33 @@ class CompactUiInstrumentedTest {
             }
         }
 
+        val regularUserCardHeight = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot.height
         val regularSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
 
         compose.runOnIdle {
             AppearancePrefs.setUiDensity(context, UiDensity.Minimal)
             AppearancePrefs.setCompactInlineStatusMessage(context, true)
             AppearancePrefs.setCompactHidePresenceText(context, true)
+        }
+        compose.waitForIdle()
+
+        val minimalUserCardHeight = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot.height
+        assertEquals(
+            "Logged-in user card should never compact",
+            regularUserCardHeight,
+            minimalUserCardHeight,
+            1f,
+        )
+        val defaultMinimalSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+        assertEquals(
+            "Search bar should stay regular when compact search and sort toggle is off",
+            regularSearchHeight,
+            defaultMinimalSearchHeight,
+            1f,
+        )
+
+        compose.runOnIdle {
+            AppearancePrefs.setCompactSearchAndSort(context, true)
         }
         compose.waitForIdle()
 
@@ -234,5 +257,31 @@ class CompactUiInstrumentedTest {
         compose.onNodeWithText("Study Group").assertDoesNotExist()
         compose.onNodeWithText("Groups").performClick()
         compose.onNodeWithText("Study Group").assertIsDisplayed()
+    }
+
+    @Test fun blockedContactsPageIgnoresCompactLayoutSettings() {
+        val blocked = listOf(
+            Contact("blocked-1", "Blocked Friend", "blocked@example.com", Presence.Offline, isBlocked = true),
+        )
+        val density = mutableStateOf(UiDensity.Regular)
+
+        compose.setContent {
+            MsngrTheme {
+                CompositionLocalProvider(LocalLayoutSettings provides LayoutSettings(density = density.value)) {
+                    BlockedContactsPage(
+                        innerPadding = PaddingValues(),
+                        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
+                        contacts = blocked,
+                        onUnblockContact = {},
+                    )
+                }
+            }
+        }
+
+        val regularHeight = compose.onNodeWithTag("contact-row-blocked-1").fetchSemanticsNode().boundsInRoot.height
+        density.value = UiDensity.Minimal
+        compose.waitForIdle()
+        val minimalHeight = compose.onNodeWithTag("contact-row-blocked-1").fetchSemanticsNode().boundsInRoot.height
+        assertEquals("Blocked contacts row should not compact", regularHeight, minimalHeight, 1f)
     }
 }

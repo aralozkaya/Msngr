@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -74,9 +75,14 @@ fun GroupDetailsPage(
             Text(stringResource(R.string.group_details_unavailable), Modifier.padding(24.dp))
             return@Column
         }
+        val layout = LocalLayoutSettings.current
+        val compact = layout.isCompact
+        val compactSearchAndSort = layout.compactSearchAndSort
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 0.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactSearchAndSort) 8.dp else 12.dp),
         ) {
             Column(
                 Modifier.fillMaxWidth()
@@ -101,21 +107,19 @@ fun GroupDetailsPage(
                 }
                 Text(summaryText, style = MaterialTheme.typography.bodyMedium)
             }
-            val compact = LocalLayoutSettings.current.isCompact
             CompactSearchField(
                 state = searchFieldState,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = stringResource(R.string.group_search_members_placeholder),
                 clearContentDescription = stringResource(R.string.contacts_search_clear),
-                compact = compact,
+                compact = compactSearchAndSort,
             )
         }
-        val compact = LocalLayoutSettings.current.isCompact
         PageContentList(
             modifier = Modifier.fillMaxWidth().weight(1f),
             innerPadding = PaddingValues(),
             scrollBehavior = scrollBehavior,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else ListItemDefaults.SegmentedGap),
         ) {
             itemsIndexed(visible, key = { _, member -> member.id }) { index, member ->
                 val isOwnContact = member.email.equals(ownEmail, ignoreCase = true)

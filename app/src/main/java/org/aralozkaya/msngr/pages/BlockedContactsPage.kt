@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -24,12 +25,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
-import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.LayoutSettings
 import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.R
+import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.ContactRow
+import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
 import org.aralozkaya.msngr.pages.components.PageContentList
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -71,18 +73,19 @@ fun BlockedContactsPage(
             }
         }
     } else {
-        val compact = LocalLayoutSettings.current.isCompact
-        PageContentList(
-            innerPadding = innerPadding,
-            scrollBehavior = scrollBehavior,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp),
-        ) {
-            if (refreshError != null) item(key = "refresh-error") {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BlockedContactsRefreshError(refreshError, onRefresh)
+        CompositionLocalProvider(LocalLayoutSettings provides LayoutSettings()) {
+            PageContentList(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (refreshError != null) item(key = "refresh-error") {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        BlockedContactsRefreshError(refreshError, onRefresh)
+                    }
                 }
+                blockedContactsContent(blocked, onUnblockContact, onDeleteContact, onOpenProfile)
             }
-            blockedContactsContent(blocked, onUnblockContact, onDeleteContact, onOpenProfile)
         }
     }
 }

@@ -2003,4 +2003,6 @@
     <string name="settings_layout_favorites_header">Favourites</string>
     <string name="settings_layout_favorites_separate_title">Separate layout for Favourites</string>
     <string name="settings_layout_favorites_separate_supporting">Choose a different density and compact options for Favourites</string>
+    <string name="settings_layout_compact_search_sort_title">Compact search and sort</string>
+    <string name="settings_layout_compact_search_sort_supporting">Use a compact search bar and text-only Sort button on the Contacts page.</string>
 </resources>
