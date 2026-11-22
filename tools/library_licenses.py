@@ -146,7 +146,7 @@ def generate(android, metadata, ruffle_source, rust_notices, output=ASSETS):
         zip_write(sources, "README.txt", b"libsiren contains the complete upstream source. Apply msngr/third_party/patches/libsiren-hardening.patch using the included CMakeLists.txt. The full application and build instructions accompany releases as Msngr-corresponding-source.zip. Symphonia packages are unmodified MPL-2.0 source copies.\n")
 
     node_modules = ruffle_source / "web/node_modules"
-    for name in ("@fluent/bundle", "@fluent/langneg", "wasm-feature-detect", "tsx-dom", "webpack"):
+    for name in ("@fluent/bundle", "@fluent/langneg", "wasm-feature-detect", "tsx-dom", "esbuild"):
         directory = node_modules / name
         package = json.loads((directory / "package.json").read_text())
         notices = [document(text(p)) for p in notice_files(directory)]

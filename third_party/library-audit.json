@@ -1,6 +1,6 @@
 {
-  "ruffleSourceCommit": "89a7049965f3090e706265670df309a5128233ac",
-  "ruffleInventorySha256": "7fcb34a2d6f52f6b5ffe0f97b36c97550f840cd8197f98ea7cca33e7a72fbcee",
+  "ruffleSourceCommit": "cd4cb8f45f144d5a9209f496ee09b60ad136b5b3",
+  "ruffleInventorySha256": "18710f5f63920293478f6399e1c8ac9acaa233c7a0329c2dfca5c6f0cbfc5b0d",
   "libsirenCommit": "c7724c03d4a6daf4d6dff9e917c14ce5071dce66",
   "libsirenPatchSha256": "6fef2668cc0d8f7f3ad56d8c7f6c6c23f0d7c8dfe97f7ce27d7bed9475c4632c",
   "inputs": {
@@ -48,7 +48,7 @@
     {
       "name": "Ruffle web attribution collection",
       "license": "MIT OR Apache-2.0",
-      "source": "https://github.com/ruffle-rs/ruffle/tree/89a7049965f3090e706265670df309a5128233ac",
+      "source": "https://github.com/ruffle-rs/ruffle/tree/cd4cb8f45f144d5a9209f496ee09b60ad136b5b3",
       "notices": [
         "83e0a3ea1690281ca2c70f92c17dff9a05f110c0100242478a89bb0a06e815a3",
         "e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71"
@@ -1226,12 +1226,12 @@
       "artifactSha256": "a967c776d2c2ff9a7a541679d2fb51cefdc78d4010fcf68f3fdd4c57c29e89dc"
     },
     {
-      "name": "annotate-snippets 0.12.16",
+      "name": "annotate-snippets 0.12.18",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/annotate-snippets-rs",
       "notices": [
-        "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6",
-        "a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4ae"
+        "2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e",
+        "6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6"
       ],
       "ecosystem": "Cargo",
       "authors": []
@@ -1307,7 +1307,7 @@
       ]
     },
     {
-      "name": "asc 0.7.1",
+      "name": "asc 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -1447,7 +1447,7 @@
       ]
     },
     {
-      "name": "build_playerglobal 0.7.1",
+      "name": "build_playerglobal 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -1459,7 +1459,7 @@
       ]
     },
     {
-      "name": "bumpalo 3.20.3",
+      "name": "bumpalo 3.20.4",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/fitzgen/bumpalo",
       "notices": [
@@ -1525,7 +1525,7 @@
       "authors": []
     },
     {
-      "name": "bytes 1.12.1",
+      "name": "bytes 1.12.2",
       "license": "MIT",
       "source": "https://github.com/tokio-rs/bytes",
       "notices": [
@@ -1538,7 +1538,7 @@
       ]
     },
     {
-      "name": "cc 1.4.7",
+      "name": "cc 1.11.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/cc-rs",
       "notices": [
@@ -1562,7 +1562,7 @@
       ]
     },
     {
-      "name": "cfg-if 1.0.4",
+      "name": "cfg-if 1.0.5",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/cfg-if",
       "notices": [
@@ -1623,7 +1623,7 @@
       ]
     },
     {
-      "name": "clap 4.6.7",
+      "name": "clap 4.6.8",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/clap-rs/clap",
       "notices": [
@@ -1645,7 +1645,7 @@
       "authors": []
     },
     {
-      "name": "clap_derive 4.6.7",
+      "name": "clap_derive 4.6.8",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/clap-rs/clap",
       "notices": [
@@ -1656,7 +1656,7 @@
       "authors": []
     },
     {
-      "name": "clap_lex 1.1.1",
+      "name": "clap_lex 1.1.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/clap-rs/clap",
       "notices": [
@@ -1844,7 +1844,21 @@
       ]
     },
     {
-      "name": "convert_case 0.11.0",
+      "name": "constant_time_eq 0.6.1",
+      "license": "CC0-1.0 OR MIT-0 OR Apache-2.0",
+      "source": "https://codeberg.org/cesarb/constant_time_eq",
+      "notices": [
+        "9a3aeb3f63659c4c6302d315e1d98784d1e8559858a47ff9562e091bb922d28d",
+        "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+        "b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e"
+      ],
+      "ecosystem": "Cargo",
+      "authors": [
+        "Cesar Eduardo Barros <cesarb@cesarb.eti.br>"
+      ]
+    },
+    {
+      "name": "convert_case 0.12.0",
       "license": "MIT",
       "source": "https://github.com/rutrum/convert-case",
       "notices": [
@@ -1882,7 +1896,7 @@
       ]
     },
     {
-      "name": "crc32fast 1.5.2",
+      "name": "crc32fast 1.5.5",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/srijs/rust-crc32fast",
       "notices": [
@@ -1918,7 +1932,7 @@
       "authors": []
     },
     {
-      "name": "crossbeam-utils 0.8.21",
+      "name": "crossbeam-utils 0.8.23",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/crossbeam-rs/crossbeam",
       "notices": [
@@ -2097,7 +2111,7 @@
       ]
     },
     {
-      "name": "deranged 0.5.8",
+      "name": "deranged 0.5.9",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/jhpratt/deranged",
       "notices": [
@@ -2150,7 +2164,7 @@
       ]
     },
     {
-      "name": "either 1.18.0",
+      "name": "either 1.19.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rayon-rs/either",
       "notices": [
@@ -2161,7 +2175,7 @@
       "authors": []
     },
     {
-      "name": "encoding_rs 0.8.42",
+      "name": "encoding_rs 0.8.44",
       "license": "(Apache-2.0 OR MIT) AND BSD-3-Clause",
       "source": "https://github.com/hsivonen/encoding_rs",
       "notices": [
@@ -2200,7 +2214,7 @@
       ]
     },
     {
-      "name": "enumset 1.1.13",
+      "name": "enumset 1.1.15",
       "license": "MIT/Apache-2.0",
       "source": "https://github.com/Lymia/enumset",
       "notices": [
@@ -2213,7 +2227,7 @@
       ]
     },
     {
-      "name": "enumset_derive 0.15.0",
+      "name": "enumset_derive 0.15.1",
       "license": "MIT/Apache-2.0",
       "source": "https://github.com/Lymia/enumset",
       "notices": [
@@ -2226,7 +2240,7 @@
       ]
     },
     {
-      "name": "equivalent 1.0.2",
+      "name": "equivalent 1.0.3",
       "license": "Apache-2.0 OR MIT",
       "source": "https://github.com/indexmap-rs/equivalent",
       "notices": [
@@ -2235,6 +2249,15 @@
       ],
       "ecosystem": "Cargo",
       "authors": []
+    },
+    {
+      "name": "esbuild 0.28.2",
+      "license": "MIT",
+      "source": "{'type': 'git', 'url': 'git+https://github.com/evanw/esbuild.git'}",
+      "notices": [
+        "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681"
+      ],
+      "ecosystem": "npm"
     },
     {
       "name": "euclid 0.22.14",
@@ -2303,7 +2326,7 @@
       ]
     },
     {
-      "name": "find-msvc-tools 0.1.13",
+      "name": "find-msvc-tools 0.1.15",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/cc-rs",
       "notices": [
@@ -2314,9 +2337,9 @@
       "authors": []
     },
     {
-      "name": "flash-lso 0.6.0",
+      "name": "flash-lso 0.7.0",
       "license": "MIT",
-      "source": "https://github.com/CUB3D/rust-sol",
+      "source": "https://github.com/ruffle-rs/rust-flash-lso",
       "notices": [
         "14b8f0125346072b19f89f9056067962b6512092ec6304c86036d36eda66599d"
       ],
@@ -2364,7 +2387,7 @@
         "Caleb Maclennan <caleb@alerque.com>",
         "Bruce Mitchener <bruce.mitchener@gmail.com",
         "Zibi Braniecki <zibi@unicode.org>",
-        "StaÅ› MaÅ‚olepszy <stas@mozilla.com>"
+        "Staś Małolepszy <stas@mozilla.com>"
       ]
     },
     {
@@ -2392,11 +2415,11 @@
         "Caleb Maclennan <caleb@alerque.com>",
         "Bruce Mitchener <bruce.mitchener@gmail.com",
         "Zibi Braniecki <zibi@unicode.org>",
-        "StaÅ› MaÅ‚olepszy <stas@mozilla.com>"
+        "Staś Małolepszy <stas@mozilla.com>"
       ]
     },
     {
-      "name": "fluent-template-macros 0.13.3",
+      "name": "fluent-template-macros 0.15.1",
       "license": "MIT/Apache-2.0",
       "source": "https://github.com/XAMPPRocky/fluent-templates",
       "notices": [
@@ -2408,7 +2431,7 @@
       ]
     },
     {
-      "name": "fluent-templates 0.13.3",
+      "name": "fluent-templates 0.15.1",
       "license": "MIT/Apache-2.0",
       "source": "https://github.com/XAMPPRocky/fluent-templates",
       "notices": [
@@ -2434,7 +2457,7 @@
       ]
     },
     {
-      "name": "flv-rs 0.7.1",
+      "name": "flv-rs 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://crates.io/crates/flv-rs",
       "notices": [
@@ -2471,7 +2494,7 @@
       ]
     },
     {
-      "name": "form_urlencoded 1.2.2",
+      "name": "form_urlencoded 1.2.3",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/servo/rust-url",
       "notices": [
@@ -2664,7 +2687,7 @@
       ]
     },
     {
-      "name": "globset 0.4.19",
+      "name": "globset 0.4.21",
       "license": "Unlicense OR MIT",
       "source": "https://github.com/BurntSushi/ripgrep/tree/master/crates/globset",
       "notices": [
@@ -2691,7 +2714,7 @@
       ]
     },
     {
-      "name": "gloo-utils 0.3.0",
+      "name": "gloo-utils 0.3.1",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rustwasm/gloo/tree/master/crates/utils",
       "notices": [
@@ -2751,7 +2774,7 @@
       ],
       "ecosystem": "Cargo",
       "authors": [
-        "TÃ–RÃ–K Attila <torokati44@gmail.com>"
+        "TÖRÖK Attila <torokati44@gmail.com>"
       ]
     },
     {
@@ -2830,7 +2853,7 @@
       ]
     },
     {
-      "name": "id3 1.17.2",
+      "name": "id3 1.17.4",
       "license": "MIT",
       "source": "https://codeberg.org/polyfloyd/rust-id3",
       "notices": [
@@ -2880,7 +2903,7 @@
       ]
     },
     {
-      "name": "ignore 0.4.32",
+      "name": "ignore 0.4.34",
       "license": "Unlicense OR MIT",
       "source": "https://github.com/BurntSushi/ripgrep/tree/master/crates/ignore",
       "notices": [
@@ -2930,7 +2953,7 @@
         "Caleb Maclennan <caleb@alerque.com>",
         "Bruce Mitchener <bruce.mitchener@gmail.com",
         "Zibi Braniecki <zibi@unicode.org>",
-        "StaÅ› MaÅ‚olepszy <stas@mozilla.com>"
+        "Staś Małolepszy <stas@mozilla.com>"
       ]
     },
     {
@@ -2984,7 +3007,7 @@
       ]
     },
     {
-      "name": "itoa 1.0.18",
+      "name": "itoa 1.0.19",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/dtolnay/itoa",
       "notices": [
@@ -3048,20 +3071,20 @@
       ]
     },
     {
-      "name": "lazy_static 1.5.0",
+      "name": "lazy_static 1.5.1",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang-nursery/lazy-static.rs",
       "notices": [
-        "0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720",
-        "143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4"
+        "143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4",
+        "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
       ],
       "ecosystem": "Cargo",
       "authors": [
-        "Marvin LÃ¶bel <loebel.marvin@gmail.com>"
+        "Marvin Löbel <loebel.marvin@gmail.com>"
       ]
     },
     {
-      "name": "libc 0.2.189",
+      "name": "libc 0.2.191",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/libc",
       "notices": [
@@ -3108,7 +3131,7 @@
       ]
     },
     {
-      "name": "litrs 1.0.0",
+      "name": "litrs 1.0.1",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/LukasKalbertodt/litrs",
       "notices": [
@@ -3134,7 +3157,7 @@
       ]
     },
     {
-      "name": "log 0.4.34",
+      "name": "log 0.4.35",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/log",
       "notices": [
@@ -3147,7 +3170,7 @@
       ]
     },
     {
-      "name": "lru 0.18.4",
+      "name": "lru 0.18.5",
       "license": "MIT",
       "source": "https://github.com/jeromefroe/lru-rs.git",
       "notices": [
@@ -3316,7 +3339,7 @@
       ]
     },
     {
-      "name": "naga 30.0.1",
+      "name": "naga 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -3329,7 +3352,7 @@
       ]
     },
     {
-      "name": "naga-agal 0.7.1",
+      "name": "naga-agal 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -3341,7 +3364,7 @@
       ]
     },
     {
-      "name": "naga-pixelbender 0.7.1",
+      "name": "naga-pixelbender 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -3353,7 +3376,7 @@
       ]
     },
     {
-      "name": "naga-types 30.0.1",
+      "name": "naga-types 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -3555,7 +3578,7 @@
       ]
     },
     {
-      "name": "ordered-float 5.5.0",
+      "name": "ordered-float 5.5.1",
       "license": "MIT",
       "source": "https://github.com/reem/rust-ordered-float",
       "notices": [
@@ -3932,7 +3955,7 @@
       "authors": []
     },
     {
-      "name": "pixel_bender 0.7.1",
+      "name": "pixel_bender 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -3957,7 +3980,7 @@
       ]
     },
     {
-      "name": "powerfmt 0.2.0",
+      "name": "powerfmt 0.2.1",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/jhpratt/powerfmt",
       "notices": [
@@ -4085,7 +4108,7 @@
       ]
     },
     {
-      "name": "rand 0.10.2",
+      "name": "rand 0.10.4",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-random/rand",
       "notices": [
@@ -4140,10 +4163,11 @@
       ]
     },
     {
-      "name": "realfft 3.5.0",
+      "name": "realfft 3.5.1",
       "license": "MIT",
       "source": "https://github.com/HEnquist/realfft",
       "notices": [
+        "080766c57f9e48f00218f4e43c7d671d4b6ffee85a39417b5ab3c916dfe29b0d",
         "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d"
       ],
       "ecosystem": "Cargo",
@@ -4152,7 +4176,7 @@
       ]
     },
     {
-      "name": "regex 1.13.1",
+      "name": "regex 1.13.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/regex",
       "notices": [
@@ -4166,7 +4190,7 @@
       ]
     },
     {
-      "name": "regex-automata 0.4.18",
+      "name": "regex-automata 0.4.19",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/regex",
       "notices": [
@@ -4180,7 +4204,7 @@
       ]
     },
     {
-      "name": "regex-syntax 0.8.11",
+      "name": "regex-syntax 0.8.12",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/rust-lang/regex",
       "notices": [
@@ -4219,7 +4243,7 @@
       ]
     },
     {
-      "name": "ruffle_common 0.7.1",
+      "name": "ruffle_common 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4231,7 +4255,7 @@
       ]
     },
     {
-      "name": "ruffle_core 0.7.1",
+      "name": "ruffle_core 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4243,7 +4267,7 @@
       ]
     },
     {
-      "name": "ruffle_macros 0.7.1",
+      "name": "ruffle_macros 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4255,7 +4279,7 @@
       ]
     },
     {
-      "name": "ruffle_render 0.7.1",
+      "name": "ruffle_render 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4267,7 +4291,7 @@
       ]
     },
     {
-      "name": "ruffle_render_canvas 0.7.1",
+      "name": "ruffle_render_canvas 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4279,7 +4303,7 @@
       ]
     },
     {
-      "name": "ruffle_render_webgl 0.7.1",
+      "name": "ruffle_render_webgl 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4291,7 +4315,7 @@
       ]
     },
     {
-      "name": "ruffle_render_wgpu 0.7.1",
+      "name": "ruffle_render_wgpu 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4303,7 +4327,7 @@
       ]
     },
     {
-      "name": "ruffle_video 0.7.1",
+      "name": "ruffle_video 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4315,7 +4339,7 @@
       ]
     },
     {
-      "name": "ruffle_video_external 0.7.1",
+      "name": "ruffle_video_external 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4327,7 +4351,7 @@
       ]
     },
     {
-      "name": "ruffle_video_software 0.7.1",
+      "name": "ruffle_video_software 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4339,7 +4363,7 @@
       ]
     },
     {
-      "name": "ruffle_web 0.7.1",
+      "name": "ruffle_web 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4351,7 +4375,7 @@
       ]
     },
     {
-      "name": "ruffle_web_common 0.7.1",
+      "name": "ruffle_web_common 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://crates.io/crates/ruffle_web_common",
       "notices": [
@@ -4363,7 +4387,7 @@
       ]
     },
     {
-      "name": "ruffle_wstr 0.7.1",
+      "name": "ruffle_wstr 0.8.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
@@ -4535,7 +4559,7 @@
       ]
     },
     {
-      "name": "serde_json 1.0.151",
+      "name": "serde_json 1.0.154",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/serde-rs/json",
       "notices": [
@@ -4543,10 +4567,7 @@
         "b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e"
       ],
       "ecosystem": "Cargo",
-      "authors": [
-        "Erick Tryzelaar <erick.tryzelaar@gmail.com>",
-        "David Tolnay <dtolnay@gmail.com>"
-      ]
+      "authors": []
     },
     {
       "name": "sharded-slab 0.1.7",
@@ -4627,9 +4648,9 @@
       ]
     },
     {
-      "name": "smallvec 1.16.2",
+      "name": "smallvec 1.16.6",
       "license": "MIT OR Apache-2.0",
-      "source": "https://github.com/servo/rust-smallvec",
+      "source": "https://github.com/smallvec/smallvec",
       "notices": [
         "0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9",
         "143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4"
@@ -4718,12 +4739,12 @@
       ]
     },
     {
-      "name": "swf 0.3.0",
+      "name": "swf 0.4.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/ruffle-rs/ruffle",
       "notices": [
-        "0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720",
-        "143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4"
+        "143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4",
+        "8a64e11eed70f6539713ac2755ca666f332ca7e48e6cad3dd0d7208f8ac9e53b"
       ],
       "ecosystem": "Cargo",
       "authors": [
@@ -4805,7 +4826,7 @@
       ]
     },
     {
-      "name": "syn 3.0.6",
+      "name": "syn 3.0.10",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/dtolnay/syn",
       "notices": [
@@ -4844,7 +4865,7 @@
       ]
     },
     {
-      "name": "thiserror 2.0.18",
+      "name": "thiserror 2.0.21",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/dtolnay/thiserror",
       "notices": [
@@ -4857,7 +4878,7 @@
       ]
     },
     {
-      "name": "thiserror-impl 2.0.18",
+      "name": "thiserror-impl 2.0.21",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/dtolnay/thiserror",
       "notices": [
@@ -4937,7 +4958,7 @@
       ]
     },
     {
-      "name": "tinystr 0.8.4",
+      "name": "tinystr 0.8.5",
       "license": "Unicode-3.0",
       "source": "https://github.com/unicode-org/icu4x",
       "notices": [
@@ -5062,7 +5083,7 @@
         "Caleb Maclennan <caleb@alerque.com>",
         "Laurenz Stampfl <laurenz.stampfl@gmail.com>",
         "Yevhenii Reizner <razrfalcon@gmail.com>",
-        "Ø®Ø§Ù„Ø¯ Ø­Ø³Ù†ÙŠ (Khaled Hosny) <khaled@aliftype.com>"
+        "خالد حسني (Khaled Hosny) <khaled@aliftype.com>"
       ]
     },
     {
@@ -5079,7 +5100,7 @@
       ]
     },
     {
-      "name": "typed-path 0.12.3",
+      "name": "typed-path 0.13.0",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/chipsenkbeil/typed-path",
       "notices": [
@@ -5144,7 +5165,7 @@
       ]
     },
     {
-      "name": "unicode-ident 1.0.24",
+      "name": "unicode-ident 1.0.27",
       "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
       "source": "https://github.com/dtolnay/unicode-ident",
       "notices": [
@@ -5173,7 +5194,7 @@
       ]
     },
     {
-      "name": "unicode-width 0.2.2",
+      "name": "unicode-width 0.2.3",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/unicode-rs/unicode-width",
       "notices": [
@@ -5188,7 +5209,7 @@
       ]
     },
     {
-      "name": "url 2.5.8",
+      "name": "url 2.5.9",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/servo/rust-url",
       "notices": [
@@ -5201,7 +5222,7 @@
       ]
     },
     {
-      "name": "utf8_iter 1.0.4",
+      "name": "utf8_iter 1.1.0",
       "license": "Apache-2.0 OR MIT",
       "source": "https://github.com/hsivonen/utf8_iter",
       "notices": [
@@ -5226,6 +5247,20 @@
       "authors": [
         "Joe Wilm <joe@jwilm.com>",
         "Christian Duerr <contact@christianduerr.com>"
+      ]
+    },
+    {
+      "name": "utf_types 1.0.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/hsivonen/utf_types",
+      "notices": [
+        "3210be7332b5bdf48eb24a945258b9f38616a2cceb0dfc06e3c3c7e9740475a0",
+        "3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c",
+        "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"
+      ],
+      "ecosystem": "Cargo",
+      "authors": [
+        "Henri Sivonen <hsivonen@hsivonen.fi>"
       ]
     },
     {
@@ -5331,7 +5366,7 @@
       "ecosystem": "npm"
     },
     {
-      "name": "wasm-streams 0.5.0",
+      "name": "wasm-streams 0.7.1",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/MattiasBuelens/wasm-streams/",
       "notices": [
@@ -5341,18 +5376,6 @@
       "ecosystem": "Cargo",
       "authors": [
         "Mattias Buelens <mattias@buelens.com>"
-      ]
-    },
-    {
-      "name": "weak-table 0.3.2",
-      "license": "MIT",
-      "source": "https://github.com/tov/weak-table-rs",
-      "notices": [
-        "c94d1aee4aa4e9bd6f4fef11b12149950539abab0a1d53b06cb46a797d67a75c"
-      ],
-      "ecosystem": "Cargo",
-      "authors": [
-        "Jesse A. Tov <jesse.tov@gmail.com>"
       ]
     },
     {
@@ -5380,15 +5403,6 @@
       "authors": []
     },
     {
-      "name": "webpack 5.111.1",
-      "license": "MIT",
-      "source": "https://github.com/webpack/webpack",
-      "notices": [
-        "9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e"
-      ],
-      "ecosystem": "npm"
-    },
-    {
       "name": "weezl 0.1.12",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/image-rs/weezl",
@@ -5402,7 +5416,7 @@
       ]
     },
     {
-      "name": "wgpu 30.0.1",
+      "name": "wgpu 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5415,7 +5429,7 @@
       ]
     },
     {
-      "name": "wgpu-core 30.0.1",
+      "name": "wgpu-core 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5428,7 +5442,7 @@
       ]
     },
     {
-      "name": "wgpu-core-deps-wasm 30.0.1",
+      "name": "wgpu-core-deps-wasm 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5441,7 +5455,7 @@
       ]
     },
     {
-      "name": "wgpu-hal 30.0.1",
+      "name": "wgpu-hal 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5454,7 +5468,7 @@
       ]
     },
     {
-      "name": "wgpu-naga-bridge 30.0.1",
+      "name": "wgpu-naga-bridge 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5480,7 +5494,7 @@
       ]
     },
     {
-      "name": "wgpu-types 30.0.1",
+      "name": "wgpu-types 30.0.2",
       "license": "MIT OR Apache-2.0",
       "source": "https://github.com/gfx-rs/wgpu",
       "notices": [
@@ -5507,7 +5521,7 @@
       ]
     },
     {
-      "name": "winnow 1.0.4",
+      "name": "winnow 1.0.5",
       "license": "MIT",
       "source": "https://github.com/winnow-rs/winnow",
       "notices": [
@@ -5517,7 +5531,7 @@
       "authors": []
     },
     {
-      "name": "zerocopy 0.8.57",
+      "name": "zerocopy 0.8.63",
       "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
       "source": "https://github.com/google/zerocopy",
       "notices": [
@@ -5529,7 +5543,7 @@
       "authors": []
     },
     {
-      "name": "zerocopy-derive 0.8.57",
+      "name": "zerocopy-derive 0.8.63",
       "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
       "source": "https://github.com/google/zerocopy",
       "notices": [
@@ -5553,7 +5567,33 @@
       ]
     },
     {
-      "name": "zerovec 0.11.8",
+      "name": "zeroize 1.9.2",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/RustCrypto/utils",
+      "notices": [
+        "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a",
+        "8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b"
+      ],
+      "ecosystem": "Cargo",
+      "authors": [
+        "The RustCrypto Project Developers"
+      ]
+    },
+    {
+      "name": "zeroize_derive 1.5.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/RustCrypto/utils",
+      "notices": [
+        "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a",
+        "b8c6939380a400f53e11923d50fcc4dd2fa1ba8339fd9d04cda38a0251b6c9b0"
+      ],
+      "ecosystem": "Cargo",
+      "authors": [
+        "The RustCrypto Project Developers"
+      ]
+    },
+    {
+      "name": "zerovec 0.11.9",
       "license": "Unicode-3.0",
       "source": "https://github.com/unicode-org/icu4x",
       "notices": [
@@ -5565,7 +5605,7 @@
       ]
     },
     {
-      "name": "zip 9.0.5",
+      "name": "zip 9.7.0",
       "license": "MIT",
       "source": "https://github.com/zip-rs/zip2",
       "notices": [
@@ -5619,8 +5659,8 @@
     }
   ],
   "files": {
-    "index.html": "62bedc33d636ec6304364313d05570b9f27ada34a9e04a35f44706eab3975082",
-    "library-sources.zip": "ac004e4b1eff760fd2ee5087b65a617f57f023353019f1a3fdc1ef6d0817915d",
-    "THIRD_PARTY_NOTICES.txt": "3e7917e8e5fdf028231dc0108b45e6a66179cb6d533ca6dec50fad236c52d84a"
+    "index.html": "a27a5bf39a39dacaad0f8e354dbf6c36d6e81d8ede03bbc25cfc64b14542c92f",
+    "library-sources.zip": "316668aba25d1ae48cb6981e798aaf44fee76e00f7beebe83207a9cfb387ea81",
+    "THIRD_PARTY_NOTICES.txt": "1ccebd9da340f5d92e88359e4dfe5f3156533ede87d153bb28684a62b2f76ad6"
   }
 }
