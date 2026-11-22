@@ -2282,6 +2282,8 @@ internal class LiveMsnp18Client(
         val envelope = circleSegments.accept(rawEnvelope) ?: return
         val sender = envelope.senderEmail ?: return
         val mine = sender.equals(signedInEmail, true)
+        val senderEndpoint = normalizeEndpointId(envelope.routing["from"].orEmpty().substringAfter(";epid=", ""))
+        if (mine && senderEndpoint != null && senderEndpoint == normalizeEndpointId(machineGuid)) return
         val type = envelope.headers["message-type"]
         if (type == "Control" && envelope.headers["message-subtype"] == "Typing") {
             if (mine) return
@@ -2299,8 +2301,6 @@ internal class LiveMsnp18Client(
                 "Content-Type: ${Msnp18Protocol.NUDGE_CONTENT_TYPE}\r\n\r\n".toByteArray() + envelope.body,
             ) as? SwitchboardMimeMessage.WinkOffer ?: return
             if (!offer.metadata.creator.equals(sender, true) || group.joinedMembers.none { it.email.equals(sender, true) }) return
-            val senderEndpoint = normalizeEndpointId(envelope.routing["from"].orEmpty().substringAfter(";epid=", ""))
-            if (mine && senderEndpoint == normalizeEndpointId(machineGuid)) return
             receiveCircleWink(group, sender, offer.metadata)
             return
         }
@@ -2337,7 +2337,9 @@ internal class LiveMsnp18Client(
         appendMessage(message)
         typingJobs.remove(id)?.cancel()
         mutableTyping.update { it + (id to false) }
-        if (!mine) {
+        if (mine) {
+            onRepliedFromOtherSession(id)
+        } else {
             incrementUnread(id)
             if (!nudge || allowNudgeAlert) {
                 mutableEvents.tryEmit(if (nudge) MessengerEvent.IncomingNudge(id)
@@ -2358,7 +2360,9 @@ internal class LiveMsnp18Client(
             "Wink: $name", System.currentTimeMillis(),
             senderEmail = sender, senderName = group.members.firstOrNull { it.email.equals(sender, true) }?.displayName ?: sender,
             wink = org.aralozkaya.msngr.protocol.WinkReference(metadata, name), isWinkPending = true))
-        if (!mine) {
+        if (mine) {
+            onRepliedFromOtherSession(group.id)
+        } else {
             incrementUnread(group.id)
             mutableEvents.tryEmit(MessengerEvent.IncomingMessage(group.id, id))
         }
@@ -3377,7 +3381,8 @@ internal class LiveMsnp18Client(
                 val name = winkName(event.metadata)
                 appendMessage(ChatMessage(id, contactId, if (mine) MessageAuthor.Me else MessageAuthor.Contact,
                     "Wink: $name", System.currentTimeMillis(), wink = org.aralozkaya.msngr.protocol.WinkReference(event.metadata, name), isWinkPending = true))
-                if (!mine) { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id)) }
+                if (mine) onRepliedFromOtherSession(contactId)
+                else { incrementUnread(contactId); mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id)) }
                 mutableTyping.update { it + (contactId to false) }
                 startWinkTimeout(key, contactId, pending)
             }
@@ -3503,7 +3508,9 @@ internal class LiveMsnp18Client(
                 val mine = event.senderEmail.equals(signedInEmail, true)
                 appendMessage(ChatMessage(id, contactId, if (mine) MessageAuthor.Me else MessageAuthor.Contact,
                     "Voice clip", System.currentTimeMillis(), isVoiceClipPending = true))
-                if (!mine) {
+                if (mine) {
+                    onRepliedFromOtherSession(contactId)
+                } else {
                     incrementUnread(contactId)
                     mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, id))
                 }
@@ -3529,10 +3536,13 @@ internal class LiveMsnp18Client(
                     inkDrawing = event.drawing,
                 )
                 appendMessage(message)
-                if (!mine) incrementUnread(contactId)
                 mutableTyping.value = mutableTyping.value + (contactId to false)
                 typingJobs.remove(contactId)?.cancel()
-                if (!mine) mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                if (mine) onRepliedFromOtherSession(contactId)
+                else {
+                    incrementUnread(contactId)
+                    mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                }
             }
             is SwitchboardEvent.Text -> {
                 val mine = event.senderEmail.equals(signedInEmail, ignoreCase = true)
@@ -3546,10 +3556,13 @@ internal class LiveMsnp18Client(
                     timestampMillis = System.currentTimeMillis(),
                 )
                 appendMessage(message)
-                if (!mine) incrementUnread(contactId)
                 mutableTyping.value = mutableTyping.value + (contactId to false)
                 typingJobs.remove(contactId)?.cancel()
-                if (!mine) mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                if (mine) onRepliedFromOtherSession(contactId)
+                else {
+                    incrementUnread(contactId)
+                    mutableEvents.tryEmit(MessengerEvent.IncomingMessage(contactId, message.id))
+                }
             }
             is SwitchboardEvent.Typing -> {
                 mutableTyping.value = mutableTyping.value + (contactId to true)
@@ -3573,7 +3586,9 @@ internal class LiveMsnp18Client(
                     isNudge = true,
                 )
                 appendMessage(message)
-                if (!mine) {
+                if (mine) {
+                    onRepliedFromOtherSession(contactId)
+                } else {
                     incrementUnread(contactId)
                     if (allowAlert) {
                         mutableEvents.tryEmit(MessengerEvent.IncomingNudge(contactId))
@@ -3699,6 +3714,11 @@ internal class LiveMsnp18Client(
                 timestampMillis = System.currentTimeMillis(),
             ),
         )
+    }
+
+    private fun onRepliedFromOtherSession(contactId: String) {
+        markRead(contactId)
+        mutableEvents.tryEmit(MessengerEvent.ConversationRepliedElsewhere(contactId))
     }
 
     private fun incrementUnread(contactId: String) {
