@@ -414,10 +414,10 @@ License: Apache-2.0
 Source: https://maven.google.com/
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-annotate-snippets 0.12.16
+annotate-snippets 0.12.18
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/annotate-snippets-rs
-Notices: 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6, a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4ae
+Notices: 2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e, 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6
 
 anstream 1.0.0
 License: MIT OR Apache-2.0
@@ -451,7 +451,7 @@ Source: https://github.com/bluss/arrayvec
 Authors: bluss
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 4da95ec4ecb65b738d470b7d762894ad9c97da93e6cbfb18b570fc2c96f4b871
 
-asc 0.7.1
+asc 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
@@ -516,13 +516,13 @@ Source: https://github.com/BurntSushi/bstr
 Authors: Andrew Gallant <jamslam@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 68653aaa727a2bfa31b7a751e31701ce33c49d695c12dd291a07d1c54da4c14b, 6b7374c39a57e57fc2c38eb529c4c88340152b10f51dd5ae2d819dfa67f61715
 
-build_playerglobal 0.7.1
+build_playerglobal 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-bumpalo 3.20.3
+bumpalo 3.20.4
 License: MIT OR Apache-2.0
 Source: https://github.com/fitzgen/bumpalo
 Authors: Nick Fitzgerald <fitzgen@gmail.com>
@@ -551,13 +551,13 @@ License: Unlicense OR MIT
 Source: https://github.com/image-rs/byteorder-lite
 Notices: 0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f, 7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c
 
-bytes 1.12.1
+bytes 1.12.2
 License: MIT
 Source: https://github.com/tokio-rs/bytes
 Authors: Carl Lerche <me@carllerche.com>; Sean McArthur <sean@seanmonstar.com>
 Notices: 45f522cacecb1023856e46df79ca625dfc550c94910078bd8aec6e02880b3d42
 
-cc 1.4.7
+cc 1.11.2
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/cc-rs
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397
@@ -568,7 +568,7 @@ Source: https://github.com/jethrogb/rust-cexpr
 Authors: Jethro Beekman <jethro@jbeekman.nl>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, d9771b8c6cf4426d3846de54c1febe20907f1eeadf7adfb5ade89a83bd9ea77f
 
-cfg-if 1.0.4
+cfg-if 1.0.5
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/cfg-if
 Authors: Alex Crichton <alex@alexcrichton.com>
@@ -597,7 +597,7 @@ Source: https://github.com/KyleMayes/clang-sys
 Authors: Kyle Mayes <kyle@mayeses.com>
 Notices: 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a
 
-clap 4.6.7
+clap 4.6.8
 License: MIT OR Apache-2.0
 Source: https://github.com/clap-rs/clap
 Notices: 2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e, 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6
@@ -607,12 +607,12 @@ License: MIT OR Apache-2.0
 Source: https://github.com/clap-rs/clap
 Notices: 2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e, 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6
 
-clap_derive 4.6.7
+clap_derive 4.6.8
 License: MIT OR Apache-2.0
 Source: https://github.com/clap-rs/clap
 Notices: 2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e, 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6
 
-clap_lex 1.1.1
+clap_lex 1.1.2
 License: MIT OR Apache-2.0
 Source: https://github.com/clap-rs/clap
 Notices: 2615b7a45c2002e13fac0f82d941c36df1e6982519e73ef572b9a83f4d98d01e, 6efb0476a1cc085077ed49357026d8c173bf33017278ef440f222fb9cbcb66e6
@@ -686,7 +686,13 @@ Source: https://github.com/rustwasm/console_error_panic_hook
 Authors: Nick Fitzgerald <fitzgen@gmail.com>
 Notices: 77674336af8ded214dc3ae07da631c7dd35cc8205f39298474ba98a889e57272, f8c930c845c910f4948b1fe208a185fe7f0b04ac97d3e54d079ade077b61f383
 
-convert_case 0.11.0
+constant_time_eq 0.6.1
+License: CC0-1.0 OR MIT-0 OR Apache-2.0
+Source: https://codeberg.org/cesarb/constant_time_eq
+Authors: Cesar Eduardo Barros <cesarb@cesarb.eti.br>
+Notices: 9a3aeb3f63659c4c6302d315e1d98784d1e8559858a47ff9562e091bb922d28d, a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
+
+convert_case 0.12.0
 License: MIT
 Source: https://github.com/rutrum/convert-case
 Authors: rutrum <dave@rutrum.net>
@@ -704,7 +710,7 @@ Source: https://github.com/akhilles/crc-catalog.git
 Authors: Akhil Velagapudi <akhilvelagapudi@gmail.com>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-crc32fast 1.5.2
+crc32fast 1.5.5
 License: MIT OR Apache-2.0
 Source: https://github.com/srijs/rust-crc32fast
 Authors: Sam Rijs <srijs@airpost.net>; Alex Crichton <alex@alexcrichton.com>
@@ -720,7 +726,7 @@ License: MIT OR Apache-2.0
 Source: https://github.com/crossbeam-rs/crossbeam
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 5734ed989dfca1f625b40281ee9f4530f91b2411ec01cb748223e7eb87e201ab
 
-crossbeam-utils 0.8.21
+crossbeam-utils 0.8.23
 License: MIT OR Apache-2.0
 Source: https://github.com/crossbeam-rs/crossbeam
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 5734ed989dfca1f625b40281ee9f4530f91b2411ec01cb748223e7eb87e201ab
@@ -809,7 +815,7 @@ Source: https://github.com/rustaudio/dasp.git
 Authors: mitchmindtree <mitchell.nordine@gmail.com>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-deranged 0.5.8
+deranged 0.5.9
 License: MIT OR Apache-2.0
 Source: https://github.com/jhpratt/deranged
 Authors: Jacob Pratt <jacob@jhpratt.dev>
@@ -837,12 +843,12 @@ License: Apache-2.0
 Source: https://github.com/dorkbox/CabParser
 Notices: 209216c0719a4729cc9ab24140778cb8954ca14d1f342c542ba3dc2f1ae6b441, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-either 1.18.0
+either 1.19.0
 License: MIT OR Apache-2.0
 Source: https://github.com/rayon-rs/either
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 7576269ea71f767b99297934c0b2367532690f8c4badc695edf8e04ab6a1e545
 
-encoding_rs 0.8.42
+encoding_rs 0.8.44
 License: (Apache-2.0 OR MIT) AND BSD-3-Clause
 Source: https://github.com/hsivonen/encoding_rs
 Authors: Henri Sivonen <hsivonen@hsivonen.fi>
@@ -860,22 +866,27 @@ Source: https://codeberg.org/xfix/enum-map
 Authors: Kamila Borowska <kamila@borowska.pw>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-enumset 1.1.13
+enumset 1.1.15
 License: MIT/Apache-2.0
 Source: https://github.com/Lymia/enumset
 Authors: Alissa Rao <aura@aura.moe>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 5e66e0ab557f555f094c818bda6f497dbc5409c3b68bc645396841e7980073da
 
-enumset_derive 0.15.0
+enumset_derive 0.15.1
 License: MIT/Apache-2.0
 Source: https://github.com/Lymia/enumset
 Authors: Alissa Rao <aura@aura.moe>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 5e66e0ab557f555f094c818bda6f497dbc5409c3b68bc645396841e7980073da
 
-equivalent 1.0.2
+equivalent 1.0.3
 License: Apache-2.0 OR MIT
 Source: https://github.com/indexmap-rs/equivalent
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 7365cc8878a1d7ce155a58c4ca09c3d7a6be413efa5334a80ea842912b669349
+
+esbuild 0.28.2
+License: MIT
+Source: {'type': 'git', 'url': 'git+https://github.com/evanw/esbuild.git'}
+Notices: b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681
 
 euclid 0.22.14
 License: MIT OR Apache-2.0
@@ -907,14 +918,14 @@ Source: https://github.com/image-rs/fdeflate
 Authors: The image-rs Developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3
 
-find-msvc-tools 0.1.13
+find-msvc-tools 0.1.15
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/cc-rs
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397
 
-flash-lso 0.6.0
+flash-lso 0.7.0
 License: MIT
-Source: https://github.com/CUB3D/rust-sol
+Source: https://github.com/ruffle-rs/rust-flash-lso
 Authors: CUB3D <callumthom11@gmail.com>
 Notices: 14b8f0125346072b19f89f9056067962b6512092ec6304c86036d36eda66599d
 
@@ -933,7 +944,7 @@ Notices: 0604d5817110dacc5c7d9b7de6b58b962794603d4823c357157bd5dec4198bc5
 fluent-bundle 0.16.0
 License: Apache-2.0 OR MIT
 Source: https://github.com/projectfluent/fluent-rs
-Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; StaÅ› MaÅ‚olepszy <stas@mozilla.com>
+Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; Staś Małolepszy <stas@mozilla.com>
 Notices: 49c0b000c03731d9e3970dc059ad4ca345d773681f4a612b0024435b663e0220, 8a5119d39ab16b8104fdcc022b02ebe958c2c00bc42996d93f5b5caf90667477
 
 fluent-langneg 0.13.1
@@ -945,16 +956,16 @@ Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 fluent-syntax 0.12.0
 License: Apache-2.0 OR MIT
 Source: https://github.com/projectfluent/fluent-rs
-Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; StaÅ› MaÅ‚olepszy <stas@mozilla.com>
+Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; Staś Małolepszy <stas@mozilla.com>
 Notices: 49c0b000c03731d9e3970dc059ad4ca345d773681f4a612b0024435b663e0220, 8a5119d39ab16b8104fdcc022b02ebe958c2c00bc42996d93f5b5caf90667477
 
-fluent-template-macros 0.13.3
+fluent-template-macros 0.15.1
 License: MIT/Apache-2.0
 Source: https://github.com/XAMPPRocky/fluent-templates
 Authors: XAMPPRocky <xampprocky@icloud.com>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-fluent-templates 0.13.3
+fluent-templates 0.15.1
 License: MIT/Apache-2.0
 Source: https://github.com/XAMPPRocky/fluent-templates
 Authors: XAMPPRocky <xampprocky@icloud.com>
@@ -966,7 +977,7 @@ Source: https://github.com/zesterer/flume
 Authors: Joshua Barretto <joshua.s.barretto@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a
 
-flv-rs 0.7.1
+flv-rs 0.8.0
 License: MIT OR Apache-2.0
 Source: https://crates.io/crates/flv-rs
 Authors: David Wendt <dcrkid@gmail.com>
@@ -984,7 +995,7 @@ Source: https://github.com/orlp/foldhash
 Authors: Orson Peters <orsonpeters@gmail.com>
 Notices: 1d4c38d56650edc2c673cadbec74bec14db1fe8f2f10f4e3477dcbb49563be40
 
-form_urlencoded 1.2.2
+form_urlencoded 1.2.3
 License: MIT OR Apache-2.0
 Source: https://github.com/servo/rust-url
 Authors: The rust-url developers
@@ -1071,7 +1082,7 @@ Source: https://github.com/rust-lang/glob
 Authors: The Rust Project Developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb
 
-globset 0.4.19
+globset 0.4.21
 License: Unlicense OR MIT
 Source: https://github.com/BurntSushi/ripgrep/tree/master/crates/globset
 Authors: Andrew Gallant <jamslam@gmail.com>
@@ -1083,7 +1094,7 @@ Source: https://github.com/rustwasm/gloo
 Authors: Rust and WebAssembly Working Group; Elina <imelina@elina.website>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-gloo-utils 0.3.0
+gloo-utils 0.3.1
 License: MIT OR Apache-2.0
 Source: https://github.com/rustwasm/gloo/tree/master/crates/utils
 Authors: Rust and WebAssembly Working Group
@@ -1110,7 +1121,7 @@ Notices: f7e454fb3ab6d563d13f0df521957d4f30a759cdf639456d4271c4c9c2fa05f7
 h263-rs-deblock 0.1.0
 License: MIT OR Apache-2.0
 Source: https://crates.io/crates/h263-rs-deblock
-Authors: TÃ–RÃ–K Attila <torokati44@gmail.com>
+Authors: TÖRÖK Attila <torokati44@gmail.com>
 Notices: f7e454fb3ab6d563d13f0df521957d4f30a759cdf639456d4271c4c9c2fa05f7
 
 h263-rs-yuv 0.1.0
@@ -1147,7 +1158,7 @@ Source: https://github.com/hyperium/http
 Authors: Alex Crichton <alex@alexcrichton.com>; Carl Lerche <me@carllerche.com>; Sean McArthur <sean@seanmonstar.com>
 Notices: 336977372a4072c666d23fe62a915db7fea41c94130fb5ec9766d634269ae2a2, dc91f8200e4b2a1f9261035d4c18c33c246911a6c0f7b543d75347e61b249cff
 
-id3 1.17.2
+id3 1.17.4
 License: MIT
 Source: https://codeberg.org/polyfloyd/rust-id3
 Authors: polyfloyd <floyd@polyfloyd.net>
@@ -1171,7 +1182,7 @@ Source: https://github.com/hsivonen/idna_adapter
 Authors: The rust-url developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 8b43ce8accd61e9d370b5ca9e9c4f953279b5c239926c62315b40e24df51b726
 
-ignore 0.4.32
+ignore 0.4.34
 License: Unlicense OR MIT
 Source: https://github.com/BurntSushi/ripgrep/tree/master/crates/ignore
 Authors: Andrew Gallant <jamslam@gmail.com>
@@ -1191,7 +1202,7 @@ Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, ecc26
 intl-memoizer 0.5.3
 License: Apache-2.0 OR MIT
 Source: https://github.com/projectfluent/fluent-rs
-Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; StaÅ› MaÅ‚olepszy <stas@mozilla.com>
+Authors: Caleb Maclennan <caleb@alerque.com>; Bruce Mitchener <bruce.mitchener@gmail.com; Zibi Braniecki <zibi@unicode.org>; Staś Małolepszy <stas@mozilla.com>
 Notices: 49c0b000c03731d9e3970dc059ad4ca345d773681f4a612b0024435b663e0220, 8a5119d39ab16b8104fdcc022b02ebe958c2c00bc42996d93f5b5caf90667477
 
 intl_pluralrules 7.0.2
@@ -1217,7 +1228,7 @@ Source: https://github.com/rust-itertools/itertools
 Authors: bluss
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 7576269ea71f767b99297934c0b2367532690f8c4badc695edf8e04ab6a1e545
 
-itoa 1.0.18
+itoa 1.0.19
 License: MIT OR Apache-2.0
 Source: https://github.com/dtolnay/itoa
 Authors: David Tolnay <dtolnay@gmail.com>
@@ -1247,13 +1258,13 @@ Source: https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys
 Authors: The wasm-bindgen Developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397
 
-lazy_static 1.5.0
+lazy_static 1.5.1
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang-nursery/lazy-static.rs
-Authors: Marvin LÃ¶bel <loebel.marvin@gmail.com>
-Notices: 0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720, 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4
+Authors: Marvin Löbel <loebel.marvin@gmail.com>
+Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3
 
-libc 0.2.189
+libc 0.2.191
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/libc
 Notices: 123a331b5dbf04c30097fa43b8f858bc85df671fe776de498d01f3d6b7c1f69e, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
@@ -1275,7 +1286,7 @@ License: LGPL-2.1-or-later
 Source: https://github.com/kakaroto/libsiren
 Notices: 2403020ec1fa1ada91cdffb14cc48251088c20e4d2cd4c70081c0f1d0fb10e30, 5a9f4257d9c5cf1b15f54a0cb72d1f131c389af456716a56c07fee3a843e0369
 
-litrs 1.0.0
+litrs 1.0.1
 License: MIT OR Apache-2.0
 Source: https://github.com/LukasKalbertodt/litrs
 Authors: Lukas Kalbertodt <lukas.kalbertodt@gmail.com>
@@ -1287,13 +1298,13 @@ Source: https://github.com/Amanieu/parking_lot
 Authors: Amanieu d'Antras <amanieu@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5
 
-log 0.4.34
+log 0.4.35
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/log
 Authors: The Rust Project Developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb
 
-lru 0.18.4
+lru 0.18.5
 License: MIT
 Source: https://github.com/jeromefroe/lru-rs.git
 Authors: Jerome Froelich <jeromefroelic@hotmail.com>
@@ -1376,25 +1387,25 @@ Source: https://github.com/hsivonen/multiversion_no_op
 Authors: Henri Sivonen <hsivonen@hsivonen.fi>
 Notices: 3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c, 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a, d2a809eafabba137f508bea16a1b93d8ff24df7da6f38129d830db9bc118bdfe
 
-naga 30.0.1
+naga 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21
 
-naga-agal 0.7.1
+naga-agal 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-naga-pixelbender 0.7.1
+naga-pixelbender 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-naga-types 30.0.1
+naga-types 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
@@ -1489,7 +1500,7 @@ Source: https://github.com/matklad/once_cell
 Authors: Aleksey Kladov <aleksey.kladov@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3
 
-ordered-float 5.5.0
+ordered-float 5.5.1
 License: MIT
 Source: https://github.com/reem/rust-ordered-float
 Authors: Jonathan Reem <jonathan.reem@gmail.com>; Matt Brubeck <mbrubeck@limpet.net>
@@ -1628,7 +1639,7 @@ License: Apache-2.0 OR MIT
 Source: https://github.com/taiki-e/pin-project-lite
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-pixel_bender 0.7.1
+pixel_bender 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
@@ -1640,7 +1651,7 @@ Source: https://github.com/image-rs/image-png
 Authors: The image-rs Developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, eaf40297c75da471f7cda1f3458e8d91b4b2ec866e609527a13acfa93b638652
 
-powerfmt 0.2.0
+powerfmt 0.2.1
 License: MIT OR Apache-2.0
 Source: https://github.com/jhpratt/powerfmt
 Authors: Jacob Pratt <jacob@jhpratt.dev>
@@ -1699,7 +1710,7 @@ Source: https://github.com/dtolnay/quote
 Authors: David Tolnay <dtolnay@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-rand 0.10.2
+rand 0.10.4
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-random/rand
 Authors: The Rand Project Developers; The Rust Project Developers
@@ -1723,25 +1734,25 @@ Source: https://github.com/rust-windowing/raw-window-handle
 Authors: Osspial <osspial@gmail.com>
 Notices: 9c5a80639a57c1c945570e7ebbca0706305849ce3c098021325cca9db2f7acc4, ae895c8576e682f310fb70d93d9f99b1dd82872094c54a8f6cdfe2ca5c2d6ecb, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-realfft 3.5.0
+realfft 3.5.1
 License: MIT
 Source: https://github.com/HEnquist/realfft
 Authors: HEnquist <henrik.enquist@gmail.com>
-Notices: f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d
+Notices: 080766c57f9e48f00218f4e43c7d671d4b6ffee85a39417b5ab3c916dfe29b0d, f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d
 
-regex 1.13.1
+regex 1.13.2
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/regex
 Authors: The Rust Project Developers; Andrew Gallant <jamslam@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb
 
-regex-automata 0.4.18
+regex-automata 0.4.19
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/regex
 Authors: The Rust Project Developers; Andrew Gallant <jamslam@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb
 
-regex-syntax 0.8.11
+regex-syntax 0.8.12
 License: MIT OR Apache-2.0
 Source: https://github.com/rust-lang/regex
 Authors: The Rust Project Developers; Andrew Gallant <jamslam@gmail.com>
@@ -1761,82 +1772,82 @@ Notices: 65fc947f4bac882a2cd104ef73c246b1b037059df9f2b3a58b7f77f0b9e56071
 
 Ruffle web attribution collection
 License: MIT OR Apache-2.0
-Source: https://github.com/ruffle-rs/ruffle/tree/89a7049965f3090e706265670df309a5128233ac
+Source: https://github.com/ruffle-rs/ruffle/tree/cd4cb8f45f144d5a9209f496ee09b60ad136b5b3
 Notices: 83e0a3ea1690281ca2c70f92c17dff9a05f110c0100242478a89bb0a06e815a3, e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_common 0.7.1
+ruffle_common 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_core 0.7.1
+ruffle_core 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_macros 0.7.1
+ruffle_macros 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_render 0.7.1
+ruffle_render 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_render_canvas 0.7.1
+ruffle_render_canvas 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_render_webgl 0.7.1
+ruffle_render_webgl 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_render_wgpu 0.7.1
+ruffle_render_wgpu 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Nathan Adams <dinnerbone@dinnerbone.com>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_video 0.7.1
+ruffle_video 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_video_external 0.7.1
+ruffle_video_external 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_video_software 0.7.1
+ruffle_video_software 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: e39a2fa3dfd7238f0924f568fabb659ee1a9d95ea6460dbae4bc9b67017a1c71
 
-ruffle_web 0.7.1
+ruffle_web 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: 83e0a3ea1690281ca2c70f92c17dff9a05f110c0100242478a89bb0a06e815a3
 
-ruffle_web_common 0.7.1
+ruffle_web_common 0.8.0
 License: MIT OR Apache-2.0
 Source: https://crates.io/crates/ruffle_web_common
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: 83e0a3ea1690281ca2c70f92c17dff9a05f110c0100242478a89bb0a06e815a3
 
-ruffle_wstr 0.7.1
+ruffle_wstr 0.8.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Arthur Heuillard <arthur.heuillard<orange.fr>
@@ -1919,10 +1930,9 @@ Source: https://github.com/serde-rs/serde
 Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-serde_json 1.0.151
+serde_json 1.0.154
 License: MIT OR Apache-2.0
 Source: https://github.com/serde-rs/json
-Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
 sharded-slab 0.1.7
@@ -1961,9 +1971,9 @@ Source: https://github.com/orlp/slotmap
 Authors: Orson Peters <orsonpeters@gmail.com>
 Notices: 6cec81441b2ab2b5090954c1fb5d0bcca81b86487b5849061fa8952d20ef67d4
 
-smallvec 1.16.2
+smallvec 1.16.6
 License: MIT OR Apache-2.0
-Source: https://github.com/servo/rust-smallvec
+Source: https://github.com/smallvec/smallvec
 Authors: The Servo Project Developers
 Notices: 0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9, 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4
 
@@ -2003,11 +2013,11 @@ Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
 Notices: 0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720, 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4
 
-swf 0.3.0
+swf 0.4.0
 License: MIT OR Apache-2.0
 Source: https://github.com/ruffle-rs/ruffle
 Authors: Ruffle LLC <ruffle@ruffle.rs>
-Notices: 0621878e61f0d0fda054bcbe02df75192c28bde1ecc8289cbd86aeba2dd72720, 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4
+Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 8a64e11eed70f6539713ac2755ca666f332ca7e48e6cad3dd0d7208f8ac9e53b
 
 symphonia 0.5.5
 License: MPL-2.0
@@ -2045,7 +2055,7 @@ Source: https://github.com/dtolnay/syn
 Authors: David Tolnay <dtolnay@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-syn 3.0.6
+syn 3.0.10
 License: MIT OR Apache-2.0
 Source: https://github.com/dtolnay/syn
 Authors: David Tolnay <dtolnay@gmail.com>
@@ -2063,13 +2073,13 @@ Source: https://github.com/BurntSushi/termcolor
 Authors: Andrew Gallant <jamslam@gmail.com>
 Notices: 01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f, 0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f, 7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c
 
-thiserror 2.0.18
+thiserror 2.0.21
 License: MIT OR Apache-2.0
 Source: https://github.com/dtolnay/thiserror
 Authors: David Tolnay <dtolnay@gmail.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-thiserror-impl 2.0.18
+thiserror-impl 2.0.21
 License: MIT OR Apache-2.0
 Source: https://github.com/dtolnay/thiserror
 Authors: David Tolnay <dtolnay@gmail.com>
@@ -2105,7 +2115,7 @@ Source: https://github.com/time-rs/time
 Authors: Jacob Pratt <open-source@jhpratt.dev>; Time contributors
 Notices: 2537228d9a1b44a5dc595241349cae7090b326c8de165aaf89bfddef4a00d0fc, bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec
 
-tinystr 0.8.4
+tinystr 0.8.5
 License: Unicode-3.0
 Source: https://github.com/unicode-org/icu4x
 Authors: The ICU4X Project Developers
@@ -2161,7 +2171,7 @@ Notices: a1b4fcc0102c5dca085eb9e3b7395bb9262be7390f3c90109c03b7ff3c2b4aa8
 ttf-parser 0.25.1
 License: MIT OR Apache-2.0
 Source: https://github.com/harfbuzz/ttf-parser
-Authors: Caleb Maclennan <caleb@alerque.com>; Laurenz Stampfl <laurenz.stampfl@gmail.com>; Yevhenii Reizner <razrfalcon@gmail.com>; Ø®Ø§Ù„Ø¯ Ø­Ø³Ù†ÙŠ (Khaled Hosny) <khaled@aliftype.com>
+Authors: Caleb Maclennan <caleb@alerque.com>; Laurenz Stampfl <laurenz.stampfl@gmail.com>; Yevhenii Reizner <razrfalcon@gmail.com>; خالد حسني (Khaled Hosny) <khaled@aliftype.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, bb7d16c928ad39fd073ae51d636ef8b62ec893ccea4058a0b5829bec76ad1fca
 
 type-map 0.5.1
@@ -2170,7 +2180,7 @@ Source: https://github.com/kardeiz/type-map
 Authors: Jacob Brown <kardeiz@gmail.com>
 Notices: 1e932f2af080ff34117d4090bf0b873ed6339f5db932fd0aef2595501915c21e, 2ce11c42d594ff12365ffb4bb13a5f994964795a102c60911454822368c07ebb
 
-typed-path 0.12.3
+typed-path 0.13.0
 License: MIT OR Apache-2.0
 Source: https://github.com/chipsenkbeil/typed-path
 Authors: Chip Senkbeil <chip@senkbeil.org>
@@ -2205,7 +2215,7 @@ License: Unicode-3.0
 Source: https://www.unicode.org/Public/18.0.0/ucd/emoji/emoji-data.txt
 Notices: e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96
 
-unicode-ident 1.0.24
+unicode-ident 1.0.27
 License: (MIT OR Apache-2.0) AND Unicode-3.0
 Source: https://github.com/dtolnay/unicode-ident
 Authors: David Tolnay <dtolnay@gmail.com>
@@ -2217,19 +2227,19 @@ Source: https://github.com/unicode-rs/unicode-segmentation
 Authors: kwantam <kwantam@gmail.com>; Manish Goregaokar <manishsmail@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d, 7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0
 
-unicode-width 0.2.2
+unicode-width 0.2.3
 License: MIT OR Apache-2.0
 Source: https://github.com/unicode-rs/unicode-width
 Authors: kwantam <kwantam@gmail.com>; Manish Goregaokar <manishsmail@gmail.com>
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d, 7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0
 
-url 2.5.8
+url 2.5.9
 License: MIT OR Apache-2.0
 Source: https://github.com/servo/rust-url
 Authors: The rust-url developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, b38f11f6096706e6de553dabe2a7ed142d59b6fa8c97e290c67496154745cdd5
 
-utf8_iter 1.0.4
+utf8_iter 1.1.0
 License: Apache-2.0 OR MIT
 Source: https://github.com/hsivonen/utf8_iter
 Authors: Henri Sivonen <hsivonen@hsivonen.fi>
@@ -2240,6 +2250,12 @@ License: Apache-2.0 OR MIT
 Source: https://github.com/alacritty/vte
 Authors: Joe Wilm <joe@jwilm.com>; Christian Duerr <contact@christianduerr.com>
 Notices: b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e, e4c9b06fa850cb9b540a5e400e9f6394cf15efcf4098144de477d1d3dae10150
+
+utf_types 1.0.0
+License: Apache-2.0 OR MIT
+Source: https://github.com/hsivonen/utf_types
+Authors: Henri Sivonen <hsivonen@hsivonen.fi>
+Notices: 3210be7332b5bdf48eb24a945258b9f38616a2cceb0dfc06e3c3c7e9740475a0, 3fa4ca83dcc9237839b1bdeb2e6d16bdfb5ec0c5ce42b24694d8bbf0dcbef72c, 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a
 
 version_check 0.9.5
 License: MIT/Apache-2.0
@@ -2288,17 +2304,11 @@ License: Apache-2.0
 Source: GoogleChromeLabs/wasm-feature-detect
 Notices: 6fbcac4f55705b2ef53211f286842f84679f8a97bad9e52ad598caa262c6af90, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
 
-wasm-streams 0.5.0
+wasm-streams 0.7.1
 License: MIT OR Apache-2.0
 Source: https://github.com/MattiasBuelens/wasm-streams/
 Authors: Mattias Buelens <mattias@buelens.com>
 Notices: 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3, b30df9a48463d1c99c6a66cdee623b1b0832c3811d58a80b338268d71cea190e
-
-weak-table 0.3.2
-License: MIT
-Source: https://github.com/tov/weak-table-rs
-Authors: Jesse A. Tov <jesse.tov@gmail.com>
-Notices: c94d1aee4aa4e9bd6f4fef11b12149950539abab0a1d53b06cb46a797d67a75c
 
 web-sys 0.3.104
 License: MIT OR Apache-2.0
@@ -2311,42 +2321,37 @@ License: MIT OR Apache-2.0
 Source: https://github.com/daxpedda/web-time
 Notices: 485215d5d9408bdaed32850aac9e7e3f7b2cca1af0c6a7d8c39c9a5bb83a7af1, f428305bbf2e70fbd807af0f3c7ac1b7acfb95311640f451e9d2e48db6d7e96b
 
-webpack 5.111.1
-License: MIT
-Source: https://github.com/webpack/webpack
-Notices: 9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e
-
 weezl 0.1.12
 License: MIT OR Apache-2.0
 Source: https://github.com/image-rs/weezl
 Authors: The image-rs Developers
 Notices: 143368af9701a24ebaf89fe5310ad8116ca71e8e99f17415c0dd893f6a256ae4, 776aa6f89099bf24a9bceac4b7d9ad8946c017161de770698b5a5cc8de0254a6
 
-wgpu 30.0.1
+wgpu 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21
 
-wgpu-core 30.0.1
+wgpu-core 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21
 
-wgpu-core-deps-wasm 30.0.1
+wgpu-core-deps-wasm 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21
 
-wgpu-hal 30.0.1
+wgpu-hal 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
 Notices: bb28c48e3e078166e91cfc2b6db7ffebb8a0973b9e23b3df060561292d8d69ec, dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21
 
-wgpu-naga-bridge 30.0.1
+wgpu-naga-bridge 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
@@ -2358,7 +2363,7 @@ Source: https://github.com/Wumpf/wgpu-profiler
 Authors: Andreas Reich <r_andreas2@web.de>
 Notices: 866565afd03696d5dcda9e86933339e537a632047e4aaa8dca7069f16b5f0301, c00f24c69536b0c4c736a1d51b480f8c60ea49c7db92eba54f88a698e44a7321
 
-wgpu-types 30.0.1
+wgpu-types 30.0.2
 License: MIT OR Apache-2.0
 Source: https://github.com/gfx-rs/wgpu
 Authors: gfx-rs developers
@@ -2370,17 +2375,17 @@ Source: https://github.com/Lokathor/wide
 Authors: Lokathor <zefria@gmail.com>
 Notices: 33e9b6beb7db4174de38086582e4ec2bed8ff88320f9bae959a7b78d3ea4bc8d, 3c6921f3dfec0bed0cfa2d632616edd7380a875c8ad76c7b23dc59892259f62c, 69c62cda6938d510467c134dc0b5c83fb9c8ca847b9cd9d9d2fe9ab427c82100
 
-winnow 1.0.4
+winnow 1.0.5
 License: MIT
 Source: https://github.com/winnow-rs/winnow
 Notices: cb5aedb296c5246d1f22e9099f925a65146f9f0d6b4eebba97fd27a6cdbbab2d
 
-zerocopy 0.8.57
+zerocopy 0.8.63
 License: BSD-2-Clause OR Apache-2.0 OR MIT
 Source: https://github.com/google/zerocopy
 Notices: 24fa231567ace7e0cdd96e5b2e649b0445d280710f7018d01ba6411e06aa641e, 83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32, cb84f28c8b267bfd66ccf1f43f63bd9c357bb479576e437243ca38dad2851808
 
-zerocopy-derive 0.8.57
+zerocopy-derive 0.8.63
 License: BSD-2-Clause OR Apache-2.0 OR MIT
 Source: https://github.com/google/zerocopy
 Notices: 24fa231567ace7e0cdd96e5b2e649b0445d280710f7018d01ba6411e06aa641e, 83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32, cb84f28c8b267bfd66ccf1f43f63bd9c357bb479576e437243ca38dad2851808
@@ -2391,13 +2396,25 @@ Source: https://github.com/unicode-org/icu4x
 Authors: The ICU4X Project Developers
 Notices: f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2
 
-zerovec 0.11.8
+zeroize 1.9.2
+License: Apache-2.0 OR MIT
+Source: https://github.com/RustCrypto/utils
+Authors: The RustCrypto Project Developers
+Notices: 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a, 8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b
+
+zeroize_derive 1.5.0
+License: Apache-2.0 OR MIT
+Source: https://github.com/RustCrypto/utils
+Authors: The RustCrypto Project Developers
+Notices: 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a, b8c6939380a400f53e11923d50fcc4dd2fa1ba8339fd9d04cda38a0251b6c9b0
+
+zerovec 0.11.9
 License: Unicode-3.0
 Source: https://github.com/unicode-org/icu4x
 Authors: The ICU4X Project Developers
 Notices: f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2
 
-zip 9.0.5
+zip 9.7.0
 License: MIT
 Source: https://github.com/zip-rs/zip2
 Authors: Mathijs van de Nes <git@mathijs.vd-nes.nl>; Marli Frost <marli@frost.red>; Ryan Levick <ryan.levick@gmail.com>; Chris Hennick <hennickc@amazon.com>
@@ -2648,6 +2665,31 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+========================================================================
+Notice 080766c57f9e48f00218f4e43c7d671d4b6ffee85a39417b5ab3c916dfe29b0d
+========================================================================
+MIT License
+
+Copyright (c) 2020 Henrik Enquist and RealFFT contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ========================================================================
 Notice 0a4e5a27177da58ebaec50645beab083ba00ba2f4ca3a7c1fa6f4d10491d1d41
@@ -36326,6 +36368,30 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
+Notice 3210be7332b5bdf48eb24a945258b9f38616a2cceb0dfc06e3c3c7e9740475a0
+========================================================================
+Copyright Mozilla Foundation
+
+Licensed under the Apache License (Version 2.0), or the MIT license,
+(the "Licenses") at your option. You may not use this file except in
+compliance with one of the Licenses. You may obtain copies of the
+Licenses at:
+
+   https://www.apache.org/licenses/LICENSE-2.0
+   https://opensource.org/licenses/MIT
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the Licenses is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the Licenses for the specific language governing permissions and
+limitations under the Licenses.
+
+--
+
+Test code is dedicated to the Public Domain when so designated (see
+the individual files for PD/CC0-dedicated sections).
+
+========================================================================
 Notice 336977372a4072c666d23fe62a915db7fea41c94130fb5ec9766d634269ae2a2
 ========================================================================
 Apache License
@@ -42612,6 +42678,35 @@ Apache License
    limitations under the License.
 
 ========================================================================
+Notice 8a64e11eed70f6539713ac2755ca666f332ca7e48e6cad3dd0d7208f8ac9e53b
+========================================================================
+Copyright (c) 2016 Ruffle LLC <ruffle@ruffle.rs> and Ruffle contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+========================================================================
 Notice 8b43ce8accd61e9d370b5ca9e9c4f953279b5c239926c62315b40e24df51b726
 ========================================================================
 Copyright (c) The rust-url developers
@@ -42644,6 +42739,35 @@ DEALINGS IN THE SOFTWARE.
 Notice 8b6e9feec03e7c9a5facb26855cecd31662bf989b636bcfe79521bdf8ac863f0
 ========================================================================
 Copyright (c) 2018-2026 The Rand Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+========================================================================
+Notice 8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b
+========================================================================
+Copyright (c) 2018-2026 The RustCrypto Project Developers
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -42747,30 +42871,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-========================================================================
-Notice 9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e
-========================================================================
-Copyright JS Foundation and other contributors
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
 Notice 90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5
@@ -42937,6 +43037,24 @@ androidx/compose/material/icons/rounded/CopyrightKt
 30#1:123,4
 *E
 J   @ ' ([ I)I*I+,I-.I/0[ s12[ s s 	s3s$s s s4A    > ?[ s@
+
+========================================================================
+Notice 9a3aeb3f63659c4c6302d315e1d98784d1e8559858a47ff9562e091bb922d28d
+========================================================================
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
 Notice 9c5a80639a57c1c945570e7ebbca0706305849ce3c098021325cca9db2f7acc4
@@ -44054,6 +44172,31 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ========================================================================
+Notice b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681
+========================================================================
+MIT License
+
+Copyright (c) 2020 Evan Wallace
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+========================================================================
 Notice b7e650f3fce5c53249d1cdc608b54df156a97edd636cf9d23498d0cfe7aec63e
 ========================================================================
 The MIT License (MIT)
@@ -44075,6 +44218,35 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+========================================================================
+Notice b8c6939380a400f53e11923d50fcc4dd2fa1ba8339fd9d04cda38a0251b6c9b0
+========================================================================
+Copyright (c) 2019-2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 
 ========================================================================
 Notice b90ed8150a6d371c84b7dbaa680cd0e9893ef7c2558765e1e00930513efcfe3b
@@ -44783,31 +44955,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
-========================================================================
-Notice c94d1aee4aa4e9bd6f4fef11b12149950539abab0a1d53b06cb46a797d67a75c
-========================================================================
-MIT License
-
-Copyright (c) 2018 Jesse A. Tov
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 ========================================================================
 Notice c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5

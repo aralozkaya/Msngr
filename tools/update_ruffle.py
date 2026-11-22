@@ -128,7 +128,7 @@ def runtime_files(archive, integrity, version, commit):
     if package is None or package.get("name") != "@ruffle-rs/ruffle" or package.get("version") != version:
         raise ValueError("Unexpected Ruffle package identity")
     required = {"ruffle.js", "LICENSE_MIT", "LICENSE_APACHE"}
-    if not required.issubset(files) or not any(n.endswith(".wasm") for n in files) or not any(n.startswith("core.ruffle.") for n in files):
+    if not required.issubset(files) or not any(n.endswith(".wasm") for n in files):
         raise ValueError("Incomplete Ruffle runtime")
     loader = files["ruffle.js"].decode("utf-8")
     if f'commitHash:"{commit}"' not in loader or f'versionNumber:"{version}"' not in loader:
