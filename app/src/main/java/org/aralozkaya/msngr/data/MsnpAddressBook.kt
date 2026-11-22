@@ -5,11 +5,14 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.enums.Presence
+import org.w3c.dom.Document
 import org.w3c.dom.Element
+import org.xml.sax.SAXException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.parsers.ParserConfigurationException
 
 /** MSNP18-era Address Book SOAP client used to load forward-list contacts after SSO. */
 internal object MsnpAddressBookService {
@@ -328,7 +331,7 @@ internal fun buildAddContactRequest(ticket: String, email: String, displayName: 
 
 internal fun parseAddContactResponse(xml: String): String {
     val document = try {
-        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        parseAddressBookXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The contact service returned an invalid response.", error)
     }
@@ -378,7 +381,7 @@ internal fun buildContactMessengerUpdateRequest(ticket: String, contactGuid: Str
 
 internal fun parseContactUpdateResponse(xml: String) {
     val document = try {
-        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        parseAddressBookXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The contact service returned an invalid response.", error)
     }
@@ -487,7 +490,7 @@ internal fun buildCreateCategoryRequest(
 
 internal fun parseCreateCategoryResponse(xml: String): String {
     val document = try {
-        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        parseAddressBookXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The category service returned an invalid response.", error)
     }
@@ -665,7 +668,7 @@ internal fun buildRemoveContactFromCategoryRequest(
 
 internal fun parseCategoryOperationResponse(xml: String, action: String) {
     val document = try {
-        secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        parseAddressBookXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The category service returned an invalid response.", error)
     }
@@ -715,7 +718,7 @@ internal fun buildMembershipChangeRequest(ticket: String, email: String, role: S
 }
 
 internal fun parseMembershipChangeResponse(xml: String, action: String) {
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream())
+    val document = parseAddressBookXml(xml)
     if (document.getElementsByTagNameNS("*", "Fault").length > 0 ||
         document.getElementsByTagNameNS("*", "${action}Response").length == 0)
         throw AddressBookException("The server could not update this contact request. Please try again.")
@@ -723,7 +726,7 @@ internal fun parseMembershipChangeResponse(xml: String, action: String) {
 
 internal fun parseMessengerMemberships(xml: String, signedInEmail: String): MessengerMemberships {
     val blocked = parseBlockedMemberships(xml, signedInEmail)
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream())
+    val document = parseAddressBookXml(xml)
     val requests = document.getElementsByTagNameNS("*", "Membership").asElementSequence()
         .filter { it.descendantText("MemberRole").equals("Pending", true) }
         .filter { membership ->
@@ -802,8 +805,7 @@ internal fun parseAddressBookContacts(xml: String, signedInEmail: String): List<
     parseAddressBook(xml, signedInEmail).contacts
 
 internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSnapshot {
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder()
-        .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+    val document = parseAddressBookXml(xml)
     val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
     if (fault != null) {
         throw AddressBookException(
@@ -962,8 +964,7 @@ private fun parseAddressBookCircles(
         }.distinctBy(Contact::id).toList()
 
 internal fun parseBlockedMemberships(xml: String, signedInEmail: String): List<Contact> {
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder()
-        .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+    val document = parseAddressBookXml(xml)
     val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
     if (fault != null) {
         throw AddressBookException(
@@ -1003,7 +1004,7 @@ internal fun parseBlockedMemberships(xml: String, signedInEmail: String): List<C
 }
 
 internal fun parseCircleMembers(xml: String): List<GroupMember> {
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder().parse(xml.byteInputStream())
+    val document = parseAddressBookXml(xml)
     return document.getElementsByTagNameNS("*", "Contact").asElementSequence()
         .filterNot { it.descendantText("fDeleted").equals("true", true) }
         .filter { it.descendantText("contactType") in setOf("Live", "LivePending") }
@@ -1050,8 +1051,7 @@ internal fun mergeMessengerMemberships(addressBook: AddressBookSnapshot, members
 }
 
 private fun parseAddressBookFault(xml: String): String = runCatching {
-    val document = secureAddressBookDocumentBuilderFactory().newDocumentBuilder()
-        .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+    val document = parseAddressBookXml(xml)
     document.documentElement.descendantText("faultstring")
 }.getOrDefault("")
 
@@ -1082,14 +1082,39 @@ private fun String.escapeAddressBookXml(): String = buildString(length) {
     }
 }
 
-private fun secureAddressBookDocumentBuilderFactory(): DocumentBuilderFactory =
-    DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+private fun parseAddressBookXml(xml: String): Document {
+    val factory = DocumentBuilderFactory.newInstance()
+    factory.isNamespaceAware = true
+    factory.isExpandEntityReferences = false
+    try {
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    } catch (_: ParserConfigurationException) {
+        // Android's Harmony parser does not support Xerces DTD features.
     }
+    try {
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+    } catch (_: ParserConfigurationException) {
+        // Unsupported on Android's Harmony parser.
+    }
+    try {
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+    } catch (_: ParserConfigurationException) {
+        // Unsupported on Android's Harmony parser.
+    }
+    try {
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+    } catch (_: ParserConfigurationException) {
+        // Unsupported on Android's Harmony parser.
+    }
+    try {
+        factory.isXIncludeAware = false
+    } catch (_: UnsupportedOperationException) {
+        // Unsupported on Android's Harmony parser.
+    }
+    val builder = factory.newDocumentBuilder()
+    builder.setEntityResolver { _, _ -> throw SAXException("External entities are not allowed.") }
+    return builder.parse(xml.byteInputStream(StandardCharsets.UTF_8))
+}
 
 private class AddressBookException(message: String, cause: Throwable? = null) :
     Exception(message, cause)
