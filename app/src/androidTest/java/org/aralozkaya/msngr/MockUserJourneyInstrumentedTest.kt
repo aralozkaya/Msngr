@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasScrollAction
@@ -215,14 +216,25 @@ class MockUserJourneyInstrumentedTest {
                 .getBoolean("convert_typed_shortcuts", true),
         )
         shortcutToggle.performClick().assertIsOn()
-        val originalToggle = compose.onNodeWithTag("use_original_emoticons")
-        originalToggle.assertIsOn().performClick().assertIsOff()
+        val wlm2009Option = compose.onNodeWithTag("emoticon_style_wlm_2009")
+        val wlm2012Option = compose.onNodeWithTag("emoticon_style_wlm_2012")
+        val androidEmojiOption = compose.onNodeWithTag("emoticon_style_android_emoji")
+        wlm2009Option.assertIsSelected()
+        wlm2012Option.performClick().assertIsSelected()
+        assertEquals(EmoticonStyle.Wlm2012, EmoticonPrefs.state(context).value.style)
+        assertEquals(
+            EmoticonStyle.Wlm2012.storageValue,
+            AccountPreferences.preferences(context, "msngr_emoticons")
+                .getString("emoticon_style", null),
+        )
+        androidEmojiOption.performClick().assertIsSelected()
+        assertEquals(EmoticonStyle.AndroidEmoji, EmoticonPrefs.state(context).value.style)
         assertFalse(EmoticonPrefs.state(context).value.useOriginalEmoticons)
         assertFalse(
             AccountPreferences.preferences(context, "msngr_emoticons")
                 .getBoolean("use_original_emoticons", true),
         )
-        originalToggle.performClick().assertIsOn()
+        wlm2009Option.performClick().assertIsSelected()
         compose.onNodeWithContentDescription("Back").performClick()
         waitForText("Settings")
         compose.onNodeWithText("About").performScrollTo().performClick()

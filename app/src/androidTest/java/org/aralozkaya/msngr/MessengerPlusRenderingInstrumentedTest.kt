@@ -45,7 +45,7 @@ class MessengerPlusRenderingInstrumentedTest {
         val source = "[a=#123456][u][s][c=#000000]AA[b]BB[/b]CC[/c=#FFFFFF][/s][/u][/a]"
         compose.setContent {
             MaterialTheme {
-                MsnEmoticonEditor(source, {}, false, false)
+                MsnEmoticonEditor(source, {}, false, EmoticonStyle.AndroidEmoji)
             }
         }
         onView(withContentDescription("Message input")).check { view, error ->
@@ -86,7 +86,7 @@ class MessengerPlusRenderingInstrumentedTest {
                         samples.forEach { (label, source) ->
                             Column {
                                 Text(label, style = MaterialTheme.typography.labelMedium)
-                                MsnEmoticonText(source, false, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp))
+                                MsnEmoticonText(source, EmoticonStyle.AndroidEmoji, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp))
                             }
                         }
                     }

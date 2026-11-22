@@ -167,7 +167,7 @@ class AccountStorageInstrumentedTest {
         assertEquals("content://alice/photo", restored.avatarUri)
         assertEquals(Presence.Busy, restored.presence)
         assertEquals(AppAppearance(ThemeMode.Dark, ColorMode.Default), appearance.value)
-        assertEquals(EmoticonSettings(false, false), emoticons.value)
+        assertEquals(EmoticonSettings(false, EmoticonStyle.AndroidEmoji), emoticons.value)
         assertEquals(MessengerPlusSettings(false, false), plus.value)
         assertFalse(BackgroundDeliveryPrefs.keepsConnectionAlive(context))
         val snapshot = SessionPrefs.readLoginSnapshot(context)

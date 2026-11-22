@@ -185,6 +185,7 @@ sealed interface MessengerEvent {
     data class OwnPersonalStatusChanged(val account: AccountIdentity, val statusMessage: String) : MessengerEvent
     data class OwnCurrentMediaChanged(val account: AccountIdentity, val currentMedia: CurrentMedia?) : MessengerEvent
     data class OwnPresenceChanged(val account: AccountIdentity, val presence: Presence) : MessengerEvent
+    data class ConversationRepliedElsewhere(val contactId: String) : MessengerEvent
 }
 
 data class PortalState(
@@ -1054,6 +1055,11 @@ class MessengerRepository(
                 } else if (event is MessengerEvent.OwnPresenceChanged && event.account == signedInAccountIdentity) {
                     mutableProfile.update { it.copy(presence = event.presence) }
                     onOwnPresenceChanged(event.account, event.presence)
+                } else if (event is MessengerEvent.ConversationRepliedElsewhere) {
+                    clearPendingNudgeShake(event.contactId)
+                    mutablePendingWinks.update { it - event.contactId }
+                    mutablePendingEmotionSounds.update { it - event.contactId }
+                    onConversationRead(event.contactId)
                 } else if (event is MessengerEvent.SignedOut) {
                     scope.launch {
                         connectionMutex.withLock {

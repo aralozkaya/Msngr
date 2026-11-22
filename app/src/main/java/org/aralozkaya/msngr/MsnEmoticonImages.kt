@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.PathParser
 import androidx.core.graphics.withSave
 import kotlinx.coroutines.delay
+import java.io.FileNotFoundException
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
@@ -264,6 +265,8 @@ internal object MsnEmoticonImages {
         cache[path]?.let { return it as? MsnEmoticonImage }
         val decoded = try {
             context.assets.open(path).use { decode(path, it.readBytes()) }
+        } catch (_: FileNotFoundException) {
+            null
         } catch (error: Exception) {
             Log.w(TAG, "Unable to load emoticon artwork $path", error)
             null
@@ -337,12 +340,13 @@ internal fun MsnEmoticonArtwork(
     emoticon: MsnEmoticonShortcut,
     staticOnly: Boolean,
     modifier: Modifier = Modifier,
+    emoticonStyle: EmoticonStyle = EmoticonStyle.Wlm2009,
 ) {
     val context = LocalContext.current.applicationContext
     val candidates = if (staticOnly) {
-        emoticon.selectorAssetCandidates
+        emoticon.selectorAssetCandidates(emoticonStyle)
     } else {
-        emoticon.artworkAssetCandidates
+        emoticon.artworkAssetCandidates(emoticonStyle)
     }
     val image = remember(context, candidates) {
         MsnEmoticonImages.loadFirst(context, candidates)

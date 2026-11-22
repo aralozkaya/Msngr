@@ -164,7 +164,7 @@ fun ContactProfilePage(
                                 text = contact.statusMessage.takeIf {
                                     it.messengerPlusPlainText().isNotBlank()
                                 } ?: stringResource(R.string.contact_profile_no_status),
-                                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                emoticonStyle = emoticonSettings.style,
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }

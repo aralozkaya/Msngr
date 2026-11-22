@@ -59,6 +59,52 @@ class LiveCircleClientTest {
     private val otherGroupId = "00000000-0000-0000-0009-123456789abd@live.com"
     private val group = Contact(groupId, "Test", groupId, Presence.Online, isGroup = true)
 
+    @Test fun groupReplyFromAnotherSessionMarksGroupReadAndIgnoresCurrentEndpointEcho() = runBlocking {
+        val currentEndpoint = "11111111-1111-1111-1111-111111111111"
+        val desktopEndpoint = "22222222-2222-2222-2222-222222222222"
+        val transport = CircleTransport()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = LiveMsnp18Client(
+            scope = scope,
+            transport = transport,
+            switchboardTransportFactory = { error("Group chat should not open a switchboard") },
+            authenticateSso = { _, _, _, _, _ -> SsoToken("ticket", "response", "contacts", "storage") },
+            fetchAddressBook = { _, _, _ -> AddressBookSnapshot(listOf(group), circleTicket = "signed") },
+            fetchStorageProfile = { _, _ -> StorageProfile() },
+            endpointId = { currentEndpoint },
+        )
+        val events = CopyOnWriteArrayList<MessengerEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { client.events.collect { events += it } }
+        try {
+            client.signIn(SignInRequest(me, "password", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            transport.incoming.send(roster(groupId, me, "alice@example.com"))
+            withTimeout(2_000) { client.contacts.first { it.single().presence.isOnline } }
+
+            transport.incoming.send(MsnpCircles.message(0, groupId, "alice@example.com", "peer", "Hello group"))
+            withTimeout(2_000) { client.contacts.first { it.single().unreadCount == 1 } }
+
+            // An echo from this device's own endpoint is ignored.
+            transport.incoming.send(MsnpCircles.message(0, groupId, me, currentEndpoint, "Self echo"))
+            delay(100)
+            assertEquals(1, client.contacts.value.single().unreadCount)
+            assertEquals(1, client.messages.value.getValue(groupId).size)
+
+            // A reply from another session appends as own message, clears unread, and emits ConversationRepliedElsewhere.
+            transport.incoming.send(MsnpCircles.message(0, groupId, me, desktopEndpoint, "Desktop group reply"))
+            withTimeout(2_000) { client.contacts.first { !it.single().isUnread } }
+            withTimeout(2_000) { while (MessengerEvent.ConversationRepliedElsewhere(groupId) !in events) yield() }
+            val messages = client.messages.value.getValue(groupId)
+            assertEquals(2, messages.size)
+            assertEquals(MessageAuthor.Me, messages.last().author)
+            assertEquals("Desktop group reply", messages.last().text)
+            assertTrue(MessengerEvent.ConversationRepliedElsewhere(groupId) in events)
+        } finally {
+            collector.cancel()
+            client.close()
+            scope.cancel()
+        }
+    }
+
     @Test fun styledEmotionSoundsUseNormalGroupTextAndDoNotRequireClientCapabilities() = runBlocking {
         val transport = CircleTransport()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -172,7 +218,7 @@ class LiveCircleClientTest {
             withTimeout(2_000) { while (events.none { it == MessengerEvent.IncomingMessage(groupId, marker) }) yield() }
             assertEquals(7, client.messages.value.getValue(groupId).count { it.isNudge })
             assertEquals(3, events.count { it is MessengerEvent.IncomingNudge })
-            assertEquals(6, client.contacts.value.single().unreadCount)
+            assertEquals(1, client.contacts.value.single().unreadCount)
             assertTrue(client.sendNudgeWithResult(groupId).exceptionOrNull() is NudgeCooldownException)
         } finally { collector.cancel(); client.close(); scope.cancel() }
     }
