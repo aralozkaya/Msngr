@@ -79,6 +79,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.SoftwareKeyboardControllerCompat
 import org.aralozkaya.msngr.pages.components.KeyboardSheetHostState
 import org.aralozkaya.msngr.pages.components.LocalKeyboardSheetHost
+import org.aralozkaya.msngr.pages.components.snapToVisibleWhenActive
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -291,7 +292,9 @@ internal fun MsnEmoticonEditor(
                 controller.attach(editor) { currentOnSelectionChanged(it) }
             }
         },
-        modifier = modifier.semantics(mergeDescendants = true) {
+        modifier = modifier
+            .snapToVisibleWhenActive(editorFocused)
+            .semantics(mergeDescendants = true) {
             this.contentDescription = contentDescription
             focused = editorFocused
             if (!enabled) disabled()

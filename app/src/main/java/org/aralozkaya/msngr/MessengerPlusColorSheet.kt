@@ -78,6 +78,9 @@ internal class MessengerPlusColorSheetState {
     var initialStyle by mutableStateOf(MessengerPlusStyle())
         private set
 
+    fun isOpenFor(controller: MessengerPlusEditorController): Boolean =
+        visible && this.controller === controller
+
     /** The keyboard sheet scaffold closes the keyboard once the sheet has taken its slot. */
     fun open(controller: MessengerPlusEditorController) {
         this.controller = controller

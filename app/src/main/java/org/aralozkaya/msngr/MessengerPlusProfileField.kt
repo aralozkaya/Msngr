@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import org.aralozkaya.msngr.pages.components.LocalScrollVisibilityHost
+import org.aralozkaya.msngr.pages.components.snapToVisibleWhenActive
 
 /** The native rich-text editor with the profile page's Material outlined-field decoration. */
 @Composable
@@ -54,6 +57,7 @@ internal fun MessengerPlusProfileField(
     supportingText: String? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
     emoticonSheet: EmoticonSheetState? = null,
+    colorSheet: MessengerPlusColorSheetState? = null,
     onColors: (() -> Unit)? = null,
 ) {
     val plainText = value.text.messengerPlusPlainText()
@@ -103,8 +107,13 @@ internal fun MessengerPlusProfileField(
             null
         }
 
+    val fieldActive = focusInteraction != null ||
+        emoticonSheet?.isOpenFor(controller) == true ||
+        colorSheet?.isOpenFor(controller) == true
+
     Box(
         modifier = modifier
+            .snapToVisibleWhenActive(fieldActive)
             .padding(top = 8.dp)
             .defaultMinSize(minHeight = OutlinedTextFieldDefaults.MinHeight)
             .pointerInput(controller, enabled) {
@@ -124,34 +133,36 @@ internal fun MessengerPlusProfileField(
             supportingText = supportingText?.let { { Text(it) } },
             trailingIcon = combinedTrailingIcon,
         ).Decoration {
-            MsnEmoticonEditor(
-                value = value.text,
-                onValueChange = { source -> onValueChange(controller.snapshot().copy(text = source)) },
-                controller = controller,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 24.dp),
-                enabled = enabled,
-                convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
-                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
-                messengerPlusEnabled = messengerPlusEnabled,
-                initialSelection = value.selection,
-                singleLine = true,
-                hint = "",
-                contentDescription = label,
-                contentPadding = PaddingValues(0.dp),
-                onColors = onColors,
-                onFocusChanged = { focused ->
-                    if (focused && focusInteraction == null) {
-                        val interaction = FocusInteraction.Focus()
-                        focusInteraction = interaction
-                        interactionSource.tryEmit(interaction)
-                    } else if (!focused) {
-                        focusInteraction?.let {
-                            interactionSource.tryEmit(FocusInteraction.Unfocus(it))
+            CompositionLocalProvider(LocalScrollVisibilityHost provides null) {
+                MsnEmoticonEditor(
+                    value = value.text,
+                    onValueChange = { source -> onValueChange(controller.snapshot().copy(text = source)) },
+                    controller = controller,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 24.dp),
+                    enabled = enabled,
+                    convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
+                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                    messengerPlusEnabled = messengerPlusEnabled,
+                    initialSelection = value.selection,
+                    singleLine = true,
+                    hint = "",
+                    contentDescription = label,
+                    contentPadding = PaddingValues(0.dp),
+                    onColors = onColors,
+                    onFocusChanged = { focused ->
+                        if (focused && focusInteraction == null) {
+                            val interaction = FocusInteraction.Focus()
+                            focusInteraction = interaction
+                            interactionSource.tryEmit(interaction)
+                        } else if (!focused) {
+                            focusInteraction?.let {
+                                interactionSource.tryEmit(FocusInteraction.Unfocus(it))
+                            }
+                            focusInteraction = null
                         }
-                        focusInteraction = null
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
     }
 }
