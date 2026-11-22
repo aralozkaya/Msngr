@@ -3721,6 +3721,10 @@
     <string name="contact_favorites_removed"></string>
     <!-- Reference (en): Couldn’t update categories. Try again. -->
     <string name="contact_categories_update_failed"></string>
+    <!-- Reference (en): None -->
+    <string name="contact_category_none"></string>
+    <!-- Reference (en): Category -->
+    <string name="contact_category_select_label"></string>
     <!-- Reference (en): Category options -->
     <string name="category_options_description"></string>
     <!-- Reference (en): Create category -->

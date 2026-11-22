@@ -188,24 +188,18 @@ fun ContactProfilePage(
                             }
                         }
                         if (contact.isForwardListContact && !contact.isBlocked && !contact.isGroup) {
-                            val favoritesLabel = stringResource(R.string.contacts_section_favorites)
-                            val otherLabel = stringResource(R.string.contacts_section_other)
-                            val customNames = categories.filterNot(ContactCategory::isBuiltIn)
-                                .associate { it.id to it.name }
-                            val assignedNames = buildList {
-                                if (contact.isFavorite) add(favoritesLabel)
-                                val customAssigned = contact.categoryIds.mapNotNull { customNames[it] }
-                                addAll(customAssigned)
-                                if (customAssigned.isEmpty()) {
-                                    add(otherLabel)
+                            val customCategoryName = categories
+                                .filterNot(ContactCategory::isBuiltIn)
+                                .firstOrNull { it.id in contact.categoryIds }
+                                ?.name
+                            if (customCategoryName != null) {
+                                ProfileDetailCard(
+                                    icon = Icons.Outlined.Folder,
+                                    label = stringResource(R.string.contact_category_select_label),
+                                    modifier = Modifier.testTag("contact-profile-categories"),
+                                ) {
+                                    Text(customCategoryName, style = MaterialTheme.typography.bodyLarge)
                                 }
-                            }
-                            ProfileDetailCard(
-                                icon = Icons.Outlined.Folder,
-                                label = stringResource(R.string.contact_manage_categories),
-                                modifier = Modifier.testTag("contact-profile-categories"),
-                            ) {
-                                Text(assignedNames.joinToString(", "), style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                     }
@@ -225,7 +219,7 @@ fun ContactProfilePage(
                     ) {
                         Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(stringResource(R.string.contact_manage_categories))
+                        Text(stringResource(R.string.contact_category_select_label))
                     }
                 }
             }

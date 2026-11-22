@@ -1978,6 +1978,8 @@
     <string name="contact_favorites_added">Favorilere eklendi.</string>
     <string name="contact_favorites_removed">Favorilerden çıkarıldı.</string>
     <string name="contact_categories_update_failed">Kategoriler güncellenemedi. Tekrar deneyin.</string>
+    <string name="contact_category_none">Yok</string>
+    <string name="contact_category_select_label">Kategori</string>
     <string name="category_options_description">Kategori seçenekleri</string>
     <string name="category_create_title">Kategori oluştur</string>
     <string name="category_edit_title">Kategoriyi düzenle</string>
