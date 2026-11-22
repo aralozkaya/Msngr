@@ -101,11 +101,13 @@ fun GroupDetailsPage(
                 }
                 Text(summaryText, style = MaterialTheme.typography.bodyMedium)
             }
+            val compact = LocalLayoutSettings.current.isCompact
             CompactSearchField(
                 state = searchFieldState,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = stringResource(R.string.group_search_members_placeholder),
                 clearContentDescription = stringResource(R.string.contacts_search_clear),
+                compact = compact,
             )
         }
         val compact = LocalLayoutSettings.current.isCompact

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
@@ -184,43 +186,68 @@ fun ContactsPage(
                 horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SearchBar(
-                    state = searchBarState,
-                    modifier = Modifier.weight(1f).testTag("contacts_search_bar"),
-                    inputField = {
-                        // Keep the app's native editor so search filters the page in place.
-                        CompactSearchField(
-                            state = searchFieldState,
-                            placeholder = stringResource(R.string.contacts_search_placeholder),
-                            clearContentDescription = stringResource(R.string.contacts_search_clear),
-                            modifier = Modifier.fillMaxWidth(),
-                            controller = searchEditorController,
-                            onFocusChanged = { searchFocused = it },
-                        )
-                    },
-                )
-                val iconSize = ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight)
-                FilledTonalButton(
-                    onClick = { showSortOptions = true },
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier
-                        .testTag("contacts_sort_button")
-                        .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec())
-                        .widthIn(min = ButtonDefaults.MinHeight),
-                    contentPadding = if (searchFocused) {
-                        PaddingValues(horizontal = (ButtonDefaults.MinHeight - iconSize) / 2)
-                    } else {
-                        ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight, hasStartIcon = true)
-                    },
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Sort,
-                        contentDescription = stringResource(R.string.contacts_sort_action),
-                        modifier = Modifier.size(iconSize),
+                if (compact) {
+                    CompactSearchField(
+                        state = searchFieldState,
+                        placeholder = stringResource(R.string.contacts_search_placeholder),
+                        clearContentDescription = stringResource(R.string.contacts_search_clear),
+                        modifier = Modifier.weight(1f).testTag("contacts_search_bar"),
+                        compact = true,
+                        controller = searchEditorController,
+                        onFocusChanged = { searchFocused = it },
                     )
-                    if (!searchFocused) {
-                        Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(ButtonDefaults.MinHeight)))
-                        Text(stringResource(R.string.contacts_sort_action))
+                    val compactButtonHeight = 36.dp
+                    TextButton(
+                        onClick = { showSortOptions = true },
+                        modifier = Modifier
+                            .testTag("contacts_sort_button")
+                            .defaultMinSize(minWidth = compactButtonHeight, minHeight = compactButtonHeight),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.contacts_sort_action),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                } else {
+                    SearchBar(
+                        state = searchBarState,
+                        modifier = Modifier.weight(1f).testTag("contacts_search_bar"),
+                        inputField = {
+                            // Keep the app's native editor so search filters the page in place.
+                            CompactSearchField(
+                                state = searchFieldState,
+                                placeholder = stringResource(R.string.contacts_search_placeholder),
+                                clearContentDescription = stringResource(R.string.contacts_search_clear),
+                                modifier = Modifier.fillMaxWidth(),
+                                controller = searchEditorController,
+                                onFocusChanged = { searchFocused = it },
+                            )
+                        },
+                    )
+                    val iconSize = ButtonDefaults.iconSizeFor(ButtonDefaults.MinHeight)
+                    FilledTonalButton(
+                        onClick = { showSortOptions = true },
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier
+                            .testTag("contacts_sort_button")
+                            .animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec())
+                            .widthIn(min = ButtonDefaults.MinHeight),
+                        contentPadding = if (searchFocused) {
+                            PaddingValues(horizontal = (ButtonDefaults.MinHeight - iconSize) / 2)
+                        } else {
+                            ButtonDefaults.contentPaddingFor(ButtonDefaults.MinHeight, hasStartIcon = true)
+                        },
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = stringResource(R.string.contacts_sort_action),
+                            modifier = Modifier.size(iconSize),
+                        )
+                        if (!searchFocused) {
+                            Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(ButtonDefaults.MinHeight)))
+                            Text(stringResource(R.string.contacts_sort_action))
+                        }
                     }
                 }
             }

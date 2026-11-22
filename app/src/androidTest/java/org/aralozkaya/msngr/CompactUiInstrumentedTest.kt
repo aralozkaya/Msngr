@@ -22,6 +22,7 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -177,9 +178,6 @@ class CompactUiInstrumentedTest {
 
     @Test fun minimalContactsPagePreservesInteractions() {
         val context = isolatedContext()
-        AppearancePrefs.setUiDensity(context, UiDensity.Minimal)
-        AppearancePrefs.setCompactInlineStatusMessage(context, true)
-        AppearancePrefs.setCompactHidePresenceText(context, true)
         val contacts = listOf(
             Contact("group-1", "Study Group", "study@live.com", Presence.Online, isGroup = true),
             Contact("friend-1", "Alice", "alice@example.com", Presence.Online, statusMessage = "Hello there"),
@@ -205,6 +203,25 @@ class CompactUiInstrumentedTest {
                 }
             }
         }
+
+        val regularSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+
+        compose.runOnIdle {
+            AppearancePrefs.setUiDensity(context, UiDensity.Minimal)
+            AppearancePrefs.setCompactInlineStatusMessage(context, true)
+            AppearancePrefs.setCompactHidePresenceText(context, true)
+        }
+        compose.waitForIdle()
+
+        val compactSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+        assertTrue(
+            "Compact search bar ($compactSearchHeight) should be shorter than regular ($regularSearchHeight)",
+            compactSearchHeight < regularSearchHeight,
+        )
+
+        compose.onNodeWithTag("contacts_sort_button").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Name").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close sheet").performClick()
 
         compose.onNodeWithTag("contact-row-friend-1").performClick()
         compose.runOnIdle { assertEquals("friend-1", openedChatId) }

@@ -3,10 +3,14 @@ package org.aralozkaya.msngr
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -19,6 +23,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -29,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -48,10 +54,15 @@ internal fun CompactSearchField(
     clearContentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    compact: Boolean = false,
     controller: MessengerPlusEditorController = remember { MessengerPlusEditorController() },
     onFocusChanged: (Boolean) -> Unit = {},
     leadingIcon: @Composable () -> Unit = {
-        Icon(Icons.Default.Search, contentDescription = null)
+        Icon(
+            Icons.Default.Search,
+            contentDescription = null,
+            modifier = if (compact) Modifier.size(18.dp) else Modifier,
+        )
     },
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -63,13 +74,123 @@ internal fun CompactSearchField(
             focusInteraction?.let { interactionSource.tryEmit(FocusInteraction.Unfocus(it)) }
         }
     }
-    val textStyle = MaterialTheme.typography.bodyMedium
+    val textStyle = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
     val minimumHeight = with(LocalDensity.current) {
-        (textStyle.lineHeight.toDp() + 16.dp).coerceAtLeast(48.dp)
+        if (compact) {
+            (textStyle.lineHeight.toDp() + 10.dp).coerceAtLeast(36.dp)
+        } else {
+            (textStyle.lineHeight.toDp() + 16.dp).coerceAtLeast(48.dp)
+        }
     }
     val colors = SearchBarDefaults.colors().inputFieldColors
     val contentColor = if (enabled) MaterialTheme.colorScheme.onSurface
         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val editor: @Composable () -> Unit = {
+        CompositionLocalProvider(LocalScrollVisibilityHost provides null) {
+            MsnEmoticonEditor(
+                value = state.text.toString(),
+                onValueChange = { value ->
+                    state.edit {
+                        replace(0, length, value)
+                        val nativeSelection = controller.snapshot().selection
+                        selection = TextRange(
+                            nativeSelection.start.coerceIn(0, length),
+                            nativeSelection.end.coerceIn(0, length),
+                        )
+                    }
+                },
+                controller = controller,
+                initialSelection = state.selection,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = enabled,
+                convertTypedShortcuts = settings.convertTypedShortcuts,
+                emoticonStyle = settings.style,
+                messengerPlusEnabled = false,
+                hideControlCharacters = false,
+                allowUnicodeEmoji = true,
+                singleLine = true,
+                hint = "",
+                contentDescription = placeholder,
+                contentPadding = PaddingValues(0.dp),
+                onSearch = controller::hideKeyboard,
+                onSelectionChanged = { selection ->
+                    val value = controller.snapshot().text
+                    state.edit {
+                        if (toString() != value) replace(0, length, value)
+                        this.selection = selection
+                    }
+                },
+                onFocusChanged = { focused ->
+                    if (focused && focusInteraction == null) {
+                        val interaction = FocusInteraction.Focus()
+                        focusInteraction = interaction
+                        interactionSource.tryEmit(interaction)
+                    } else if (!focused) {
+                        focusInteraction?.let { interactionSource.tryEmit(FocusInteraction.Unfocus(it)) }
+                        focusInteraction = null
+                    }
+                    onFocusChanged(focused)
+                },
+            )
+        }
+    }
+    if (compact) {
+        val containerColor = when {
+            !enabled -> colors.disabledContainerColor
+            focusInteraction != null -> colors.focusedContainerColor
+            else -> colors.unfocusedContainerColor
+        }
+        val placeholderColor = if (enabled) colors.unfocusedPlaceholderColor else colors.disabledPlaceholderColor
+        val iconColor = if (enabled) colors.unfocusedLeadingIconColor else colors.disabledLeadingIconColor
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            modifier = modifier
+                .snapToVisibleWhenActive(focusInteraction != null)
+                .heightIn(min = minimumHeight)
+                .semantics(mergeDescendants = true) {}
+                .pointerInput(controller, enabled) {
+                    detectTapGestures { if (enabled) controller.requestFocusAndShowKeyboard() }
+                },
+        ) {
+            CompositionLocalProvider(LocalTextStyle provides textStyle, LocalContentColor provides contentColor) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CompositionLocalProvider(LocalContentColor provides iconColor) {
+                        leadingIcon()
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (state.text.isEmpty()) {
+                            Text(placeholder, style = textStyle, color = placeholderColor)
+                        }
+                        editor()
+                    }
+                    if (state.text.isNotEmpty()) {
+                        IconButton(
+                            onClick = { controller.replaceValue(TextFieldValue("")) },
+                            enabled = enabled,
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = clearContentDescription,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     Box(
         modifier = modifier
             .snapToVisibleWhenActive(focusInteraction != null)
@@ -94,7 +215,10 @@ internal fun CompactSearchField(
                             onClick = { controller.replaceValue(TextFieldValue("")) },
                             enabled = enabled,
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = clearContentDescription)
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = clearContentDescription,
+                            )
                         }
                     }
                 },
@@ -112,53 +236,7 @@ internal fun CompactSearchField(
                     )
                 },
             ).Decoration {
-                CompositionLocalProvider(LocalScrollVisibilityHost provides null) {
-                    MsnEmoticonEditor(
-                        value = state.text.toString(),
-                        onValueChange = { value ->
-                            state.edit {
-                                replace(0, length, value)
-                                val nativeSelection = controller.snapshot().selection
-                                selection = TextRange(
-                                    nativeSelection.start.coerceIn(0, length),
-                                    nativeSelection.end.coerceIn(0, length),
-                                )
-                            }
-                        },
-                        controller = controller,
-                        initialSelection = state.selection,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = enabled,
-                        convertTypedShortcuts = settings.convertTypedShortcuts,
-                        emoticonStyle = settings.style,
-                        messengerPlusEnabled = false,
-                        hideControlCharacters = false,
-                        allowUnicodeEmoji = true,
-                        singleLine = true,
-                        hint = "",
-                        contentDescription = placeholder,
-                        contentPadding = PaddingValues(0.dp),
-                        onSearch = controller::hideKeyboard,
-                        onSelectionChanged = { selection ->
-                            val value = controller.snapshot().text
-                            state.edit {
-                                if (toString() != value) replace(0, length, value)
-                                this.selection = selection
-                            }
-                        },
-                        onFocusChanged = { focused ->
-                            if (focused && focusInteraction == null) {
-                                val interaction = FocusInteraction.Focus()
-                                focusInteraction = interaction
-                                interactionSource.tryEmit(interaction)
-                            } else if (!focused) {
-                                focusInteraction?.let { interactionSource.tryEmit(FocusInteraction.Unfocus(it)) }
-                                focusInteraction = null
-                            }
-                            onFocusChanged(focused)
-                        },
-                    )
-                }
+                editor()
             }
         }
     }
