@@ -37,6 +37,7 @@ import org.aralozkaya.msngr.pages.CustomizedNotificationsScreen
 import org.aralozkaya.msngr.pages.EmoticonSettingsScreen
 import org.aralozkaya.msngr.pages.InAppNotificationSettingsMenu
 import org.aralozkaya.msngr.pages.InAppNotificationSettingsScreen
+import org.aralozkaya.msngr.pages.LayoutSettingsScreen
 import org.aralozkaya.msngr.pages.MessengerPlusSettingsScreen
 import org.aralozkaya.msngr.pages.NotificationSettingsScreen
 import org.aralozkaya.msngr.pages.SettingsDestination
@@ -173,6 +174,11 @@ private fun SettingsPage(
                 onDeleteAllChatHistories = onDeleteAllChatHistories,
             )
             SettingsDestination.Appearance -> AppearanceSettingsScreen(
+                innerPadding = innerPadding,
+                scrollBehavior = scrollBehavior,
+                onLayoutClick = { navigateTo(SettingsDestination.Layout) },
+            )
+            SettingsDestination.Layout -> LayoutSettingsScreen(
                 innerPadding = innerPadding,
                 scrollBehavior = scrollBehavior,
             )

@@ -606,6 +606,21 @@
     <string name="settings_emotion_sounds_auto_supporting">Play new emotion sounds while their conversation is open.</string>
     <string name="settings_theme_header">Theme</string>
     <string name="settings_color_scheme_header">Color scheme</string>
+    <string name="settings_layout_header">Layout</string>
+    <string name="settings_destination_layout">Layout</string>
+    <string name="ui_density_minimal">Minimal</string>
+    <string name="ui_density_small">Small</string>
+    <string name="ui_density_medium">Medium</string>
+    <string name="ui_density_regular">Regular</string>
+    <string name="settings_layout_preview_header">Preview</string>
+    <string name="settings_layout_size_header">Contact list size</string>
+    <string name="settings_layout_compact_options_header">Compact options</string>
+    <string name="settings_layout_inline_status_title">Show status message next to name</string>
+    <string name="settings_layout_inline_status_supporting">Remove the second line and append the status message next to the contact name.</string>
+    <string name="settings_layout_hide_presence_text_title">Hide status text</string>
+    <string name="settings_layout_hide_presence_text_supporting">Hide Available, Busy, Away, and Offline labels in compact mode.</string>
+    <string name="layout_preview_status_long">Working on the new release all afternoon</string>
+    <string name="layout_preview_status_short">In a meeting</string>
     <string name="settings_home_header">Home</string>
     <string name="settings_convert_shortcuts_title">Convert typed shortcuts</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->

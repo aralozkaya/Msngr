@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.CompactSearchField
+import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.MessengerPlusText
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.data.Contact
@@ -107,11 +108,12 @@ fun GroupDetailsPage(
                 clearContentDescription = stringResource(R.string.contacts_search_clear),
             )
         }
+        val compact = LocalLayoutSettings.current.isCompact
         PageContentList(
             modifier = Modifier.fillMaxWidth().weight(1f),
             innerPadding = PaddingValues(),
             scrollBehavior = scrollBehavior,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp),
         ) {
             itemsIndexed(visible, key = { _, member -> member.id }) { index, member ->
                 val isOwnContact = member.email.equals(ownEmail, ignoreCase = true)

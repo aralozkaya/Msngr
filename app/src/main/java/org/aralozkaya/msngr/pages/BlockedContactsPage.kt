@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.pages.components.MsngrLoadingIndicator
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.ContactRow
@@ -70,10 +71,11 @@ fun BlockedContactsPage(
             }
         }
     } else {
+        val compact = LocalLayoutSettings.current.isCompact
         PageContentList(
             innerPadding = innerPadding,
             scrollBehavior = scrollBehavior,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp),
         ) {
             if (refreshError != null) item(key = "refresh-error") {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

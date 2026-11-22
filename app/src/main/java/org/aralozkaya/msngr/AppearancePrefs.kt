@@ -3,6 +3,7 @@ package org.aralozkaya.msngr
 import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,21 +28,58 @@ enum class ColorMode(val label: String, @param:StringRes val labelRes: Int) {
     fun displayLabel(): String = stringResource(labelRes)
 }
 
+enum class UiDensity(val label: String, @param:StringRes val labelRes: Int) {
+    Minimal("Minimal", R.string.ui_density_minimal),
+    Small("Small", R.string.ui_density_small),
+    Medium("Medium", R.string.ui_density_medium),
+    Regular("Regular", R.string.ui_density_regular);
+
+    val isCompact: Boolean
+        get() = this != Regular
+
+    @Composable
+    fun displayLabel(): String = stringResource(labelRes)
+}
+
+data class LayoutSettings(
+    val density: UiDensity = UiDensity.Regular,
+    val compactInlineStatusMessage: Boolean = false,
+    val compactHidePresenceText: Boolean = false,
+) {
+    val isCompact: Boolean
+        get() = density.isCompact
+}
+
+val LocalLayoutSettings = staticCompositionLocalOf { LayoutSettings() }
+
 data class AppAppearance(
     val themeMode: ThemeMode = ThemeMode.System,
     val colorMode: ColorMode = ColorMode.Dynamic,
+    val uiDensity: UiDensity = UiDensity.Regular,
+    val compactInlineStatusMessage: Boolean = false,
+    val compactHidePresenceText: Boolean = false,
     val sceneId: String = "daisyhill",
     val customColorArgb: Int? = null,
     val sceneColorArgb: Int? = null,
     val showSceneInConversations: Boolean = true,
     val darkenScenesInDarkMode: Boolean = true,
     val showAds: Boolean = true,
-)
+) {
+    val layoutSettings: LayoutSettings
+        get() = LayoutSettings(
+            density = uiDensity,
+            compactInlineStatusMessage = compactInlineStatusMessage,
+            compactHidePresenceText = compactHidePresenceText,
+        )
+}
 
 object AppearancePrefs {
     private const val PREFS_NAME = "msngr_appearance"
     private const val KEY_THEME = "theme"
     private const val KEY_COLOR = "color"
+    private const val KEY_UI_DENSITY = "ui_density"
+    private const val KEY_COMPACT_INLINE_STATUS = "compact_inline_status"
+    private const val KEY_COMPACT_HIDE_PRESENCE_TEXT = "compact_hide_presence_text"
     private const val KEY_SCENE = "scene"
     private const val KEY_CUSTOM_COLOR = "custom_color"
     private const val KEY_SCENE_COLOR = "scene_color"
@@ -100,6 +138,21 @@ object AppearancePrefs {
         update(context, mutableAppearance.value.copy(showAds = enabled))
     }
 
+    fun setUiDensity(context: Context, density: UiDensity) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(uiDensity = density))
+    }
+
+    fun setCompactInlineStatusMessage(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(compactInlineStatusMessage = enabled))
+    }
+
+    fun setCompactHidePresenceText(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(compactHidePresenceText = enabled))
+    }
+
     private fun update(context: Context, appearance: AppAppearance) {
         mutableAppearance.value = appearance
         persist(context, appearance)
@@ -108,9 +161,17 @@ object AppearancePrefs {
 
     internal fun reload(context: Context) {
         val prefs = AccountPreferences.preferences(context, PREFS_NAME)
+        val rawDensity = prefs.getString(KEY_UI_DENSITY, null)
+        val uiDensity = when (rawDensity) {
+            "Compact" -> UiDensity.Small
+            else -> enumValueOrDefault(rawDensity, UiDensity.Regular)
+        }
         mutableAppearance.value = AppAppearance(
             themeMode = enumValueOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.System),
             colorMode = enumValueOrDefault(prefs.getString(KEY_COLOR, null), ColorMode.Dynamic),
+            uiDensity = uiDensity,
+            compactInlineStatusMessage = prefs.getBoolean(KEY_COMPACT_INLINE_STATUS, false),
+            compactHidePresenceText = prefs.getBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, false),
             sceneId = messengerScene(prefs.getString(KEY_SCENE, null) ?: "daisyhill").id,
             customColorArgb = if (prefs.contains(KEY_CUSTOM_COLOR)) prefs.getInt(KEY_CUSTOM_COLOR, 0) else null,
             sceneColorArgb = if (prefs.contains(KEY_SCENE_COLOR)) prefs.getInt(KEY_SCENE_COLOR, 0) else null,
@@ -124,6 +185,9 @@ object AppearancePrefs {
         AccountPreferences.preferences(context, PREFS_NAME).edit {
             putString(KEY_THEME, appearance.themeMode.name)
             putString(KEY_COLOR, appearance.colorMode.name)
+            putString(KEY_UI_DENSITY, appearance.uiDensity.name)
+            putBoolean(KEY_COMPACT_INLINE_STATUS, appearance.compactInlineStatusMessage)
+            putBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, appearance.compactHidePresenceText)
             putString(KEY_SCENE, appearance.sceneId)
             putBoolean(KEY_SCENE_IN_CONVERSATIONS, appearance.showSceneInConversations)
             putBoolean(KEY_DARKEN_SCENES, appearance.darkenScenesInDarkMode)

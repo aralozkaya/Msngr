@@ -12,7 +12,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -41,9 +44,11 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -74,6 +79,7 @@ import androidx.compose.ui.res.stringResource
 import org.aralozkaya.msngr.CompactSearchField
 import org.aralozkaya.msngr.ContactProfileActivity
 import org.aralozkaya.msngr.GroupDetailsActivity
+import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.MessengerPlusEditorController
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.UserProfileSnapshot
@@ -157,12 +163,13 @@ fun ContactsPage(
         }.sortedWith(comparator)
     val groups = sorted.filter(Contact::isGroup)
     val visible = sorted.filterNot(Contact::isGroup)
+    val compact = LocalLayoutSettings.current.isCompact
     PageContentList(
         modifier = modifier.fillMaxSize(),
         listState = listState,
         innerPadding = innerPadding,
         scrollBehavior = scrollBehavior,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp),
     ) {
         item {
             LoggedInUserProfileCard(
@@ -173,7 +180,7 @@ fun ContactsPage(
         }
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 12.dp),
                 horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -291,12 +298,47 @@ fun ContactsPage(
 }
 
 @Composable
-private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+internal fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
     val stateLabel = stringResource(if (expanded) R.string.contacts_section_expanded else R.string.contacts_section_collapsed)
     val toggleDesc = stringResource(
         if (expanded) R.string.contacts_section_collapse else R.string.contacts_section_expand,
         title,
     )
+    if (LocalLayoutSettings.current.isCompact) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .clickable(onClick = onToggle)
+                .semantics {
+                    role = Role.Button
+                    stateDescription = stateLabel
+                }
+                .heightIn(min = 36.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = toggleDesc,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        return
+    }
     SegmentedListItem(
         onClick = onToggle,
         shapes = ListItemDefaults.segmentedShapes(
@@ -344,6 +386,22 @@ private fun ContactSectionHeader(title: String, count: Int, expanded: Boolean, o
 
 @Composable
 private fun EmptySectionItem(content: @Composable () -> Unit) {
+    if (LocalLayoutSettings.current.isCompact) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            ProvideTextStyle(
+                MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                content()
+            }
+        }
+        return
+    }
     SegmentedListItem(
         shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
         modifier = Modifier.fillMaxWidth(),
@@ -359,6 +417,7 @@ private fun ExpandableContactSection(
     onToggle: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val compact = LocalLayoutSettings.current.isCompact
     Column(Modifier.fillMaxWidth()) {
         ContactSectionHeader(title, count, transition.targetState, onToggle)
         // Bottom alignment slides the entire child block out from behind the parent.
@@ -368,10 +427,20 @@ private fun ExpandableContactSection(
             enter = expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()),
             exit = shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec()),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = ListItemDefaults.SegmentedGap),
-                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-            ) { content() }
+            if (compact) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) { content() }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = ListItemDefaults.SegmentedGap),
+                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                ) { content() }
+            }
         }
     }
 }
