@@ -637,20 +637,50 @@ fun EmoticonSettingsScreen(
     val context = LocalContext.current
     val settings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     val winkSettings by remember(context) { org.aralozkaya.msngr.WinkPrefs.state(context) }.collectAsState()
-    val itemCount = 4
+    val styles = org.aralozkaya.msngr.EmoticonStyle.entries
+    val previewEmoticon = org.aralozkaya.msngr.MSN_EMOTICON_SHORTCUTS.first()
+    val behaviorItemCount = 3
 
     PageContentList(
         innerPadding = innerPadding,
         scrollBehavior = scrollBehavior,
         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
+        settingsSectionHeader(R.string.settings_emoticon_style_header, first = true)
+        styles.forEachIndexed { index, style ->
+            item(key = "emoticon-style-${style.storageValue}") {
+                SegmentedListItem(
+                    selected = settings.style == style,
+                    onClick = { EmoticonPrefs.setEmoticonStyle(context, style) },
+                    shapes = ListItemDefaults.segmentedShapes(index = index, count = styles.size),
+                    modifier = Modifier
+                        .settingsRow()
+                        .testTag("emoticon_style_${style.storageValue}"),
+                    leadingContent = {
+                        org.aralozkaya.msngr.MsnEmoticonGlyph(
+                            emoticon = previewEmoticon,
+                            emoticonStyle = style,
+                        )
+                    },
+                    trailingContent = {
+                        RadioButton(
+                            selected = settings.style == style,
+                            onClick = null,
+                        )
+                    },
+                    content = { Text(style.displayLabel()) },
+                )
+            }
+        }
+        settingsSectionSpacer()
+        settingsSectionHeader(R.string.settings_emoticon_behavior_header)
         item(key = "typed-shortcuts") {
             SegmentedListItem(
                 checked = settings.convertTypedShortcuts,
                 onCheckedChange = { enabled ->
                     EmoticonPrefs.setConvertTypedShortcuts(context, enabled)
                 },
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = itemCount),
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = behaviorItemCount),
                 modifier = Modifier
                     .settingsRow()
                     .testTag("convert_typed_shortcuts"),
@@ -666,32 +696,10 @@ fun EmoticonSettingsScreen(
                 content = { Text(stringResource(R.string.settings_convert_shortcuts_title)) },
             )
         }
-        item(key = "original-emoticons") {
-            SegmentedListItem(
-                checked = settings.useOriginalEmoticons,
-                onCheckedChange = { enabled ->
-                    EmoticonPrefs.setUseOriginalEmoticons(context, enabled)
-                },
-                shapes = ListItemDefaults.segmentedShapes(index = 1, count = itemCount),
-                modifier = Modifier
-                    .settingsRow()
-                    .testTag("use_original_emoticons"),
-                trailingContent = {
-                    Switch(
-                        checked = settings.useOriginalEmoticons,
-                        onCheckedChange = null,
-                    )
-                },
-                supportingContent = {
-                    Text(stringResource(R.string.settings_original_emoticons_supporting))
-                },
-                content = { Text(stringResource(R.string.settings_original_emoticons_title)) },
-            )
-        }
         item(key = "play-winks") {
             SegmentedListItem(checked = winkSettings.playWinks,
                 onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(playWinks = it)) },
-                shapes = ListItemDefaults.segmentedShapes(index = 2, count = itemCount), modifier = Modifier.settingsRow(),
+                shapes = ListItemDefaults.segmentedShapes(index = 1, count = behaviorItemCount), modifier = Modifier.settingsRow(),
                 trailingContent = { Switch(winkSettings.playWinks, null) },
                 supportingContent = { Text(stringResource(R.string.settings_play_winks_auto_supporting)) },
                 content = { Text(stringResource(R.string.settings_play_winks_auto_title)) })
@@ -699,12 +707,19 @@ fun EmoticonSettingsScreen(
         item(key = "wink-sounds") {
             SegmentedListItem(checked = winkSettings.sounds,
                 onCheckedChange = { org.aralozkaya.msngr.WinkPrefs.update(context, winkSettings.copy(sounds = it)) },
-                shapes = ListItemDefaults.segmentedShapes(index = 3, count = itemCount), modifier = Modifier.settingsRow(),
+                shapes = ListItemDefaults.segmentedShapes(index = 2, count = behaviorItemCount), modifier = Modifier.settingsRow(),
                 trailingContent = { Switch(winkSettings.sounds, null) },
                 supportingContent = { Text(stringResource(R.string.settings_wink_sounds_supporting_you_singular)) },
                 content = { Text(stringResource(R.string.settings_wink_sounds_title)) })
         }
     }
+}
+
+@Composable
+private fun org.aralozkaya.msngr.EmoticonStyle.displayLabel(): String = when (this) {
+    org.aralozkaya.msngr.EmoticonStyle.Wlm2009 -> stringResource(R.string.settings_emoticon_style_wlm_2009_title)
+    org.aralozkaya.msngr.EmoticonStyle.Wlm2012 -> stringResource(R.string.settings_emoticon_style_wlm_2012_title)
+    org.aralozkaya.msngr.EmoticonStyle.AndroidEmoji -> stringResource(R.string.settings_emoticon_style_android_title)
 }
 
 @Composable

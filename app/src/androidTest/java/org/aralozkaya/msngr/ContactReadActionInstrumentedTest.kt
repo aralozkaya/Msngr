@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -46,6 +48,7 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
     androidx.compose.ui.test.ExperimentalTestApi::class)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class ContactReadActionInstrumentedTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()

@@ -141,7 +141,7 @@ internal fun MessengerPlusProfileField(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 24.dp),
                     enabled = enabled,
                     convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
-                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                    emoticonStyle = emoticonSettings.style,
                     messengerPlusEnabled = messengerPlusEnabled,
                     initialSelection = value.selection,
                     singleLine = true,

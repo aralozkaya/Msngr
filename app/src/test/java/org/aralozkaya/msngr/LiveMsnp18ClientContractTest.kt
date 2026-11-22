@@ -196,7 +196,7 @@ class LiveMsnp18ClientContractTest {
     )
 
     @Test fun retryDownloadsARestoredWinkIntoTheSameMessageWithoutDuplicates() = runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("wink-retry").toFile()
+        val directory = createTestTempDir("wink-retry")
         val store = org.aralozkaya.msngr.data.WinkStore(directory)
         val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val metadata = MsnDisplayPicture.create(contact.email, bytes, 8)
@@ -317,7 +317,7 @@ class LiveMsnp18ClientContractTest {
             assertEquals(28, history.messages.value.getValue(contact.id).count { it.isNudge })
             assertEquals(2, events.count { it is MessengerEvent.IncomingNudge })
             assertEquals(2, events.count { it is MessengerEvent.IncomingMessage })
-            assertEquals(29, client.contacts.value.single().unreadCount)
+            assertEquals(1, client.contacts.value.single().unreadCount)
             assertFalse(switchboard.closed.isCompleted)
         } finally { collector.cancel(); repository.logout() }
     }
@@ -351,8 +351,63 @@ class LiveMsnp18ClientContractTest {
             assertTrue(messages[2].isNudge)
             assertEquals(1, client.contacts.value.single().unreadCount)
             assertFalse(client.typing.value[contact.id] == true)
-            assertEquals(listOf(MessengerEvent.IncomingMessage(contact.id, messages.last().id)), events.toList())
+            assertEquals(
+                listOf(
+                    MessengerEvent.ConversationRepliedElsewhere(contact.id),
+                    MessengerEvent.ConversationRepliedElsewhere(contact.id),
+                    MessengerEvent.IncomingMessage(contact.id, messages.last().id),
+                ),
+                events.toList(),
+            )
         } finally { collector.cancel(); repository.logout() }
+    }
+
+    @Test fun desktopReplyClearsUnreadBadgeNotificationAndPendingEffects() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email)
+        val client = syncClient(notification, switchboard)
+        val dismissed = CopyOnWriteArrayList<String>()
+        val repository = MessengerRepository(
+            client = client,
+            onConversationRead = { dismissed += it },
+        )
+        try {
+            repository.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            client.sendMessageWithResult(contact.id, "Opening chat").getOrThrow()
+            fun deliver(sender: String, payload: ByteArray) = switchboard.deliver(
+                MsnpCommand("MSG", parameters = listOf(sender, "Name", payload.size.toString()), payload = payload),
+            )
+            deliver(contact.email, Msnp18Protocol.textPayload("Are you there?"))
+            deliver(contact.email, Msnp18Protocol.nudgePayload())
+            withTimeout(2_000) { client.contacts.first { it.single().unreadCount == 2 } }
+            repository.markUnread(contact.id)
+            withTimeout(2_000) { repository.pendingNudgeShakes.first { contact.id in it } }
+            assertTrue(dismissed.isEmpty())
+
+            // Sibling typing alone must not clear unread state or dismiss notifications.
+            deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.typingPayload(email))
+            delay(100)
+            assertEquals(2, client.contacts.value.single().unreadCount)
+            assertTrue(client.contacts.value.single().isMarkedUnread)
+            assertTrue(dismissed.isEmpty())
+
+            // Sibling text reply marks the conversation read and dismisses notifications.
+            deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.textPayload("Yes, on PC!"))
+            withTimeout(2_000) { client.contacts.first { !it.single().isUnread } }
+            withTimeout(2_000) { repository.pendingNudgeShakes.first { contact.id !in it } }
+            withTimeout(2_000) { while (dismissed.size < 1) yield() }
+            assertEquals(0, client.contacts.value.single().unreadCount)
+            assertFalse(client.contacts.value.single().isMarkedUnread)
+            assertEquals(listOf(contact.id), dismissed.toList())
+
+            // Another incoming message followed by a desktop nudge also clears unread state.
+            deliver(contact.email, Msnp18Protocol.textPayload("Still there?"))
+            withTimeout(2_000) { client.contacts.first { it.single().unreadCount == 1 } }
+            deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.nudgePayload())
+            withTimeout(2_000) { client.contacts.first { !it.single().isUnread } }
+            withTimeout(2_000) { while (dismissed.size < 2) yield() }
+            assertEquals(listOf(contact.id, contact.id), dismissed.toList())
+        } finally { repository.logout() }
     }
 
     @Test fun desktopInitiatedChatResolvesItsContactFromRosterOrLaterJoinAndCanBeReused() = runBlocking {
@@ -390,9 +445,15 @@ class LiveMsnp18ClientContractTest {
                 val messages = withTimeout(1_000) {
                     client.messages.first { it[contact.id]?.size == 3 }.getValue(contact.id)
                 }
-                withTimeout(1_000) { while (events.isEmpty()) yield() }
+                withTimeout(1_000) { while (events.none { it is MessengerEvent.IncomingMessage }) yield() }
                 assertEquals(listOf(MessageAuthor.Me, MessageAuthor.Me, MessageAuthor.Contact), messages.map { it.author })
-                assertEquals(listOf(MessengerEvent.IncomingMessage(contact.id, messages.last().id)), events.toList())
+                assertEquals(
+                    listOf(
+                        MessengerEvent.ConversationRepliedElsewhere(contact.id),
+                        MessengerEvent.IncomingMessage(contact.id, messages.last().id),
+                    ),
+                    events.toList(),
+                )
             } finally { collector.cancel(); client.close() }
         }
     }
@@ -2457,7 +2518,7 @@ class LiveMsnp18ClientContractTest {
     @Test fun privateContactCapabilitiesFollowPresenceAndEndpointUpdatesAndGuardEveryFeature() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val switchboard = ContractSwitchboardTransport(email, contact.email)
-        val directory = java.nio.file.Files.createTempDirectory("cap-guard").toFile()
+        val directory = createTestTempDir("cap-guard")
         val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
             MsnDisplayPicture.create(email, winkBytes, 8),
@@ -2560,7 +2621,7 @@ class LiveMsnp18ClientContractTest {
         var time = 0L
         val notification = ContractNotificationTransport(email)
         val switchboard = ContractSwitchboardTransport(email, contact.email)
-        val directory = java.nio.file.Files.createTempDirectory("cap-desktop").toFile()
+        val directory = createTestTempDir("cap-desktop")
         val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
             MsnDisplayPicture.create(email, winkBytes, 8),

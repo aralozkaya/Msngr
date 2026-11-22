@@ -273,7 +273,7 @@ class WinkInstrumentedTest {
                 org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = wink) }
         compose.setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.statusBarsPadding().padding(16.dp)) {
-                messages.forEach { MessageBubble(it, useOriginalEmoticons = true) }
+                messages.forEach { MessageBubble(it, emoticonStyle = EmoticonStyle.Wlm2009) }
             }
         } } }
         compose.onNodeWithText("Play").assertDoesNotExist()
@@ -320,7 +320,7 @@ class WinkInstrumentedTest {
             winkTransferError = "Wink download timed out."))
         var retries = 0
         compose.setContent { MaterialTheme { Surface {
-            MessageBubble(message, useOriginalEmoticons = true, onRetry = {
+            MessageBubble(message, emoticonStyle = EmoticonStyle.Wlm2009, onRetry = {
                 retries++
                 message = message.copy(isWinkPending = true, winkTransferError = null)
             })
@@ -356,7 +356,7 @@ class WinkInstrumentedTest {
             org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference,
             winkTransferError = "Wink download timed out."))
         compose.setContent { MaterialTheme { Surface {
-            MessageBubble(message, useOriginalEmoticons = true, onRetry = {
+            MessageBubble(message, emoticonStyle = EmoticonStyle.Wlm2009, onRetry = {
                 message = message.copy(isWinkPending = true, winkTransferError = null)
             })
         } } }
@@ -393,7 +393,7 @@ class WinkInstrumentedTest {
             org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference,
             winkTransferError = "Wink download timed out."))
         compose.setContent { MaterialTheme { Surface {
-            MessageBubble(message, useOriginalEmoticons = true, onRetry = {})
+            MessageBubble(message, emoticonStyle = EmoticonStyle.Wlm2009, onRetry = {})
         } } }
         compose.onNodeWithText("Retry").assertIsDisplayed()
         compose.onNodeWithContentDescription("Wink download failed").assertIsDisplayed().performClick()

@@ -2,6 +2,8 @@
 
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Movie
@@ -29,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class AnimatedAvatarInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private fun gif() = InstrumentationRegistry.getInstrumentation().context.assets

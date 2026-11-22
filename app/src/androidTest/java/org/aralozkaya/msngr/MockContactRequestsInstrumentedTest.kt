@@ -54,9 +54,11 @@ class MockContactRequestsInstrumentedTest {
                 compose.waitUntil(5000) { manager.activeNotifications.any {
                     it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID } }
                 val notice = manager.activeNotifications.single { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID }.notification
-                assertEquals(NotificationChannels.CONTACT_REQUESTS, notice.channelId)
+                assertEquals(NotificationChannels.CONTACT_REQUESTS, androidx.core.app.NotificationCompat.getChannelId(notice))
                 assertEquals(1, notice.number)
-                assertTrue(manager.getNotificationChannel(NotificationChannels.CONTACT_REQUESTS).canShowBadge())
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    assertTrue(manager.getNotificationChannel(NotificationChannels.CONTACT_REQUESTS).canShowBadge())
+                }
                 compose.onNodeWithTag("decline-request-$peer").performClick()
                 compose.onNodeWithTag("contact-request-block").assertIsOff()
                 saveScreen("decision")

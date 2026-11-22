@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
@@ -37,7 +39,7 @@ class EmoticonUiInstrumentedTest {
 
     private val editorValue = mutableStateOf("")
     private val convertTypedShortcuts = mutableStateOf(true)
-    private val useOriginalEmoticons = mutableStateOf(true)
+    private val emoticonStyle = mutableStateOf(EmoticonStyle.Wlm2009)
     private val messengerPlusEnabled = mutableStateOf(true)
     private val hideControlCharacters = mutableStateOf(true)
     private lateinit var formattingController: MessengerPlusEditorController
@@ -48,7 +50,7 @@ class EmoticonUiInstrumentedTest {
         formattingController = MessengerPlusEditorController(syntax)
         editorValue.value = ""
         convertTypedShortcuts.value = true
-        useOriginalEmoticons.value = true
+        emoticonStyle.value = EmoticonStyle.Wlm2009
         messengerPlusEnabled.value = true
         hideControlCharacters.value = true
         compose.setContent {
@@ -57,7 +59,7 @@ class EmoticonUiInstrumentedTest {
                     value = editorValue.value,
                     onValueChange = { editorValue.value = it },
                     convertTypedShortcuts = convertTypedShortcuts.value,
-                    useOriginalEmoticons = useOriginalEmoticons.value,
+                    emoticonStyle = emoticonStyle.value,
                     messengerPlusEnabled = messengerPlusEnabled.value,
                     hideControlCharacters = hideControlCharacters.value,
                     controller = formattingController,
@@ -217,7 +219,11 @@ class EmoticonUiInstrumentedTest {
         assertSingleSpanNamed("OriginalMsnGlyphSpan")
         compose.onNode(hasSetTextAction()).assertTextEquals(":)")
 
-        compose.runOnIdle { useOriginalEmoticons.value = false }
+        compose.runOnIdle { emoticonStyle.value = EmoticonStyle.Wlm2012 }
+        assertSingleSpanNamed("OriginalMsnGlyphSpan")
+        compose.onNode(hasSetTextAction()).assertTextEquals(":)")
+
+        compose.runOnIdle { emoticonStyle.value = EmoticonStyle.AndroidEmoji }
         assertSingleSpanNamed("UnicodeMsnGlyphSpan")
     }
 
@@ -228,18 +234,23 @@ class EmoticonUiInstrumentedTest {
                 Column {
                     MsnEmoticonText(
                         text = "Original :D",
-                        useOriginalEmoticons = true,
+                        emoticonStyle = EmoticonStyle.Wlm2009,
+                    )
+                    MsnEmoticonText(
+                        text = "Classic2012 :D",
+                        emoticonStyle = EmoticonStyle.Wlm2012,
                     )
                     MsnEmoticonText(
                         text = "Modern :D",
-                        useOriginalEmoticons = false,
+                        emoticonStyle = EmoticonStyle.AndroidEmoji,
                     )
                 }
             }
         }
 
         compose.onNodeWithText("Original :D").assertExists()
-        compose.onNodeWithContentDescription("Open-mouthed smile").assertExists()
+        compose.onNodeWithText("Classic2012 :D").assertExists()
+        compose.onAllNodesWithContentDescription("Open-mouthed smile").assertCountEquals(2)
         compose.onNodeWithText("Modern 😀").assertExists()
     }
 

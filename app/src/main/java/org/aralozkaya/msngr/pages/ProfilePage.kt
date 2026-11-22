@@ -199,7 +199,7 @@ internal fun ProfilePage(
     }
     EmoticonPanel(
         state = emoticonSheet,
-        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+        emoticonStyle = emoticonSettings.style,
     )
     MessengerPlusColorSheet(colorSheet)
     val normalizedUsername = usernameDraft.withExpandedMsnMenuTokens().trim().let { value ->

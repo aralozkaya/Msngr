@@ -57,7 +57,7 @@ class OfflineMessageNotificationInstrumentedTest {
             events.emit(MessengerEvent.OfflineMessagesReceived)
             renderer.dismissConversation("offline-peer@example.com")
             val notices = manager.activeNotifications.filter {
-                it.notification.channelId == NotificationChannels.OFFLINE_MESSAGES
+                androidx.core.app.NotificationCompat.getChannelId(it.notification) == NotificationChannels.OFFLINE_MESSAGES
             }
             assertEquals(1, notices.size)
             val notification = notices.single().notification

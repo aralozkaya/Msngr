@@ -264,7 +264,7 @@ fun PortalPage(
                         count = items.size,
                         activity = activity,
                         matchedContact = matchedContact,
-                        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                        emoticonStyle = emoticonSettings.style,
                         onClick = { selectedActivity = activity },
                     )
                 }
@@ -278,7 +278,7 @@ fun PortalPage(
         WhatsNewDetailDialog(
             activity = activity,
             matchedContact = matchedContact,
-            useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+            emoticonStyle = emoticonSettings.style,
             onOpenContactProfile = matchedContact?.let { contact ->
                 {
                     selectedActivity = null
@@ -375,7 +375,7 @@ private fun WhatsNewRow(
     count: Int,
     activity: WhatsNewActivity,
     matchedContact: Contact?,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: org.aralozkaya.msngr.EmoticonStyle,
     onClick: () -> Unit,
 ) {
     val photoPainter = rememberRemoteImagePainter(
@@ -460,7 +460,7 @@ private fun WhatsNewRow(
             if (displayText.isNotEmpty()) {
                 MsnEmoticonText(
                     text = displayText,
-                    useOriginalEmoticons = useOriginalEmoticons,
+                    emoticonStyle = emoticonStyle,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (activity.kind == WhatsNewKind.Photo) 3 else 1,
                     overflow = TextOverflow.Ellipsis,
@@ -526,7 +526,7 @@ private fun WhatsNewPublisherAvatar(
 private fun WhatsNewDetailDialog(
     activity: WhatsNewActivity,
     matchedContact: Contact?,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: org.aralozkaya.msngr.EmoticonStyle,
     onOpenContactProfile: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
@@ -589,7 +589,7 @@ private fun WhatsNewDetailDialog(
                 if (displayText.isNotEmpty()) {
                     MsnEmoticonText(
                         text = displayText,
-                        useOriginalEmoticons = useOriginalEmoticons,
+                        emoticonStyle = emoticonStyle,
                         style = MaterialTheme.typography.bodyLarge,
                         linkify = true,
                     )

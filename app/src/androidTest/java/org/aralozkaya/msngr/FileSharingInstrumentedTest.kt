@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +50,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class FileSharingInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 

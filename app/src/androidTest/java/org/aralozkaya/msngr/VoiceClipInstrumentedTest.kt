@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +44,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.sin
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class VoiceClipInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private fun nativeWave() = InstrumentationRegistry.getInstrumentation().context.assets
@@ -81,7 +84,7 @@ class VoiceClipInstrumentedTest {
     @Test fun rendersIncomingClipWithExplicitPlaybackAndDuration() {
         val clip = MsnVoiceClip.parse(nativeWave())!!
         compose.setContent { MaterialTheme { MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact,
-            "Voice clip", 1, voiceClip = clip), false) } }
+            "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji) } }
         compose.onNodeWithContentDescription("Play voice clip").assertIsDisplayed().performClick()
         compose.onNodeWithText("2.7 s").assertIsDisplayed()
     }
@@ -99,8 +102,14 @@ class VoiceClipInstrumentedTest {
 
     private fun grantMicrophone() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
-            context.packageName, android.Manifest.permission.RECORD_AUDIO)
+        val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            uiAutomation.grantRuntimePermission(context.packageName, android.Manifest.permission.RECORD_AUDIO)
+        } else {
+            uiAutomation.executeShellCommand(
+                "pm grant ${context.packageName} ${android.Manifest.permission.RECORD_AUDIO}"
+            ).close()
+        }
     }
 
     private fun composer(onSend: suspend (org.aralozkaya.msngr.protocol.VoiceClip) -> Result<Unit> = { Result.success(Unit) }) {
@@ -239,8 +248,8 @@ class VoiceClipInstrumentedTest {
         compose.setContent { MaterialTheme(colorScheme = if (dark.value) darkColorScheme() else androidx.compose.material3.lightColorScheme()) {
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(16.dp)) {
-                    MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact, "Voice clip", 1, voiceClip = clip), false)
-                    MessageBubble(ChatMessage(2, "peer", MessageAuthor.Me, "Voice clip", 1, voiceClip = clip), false)
+                    MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact, "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji)
+                    MessageBubble(ChatMessage(2, "peer", MessageAuthor.Me, "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji)
                 }
             }
         } }

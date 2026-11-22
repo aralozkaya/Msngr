@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import java.util.Base64
+import kotlin.io.encoding.Base64
 
 /** Outputs captured from MsgPlus.RemoveFormatCodes in the installed Plus! 5.02.712. */
 @RunWith(Parameterized::class)
@@ -44,6 +44,6 @@ class MessengerPlusNativeCompatibilityTest(
                 }
         }
 
-        private fun decode(value: String): String = String(Base64.getDecoder().decode(value), Charsets.UTF_8)
+        private fun decode(value: String): String = String(Base64.decode(value), Charsets.UTF_8)
     }
 }

@@ -2,6 +2,8 @@
 
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
@@ -42,6 +44,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class ProgressIndicatorInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 

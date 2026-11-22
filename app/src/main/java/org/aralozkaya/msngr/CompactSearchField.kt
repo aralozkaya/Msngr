@@ -130,7 +130,7 @@ internal fun CompactSearchField(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = enabled,
                         convertTypedShortcuts = settings.convertTypedShortcuts,
-                        useOriginalEmoticons = settings.useOriginalEmoticons,
+                        emoticonStyle = settings.style,
                         messengerPlusEnabled = false,
                         hideControlCharacters = false,
                         allowUnicodeEmoji = true,

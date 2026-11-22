@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.updates
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
@@ -36,6 +38,7 @@ import org.junit.Test
 import java.io.File
 import java.util.UUID
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class UpdateScreenInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 

@@ -87,7 +87,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun MsnEmoticonText(
     text: String,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: EmoticonStyle,
     modifier: Modifier = Modifier,
     renderedShortcutRanges: List<MsnEmoticonRange>? = null,
     messengerPlusEnabled: Boolean = LocalMessengerPlusEnabled.current,
@@ -100,6 +100,7 @@ internal fun MsnEmoticonText(
     nativeStyle: NativeTextStyle = NativeTextStyle(),
     sceneGlow: Boolean = false,
 ) {
+    val usesArtwork = emoticonStyle.usesArtwork
     val adaptiveColor = MaterialTheme.colorScheme.primary.toArgb()
     val parsed = remember(text, messengerPlusEnabled, hideControlCharacters, adaptiveColor) {
         MessengerPlusTextCodec.parseForPresentation(text, messengerPlusEnabled, hideControlCharacters, adaptiveColor)
@@ -119,8 +120,8 @@ internal fun MsnEmoticonText(
         }
     }
     val linkColor = MaterialTheme.colorScheme.primary
-    val annotatedText = remember(parsed, matches, useOriginalEmoticons, links, linkColor, nativeStyle, style.fontWeight) {
-        parsed.present(matches, useOriginalEmoticons, links, linkColor, nativeStyle, style.fontWeight?.weight ?: 400)
+    val annotatedText = remember(parsed, matches, usesArtwork, links, linkColor, nativeStyle, style.fontWeight) {
+        parsed.present(matches, usesArtwork, links, linkColor, nativeStyle, style.fontWeight?.weight ?: 400)
     }
     val emoticonSizeSp = with(LocalDensity.current) { MSN_EMOTICON_SIZE_DP.toSp() }
     val inlineContent = matches.mapIndexed { index, match ->
@@ -135,6 +136,7 @@ internal fun MsnEmoticonText(
                 emoticon = match.emoticon,
                 staticOnly = false,
                 modifier = Modifier.fillMaxSize(),
+                emoticonStyle = emoticonStyle,
             )
         }
     }.toMap()
@@ -149,7 +151,7 @@ internal fun MsnEmoticonText(
             fontSize = (if (style.fontSize == TextUnit.Unspecified) 16.sp else style.fontSize) * sizeScale,
             lineHeight = if (style.lineHeight == TextUnit.Unspecified) TextUnit.Unspecified else style.lineHeight * sizeScale,
         ),
-        inlineContent = if (useOriginalEmoticons) inlineContent else emptyMap(),
+        inlineContent = if (usesArtwork) inlineContent else emptyMap(),
         maxLines = maxLines,
         overflow = overflow,
     )
@@ -189,14 +191,15 @@ internal fun MessengerPlusText(
 @Composable
 internal fun MsnEmoticonGlyph(
     emoticon: MsnEmoticonShortcut,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: EmoticonStyle,
     modifier: Modifier = Modifier,
 ) {
-    if (useOriginalEmoticons) {
+    if (emoticonStyle.usesArtwork) {
         MsnEmoticonArtwork(
             emoticon = emoticon,
             staticOnly = true,
             modifier = modifier.size(MSN_EMOTICON_SIZE_DP),
+            emoticonStyle = emoticonStyle,
         )
     } else {
         Text(
@@ -212,7 +215,7 @@ internal fun MsnEmoticonEditor(
     value: String,
     onValueChange: (String) -> Unit,
     convertTypedShortcuts: Boolean,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: EmoticonStyle,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     messengerPlusEnabled: Boolean = LocalMessengerPlusEnabled.current,
@@ -352,7 +355,7 @@ internal fun MsnEmoticonEditor(
             )
             editor.setEmoticonAppearance(
                 convertTypedShortcuts = convertTypedShortcuts,
-                useOriginalEmoticons = useOriginalEmoticons,
+                emoticonStyle = emoticonStyle,
                 messengerPlusEnabled = messengerPlusEnabled,
                 hideControlCharacters = messengerPlusEnabled || hideControlCharacters,
             )
@@ -767,7 +770,7 @@ internal class MsnEditText(context: Context) : EditText(context) {
     var allowUnicodeEmoji = false
     private var applyingValue = false
     private var convertTypedShortcuts = true
-    private var useOriginalEmoticons = true
+    private var emoticonStyle = EmoticonStyle.Wlm2009
     private var messengerPlusEnabled = true
     private var hideControlCharacters = true
     private var singleLineEditor = false
@@ -945,19 +948,19 @@ internal class MsnEditText(context: Context) : EditText(context) {
 
     fun setEmoticonAppearance(
         convertTypedShortcuts: Boolean,
-        useOriginalEmoticons: Boolean,
+        emoticonStyle: EmoticonStyle,
         messengerPlusEnabled: Boolean,
         hideControlCharacters: Boolean = true,
     ) {
         if (this.convertTypedShortcuts == convertTypedShortcuts &&
-            this.useOriginalEmoticons == useOriginalEmoticons &&
+            this.emoticonStyle == emoticonStyle &&
             this.messengerPlusEnabled == messengerPlusEnabled &&
             this.hideControlCharacters == hideControlCharacters
         ) {
             return
         }
         this.convertTypedShortcuts = convertTypedShortcuts
-        this.useOriginalEmoticons = useOriginalEmoticons
+        this.emoticonStyle = emoticonStyle
         this.messengerPlusEnabled = messengerPlusEnabled
         this.hideControlCharacters = hideControlCharacters
         renderEmoticons()
@@ -1049,8 +1052,8 @@ internal class MsnEditText(context: Context) : EditText(context) {
             text = editable.toString(),
             includeTypedShortcuts = convertTypedShortcuts,
         ).forEach { match ->
-            val span = if (useOriginalEmoticons) {
-                MsnEmoticonImages.loadFirst(context, match.emoticon.artworkAssetCandidates)
+            val span = if (emoticonStyle.usesArtwork) {
+                MsnEmoticonImages.loadFirst(context, match.emoticon.artworkAssetCandidates(emoticonStyle))
                     ?.let { image -> OriginalMsnGlyphSpan(image, boxPx) }
             } else {
                 UnicodeMsnGlyphSpan(match.emoticon.unicode)
