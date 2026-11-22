@@ -89,11 +89,24 @@ class UpdateScreenInstrumentedTest {
         compose.onNodeWithTag("view-release-on-github").assertDoesNotExist()
         compose.onNodeWithTag("download-update").performClick()
         compose.onNodeWithText("How would you like to update?").assertExists()
+        compose.onNodeWithTag("download-choice-split-button").assertExists()
+        compose.onNodeWithTag("download-choice-install").assertExists()
         compose.onNodeWithText("Download and install").assertExists()
-        compose.onNodeWithText("Save APK to a folder").assertExists()
+        compose.onNodeWithTag("download-choice-more-options").assertExists()
+        compose.onNodeWithTag("download-choice-save").assertDoesNotExist()
+        val dialogLeadingBounds = compose.onNodeWithTag("download-choice-install").fetchSemanticsNode().boundsInRoot
+        val dialogTrailingBounds = compose.onNodeWithTag("download-choice-more-options").fetchSemanticsNode().boundsInRoot
+        assertTrue(dialogTrailingBounds.left >= dialogLeadingBounds.right)
+        assertEquals(dialogLeadingBounds.top, dialogTrailingBounds.top, 1f)
+        assertEquals(dialogLeadingBounds.height, dialogTrailingBounds.height, 1f)
         File(target.getExternalFilesDir(null), "update-download-choice-large-text.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+        compose.onNodeWithTag("download-choice-more-options").performClick()
+        compose.onNodeWithTag("download-choice-save").assertExists()
+        compose.onNodeWithText("Save APK to a folder").assertExists()
+        compose.onNodeWithTag("download-choice-more-options").performClick()
+        compose.onNodeWithTag("download-choice-save").assertDoesNotExist()
         compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithTag("update-more-options").performClick()
         compose.onNodeWithTag("skip-update").assertExists()

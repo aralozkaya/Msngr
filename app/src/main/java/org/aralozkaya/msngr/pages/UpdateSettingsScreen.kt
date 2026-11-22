@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -409,24 +410,104 @@ fun UpdateSettingsScreen(
             }
         }, confirmButton = { TextButton(onClick = { intervalDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
 
-    if (downloadDialog) AlertDialog(onDismissRequest = { downloadDialog = false },
-        title = { Text(stringResource(R.string.update_download_choice_title_you_singular)) },
-        text = { Text(stringResource(R.string.update_download_choice_description_you_singular)) },
-        confirmButton = {
-            val downloadAction: (String) -> Unit = { action ->
+    if (downloadDialog) {
+        var downloadChoiceMenuExpanded by remember { mutableStateOf(false) }
+        val downloadChoiceMenuInteractionSource = remember { MutableInteractionSource() }
+        val moreOptionsDescription = stringResource(R.string.update_more_options)
+        val menuState = stringResource(
+            if (downloadChoiceMenuExpanded) R.string.contacts_actions_expanded else R.string.contacts_actions_collapsed,
+        )
+        AlertDialog(
+            onDismissRequest = {
+                downloadChoiceMenuExpanded = false
                 downloadDialog = false
-                if (state.downloadedVersion == release?.version?.code) performFileAction(action)
-                else {
-                    pendingVersion = release?.version?.code
-                    manager.download()
-                    pendingAction = action
+            },
+            title = { Text(stringResource(R.string.update_download_choice_title_you_singular)) },
+            text = { Text(stringResource(R.string.update_download_choice_description_you_singular)) },
+            confirmButton = {
+                val downloadAction: (String) -> Unit = { action ->
+                    downloadChoiceMenuExpanded = false
+                    downloadDialog = false
+                    if (state.downloadedVersion == release?.version?.code) performFileAction(action)
+                    else {
+                        pendingVersion = release?.version?.code
+                        manager.download()
+                        pendingAction = action
+                    }
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(shapes = ButtonDefaults.shapes(), onClick = { downloadAction("install") }) { Text(stringResource(R.string.update_install)) }
-                OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { downloadAction("save") }) { Text(stringResource(R.string.update_save_apk)) }
-            }
-        }, dismissButton = { TextButton(onClick = { downloadDialog = false }) { Text(stringResource(android.R.string.cancel)) } })
+                SplitButtonLayout(
+                    modifier = Modifier.testTag("download-choice-split-button"),
+                    leadingButton = {
+                        SplitButtonDefaults.LeadingButton(
+                            onClick = { downloadAction("install") },
+                            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
+                            modifier = Modifier.testTag("download-choice-install"),
+                        ) {
+                            Text(stringResource(R.string.update_install))
+                        }
+                    },
+                    trailingButton = {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                            tooltip = { PlainTooltip { Text(moreOptionsDescription) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            SplitButtonDefaults.TrailingButton(
+                                checked = downloadChoiceMenuExpanded,
+                                onCheckedChange = { downloadChoiceMenuExpanded = it },
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .testTag("download-choice-more-options")
+                                    .semantics {
+                                        contentDescription = moreOptionsDescription
+                                        stateDescription = menuState
+                                    },
+                            ) {
+                                val rotation by animateFloatAsState(
+                                    targetValue = if (downloadChoiceMenuExpanded) 180f else 0f,
+                                    label = "DownloadChoiceOptionsIconRotation",
+                                )
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(SplitButtonDefaults.TrailingIconSize)
+                                        .graphicsLayer { rotationZ = rotation },
+                                )
+                            }
+                        }
+                        DropdownMenuPopup(
+                            expanded = downloadChoiceMenuExpanded,
+                            onDismissRequest = { downloadChoiceMenuExpanded = false },
+                        ) {
+                            DropdownMenuGroup(
+                                shapes = MenuDefaults.groupShape(0, 1),
+                                interactionSource = downloadChoiceMenuInteractionSource,
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.update_save_apk)) },
+                                    leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
+                                    shape = MenuDefaults.itemShape(0, 1).shape,
+                                    modifier = Modifier.testTag("download-choice-save"),
+                                    onClick = { downloadAction("save") },
+                                )
+                            }
+                        }
+                    },
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        downloadChoiceMenuExpanded = false
+                        downloadDialog = false
+                    },
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
