@@ -1126,6 +1126,16 @@
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): Show keyboard shortcuts such as :D as emoticons while you type. Incoming messages always use glyphs. -->
     <string name="settings_convert_shortcuts_supporting_you_singular"></string>
+    <!-- Reference (en): Emoticon style -->
+    <string name="settings_emoticon_style_header"></string>
+    <!-- Reference (en): Behavior -->
+    <string name="settings_emoticon_behavior_header"></string>
+    <!-- Reference (en): WLM 8.1 - 2009 -->
+    <string name="settings_emoticon_style_wlm_2009_title"></string>
+    <!-- Reference (en): WLM 2011 - 2012 -->
+    <string name="settings_emoticon_style_wlm_2012_title"></string>
+    <!-- Reference (en): Android emoji -->
+    <string name="settings_emoticon_style_android_title"></string>
     <!-- Reference (en): Use original Messenger emoticons -->
     <string name="settings_original_emoticons_title"></string>
     <!-- Reference (en): Show the classic MSN artwork instead of modern Unicode emoji. -->

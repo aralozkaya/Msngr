@@ -779,7 +779,7 @@ internal fun ChatMessageList(
                 MessageBubble(
                     message = message,
                     textSize = textSize,
-                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                    emoticonStyle = emoticonSettings.style,
                     showSenderName = isGroup,
                     joinsPrevious = joinsPrevious,
                     joinsNext = joinsNext,
@@ -874,7 +874,7 @@ internal fun MessageComposer(
     }
     EmoticonPanel(
         state = emoticonSheet,
-        useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+        emoticonStyle = emoticonSettings.style,
         canDelete = draft.isNotEmpty(),
         onFallbackInsert = { token -> onDraftChange(draft + token) },
     )
@@ -1042,7 +1042,7 @@ internal fun MessageComposer(
                                         .weight(1f)
                                         .requiredHeightIn(min = 48.dp),
                                     convertTypedShortcuts = emoticonSettings.convertTypedShortcuts,
-                                    useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                    emoticonStyle = emoticonSettings.style,
                                     messengerPlusEnabled = messengerPlusEnabled,
                                     controller = editorController,
                                     onColors = if (messengerPlusEnabled) {
@@ -1553,7 +1553,7 @@ internal fun rememberEmoticonSheetState(): EmoticonSheetState =
 @Composable
 internal fun EmoticonPanel(
     state: EmoticonSheetState,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: EmoticonStyle,
     canDelete: Boolean = state.canDelete,
     backspaceDescription: String = stringResource(R.string.chat_backspace_message_desc),
     onSearchFocusChanged: (Boolean) -> Unit = {},
@@ -1671,7 +1671,7 @@ internal fun EmoticonPanel(
                     ) {
                         MsnEmoticonGlyph(
                             emoticon = emoticon,
-                            useOriginalEmoticons = useOriginalEmoticons,
+                            emoticonStyle = emoticonStyle,
                         )
                     }
                 }
@@ -1691,7 +1691,7 @@ private fun ChatMessage?.groupsWith(next: ChatMessage?): Boolean =
 @Composable
 internal fun MessageBubble(
     message: ChatMessage,
-    useOriginalEmoticons: Boolean,
+    emoticonStyle: EmoticonStyle = EmoticonStyle.Wlm2009,
     showSenderName: Boolean = false,
     joinsPrevious: Boolean = false,
     joinsNext: Boolean = false,
@@ -1803,7 +1803,7 @@ internal fun MessageBubble(
                         } else Modifier,
                         nativeStyle = if (message.author == MessageAuthor.System) message.nativeStyle
                             else message.nativeStyle.copy(size = textSize),
-                        useOriginalEmoticons = useOriginalEmoticons,
+                        emoticonStyle = emoticonStyle,
                         renderedShortcutRanges = message.renderedEmoticonRanges,
                         linkify = emotionSound == null,
                         style = if (message.isNudge) {

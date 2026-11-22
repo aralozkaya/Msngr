@@ -368,7 +368,7 @@ class NativeTextStyleInstrumentedTest {
             MsngrTheme {
                 MsnEmoticonText(
                     text = "[c=#FF0000][u]Native[/u][/c]\nsecond",
-                    useOriginalEmoticons = false,
+                    emoticonStyle = EmoticonStyle.AndroidEmoji,
                     messengerPlusEnabled = true,
                     style = MaterialTheme.typography.bodyLarge,
                     nativeStyle = NativeTextStyle(bold = true, italic = true, strikeout = true,

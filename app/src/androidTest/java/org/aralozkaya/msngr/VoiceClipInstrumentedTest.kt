@@ -81,7 +81,7 @@ class VoiceClipInstrumentedTest {
     @Test fun rendersIncomingClipWithExplicitPlaybackAndDuration() {
         val clip = MsnVoiceClip.parse(nativeWave())!!
         compose.setContent { MaterialTheme { MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact,
-            "Voice clip", 1, voiceClip = clip), false) } }
+            "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji) } }
         compose.onNodeWithContentDescription("Play voice clip").assertIsDisplayed().performClick()
         compose.onNodeWithText("2.7 s").assertIsDisplayed()
     }
@@ -239,8 +239,8 @@ class VoiceClipInstrumentedTest {
         compose.setContent { MaterialTheme(colorScheme = if (dark.value) darkColorScheme() else androidx.compose.material3.lightColorScheme()) {
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.padding(16.dp)) {
-                    MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact, "Voice clip", 1, voiceClip = clip), false)
-                    MessageBubble(ChatMessage(2, "peer", MessageAuthor.Me, "Voice clip", 1, voiceClip = clip), false)
+                    MessageBubble(ChatMessage(1, "peer", MessageAuthor.Contact, "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji)
+                    MessageBubble(ChatMessage(2, "peer", MessageAuthor.Me, "Voice clip", 1, voiceClip = clip), EmoticonStyle.AndroidEmoji)
                 }
             }
         } }

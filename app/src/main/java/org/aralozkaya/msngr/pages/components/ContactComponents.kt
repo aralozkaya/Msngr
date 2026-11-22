@@ -138,7 +138,7 @@ fun LoggedInUserProfileCard(
                             text = profile.statusMessage.ifBlank {
                                 stringResource(R.string.profile_no_personal_message)
                             }.let { localizeUserMessage(it) },
-                            useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                            emoticonStyle = emoticonSettings.style,
                             sceneGlow = scene != null,
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (scene != null) sceneInk else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -263,7 +263,7 @@ fun ContactRow(
                             MsnEmoticonText(
                                 text = contact.displayName,
                                 modifier = Modifier.weight(1f, fill = false),
-                                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                emoticonStyle = emoticonSettings.style,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
                                 ),
@@ -314,7 +314,7 @@ fun ContactRow(
                                 } else {
                                     localizeUserMessage(contact.statusMessage.ifBlank { contact.email })
                                 },
-                                useOriginalEmoticons = emoticonSettings.useOriginalEmoticons,
+                                emoticonStyle = emoticonSettings.style,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
