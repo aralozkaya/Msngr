@@ -19,14 +19,17 @@ import dependency_inventory
 class RuffleArchiveTest(unittest.TestCase):
     commit = "a" * 40
 
-    def archive(self, *, commit=None, version="1.2.3", duplicate=False, symlink=False):
+    def archive(self, *, commit=None, version="1.2.3", duplicate=False, symlink=False, include_core_chunk=True, include_wasm=True):
         files = {
             "package.json": json.dumps({"name": "@ruffle-rs/ruffle", "version": version}).encode(),
             "ruffle.js": f'commitHash:"{commit or self.commit}",versionNumber:"{version}"'.encode(),
-            "core.ruffle.fixture.js": b"loader", "fixture.wasm": b"wasm",
             "LICENSE_MIT": b"license", "LICENSE_APACHE": b"license",
             "../escape.js": b"must never be extracted", "ruffle.js.map": b"omitted",
         }
+        if include_core_chunk:
+            files["core.ruffle.fixture.js"] = b"loader"
+        if include_wasm:
+            files["fixture.wasm"] = b"wasm"
         output = io.BytesIO()
         with tarfile.open(fileobj=output, mode="w:gz") as bundle:
             for name, data in files.items():
@@ -47,6 +50,16 @@ class RuffleArchiveTest(unittest.TestCase):
         data, integrity = self.archive()
         files = update_ruffle.runtime_files(data, integrity, "1.2.3", self.commit)
         self.assertEqual(set(files), {"ruffle.js", "core.ruffle.fixture.js", "fixture.wasm", "LICENSE_MIT", "LICENSE_APACHE"})
+
+    def test_single_js_bundle_without_core_chunks_is_accepted(self):
+        data, integrity = self.archive(include_core_chunk=False)
+        files = update_ruffle.runtime_files(data, integrity, "1.2.3", self.commit)
+        self.assertEqual(set(files), {"ruffle.js", "fixture.wasm", "LICENSE_MIT", "LICENSE_APACHE"})
+
+    def test_runtime_without_wasm_is_rejected(self):
+        data, integrity = self.archive(include_wasm=False)
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            update_ruffle.runtime_files(data, integrity, "1.2.3", self.commit)
 
     def test_corrupted_download_is_rejected(self):
         data, integrity = self.archive()
