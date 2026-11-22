@@ -357,7 +357,7 @@ class KeyboardSheetScaffoldInstrumentedTest {
                         value = "Hello",
                         onValueChange = {},
                         convertTypedShortcuts = false,
-                        useOriginalEmoticons = false,
+                        emoticonStyle = EmoticonStyle.AndroidEmoji,
                         controller = editor,
                         modifier = Modifier.fillMaxWidth().testTag(SNAP_EDITOR_TAG),
                     )
@@ -423,7 +423,7 @@ class KeyboardSheetScaffoldInstrumentedTest {
                         value = "Hello",
                         onValueChange = {},
                         convertTypedShortcuts = false,
-                        useOriginalEmoticons = false,
+                        emoticonStyle = EmoticonStyle.AndroidEmoji,
                         controller = editor,
                         modifier = Modifier.fillMaxWidth().testTag(SNAP_EDITOR_TAG),
                     )
