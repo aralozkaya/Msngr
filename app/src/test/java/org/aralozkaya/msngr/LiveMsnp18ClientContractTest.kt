@@ -381,7 +381,7 @@ class LiveMsnp18ClientContractTest {
             deliver(contact.email, Msnp18Protocol.nudgePayload())
             withTimeout(2_000) { client.contacts.first { it.single().unreadCount == 2 } }
             repository.markUnread(contact.id)
-            assertTrue(contact.id in repository.pendingNudgeShakes.value)
+            withTimeout(2_000) { repository.pendingNudgeShakes.first { contact.id in it } }
             assertTrue(dismissed.isEmpty())
 
             // Sibling typing alone must not clear unread state or dismiss notifications.
@@ -394,9 +394,10 @@ class LiveMsnp18ClientContractTest {
             // Sibling text reply marks the conversation read and dismisses notifications.
             deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.textPayload("Yes, on PC!"))
             withTimeout(2_000) { client.contacts.first { !it.single().isUnread } }
+            withTimeout(2_000) { repository.pendingNudgeShakes.first { contact.id !in it } }
+            withTimeout(2_000) { while (dismissed.size < 1) yield() }
             assertEquals(0, client.contacts.value.single().unreadCount)
             assertFalse(client.contacts.value.single().isMarkedUnread)
-            assertFalse(contact.id in repository.pendingNudgeShakes.value)
             assertEquals(listOf(contact.id), dismissed.toList())
 
             // Another incoming message followed by a desktop nudge also clears unread state.
@@ -404,6 +405,7 @@ class LiveMsnp18ClientContractTest {
             withTimeout(2_000) { client.contacts.first { it.single().unreadCount == 1 } }
             deliver("1:${email.uppercase()};{desktop-endpoint}", Msnp18Protocol.nudgePayload())
             withTimeout(2_000) { client.contacts.first { !it.single().isUnread } }
+            withTimeout(2_000) { while (dismissed.size < 2) yield() }
             assertEquals(listOf(contact.id, contact.id), dismissed.toList())
         } finally { repository.logout() }
     }
