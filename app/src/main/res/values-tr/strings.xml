@@ -2003,4 +2003,6 @@
     <string name="settings_layout_favorites_header">Favoriler</string>
     <string name="settings_layout_favorites_separate_title">Favoriler için ayrı düzen</string>
     <string name="settings_layout_favorites_separate_supporting">Favoriler için farklı bir boyut ve kompakt seçenekler belirleyin</string>
+    <string name="settings_layout_compact_search_sort_title">Kompakt arama ve sıralama</string>
+    <string name="settings_layout_compact_search_sort_supporting">Kişiler sayfasında kompakt arama çubuğu ve yalnızca metin içeren Sırala düğmesi kullanır.</string>
 </resources>

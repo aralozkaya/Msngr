@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
@@ -51,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -97,36 +99,19 @@ fun LoggedInUserProfileCard(
     val groupInteractionSource = remember { MutableInteractionSource() }
     val scene = LocalMessengerScene.current
     val sceneInk = sceneContentColor()
-    val layout = LocalLayoutSettings.current
-    val compact = layout.isCompact
-    val avatarSize = when (layout.density) {
-        UiDensity.Minimal -> 36.dp
-        UiDensity.Small -> 40.dp
-        UiDensity.Medium -> 44.dp
-        UiDensity.Regular -> 56.dp
-    }
-    val horizontalPadding = when (layout.density) {
-        UiDensity.Minimal, UiDensity.Small -> 12.dp
-        UiDensity.Medium -> 14.dp
-        UiDensity.Regular -> 20.dp
-    }
-    val verticalPadding = when (layout.density) {
-        UiDensity.Minimal -> 8.dp
-        UiDensity.Small -> 10.dp
-        UiDensity.Medium -> 12.dp
-        UiDensity.Regular -> 20.dp
-    }
 
     ElevatedCard(
         onClick = onEditProfile,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("logged_in_user_card"),
     ) {
         SceneBackdrop(scene, Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Avatar(
@@ -134,26 +119,26 @@ fun LoggedInUserProfileCard(
                     avatarUri = profile.avatarUri,
                     presence = profile.presence,
                     showPresenceIndicator = false,
-                    size = avatarSize,
-                    shape = if (compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.ownDisplayPicture,
+                    size = 56.dp,
+                    shape = MaterialTheme.shapes.ownDisplayPicture,
                 )
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     MessengerPlusText(
                         text = profile.username,
                         sceneGlow = scene != null,
                         color = if (scene != null) sceneInk else androidx.compose.ui.graphics.Color.Unspecified,
                         modifier = Modifier.fillMaxWidth(),
-                        style = (if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall).copy(
+                        style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     val currentMedia = profile.currentMedia
-                    val statusStyle = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
+                    val statusStyle = MaterialTheme.typography.bodyMedium
                     if (currentMedia != null) {
                         CurrentMediaLine(
                             media = currentMedia,
@@ -180,26 +165,21 @@ fun LoggedInUserProfileCard(
                         FilledTonalButton(
                             onClick = { presenceMenuExpanded = true },
                             shapes = ButtonDefaults.shapes(),
-                            modifier = if (compact) Modifier.defaultMinSize(minHeight = 32.dp) else Modifier,
-                            contentPadding = if (compact) {
-                                PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                            } else {
-                                PaddingValues(horizontal = 12.dp, vertical = 7.dp)
-                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                PresenceDot(profile.presence, modifier = Modifier.size(if (compact) 8.dp else 9.dp))
+                                PresenceDot(profile.presence, modifier = Modifier.size(9.dp))
                                 Text(
                                     profile.presence.displayOwnStatusLabel(),
-                                    style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelLarge,
                                 )
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
                                     contentDescription = stringResource(R.string.profile_change_status),
-                                    modifier = Modifier.size(if (compact) 16.dp else 18.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
                         }
@@ -530,7 +510,16 @@ fun ContactRow(
                     UiDensity.Medium -> 8.dp
                     UiDensity.Regular -> 8.dp
                 }
+                val compactCorner = MaterialTheme.shapes.small
+                val zeroCorner = CornerSize(0.dp)
+                val compactShape = when {
+                    count <= 1 -> compactCorner
+                    index == 0 -> compactCorner.copy(bottomStart = zeroCorner, bottomEnd = zeroCorner)
+                    index == count - 1 -> compactCorner.copy(topStart = zeroCorner, topEnd = zeroCorner)
+                    else -> RectangleShape
+                }
                 Surface(
+                    shape = compactShape,
                     color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     modifier = modifier,
                 ) {

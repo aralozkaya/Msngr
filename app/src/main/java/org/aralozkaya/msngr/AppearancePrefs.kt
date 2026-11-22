@@ -45,6 +45,7 @@ data class LayoutSettings(
     val density: UiDensity = UiDensity.Regular,
     val compactInlineStatusMessage: Boolean = false,
     val compactHidePresenceText: Boolean = false,
+    val compactSearchAndSort: Boolean = false,
 ) {
     val isCompact: Boolean
         get() = density.isCompact
@@ -59,6 +60,7 @@ data class AppAppearance(
     val uiDensity: UiDensity = UiDensity.Regular,
     val compactInlineStatusMessage: Boolean = false,
     val compactHidePresenceText: Boolean = false,
+    val compactSearchAndSort: Boolean = false,
     val useSeparateFavoritesLayout: Boolean = false,
     val favoritesUiDensity: UiDensity = UiDensity.Regular,
     val favoritesCompactInlineStatusMessage: Boolean = false,
@@ -75,6 +77,7 @@ data class AppAppearance(
             density = uiDensity,
             compactInlineStatusMessage = compactInlineStatusMessage,
             compactHidePresenceText = compactHidePresenceText,
+            compactSearchAndSort = compactSearchAndSort,
         )
 
     val favoritesLayoutSettings: LayoutSettings
@@ -96,6 +99,7 @@ object AppearancePrefs {
     private const val KEY_UI_DENSITY = "ui_density"
     private const val KEY_COMPACT_INLINE_STATUS = "compact_inline_status"
     private const val KEY_COMPACT_HIDE_PRESENCE_TEXT = "compact_hide_presence_text"
+    private const val KEY_COMPACT_SEARCH_AND_SORT = "compact_search_and_sort"
     private const val KEY_FAVORITES_SEPARATE_LAYOUT = "favorites_separate_layout"
     private const val KEY_FAVORITES_UI_DENSITY = "favorites_ui_density"
     private const val KEY_FAVORITES_COMPACT_INLINE_STATUS = "favorites_compact_inline_status"
@@ -173,6 +177,11 @@ object AppearancePrefs {
         update(context, mutableAppearance.value.copy(compactHidePresenceText = enabled))
     }
 
+    fun setCompactSearchAndSort(context: Context, enabled: Boolean) {
+        reload(context)
+        update(context, mutableAppearance.value.copy(compactSearchAndSort = enabled))
+    }
+
     fun setUseSeparateFavoritesLayout(context: Context, enabled: Boolean) {
         reload(context)
         update(context, mutableAppearance.value.copy(useSeparateFavoritesLayout = enabled))
@@ -212,6 +221,7 @@ object AppearancePrefs {
             uiDensity = uiDensity,
             compactInlineStatusMessage = prefs.getBoolean(KEY_COMPACT_INLINE_STATUS, false),
             compactHidePresenceText = prefs.getBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, false),
+            compactSearchAndSort = prefs.getBoolean(KEY_COMPACT_SEARCH_AND_SORT, false),
             useSeparateFavoritesLayout = prefs.getBoolean(KEY_FAVORITES_SEPARATE_LAYOUT, false),
             favoritesUiDensity = enumValueOrDefault(prefs.getString(KEY_FAVORITES_UI_DENSITY, null), UiDensity.Regular),
             favoritesCompactInlineStatusMessage = prefs.getBoolean(KEY_FAVORITES_COMPACT_INLINE_STATUS, false),
@@ -232,6 +242,7 @@ object AppearancePrefs {
             putString(KEY_UI_DENSITY, appearance.uiDensity.name)
             putBoolean(KEY_COMPACT_INLINE_STATUS, appearance.compactInlineStatusMessage)
             putBoolean(KEY_COMPACT_HIDE_PRESENCE_TEXT, appearance.compactHidePresenceText)
+            putBoolean(KEY_COMPACT_SEARCH_AND_SORT, appearance.compactSearchAndSort)
             putBoolean(KEY_FAVORITES_SEPARATE_LAYOUT, appearance.useSeparateFavoritesLayout)
             putString(KEY_FAVORITES_UI_DENSITY, appearance.favoritesUiDensity.name)
             putBoolean(KEY_FAVORITES_COMPACT_INLINE_STATUS, appearance.favoritesCompactInlineStatusMessage)

@@ -201,6 +201,27 @@ fun LayoutSettingsScreen(
             )
         }
         settingsSectionSpacer()
+        item(key = "compact-search-and-sort") {
+            SegmentedListItem(
+                checked = appearance.compactSearchAndSort,
+                onCheckedChange = { AppearancePrefs.setCompactSearchAndSort(context, it) },
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("compact_search_and_sort_switch"),
+                trailingContent = {
+                    Switch(
+                        checked = appearance.compactSearchAndSort,
+                        onCheckedChange = null,
+                    )
+                },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_layout_compact_search_sort_supporting))
+                },
+                content = { Text(stringResource(R.string.settings_layout_compact_search_sort_title)) },
+            )
+        }
+        settingsSectionSpacer()
         settingsSectionHeader(R.string.settings_layout_favorites_header)
         item(key = "favorites-layout-group") {
             ExpandableSettingsGroup(

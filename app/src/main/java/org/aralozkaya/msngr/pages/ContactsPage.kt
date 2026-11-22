@@ -191,7 +191,9 @@ fun ContactsPage(
             it.displayName.messengerPlusPlainText().contains(search, ignoreCase = true) ||
                 it.email.contains(search, ignoreCase = true)
         }.sortedWith(comparator)
-    val compact = LocalLayoutSettings.current.isCompact
+    val layout = LocalLayoutSettings.current
+    val compact = layout.isCompact
+    val compactSearchAndSort = layout.compactSearchAndSort
     val favoritesLayout = LocalFavoritesLayoutSettings.current
     PageContentList(
         modifier = modifier.fillMaxSize(),
@@ -209,11 +211,11 @@ fun ContactsPage(
         }
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = if (compactSearchAndSort) 0.dp else 12.dp),
                 horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (compact) {
+                if (compactSearchAndSort) {
                     CompactSearchField(
                         state = searchFieldState,
                         placeholder = stringResource(R.string.contacts_search_placeholder),
