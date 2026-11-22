@@ -12,11 +12,14 @@ endpoint GUIDs distinguish their sessions. Names retain Unicode and are XML esca
 
 ## Messages from other sessions
 
-While Msngr is signed in and joined to a private conversation, text and nudges sent
-from another session of the same account appear in that contact's Android history.
-Desktop text is shown as sent by you; your desktop nudges say **You sent a nudge.**
-These messages do not add unread counts or trigger incoming-message/nudge alerts,
-and your other sessions' typing indicators are ignored.
+While Msngr is signed in and joined to a private conversation (or group chat), text,
+handwriting, nudges, voice clips, and winks sent from another session of the same account
+appear in that conversation's Android history. Desktop text is shown as sent by you; your
+desktop nudges say **You sent a nudge.** These messages do not add unread counts or trigger
+incoming-message/nudge alerts, and your other sessions' typing indicators are ignored.
+Replying from another session also marks that conversation read on Android, clearing its
+unread count/badge, dismissing its active Android notifications and in-app banner, and
+clearing pending nudge shakes, winks, and emotion sounds.
 
 Msngr accepts switchboard invitations from its own account. The contact is resolved
 from the switchboard's initial roster or a later join, since desktop clients can

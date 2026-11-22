@@ -74,6 +74,11 @@ internal class RealtimeNotificationBridge(
                     is MessengerEvent.OwnPersonalStatusChanged,
                     is MessengerEvent.OwnCurrentMediaChanged,
                     is MessengerEvent.OwnPresenceChanged -> return@collect
+                    is MessengerEvent.ConversationRepliedElsewhere -> {
+                        notificationManager.dismissConversation(event.contactId)
+                        inAppNotifications?.dismissConversation(event.contactId)
+                        return@collect
+                    }
                     MessengerEvent.OfflineMessagesReceived -> {
                         if (!visibilityTracker.isForeground) notificationManager.showOfflineMessagesReceived()
                         return@collect

@@ -773,6 +773,36 @@ class MessengerRepositoryTest {
         assertTrue(client.presenceUpdates.isEmpty)
         repository.logout()
     }
+
+    @Test
+    fun conversationRepliedElsewhereClearsPendingEffectsAndDismissesConversation() = runBlocking {
+        val client = RecordingMsnpClient()
+        val dismissed = mutableListOf<String>()
+        val repository = MessengerRepository(
+            client = client,
+            onConversationRead = { dismissed += it },
+        )
+        val serverConfig = ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides())
+        repository.signIn(
+            SignInRequest(
+                MockServerData.ACCOUNT_EMAIL,
+                MockServerData.ACCOUNT_PASSWORD,
+                serverConfig,
+            ),
+        ).getOrThrow()
+
+        client.events.emit(MessengerEvent.IncomingNudge("peer@example.com"))
+        withTimeout(1_000) {
+            repository.pendingNudgeShakes.first { "peer@example.com" in it }
+        }
+
+        client.events.emit(MessengerEvent.ConversationRepliedElsewhere("peer@example.com"))
+        withTimeout(1_000) {
+            repository.pendingNudgeShakes.first { "peer@example.com" !in it }
+        }
+        assertEquals(listOf("peer@example.com"), dismissed)
+        repository.logout()
+    }
 }
 
 private class RecordingMsnpClient : MsnpClient {
