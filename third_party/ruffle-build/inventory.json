@@ -10,26 +10,26 @@
         },
         {
           "package": {
+            "name": "github.com/ruffle-rs/rust-flash-lso",
+            "commit": "11a0836a52c4aacbca96d8299bffd12f9715eec2"
+          }
+        },
+        {
+          "package": {
             "name": "github.com/ruffle-rs/nihav-vp6",
             "commit": "12d0bdf10a85641dc2de3d6900c747894431ed77"
           }
         },
         {
           "package": {
-            "name": "github.com/ruffle-rs/h263-rs",
-            "commit": "27ee833ca97aadd2a14cf0b3b4ec8b53f31ff6bd"
-          }
-        },
-        {
-          "package": {
-            "name": "github.com/ruffle-rs/rust-flash-lso",
-            "commit": "61b717248aae853a4f5d8a103eba704268d286c8"
-          }
-        },
-        {
-          "package": {
             "name": "github.com/ruffle-rs/regras3",
             "commit": "6d48179d6bd448f2cc66b76352c9f048dde968d1"
+          }
+        },
+        {
+          "package": {
+            "name": "github.com/ruffle-rs/h263-rs",
+            "commit": "8215bc7a716f0aa7e0a9bbe97af76c97ac0bfb82"
           }
         },
         {
@@ -62,7 +62,7 @@
         {
           "package": {
             "name": "annotate-snippets",
-            "version": "0.12.16",
+            "version": "0.12.18",
             "ecosystem": "crates.io"
           }
         },
@@ -181,7 +181,7 @@
         {
           "package": {
             "name": "bumpalo",
-            "version": "3.20.3",
+            "version": "3.20.4",
             "ecosystem": "crates.io"
           }
         },
@@ -216,14 +216,14 @@
         {
           "package": {
             "name": "bytes",
-            "version": "1.12.1",
+            "version": "1.12.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "cc",
-            "version": "1.4.7",
+            "version": "1.11.2",
             "ecosystem": "crates.io"
           }
         },
@@ -237,7 +237,7 @@
         {
           "package": {
             "name": "cfg-if",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "ecosystem": "crates.io"
           }
         },
@@ -272,7 +272,7 @@
         {
           "package": {
             "name": "clap",
-            "version": "4.6.7",
+            "version": "4.6.8",
             "ecosystem": "crates.io"
           }
         },
@@ -286,14 +286,14 @@
         {
           "package": {
             "name": "clap_derive",
-            "version": "4.6.7",
+            "version": "4.6.8",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "clap_lex",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "ecosystem": "crates.io"
           }
         },
@@ -334,8 +334,15 @@
         },
         {
           "package": {
+            "name": "constant_time_eq",
+            "version": "0.6.1",
+            "ecosystem": "crates.io"
+          }
+        },
+        {
+          "package": {
             "name": "convert_case",
-            "version": "0.11.0",
+            "version": "0.12.0",
             "ecosystem": "crates.io"
           }
         },
@@ -356,7 +363,7 @@
         {
           "package": {
             "name": "crc32fast",
-            "version": "1.5.2",
+            "version": "1.5.5",
             "ecosystem": "crates.io"
           }
         },
@@ -377,7 +384,7 @@
         {
           "package": {
             "name": "crossbeam-utils",
-            "version": "0.8.21",
+            "version": "0.8.23",
             "ecosystem": "crates.io"
           }
         },
@@ -482,7 +489,7 @@
         {
           "package": {
             "name": "deranged",
-            "version": "0.5.8",
+            "version": "0.5.9",
             "ecosystem": "crates.io"
           }
         },
@@ -503,14 +510,14 @@
         {
           "package": {
             "name": "either",
-            "version": "1.18.0",
+            "version": "1.19.0",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "encoding_rs",
-            "version": "0.8.42",
+            "version": "0.8.44",
             "ecosystem": "crates.io"
           }
         },
@@ -531,21 +538,21 @@
         {
           "package": {
             "name": "enumset",
-            "version": "1.1.13",
+            "version": "1.1.15",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "enumset_derive",
-            "version": "0.15.0",
+            "version": "0.15.1",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "equivalent",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "ecosystem": "crates.io"
           }
         },
@@ -587,7 +594,7 @@
         {
           "package": {
             "name": "find-msvc-tools",
-            "version": "0.1.13",
+            "version": "0.1.15",
             "ecosystem": "crates.io"
           }
         },
@@ -629,14 +636,14 @@
         {
           "package": {
             "name": "fluent-template-macros",
-            "version": "0.13.3",
+            "version": "0.15.1",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "fluent-templates",
-            "version": "0.13.3",
+            "version": "0.15.1",
             "ecosystem": "crates.io"
           }
         },
@@ -664,7 +671,7 @@
         {
           "package": {
             "name": "form_urlencoded",
-            "version": "1.2.2",
+            "version": "1.2.3",
             "ecosystem": "crates.io"
           }
         },
@@ -776,7 +783,7 @@
         {
           "package": {
             "name": "globset",
-            "version": "0.4.19",
+            "version": "0.4.21",
             "ecosystem": "crates.io"
           }
         },
@@ -790,7 +797,7 @@
         {
           "package": {
             "name": "gloo-utils",
-            "version": "0.3.0",
+            "version": "0.3.1",
             "ecosystem": "crates.io"
           }
         },
@@ -846,7 +853,7 @@
         {
           "package": {
             "name": "id3",
-            "version": "1.17.2",
+            "version": "1.17.4",
             "ecosystem": "crates.io"
           }
         },
@@ -874,7 +881,7 @@
         {
           "package": {
             "name": "ignore",
-            "version": "0.4.32",
+            "version": "0.4.34",
             "ecosystem": "crates.io"
           }
         },
@@ -930,7 +937,7 @@
         {
           "package": {
             "name": "itoa",
-            "version": "1.0.18",
+            "version": "1.0.19",
             "ecosystem": "crates.io"
           }
         },
@@ -958,14 +965,14 @@
         {
           "package": {
             "name": "lazy_static",
-            "version": "1.5.0",
+            "version": "1.5.1",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "libc",
-            "version": "0.2.189",
+            "version": "0.2.191",
             "ecosystem": "crates.io"
           }
         },
@@ -986,7 +993,7 @@
         {
           "package": {
             "name": "litrs",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "ecosystem": "crates.io"
           }
         },
@@ -1000,14 +1007,14 @@
         {
           "package": {
             "name": "log",
-            "version": "0.4.34",
+            "version": "0.4.35",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "lru",
-            "version": "0.18.4",
+            "version": "0.18.5",
             "ecosystem": "crates.io"
           }
         },
@@ -1098,14 +1105,14 @@
         {
           "package": {
             "name": "naga",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "naga-types",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
@@ -1189,7 +1196,7 @@
         {
           "package": {
             "name": "ordered-float",
-            "version": "5.5.0",
+            "version": "5.5.1",
             "ecosystem": "crates.io"
           }
         },
@@ -1245,7 +1252,7 @@
         {
           "package": {
             "name": "powerfmt",
-            "version": "0.2.0",
+            "version": "0.2.1",
             "ecosystem": "crates.io"
           }
         },
@@ -1315,7 +1322,7 @@
         {
           "package": {
             "name": "rand",
-            "version": "0.10.2",
+            "version": "0.10.4",
             "ecosystem": "crates.io"
           }
         },
@@ -1343,28 +1350,28 @@
         {
           "package": {
             "name": "realfft",
-            "version": "3.5.0",
+            "version": "3.5.1",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "regex",
-            "version": "1.13.1",
+            "version": "1.13.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "regex-automata",
-            "version": "0.4.18",
+            "version": "0.4.19",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "regex-syntax",
-            "version": "0.8.11",
+            "version": "0.8.12",
             "ecosystem": "crates.io"
           }
         },
@@ -1462,7 +1469,7 @@
         {
           "package": {
             "name": "serde_json",
-            "version": "1.0.151",
+            "version": "1.0.154",
             "ecosystem": "crates.io"
           }
         },
@@ -1511,7 +1518,7 @@
         {
           "package": {
             "name": "smallvec",
-            "version": "1.16.2",
+            "version": "1.16.6",
             "ecosystem": "crates.io"
           }
         },
@@ -1602,7 +1609,7 @@
         {
           "package": {
             "name": "syn",
-            "version": "3.0.6",
+            "version": "3.0.10",
             "ecosystem": "crates.io"
           }
         },
@@ -1623,14 +1630,14 @@
         {
           "package": {
             "name": "thiserror",
-            "version": "2.0.18",
+            "version": "2.0.21",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "thiserror-impl",
-            "version": "2.0.18",
+            "version": "2.0.21",
             "ecosystem": "crates.io"
           }
         },
@@ -1672,7 +1679,7 @@
         {
           "package": {
             "name": "tinystr",
-            "version": "0.8.4",
+            "version": "0.8.5",
             "ecosystem": "crates.io"
           }
         },
@@ -1742,7 +1749,7 @@
         {
           "package": {
             "name": "typed-path",
-            "version": "0.12.3",
+            "version": "0.13.0",
             "ecosystem": "crates.io"
           }
         },
@@ -1777,7 +1784,7 @@
         {
           "package": {
             "name": "unicode-ident",
-            "version": "1.0.24",
+            "version": "1.0.27",
             "ecosystem": "crates.io"
           }
         },
@@ -1791,21 +1798,21 @@
         {
           "package": {
             "name": "unicode-width",
-            "version": "0.2.2",
+            "version": "0.2.3",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "url",
-            "version": "2.5.8",
+            "version": "2.5.9",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "utf8_iter",
-            "version": "1.0.4",
+            "version": "1.1.0",
             "ecosystem": "crates.io"
           }
         },
@@ -1813,6 +1820,13 @@
           "package": {
             "name": "utf8parse",
             "version": "0.2.2",
+            "ecosystem": "crates.io"
+          }
+        },
+        {
+          "package": {
+            "name": "utf_types",
+            "version": "1.0.0",
             "ecosystem": "crates.io"
           }
         },
@@ -1868,14 +1882,7 @@
         {
           "package": {
             "name": "wasm-streams",
-            "version": "0.5.0",
-            "ecosystem": "crates.io"
-          }
-        },
-        {
-          "package": {
-            "name": "weak-table",
-            "version": "0.3.2",
+            "version": "0.7.1",
             "ecosystem": "crates.io"
           }
         },
@@ -1903,35 +1910,35 @@
         {
           "package": {
             "name": "wgpu",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "wgpu-core",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "wgpu-core-deps-wasm",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "wgpu-hal",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "wgpu-naga-bridge",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
@@ -1945,7 +1952,7 @@
         {
           "package": {
             "name": "wgpu-types",
-            "version": "30.0.1",
+            "version": "30.0.2",
             "ecosystem": "crates.io"
           }
         },
@@ -1959,21 +1966,21 @@
         {
           "package": {
             "name": "winnow",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "zerocopy",
-            "version": "0.8.57",
+            "version": "0.8.63",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "zerocopy-derive",
-            "version": "0.8.57",
+            "version": "0.8.63",
             "ecosystem": "crates.io"
           }
         },
@@ -1986,15 +1993,29 @@
         },
         {
           "package": {
+            "name": "zeroize",
+            "version": "1.9.2",
+            "ecosystem": "crates.io"
+          }
+        },
+        {
+          "package": {
+            "name": "zeroize_derive",
+            "version": "1.5.0",
+            "ecosystem": "crates.io"
+          }
+        },
+        {
+          "package": {
             "name": "zerovec",
-            "version": "0.11.8",
+            "version": "0.11.9",
             "ecosystem": "crates.io"
           }
         },
         {
           "package": {
             "name": "zip",
-            "version": "9.0.5",
+            "version": "9.7.0",
             "ecosystem": "crates.io"
           }
         },

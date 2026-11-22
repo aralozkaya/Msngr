@@ -1,6 +1,6 @@
 {
-  "version": "0.7.1",
-  "sourceCommit": "89a7049965f3090e706265670df309a5128233ac",
+  "version": "0.8.0",
+  "sourceCommit": "cd4cb8f45f144d5a9209f496ee09b60ad136b5b3",
   "tools": {
     "rust": "1.99.1",
     "node": "v24.22.0",
@@ -12,8 +12,8 @@
     "jpegxr"
   ],
   "inputs": {
-    "third_party/patches/ruffle-security.patch": "0e5a8ee0df268b433b3caa7fab90019f03255037a0f1d9d9a9a7b5469b943873",
-    "third_party/ruffle-build/Cargo.lock": "b92eaf409842500c4e3e7a8592853e9226120083a7ce3ee6090a141abae52964",
-    "third_party/ruffle-build/version-seal.json": "fb93f3bd8505d79ce5de39d527e9e3dd17c329a113dc38fcc6b8758fdb7cc1b5"
+    "third_party/patches/ruffle-security.patch": "1b8d0d510e4e94975eef12203483a4ef2b300185ff442590903a0af3f2f58c0a",
+    "third_party/ruffle-build/Cargo.lock": "d719a83b8e63e249c965920a76bc46bb8226e2e1a26dc1db51611f1181bbe466",
+    "third_party/ruffle-build/version-seal.json": "35f582af67d794f68a4c3e72d820357b88a50f74eb9050393c1cd7f7b8c2d386"
   }
 }
