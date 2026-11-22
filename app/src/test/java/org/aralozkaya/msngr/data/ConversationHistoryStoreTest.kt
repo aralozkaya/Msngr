@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.createTestTempDir
+
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,7 +11,6 @@ import java.io.BufferedOutputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.Files
 
 class ConversationHistoryStoreTest {
     @Test fun fileHistoryRetainsCompletedFilesAndFailsInterruptedOffersOnRestart() {
@@ -388,7 +389,7 @@ class ConversationHistoryStoreTest {
     }
 
     private fun withHistoryDirectory(name: String, block: (File) -> Unit) {
-        val parent = Files.createTempDirectory(name).toFile()
+        val parent = createTestTempDir(name)
         try {
             block(parent.resolve("conversation_history"))
         } finally {

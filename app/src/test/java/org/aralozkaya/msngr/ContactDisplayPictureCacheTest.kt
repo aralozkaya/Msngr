@@ -7,12 +7,11 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 
 class ContactDisplayPictureCacheTest {
     @Test
     fun storesOriginalLargerThanThePeerTransferLimitAcrossCacheInstances() = runBlocking {
-        val root = Files.createTempDirectory("msngr-original-picture").toFile()
+        val root = createTestTempDir("msngr-original-picture")
         try {
             val original = mockDisplayPictureBytes() + ByteArray(240 * 1024) { 42 }
             val picture = MsnDisplayPicture.create("contact@example.com", original)
@@ -30,7 +29,7 @@ class ContactDisplayPictureCacheTest {
 
     @Test
     fun storesValidatedPicturesSeparatelyForEachSignedInAccount() = runBlocking {
-        val root = Files.createTempDirectory("msngr-dp-cache").toFile()
+        val root = createTestTempDir("msngr-dp-cache")
         try {
             val cache = FileContactDisplayPictureCache(root)
             val contact = "contact@example.com"
@@ -60,7 +59,7 @@ class ContactDisplayPictureCacheTest {
 
     @Test
     fun rejectsMismatchedAndCorruptRecords() = runBlocking {
-        val root = Files.createTempDirectory("msngr-dp-cache-corrupt").toFile()
+        val root = createTestTempDir("msngr-dp-cache-corrupt")
         try {
             val cache = FileContactDisplayPictureCache(root)
             val contact = "contact@example.com"
@@ -82,7 +81,7 @@ class ContactDisplayPictureCacheTest {
 
     @Test
     fun removesOnlyTheRequestedAccountsContactPicture() = runBlocking {
-        val root = Files.createTempDirectory("msngr-dp-cache-remove").toFile()
+        val root = createTestTempDir("msngr-dp-cache-remove")
         try {
             val cache = FileContactDisplayPictureCache(root)
             val contact = "contact@example.com"

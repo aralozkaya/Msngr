@@ -10,7 +10,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.TimeZone
 
 class MsnpOfflineMessagesTest {
     private fun fixture(name: String) = checkNotNull(javaClass.getResourceAsStream("/offline/$name")).use { it.readBytes() }
@@ -36,7 +38,11 @@ class MsnpOfflineMessagesTest {
             .contains("<messageId>${metadata.id}</messageId>"))
         assertEquals("owner", metadata.senderName)
         assertEquals("owner@example.test", metadata.sender)
-        assertEquals(Instant.parse("2026-10-11T13:06:59Z").toEpochMilli(), metadata.sentAtMillis)
+        val expectedSentAtMillis = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(2026, Calendar.OCTOBER, 11, 13, 6, 59)
+        }.timeInMillis
+        assertEquals(expectedSentAtMillis, metadata.sentAtMillis)
         val xml = fixture("wlm-get-message.xml").toString(Charsets.UTF_8)
         val message = MsnpOfflineMessages.parseMessage(xml, metadata)
         assertEquals("Msngr offline protocol test 2026-10-11: Merhaba, çığ öşü (Y)", message.text)

@@ -9,11 +9,10 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.file.Files
 
 class FileTransferProtocolTest {
     @Test fun inviterAssignsOneOrderingToPhotosAddedByEitherParticipant() = runBlocking {
-        val directory = Files.createTempDirectory("msngr-photo-order").toFile()
+        val directory = createTestTempDir("msngr-photo-order")
         val hostChanges = mutableListOf<PhotoShare>()
         val guestChanges = mutableListOf<PhotoShare>()
         val announcements = mutableListOf<String>()
@@ -61,7 +60,7 @@ class FileTransferProtocolTest {
         }
     }
     @Test fun acceptingAnOldOfferStartsAFreshTransferTimeout() = runBlocking {
-        val directory = Files.createTempDirectory("msngr-delayed-accept").toFile()
+        val directory = createTestTempDir("msngr-delayed-accept")
         val changes = java.util.concurrent.CopyOnWriteArrayList<FileTransfer>()
         val engine = MsnpFileSession("a@example.test", "b@example.test", { directory }, { changes.add(it) },
             {}, { _, _, _, _ -> }, offerTimeoutMillis = 5_000, idleTimeoutMillis = 400, expiryCheckMillis = 20)
@@ -80,7 +79,7 @@ class FileTransferProtocolTest {
     }
     @Test fun photoOriginalRequestsTransferTheUnchangedFileWithHashValidation() = runBlocking {
         for (v2 in listOf(false, true)) {
-            val directory = Files.createTempDirectory("msngr-photo-original").toFile()
+            val directory = createTestTempDir("msngr-photo-original")
             val bytes = ByteArray(170_000) { (it * 43).toByte() }
             val file = java.io.File(directory, "original.png").apply { writeBytes(bytes) }
             val hash = org.aralozkaya.msngr.protocol.MsnBase64.encode(java.security.MessageDigest.getInstance("SHA-1").digest(bytes))
@@ -107,7 +106,7 @@ class FileTransferProtocolTest {
         }
     }
     @Test fun aSecondEndpointCanRetrieveThePublishedPhotoPreviewWithNativeApplication33() = runBlocking {
-        val directory = Files.createTempDirectory("msngr-photo-endpoint").toFile()
+        val directory = createTestTempDir("msngr-photo-endpoint")
         val bytes = ByteArray(6500) { (it * 19).toByte() }
         val metadata = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("a@example.test", bytes, 15)
         val packets = mutableListOf<ByteArray>()
@@ -130,7 +129,7 @@ class FileTransferProtocolTest {
     }
     @Test fun photoInvitationPreviewSelectionAndRemoteStopKeepTheSlideshow() = runBlocking {
         for (v2 in listOf(false, true)) {
-            val directory = Files.createTempDirectory("msngr-photos").toFile()
+            val directory = createTestTempDir("msngr-photos")
             val received = java.util.concurrent.CopyOnWriteArrayList<PhotoShare>()
             val sent = java.util.concurrent.CopyOnWriteArrayList<PhotoShare>()
             lateinit var a: MsnpP2pSession
@@ -169,7 +168,7 @@ class FileTransferProtocolTest {
     }
 
     @Test fun invalidFileOffsetsAndCancellationRemovePartialFiles() = runBlocking {
-        val directory = Files.createTempDirectory("msngr-invalid-file").toFile()
+        val directory = createTestTempDir("msngr-invalid-file")
         val changes = mutableListOf<FileTransfer>()
         val replies = mutableListOf<SlpMessage>()
         val engine = MsnpFileSession("a@example.test", "b@example.test", { directory }, { changes.add(it) },
@@ -209,7 +208,7 @@ class FileTransferProtocolTest {
 
     @Test fun filesStreamOnlyAfterAcceptanceAndCompleteAcrossBothFramings() = runBlocking {
         for (v2 in listOf(false, true)) {
-            val directory = Files.createTempDirectory("msngr-file").toFile()
+            val directory = createTestTempDir("msngr-file")
             val bytes = ByteArray(150_123) { (it * 29).toByte() }
             val file = java.io.File(directory, "source.bin").apply { writeBytes(bytes) }
             val sending = java.util.concurrent.CopyOnWriteArrayList<FileTransfer>()

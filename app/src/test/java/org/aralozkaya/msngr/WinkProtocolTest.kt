@@ -8,7 +8,6 @@ import org.junit.Test
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.file.Files
 
 class WinkProtocolTest {
     private fun fixture(name: String) = javaClass.getResourceAsStream("/winks/$name")!!.use { it.readBytes() }
@@ -90,7 +89,7 @@ class WinkProtocolTest {
     }
 
     @Test fun cacheIsAccountScopedDeduplicatedAndPreservesInstalledWinksWhenHistoryIsCleared() {
-        val directory = Files.createTempDirectory("wink-store").toFile()
+        val directory = createTestTempDir("wink-store")
         try {
             val store = WinkStore(directory)
             val bytes = cab(); val reference = WinkReference(MsnDisplayPicture.create("peer", bytes, 8), "Screen Punch")
@@ -135,7 +134,7 @@ class WinkProtocolTest {
     }
 
     @Test fun deletingCustomWinksPreservesDefaultsOtherAccountsAndReceivedCopies() {
-        val directory = Files.createTempDirectory("wink-delete").toFile()
+        val directory = createTestTempDir("wink-delete")
         try {
             val bundledBytes = cab()
             val bundled = WinkReference(MsnDisplayPicture.create("bundled", bundledBytes, 8), "Bundled")
@@ -162,7 +161,7 @@ class WinkProtocolTest {
     }
 
     @Test fun savedWinksIncludeDefaultsAndInstalledPackagesButNotReceivedCache() {
-        val directory = Files.createTempDirectory("wink-saved-state").toFile()
+        val directory = createTestTempDir("wink-saved-state")
         try {
             val bundledBytes = cab()
             val bundled = WinkReference(MsnDisplayPicture.create("bundled", bundledBytes, 8), "Bundled")
@@ -180,7 +179,7 @@ class WinkProtocolTest {
     }
 
     @Test fun historyRoundTripsReferencesAndMarksInterruptedDownload() {
-        val directory = Files.createTempDirectory("wink-history").toFile()
+        val directory = createTestTempDir("wink-history")
         try {
             val reference = WinkReference(MsnDisplayPicture.create("peer", cab(), 8).copy(extraAttributes = mapOf("stamp" to "original")), "Screen Punch")
             val history = FileConversationHistoryStore(directory)

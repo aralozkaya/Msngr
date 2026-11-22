@@ -96,7 +96,7 @@ class MsnpStorageServiceTest {
         )
         assertArrayEquals(
             image,
-            java.util.Base64.getDecoder().decode(
+            kotlin.io.encoding.Base64.decode(
                 document.getElementsByTagNameNS("*", "Data").item(0).textContent,
             ),
         )
@@ -127,7 +127,7 @@ class MsnpStorageServiceTest {
         )
         assertArrayEquals(
             image,
-            java.util.Base64.getDecoder().decode(
+            kotlin.io.encoding.Base64.decode(
                 document.getElementsByTagNameNS("*", "Data").item(0).textContent,
             ),
         )

@@ -196,7 +196,7 @@ class LiveMsnp18ClientContractTest {
     )
 
     @Test fun retryDownloadsARestoredWinkIntoTheSameMessageWithoutDuplicates() = runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("wink-retry").toFile()
+        val directory = createTestTempDir("wink-retry")
         val store = org.aralozkaya.msngr.data.WinkStore(directory)
         val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val metadata = MsnDisplayPicture.create(contact.email, bytes, 8)
@@ -2457,7 +2457,7 @@ class LiveMsnp18ClientContractTest {
     @Test fun privateContactCapabilitiesFollowPresenceAndEndpointUpdatesAndGuardEveryFeature() = runBlocking {
         val notification = ContractNotificationTransport(email)
         val switchboard = ContractSwitchboardTransport(email, contact.email)
-        val directory = java.nio.file.Files.createTempDirectory("cap-guard").toFile()
+        val directory = createTestTempDir("cap-guard")
         val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
             MsnDisplayPicture.create(email, winkBytes, 8),
@@ -2560,7 +2560,7 @@ class LiveMsnp18ClientContractTest {
         var time = 0L
         val notification = ContractNotificationTransport(email)
         val switchboard = ContractSwitchboardTransport(email, contact.email)
-        val directory = java.nio.file.Files.createTempDirectory("cap-desktop").toFile()
+        val directory = createTestTempDir("cap-desktop")
         val winkBytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val winkRef = org.aralozkaya.msngr.protocol.WinkReference(
             MsnDisplayPicture.create(email, winkBytes, 8),

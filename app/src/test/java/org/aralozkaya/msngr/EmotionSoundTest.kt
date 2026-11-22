@@ -5,7 +5,6 @@ import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.protocol.*
 import org.junit.Assert.*
 import org.junit.Test
-import java.nio.file.Files
 
 class EmotionSoundTest {
     private fun fixture(name: String) = javaClass.getResourceAsStream("/emotion-sounds/$name")!!.use { it.readBytes() }
@@ -135,7 +134,7 @@ class EmotionSoundTest {
         assertEquals("", ServerPresets.resolveForProvider(ProviderOptions.CUSTOM, ServerOverrides(mainServer = "ms.example", configServer = "cfg.example")).emotionSoundServer)
     }
     @Test fun libraryPersistsByAccountAndServiceAndRemovalKeepsReplayCache() {
-        val directory = Files.createTempDirectory("msngr-emotion-library").toFile()
+        val directory = createTestTempDir("msngr-emotion-library")
         try {
             val store = EmotionSoundStore(directory); val bytes = custom(); val sound = MsnEmotionSound.downloaded(bytes)
             store.put("account-a", MsnEmotionSound.DEFAULT_SERVER, sound, bytes, true)
@@ -150,7 +149,7 @@ class EmotionSoundTest {
         } finally { directory.deleteRecursively() }
     }
     @Test fun historyRetainsOriginalStyledTextButNeverRestoresAutoplay() {
-        val directory = Files.createTempDirectory("msngr-emotion-history").toFile()
+        val directory = createTestTempDir("msngr-emotion-history")
         try {
             val source = MsnEmotionSound.message(EmotionSound("012345ABCDEF", "[b]Sound[/b]"))
             val message = ChatMessage(12, "group@live.com", MessageAuthor.Contact, source, 15, senderEmail = "peer@example.test", nativeStyle = NativeTextStyle(italic = true), autoPlayEmotionSound = true)

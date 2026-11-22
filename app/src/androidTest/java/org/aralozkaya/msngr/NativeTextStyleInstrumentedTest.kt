@@ -353,7 +353,9 @@ class NativeTextStyleInstrumentedTest {
                 val paint = android.text.TextPaint(editor.paint)
                 editor.text.getSpans(0, 1, android.text.style.MetricAffectingSpan::class.java)
                     .forEach { it.updateDrawState(paint) }
-                assertEquals(option.weight, paint.typeface.weight)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    assertEquals(option.weight, paint.typeface.weight)
+                }
                 assertEquals(option.italic, paint.typeface.isItalic || paint.textSkewX < 0f)
             }
         }

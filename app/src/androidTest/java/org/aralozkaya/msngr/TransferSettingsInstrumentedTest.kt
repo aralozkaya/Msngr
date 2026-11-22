@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr
 
+import android.os.Build
+import androidx.test.filters.SdkSuppress
 import android.content.Context
 import android.content.ContentValues
 import android.content.Intent
@@ -31,6 +33,7 @@ import org.junit.Test
 import java.io.File
 import java.util.UUID
 
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.O)
 class TransferSettingsInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private lateinit var context: Context
@@ -122,10 +125,13 @@ class TransferSettingsInstrumentedTest {
         }
     }
 
+    @androidx.test.filters.SdkSuppress(minSdkVersion = android.os.Build.VERSION_CODES.Q)
     @Test fun nativeAllowAccessPickerGrantsPersistentAccessAndFilesSaveToTheChosenFolder() = verifyNativeFolder(photo = false)
 
+    @androidx.test.filters.SdkSuppress(minSdkVersion = android.os.Build.VERSION_CODES.Q)
     @Test fun nativePhotoFolderPickerGrantsPersistentAccessAndOriginalsSaveToTheChosenFolder() = verifyNativeFolder(photo = true)
 
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
     private fun verifyNativeFolder(photo: Boolean) = runBlocking {
         val resolver = context.contentResolver
         val folderName = "Msngr-picker-test-${UUID.randomUUID()}"

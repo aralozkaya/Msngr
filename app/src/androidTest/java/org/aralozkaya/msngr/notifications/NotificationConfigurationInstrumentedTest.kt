@@ -105,7 +105,7 @@ class NotificationConfigurationInstrumentedTest {
         val eventChannels = NotificationChannels.userConfigurable - NotificationChannels.APP_UPDATES
         for (attempt in 0 until 20) {
             notificationsByChannel = systemManager.activeNotifications.associateBy {
-                it.notification.channelId
+                NotificationCompat.getChannelId(it.notification).orEmpty()
             }
             if (eventChannels.all(notificationsByChannel::containsKey)) {
                 break
@@ -212,10 +212,10 @@ class NotificationConfigurationInstrumentedTest {
         }
         assertTrue(systemManager.activeNotifications.none { it.id == messageId })
         assertTrue(systemManager.activeNotifications.any {
-            it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
+            NotificationCompat.getChannelId(it.notification) == NotificationChannels.CONTACT_SIGNED_IN
         })
         assertTrue(systemManager.activeNotifications.any {
-            it.notification.channelId == NotificationChannels.NUDGES
+            NotificationCompat.getChannelId(it.notification) == NotificationChannels.NUDGES
         })
         systemManager.cancelAll()
     }
@@ -457,7 +457,7 @@ class NotificationConfigurationInstrumentedTest {
                 }
                 val failed = awaitNotification(id) { messageText(it)?.contains("reconnect") == true }
                 assertConversationPhoto(failed, contactId)
-                assertEquals(channelId, failed.channelId)
+                assertEquals(channelId, NotificationCompat.getChannelId(failed))
                 assertFalse(failed.extras.getBoolean(android.app.Notification.EXTRA_PROGRESS_INDETERMINATE))
             }
 
@@ -529,7 +529,9 @@ class NotificationConfigurationInstrumentedTest {
             ?.messages?.singleOrNull()?.text?.toString()
 
     private fun assertConversationIcon(notification: android.app.Notification, contactId: String) {
-        assertEquals(R.drawable.ic_notification_msngr, notification.smallIcon.resId)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            assertEquals(R.drawable.ic_notification_msngr, notification.smallIcon.resId)
+        }
         assertNull(notification.getLargeIcon())
         assertFalse(notification.extras.containsKey(android.app.Notification.EXTRA_PICTURE))
         assertEquals(MsngrNotificationManager.conversationShortcutId(contactId), NotificationCompat.getShortcutId(notification))
@@ -676,7 +678,7 @@ class NotificationConfigurationInstrumentedTest {
                 assertEquals(
                     "Expected alerting notification for $id while Online",
                     android.app.Notification.GROUP_ALERT_ALL,
-                    posted.groupAlertBehavior,
+                    NotificationCompat.getGroupAlertBehavior(posted),
                 )
             }
 
@@ -692,7 +694,7 @@ class NotificationConfigurationInstrumentedTest {
                     assertEquals(
                         "Expected silent non-chat notification for $id while $nonAvailable",
                         android.app.Notification.GROUP_ALERT_SUMMARY,
-                        posted.groupAlertBehavior,
+                        NotificationCompat.getGroupAlertBehavior(posted),
                     )
                 }
                 chatIds.forEach { id ->
@@ -700,7 +702,7 @@ class NotificationConfigurationInstrumentedTest {
                     assertEquals(
                         "Expected alerting chat notification for $id while $nonAvailable by default",
                         android.app.Notification.GROUP_ALERT_ALL,
-                        posted.groupAlertBehavior,
+                        NotificationCompat.getGroupAlertBehavior(posted),
                     )
                 }
             }
@@ -713,7 +715,7 @@ class NotificationConfigurationInstrumentedTest {
                 assertEquals(
                     "Expected silent notification for $id when chat silencing is included",
                     android.app.Notification.GROUP_ALERT_SUMMARY,
-                    posted.groupAlertBehavior,
+                    NotificationCompat.getGroupAlertBehavior(posted),
                 )
             }
 
@@ -724,7 +726,7 @@ class NotificationConfigurationInstrumentedTest {
                 assertEquals(
                     "Expected alerting notification for $id when back Online",
                     android.app.Notification.GROUP_ALERT_ALL,
-                    posted.groupAlertBehavior,
+                    NotificationCompat.getGroupAlertBehavior(posted),
                 )
             }
         } finally {

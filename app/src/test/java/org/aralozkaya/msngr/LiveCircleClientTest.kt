@@ -48,7 +48,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -517,7 +516,7 @@ class LiveCircleClientTest {
     @Test fun groupWinkDownloadRetriesAndCachedOffersStayInTheirOwnConversations() = runBlocking {
         val transport = CircleTransport()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val directory = Files.createTempDirectory("group-wink").toFile()
+        val directory = createTestTempDir("group-wink")
         val store = WinkStore(directory)
         val bytes = javaClass.getResourceAsStream("/winks/screen-punch.cab")!!.use { it.readBytes() }
         val sender = "alice@example.com"
