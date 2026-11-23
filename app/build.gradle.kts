@@ -556,7 +556,7 @@ val appVersion = if (releaseTag == null) {
 android {
     namespace = "org.aralozkaya.msngr"
     compileSdk {
-        version = release(37) { minorApiLevel = 1 }
+        version = release(37) { minorApiLevel = 2 }
     }
     // Java/Kotlin CodeQL extraction compiles all managed sources without needing
     // a native linker. Its default runner cannot download additional NDKs.

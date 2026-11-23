@@ -429,7 +429,7 @@ Android Studio's SDK Manager:
 
 | Package | Version |
 | --- | --- |
-| Android SDK Platform | API 37.1 (`platforms;android-37.1`) |
+| Android SDK Platform | API 37.2 (`platforms;android-37.2`) |
 | Android SDK Build-Tools | 36.0.0 |
 | Android NDK (Side by side) | 28.2.13676358 |
 | CMake | 3.22.1 |

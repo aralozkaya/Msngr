@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.ChatMessage
 import org.aralozkaya.msngr.data.Contact
@@ -201,6 +202,8 @@ class NowPlayingMonitorTest {
             withTimeout(2_000) {
                 repository.connectionIssue.first { it != null }
             }
+            // Let the controller's StateFlow combine collector observe the disconnect before reconnecting.
+            repeat(3) { withContext(dispatcher) {} }
             repository.reconnect().getOrThrow()
             withTimeout(2_000) {
                 while (client.mediaPublications.size <= beforeReconnectCount) delay(10)
