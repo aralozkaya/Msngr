@@ -326,29 +326,56 @@ class ContactCategoriesTest {
         assertTrue(repository.categories.value.isEmpty())
     }
 
-    @Test fun singleCustomCategoryPerContactReplacesPreviousCategoryWhilePreservingFavorite() = runBlocking {
+    @Test fun contactCanBelongToMultipleCategoriesAndOnlyShowsInOtherContactsWithoutCustomCategory() = runBlocking {
         val client = MockMsnp18Client(signInDelayMillis = 0L, addContactDelayMillis = 0L)
         val repository = MessengerRepository(client)
         repository.signIn(
             SignInRequest("user@example.com", "pw", ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides())),
         ).getOrThrow()
 
-        val workId = repository.createCategory("Work", listOf("selin")).getOrThrow()
+        // Favorite-only contact still belongs to Other Contacts
         repository.setContactFavorite("selin", true).getOrThrow()
-        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+        val favOnly = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID), favOnly.categoryIds)
+        assertTrue(favOnly.belongsToCategory(FAVORITES_CATEGORY_ID))
+        assertTrue(favOnly.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
 
-        // Creating another category with the same contact moves it out of Work while keeping Favorites
+        // Creating a custom category with selin removes her from Other Contacts while keeping Favorites
+        val workId = repository.createCategory("Work", listOf("selin")).getOrThrow()
+        val withWork = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), withWork.categoryIds)
+        assertFalse(withWork.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
+
+        // Creating another category with selin keeps both Work and Family as well as Favorites
         val familyId = repository.createCategory("Family", listOf("selin")).getOrThrow()
-        assertEquals(setOf(FAVORITES_CATEGORY_ID, familyId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+        val withBoth = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId, familyId), withBoth.categoryIds)
+        assertTrue(withBoth.belongsToCategory(workId))
+        assertTrue(withBoth.belongsToCategory(familyId))
+        assertFalse(withBoth.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
 
-        // Updating Work's members to include selin moves selin back to Work
-        repository.updateCategoryMembers(workId, setOf("selin")).getOrThrow()
-        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), repository.contacts.value.first { it.id == "selin" }.categoryIds)
+        // Updating Family's members to remove selin keeps Work and still excludes Other Contacts
+        repository.updateCategoryMembers(familyId, emptySet()).getOrThrow()
+        val afterRemovingFamily = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, workId), afterRemovingFamily.categoryIds)
+        assertFalse(afterRemovingFamily.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
 
-        // Passing multiple custom categories to setContactCategories keeps only one custom category
+        // setContactCategories accepts multiple custom categories plus Favorites
         repository.setContactCategories("selin", setOf(FAVORITES_CATEGORY_ID, familyId, workId)).getOrThrow()
-        val customOnly = repository.contacts.value.first { it.id == "selin" }.categoryIds - FAVORITES_CATEGORY_ID
-        assertEquals(1, customOnly.size)
-        assertTrue(repository.contacts.value.first { it.id == "selin" }.isFavorite)
+        val multiAssigned = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, familyId, workId), multiAssigned.categoryIds)
+        assertFalse(multiAssigned.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
+
+        // Clearing custom categories (leaving only Favorites) returns selin to Other Contacts
+        repository.setContactCategories("selin", setOf(FAVORITES_CATEGORY_ID)).getOrThrow()
+        val backToFavOnly = repository.contacts.value.first { it.id == "selin" }
+        assertEquals(setOf(FAVORITES_CATEGORY_ID), backToFavOnly.categoryIds)
+        assertTrue(backToFavOnly.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
+
+        // Clearing all categories ("None") leaves emptySet and belongs to Other Contacts
+        repository.setContactCategories("selin", emptySet()).getOrThrow()
+        val uncategorized = repository.contacts.value.first { it.id == "selin" }
+        assertTrue(uncategorized.categoryIds.isEmpty())
+        assertTrue(uncategorized.belongsToCategory(OTHER_CONTACTS_CATEGORY_ID))
     }
 }

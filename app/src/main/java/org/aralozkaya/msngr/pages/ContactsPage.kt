@@ -67,6 +67,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -93,10 +94,12 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import org.aralozkaya.msngr.CompactSearchField
 import org.aralozkaya.msngr.ContactProfileActivity
+import org.aralozkaya.msngr.EmoticonPrefs
 import org.aralozkaya.msngr.GroupDetailsActivity
 import org.aralozkaya.msngr.LocalFavoritesLayoutSettings
 import org.aralozkaya.msngr.LocalLayoutSettings
 import org.aralozkaya.msngr.MessengerPlusEditorController
+import org.aralozkaya.msngr.MsnEmoticonText
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.data.Contact
@@ -138,7 +141,6 @@ fun ContactsPage(
     categoryOrder: List<String> = emptyList(),
     hiddenCategoryIds: Set<String> = emptySet(),
     onToggleFavorite: ((Contact) -> Unit)? = null,
-    onManageCategories: ((Contact) -> Unit)? = null,
     onEditCategory: ((ContactCategory) -> Unit)? = null,
     onDeleteCategory: ((ContactCategory) -> Unit)? = null,
 ) {
@@ -320,7 +322,6 @@ fun ContactsPage(
                             onReadStateChange = { unread -> onReadStateChange(contact, unread) },
                             onDeleteContact = if (contact.isGroup) null else onDeleteContact?.let { delete -> { delete(contact) } },
                             onToggleFavorite = onToggleFavorite?.let { toggle -> { toggle(contact) } },
-                            onManageCategories = onManageCategories?.let { manage -> { manage(contact) } },
                         )
                     }
                 }
@@ -488,8 +489,13 @@ private fun CategoryHeaderMenu(
     Box {
         IconButton(
             onClick = { expanded = true },
+            shapes = IconButtonDefaults.shapes(),
             modifier = Modifier
-                .size(if (compact) 28.dp else 36.dp)
+                .size(
+                    IconButtonDefaults.smallContainerSize(
+                        widthOption = IconButtonDefaults.IconButtonWidthOption.Narrow,
+                    ),
+                )
                 .testTag("category-options-${category.id}"),
         ) {
             Icon(
@@ -554,6 +560,8 @@ internal fun ContactSectionHeader(
     leadingIcon: (@Composable () -> Unit)? = null,
     headerActions: (@Composable () -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+    val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
     val stateLabel = stringResource(if (expanded) R.string.contacts_section_expanded else R.string.contacts_section_collapsed)
     val toggleDesc = stringResource(
         if (expanded) R.string.contacts_section_collapse else R.string.contacts_section_expand,
@@ -575,10 +583,10 @@ internal fun ContactSectionHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             leadingIcon?.invoke()
-            Text(
+            MsnEmoticonText(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                emoticonStyle = emoticonSettings.style,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.weight(1f),
             )
             headerActions?.invoke()
@@ -639,8 +647,11 @@ internal fun ContactSectionHeader(
             }
         },
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold)
+        MsnEmoticonText(
+            text = title,
+            emoticonStyle = emoticonSettings.style,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+        )
     }
 }
 

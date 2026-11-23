@@ -64,8 +64,6 @@ import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.ContactCategory
-import org.aralozkaya.msngr.data.FAVORITES_CATEGORY_ID
-import org.aralozkaya.msngr.data.OTHER_CONTACTS_CATEGORY_ID
 import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.pages.components.Avatar
@@ -188,17 +186,30 @@ fun ContactProfilePage(
                             }
                         }
                         if (contact.isForwardListContact && !contact.isBlocked && !contact.isGroup) {
-                            val customCategoryName = categories
-                                .filterNot(ContactCategory::isBuiltIn)
-                                .firstOrNull { it.id in contact.categoryIds }
-                                ?.name
-                            if (customCategoryName != null) {
+                            val favoritesLabel = stringResource(R.string.contacts_section_favorites)
+                            val assignedNames = buildList {
+                                if (contact.isFavorite) add(favoritesLabel)
+                                addAll(
+                                    categories
+                                        .filterNot(ContactCategory::isBuiltIn)
+                                        .filter { it.id in contact.categoryIds }
+                                        .map(ContactCategory::name),
+                                )
+                            }
+                            if (assignedNames.isNotEmpty()) {
                                 ProfileDetailCard(
                                     icon = Icons.Outlined.Folder,
-                                    label = stringResource(R.string.contact_category_select_label),
+                                    label = stringResource(
+                                        if (assignedNames.size == 1) R.string.contact_category_select_label
+                                        else R.string.contact_manage_categories,
+                                    ),
                                     modifier = Modifier.testTag("contact-profile-categories"),
                                 ) {
-                                    Text(customCategoryName, style = MaterialTheme.typography.bodyLarge)
+                                    MsnEmoticonText(
+                                        text = assignedNames.joinToString(", "),
+                                        emoticonStyle = emoticonSettings.style,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
                                 }
                             }
                         }
@@ -207,27 +218,45 @@ fun ContactProfilePage(
             }
         }
         if (contact != null) {
-            if (onManageCategories != null && contact.isForwardListContact && !contact.isBlocked && !contact.isGroup) {
-                item {
+            val showManageCategories = onManageCategories != null &&
+                contact.isForwardListContact && !contact.isBlocked && !contact.isGroup
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (showManageCategories) {
+                        FilledTonalButton(
+                            onClick = { onManageCategories(contact) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("contact_manage_categories"),
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(stringResource(R.string.contact_manage_categories))
+                        }
+                    }
                     FilledTonalButton(
-                        onClick = { onManageCategories(contact) },
+                        onClick = {
+                            context.startActivity(
+                                ConversationNotificationSettingsActivity.createIntent(
+                                    context,
+                                    contact.id,
+                                    contact.displayName.messengerPlusPlainText(),
+                                    false,
+                                ),
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .testTag("contact_manage_categories"),
+                            .testTag("contact_notification_settings"),
                         shapes = ButtonDefaults.shapes(),
                     ) {
-                        Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(stringResource(R.string.contact_category_select_label))
+                        Text(stringResource(R.string.contact_customize_notifications))
                     }
                 }
-            }
-            item {
-                FilledTonalButton(onClick = { context.startActivity(ConversationNotificationSettingsActivity.createIntent(
-                    context, contact.id, contact.displayName.messengerPlusPlainText(), false)) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("contact_notification_settings"),
-                    shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.contact_customize_notifications)) }
             }
             item {
                 FlowRow(
