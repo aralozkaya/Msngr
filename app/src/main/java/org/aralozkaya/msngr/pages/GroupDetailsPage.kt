@@ -76,7 +76,6 @@ fun GroupDetailsPage(
             return@Column
         }
         val layout = LocalLayoutSettings.current
-        val compact = layout.isCompact
         val compactSearchAndSort = layout.compactSearchAndSort
         Column(
             modifier = Modifier
@@ -119,7 +118,7 @@ fun GroupDetailsPage(
             modifier = Modifier.fillMaxWidth().weight(1f),
             innerPadding = PaddingValues(),
             scrollBehavior = scrollBehavior,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else ListItemDefaults.SegmentedGap),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             itemsIndexed(visible, key = { _, member -> member.id }) { index, member ->
                 val isOwnContact = member.email.equals(ownEmail, ignoreCase = true)

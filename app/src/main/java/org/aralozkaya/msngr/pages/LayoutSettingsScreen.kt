@@ -323,38 +323,19 @@ private fun LayoutPreviewSection(
                 onToggle = {},
                 leadingIcon = leadingIcon,
             )
-            if (layoutSettings.isCompact) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        contacts.forEachIndexed { index, contact ->
-                            ContactRow(
-                                index = index + 1,
-                                count = contacts.size + 1,
-                                contact = contact,
-                                onClick = null,
-                            )
-                        }
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = ListItemDefaults.SegmentedGap),
-                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-                ) {
-                    contacts.forEachIndexed { index, contact ->
-                        ContactRow(
-                            index = index + 1,
-                            count = contacts.size + 1,
-                            contact = contact,
-                            onClick = null,
-                        )
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (layoutSettings.isCompact) 0.dp else ListItemDefaults.SegmentedGap),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+            ) {
+                contacts.forEachIndexed { index, contact ->
+                    ContactRow(
+                        index = if (layoutSettings.isCompact) index else index + 1,
+                        count = if (layoutSettings.isCompact) contacts.size else contacts.size + 1,
+                        contact = contact,
+                        onClick = null,
+                    )
                 }
             }
         }
