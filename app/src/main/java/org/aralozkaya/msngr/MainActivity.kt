@@ -117,7 +117,6 @@ import org.aralozkaya.msngr.pages.UpdateBadge
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
 import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.CategoryEditorDialog
-import org.aralozkaya.msngr.pages.components.ContactCategoriesDialog
 import org.aralozkaya.msngr.pages.components.ContactsActionMenu
 import org.aralozkaya.msngr.pages.components.DeleteCategoryDialog
 import org.aralozkaya.msngr.pages.components.DeleteContactDialog
@@ -312,9 +311,9 @@ internal fun MsngrApp(
     var showCreateGroup by rememberSaveable { mutableStateOf(false) }
     var createGroupBounds by remember { mutableStateOf<Rect?>(null) }
     var showCreateCategory by rememberSaveable { mutableStateOf(false) }
+    var createCategoryBounds by remember { mutableStateOf<Rect?>(null) }
     var editCategoryTarget by remember { mutableStateOf<ContactCategory?>(null) }
     var deleteCategoryTarget by remember { mutableStateOf<ContactCategory?>(null) }
-    var assignCategoriesTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<Contact?>(null) }
     var blockGroupTarget by remember { mutableStateOf<Contact?>(null) }
     var activeWebTarget by remember { mutableStateOf<PortalWebTarget?>(null) }
@@ -545,6 +544,8 @@ internal fun MsngrApp(
                         onAddContactBoundsChanged = { addContactBounds = it },
                         onCreateGroup = { showCreateGroup = true },
                         onCreateCategory = { showCreateCategory = true },
+                        categoryCreationVisible = showCreateCategory,
+                        onCreateCategoryBoundsChanged = { createCategoryBounds = it },
                         groupCreationVisible = showCreateGroup,
                         onCreateGroupBoundsChanged = { createGroupBounds = it },
                     )
@@ -643,7 +644,6 @@ internal fun MsngrApp(
                                 }
                             }
                         },
-                        onManageCategories = { contact -> assignCategoriesTargetId = contact.id },
                         onEditCategory = { category -> editCategoryTarget = category },
                         onDeleteCategory = { category -> deleteCategoryTarget = category },
                     )
@@ -695,6 +695,7 @@ internal fun MsngrApp(
             existingCategories = categories,
             contacts = contacts,
             category = editing,
+            sourceBounds = if (editing == null) createCategoryBounds else null,
             onCreate = repository::createCategory,
             onUpdate = { categoryId, newName, memberIds ->
                 val renameResult = if (editing != null && editing.name != newName) {
@@ -732,26 +733,6 @@ internal fun MsngrApp(
             },
             onDismiss = { deleteCategoryTarget = null },
         )
-    }
-
-    assignCategoriesTargetId?.let { targetId ->
-        val target = contacts.firstOrNull { it.id == targetId }
-        if (target == null) {
-            assignCategoriesTargetId = null
-        } else {
-            ContactCategoriesDialog(
-                contact = target,
-                categories = categories,
-                onSave = { next -> repository.setContactCategories(target.id, next) },
-                onSaved = {
-                    assignCategoriesTargetId = null
-                    scope.launch {
-                        snackbarHostState.showActionSnackbar(resources.getString(R.string.contact_categories_updated))
-                    }
-                },
-                onDismiss = { assignCategoriesTargetId = null },
-            )
-        }
     }
 
     if (showAddContact) {

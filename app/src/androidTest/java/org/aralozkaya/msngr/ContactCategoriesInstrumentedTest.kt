@@ -12,11 +12,15 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import org.aralozkaya.msngr.data.Contact
@@ -167,17 +171,21 @@ class ContactCategoriesInstrumentedTest {
             }
         }
 
-        compose.onNodeWithTag("category-name-input").performTextInput("Projects")
+        compose.onNodeWithContentDescription("Show emoticons").assertIsDisplayed()
+        Espresso.onView(withContentDescription("Category name"))
+            .inRoot(isDialog())
+            .perform(replaceText("Projects :)"))
+        compose.waitForIdle()
         compose.onNodeWithTag("category-member-alice").performClick()
         compose.onNodeWithTag("category-member-grp-1").performClick()
         compose.onNodeWithTag("category-editor-confirm").performClick()
         compose.waitForIdle()
 
-        assertEquals("Projects", createdName)
+        assertEquals("Projects :)", createdName)
         assertEquals(listOf("alice", "grp-1"), createdMembers)
     }
 
-    @Test fun contactCategoriesDialogUsesDropdownForSingleCategoryAndPreservesFavorite() {
+    @Test fun contactCategoriesDialogShowsCheckboxListWithFavoritesAndMultiSelect() {
         var savedSet: Set<String>? = null
         val work = ContactCategory(id = "work", name = "Work")
         val family = ContactCategory(id = "family", name = "Family")
@@ -186,7 +194,7 @@ class ContactCategoriesInstrumentedTest {
             "Alice",
             "alice@example.com",
             Presence.Online,
-            categoryIds = setOf(FAVORITES_CATEGORY_ID, "work"),
+            categoryIds = emptySet(),
         )
         compose.setContent {
             MsngrTheme {
@@ -203,23 +211,39 @@ class ContactCategoriesInstrumentedTest {
             }
         }
 
-        compose.onNodeWithTag("contact-category-dropdown").performClick()
+        // Scrollable checkbox list shows Favorites and custom categories without None or Other Contacts
+        compose.onNodeWithTag("contact-categories-list").assertIsDisplayed()
+        compose.onNodeWithText("None").assertDoesNotExist()
+        compose.onNodeWithText("Other Contacts").assertDoesNotExist()
+
+        compose.onNodeWithTag("assign-category-$FAVORITES_CATEGORY_ID").performClick()
+        compose.onNodeWithTag("assign-category-work").performClick()
         compose.onNodeWithTag("assign-category-family").performClick()
         compose.onNodeWithTag("contact-categories-save").performClick()
         compose.waitForIdle()
 
-        assertEquals(setOf(FAVORITES_CATEGORY_ID, "family"), savedSet)
+        assertEquals(setOf(FAVORITES_CATEGORY_ID, "work", "family"), savedSet)
+
+        // Unchecking all categories saves emptySet()
+        compose.onNodeWithTag("assign-category-$FAVORITES_CATEGORY_ID").performClick()
+        compose.onNodeWithTag("assign-category-work").performClick()
+        compose.onNodeWithTag("assign-category-family").performClick()
+        compose.onNodeWithTag("contact-categories-save").performClick()
+        compose.waitForIdle()
+
+        assertEquals(emptySet<String>(), savedSet)
     }
 
-    @Test fun contactProfilePageShowsSingularCategoryCardOnlyForCustomCategory() {
+    @Test fun contactProfilePageShowsConditionalCategoryCardForFavoritesAndMultipleCategories() {
         val work = ContactCategory(id = "work", name = "Work")
+        val family = ContactCategory(id = "family", name = "Family")
         val contactState = mutableStateOf(
             Contact(
                 id = "alice",
                 nickname = "Alice",
                 email = "alice@example.com",
                 presence = Presence.Online,
-                categoryIds = setOf(FAVORITES_CATEGORY_ID),
+                categoryIds = emptySet(),
             ),
         )
         compose.setContent {
@@ -230,7 +254,7 @@ class ContactCategoriesInstrumentedTest {
                     scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
                     onBlockContact = {},
                     onEraseHistory = { Result.success(Unit) },
-                    categories = listOf(work),
+                    categories = listOf(work, family),
                     onManageCategories = {},
                 )
             }
@@ -239,10 +263,10 @@ class ContactCategoriesInstrumentedTest {
         compose.onNodeWithTag("contact-profile-categories").assertDoesNotExist()
         compose.onNodeWithTag("contact_manage_categories").performScrollTo().assertIsDisplayed()
 
-        contactState.value = contactState.value.copy(categoryIds = setOf(FAVORITES_CATEGORY_ID, "work"))
+        contactState.value = contactState.value.copy(categoryIds = setOf(FAVORITES_CATEGORY_ID, "work", "family"))
         compose.waitForIdle()
 
         compose.onNodeWithTag("contact-profile-categories").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Work").assertIsDisplayed()
+        compose.onNodeWithText("Favorites, Work, Family").assertIsDisplayed()
     }
 }

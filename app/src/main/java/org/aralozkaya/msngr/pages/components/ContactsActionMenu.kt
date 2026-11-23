@@ -45,6 +45,8 @@ fun ContactsActionMenu(
     onAddContact: () -> Unit = {},
     onCreateGroup: () -> Unit = {},
     onCreateCategory: () -> Unit = {},
+    categoryCreationVisible: Boolean = false,
+    onCreateCategoryBoundsChanged: (Rect) -> Unit = {},
     groupCreationVisible: Boolean = false,
     onCreateGroupBoundsChanged: (Rect) -> Unit = {},
     contactInvitationVisible: Boolean = false,
@@ -118,10 +120,16 @@ fun ContactsActionMenu(
             icon = { Icon(Icons.Filled.GroupAdd, contentDescription = null) },
         )
         FloatingActionButtonMenuItem(
-            onClick = {
-                expanded = false
-                onCreateCategory()
-            },
+            // Keep the source in place so the dialog can transform back into it.
+            onClick = onCreateCategory,
+            modifier = Modifier
+                .onGloballyPositioned { coordinates ->
+                    onCreateCategoryBoundsChanged(Rect(
+                        coordinates.positionOnScreen(),
+                        Size(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()),
+                    ))
+                }
+                .graphicsLayer { alpha = if (categoryCreationVisible) 0f else 1f },
             text = { Text(stringResource(R.string.contacts_action_create_category)) },
             icon = { Icon(Icons.Filled.CreateNewFolder, contentDescription = null) },
         )

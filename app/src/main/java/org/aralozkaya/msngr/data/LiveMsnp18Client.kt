@@ -1673,29 +1673,16 @@ internal class LiveMsnp18Client(
         val created = ContactCategory(id = guid, name = normalized, serverGuid = guid)
         mutableCategories.update { list -> list.filterNot { it.id == guid } + created }
         val targetIds = memberIds.map(String::lowercase).distinct()
-        val currentContacts = mutableContacts.value
         targetIds.forEach { contactId ->
-            val contact = currentContacts.firstOrNull { it.id.equals(contactId, ignoreCase = true) }
-            val previousCustom = contact?.categoryIds?.filter {
-                it != FAVORITES_CATEGORY_ID && it != OTHER_CONTACTS_CATEGORY_ID && it != guid
-            }.orEmpty()
             syncSingleCategoryMembership(contactId, guid, add = true)
             checkGroupSession(owner, endpoint)
-            previousCustom.forEach { oldCatId ->
-                syncSingleCategoryMembership(contactId, oldCatId, add = false)
-                checkGroupSession(owner, endpoint)
-            }
         }
         if (targetIds.isNotEmpty()) {
             val targetSet = targetIds.toSet()
             mutableContacts.update { list ->
                 list.map { contact ->
                     if (contact.id.lowercase() in targetSet) {
-                        val next = buildSet {
-                            if (FAVORITES_CATEGORY_ID in contact.categoryIds) add(FAVORITES_CATEGORY_ID)
-                            add(guid)
-                        }
-                        contact.copy(categoryIds = next)
+                        contact.copy(categoryIds = (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + guid)
                     } else contact
                 }
             }
@@ -1733,15 +1720,8 @@ internal class LiveMsnp18Client(
         val toAdd = currentContacts.filter { it.id.lowercase() in targetSet && categoryId !in it.categoryIds }
         val toRemove = currentContacts.filter { it.id.lowercase() !in targetSet && categoryId in it.categoryIds }
         toAdd.forEach { contact ->
-            val previousCustom = contact.categoryIds.filter {
-                it != FAVORITES_CATEGORY_ID && it != OTHER_CONTACTS_CATEGORY_ID && it != categoryId
-            }
             syncSingleCategoryMembership(contact.id, categoryId, add = true)
             checkGroupSession(owner, endpoint)
-            previousCustom.forEach { oldCatId ->
-                syncSingleCategoryMembership(contact.id, oldCatId, add = false)
-                checkGroupSession(owner, endpoint)
-            }
         }
         toRemove.forEach { contact ->
             syncSingleCategoryMembership(contact.id, categoryId, add = false)
@@ -1751,10 +1731,7 @@ internal class LiveMsnp18Client(
             list.map { contact ->
                 val shouldContain = contact.id.lowercase() in targetSet
                 val next = if (shouldContain) {
-                    buildSet {
-                        if (FAVORITES_CATEGORY_ID in contact.categoryIds) add(FAVORITES_CATEGORY_ID)
-                        add(categoryId)
-                    }
+                    (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + categoryId
                 } else {
                     contact.categoryIds - categoryId
                 }
@@ -1806,11 +1783,9 @@ internal class LiveMsnp18Client(
         val contact = mutableContacts.value.firstOrNull { it.id.equals(normalizedContactId, ignoreCase = true) }
             ?: error("This contact is no longer available.")
         val validCustomIds = mutableCategories.value.map(ContactCategory::id).toSet()
-        val chosenCustom = categoryIds.firstOrNull { it in validCustomIds }
-        val effective = buildSet {
-            if (FAVORITES_CATEGORY_ID in categoryIds) add(FAVORITES_CATEGORY_ID)
-            if (chosenCustom != null) add(chosenCustom)
-        }
+        val effective = categoryIds.filter {
+            it == FAVORITES_CATEGORY_ID || it in validCustomIds
+        }.toSet()
         val current = contact.categoryIds
         val toAdd = effective - current
         val toRemove = current - effective

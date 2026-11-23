@@ -225,7 +225,6 @@ fun ContactRow(
     isOwnContact: Boolean = false,
     isPendingMember: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
-    onManageCategories: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val emoticonSettings by remember(context) { EmoticonPrefs.state(context) }.collectAsState()
@@ -239,8 +238,7 @@ fun ContactRow(
     val hasLongClickActions = contextActionLabel != null ||
         onReadStateChange != null ||
         onDeleteContact != null ||
-        onToggleFavorite != null ||
-        onManageCategories != null
+        onToggleFavorite != null
     val longClickLabel = stringResource(R.string.contact_long_click_actions)
     val rowSpacing = when (density) {
         UiDensity.Minimal -> 8.dp
@@ -583,15 +581,6 @@ fun ContactRow(
                                 )
                             },
                             toggleFavorite,
-                        ),
-                    )
-                }
-                onManageCategories?.let { manageCategories ->
-                    add(
-                        Triple(
-                            stringResource(R.string.contact_manage_categories),
-                            null,
-                            manageCategories,
                         ),
                     )
                 }

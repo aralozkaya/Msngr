@@ -476,11 +476,7 @@ class MockMsnp18Client(
             mutableContacts.update { list ->
                 list.map { contact ->
                     if (contact.id.lowercase() in targetMembers) {
-                        val next = buildSet {
-                            if (FAVORITES_CATEGORY_ID in contact.categoryIds) add(FAVORITES_CATEGORY_ID)
-                            add(id)
-                        }
-                        contact.copy(categoryIds = next)
+                        contact.copy(categoryIds = (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + id)
                     } else contact
                 }
             }
@@ -509,10 +505,7 @@ class MockMsnp18Client(
             list.map { contact ->
                 val shouldContain = contact.id.lowercase() in normalizedMembers
                 val next = if (shouldContain) {
-                    buildSet {
-                        if (FAVORITES_CATEGORY_ID in contact.categoryIds) add(FAVORITES_CATEGORY_ID)
-                        add(categoryId)
-                    }
+                    (contact.categoryIds - OTHER_CONTACTS_CATEGORY_ID) + categoryId
                 } else {
                     contact.categoryIds - categoryId
                 }
@@ -539,11 +532,9 @@ class MockMsnp18Client(
     override suspend fun setContactCategories(contactId: String, categoryIds: Set<String>) = contactAdditionMutex.withLock {
         check(signedInEmail.isNotBlank()) { "Sign in before updating categories." }
         val validCustomIds = mutableCategories.value.map(ContactCategory::id).toSet()
-        val chosenCustom = categoryIds.firstOrNull { it in validCustomIds }
-        val effective = buildSet {
-            if (FAVORITES_CATEGORY_ID in categoryIds) add(FAVORITES_CATEGORY_ID)
-            if (chosenCustom != null) add(chosenCustom)
-        }
+        val effective = categoryIds.filter {
+            it == FAVORITES_CATEGORY_ID || it in validCustomIds
+        }.toSet()
         mutableContacts.update { list ->
             list.map { contact ->
                 if (!contact.id.equals(contactId, ignoreCase = true)) contact
