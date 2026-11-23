@@ -16,14 +16,19 @@ internal fun ContactReadAction(
     unread: Boolean,
     onReadStateChange: ((Boolean) -> Unit)?,
     onClick: () -> Unit,
+    swipeEnabled: Boolean = true,
     content: @Composable (Modifier, () -> Unit) -> Unit,
 ) {
     if (onReadStateChange == null) {
         content(Modifier, onClick)
         return
     }
-    val actionLabel = stringResource(if (unread) R.string.contact_mark_as_read else R.string.contact_mark_as_unread)
     val stateLabel = stringResource(if (unread) R.string.contact_unread_description else R.string.contact_read_description)
+    if (!swipeEnabled) {
+        content(Modifier.semantics { stateDescription = stateLabel }, onClick)
+        return
+    }
+    val actionLabel = stringResource(if (unread) R.string.contact_mark_as_read else R.string.contact_mark_as_unread)
     SwipeRevealAction(
         itemKey = contactId,
         label = actionLabel,

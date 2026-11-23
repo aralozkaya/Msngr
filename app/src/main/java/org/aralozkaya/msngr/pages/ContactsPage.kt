@@ -52,6 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
@@ -59,7 +60,6 @@ import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SegmentedListItem
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,6 +87,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
@@ -195,12 +196,13 @@ fun ContactsPage(
     val compact = layout.isCompact
     val compactSearchAndSort = layout.compactSearchAndSort
     val favoritesLayout = LocalFavoritesLayoutSettings.current
+    val itemSpacing = if (compact) 6.dp else 12.dp
     PageContentList(
         modifier = modifier.fillMaxSize(),
         listState = listState,
         innerPadding = innerPadding,
         scrollBehavior = scrollBehavior,
-        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
         item {
             LoggedInUserProfileCard(
@@ -211,7 +213,10 @@ fun ContactsPage(
         }
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = if (compactSearchAndSort) 0.dp else 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(
+                    top = if (compactSearchAndSort) 0.dp else (24.dp - itemSpacing),
+                    bottom = if (compactSearchAndSort) 0.dp else (12.dp - itemSpacing),
+                ),
                 horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -226,17 +231,19 @@ fun ContactsPage(
                         onFocusChanged = { searchFocused = it },
                     )
                     val compactButtonHeight = 36.dp
-                    TextButton(
-                        onClick = { showSortOptions = true },
-                        modifier = Modifier
-                            .testTag("contacts_sort_button")
-                            .defaultMinSize(minWidth = compactButtonHeight, minHeight = compactButtonHeight),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.contacts_sort_action),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                        TextButton(
+                            onClick = { showSortOptions = true },
+                            modifier = Modifier
+                                .testTag("contacts_sort_button")
+                                .defaultMinSize(minWidth = compactButtonHeight, minHeight = compactButtonHeight),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.contacts_sort_action),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
                     }
                 } else {
                     SearchBar(
@@ -293,11 +300,12 @@ fun ContactsPage(
                 val transition = updateTransition(expanded, label = "Section $categoryId expansion")
                 val onToggle = { expandedSections[categoryId] = !expanded }
                 val sectionItems = sorted.filter { it.belongsToCategory(categoryId) }
-                val renderRow: @Composable (Int, Int, Contact) -> Unit = { index, count, contact ->
+                val renderRow: @Composable (Int, Int, Contact) -> Unit = { itemIndex, itemCount, contact ->
+                    val sectionCompact = LocalLayoutSettings.current.isCompact
                     key("$categoryId-${contact.id}") {
                         ContactRow(
-                            index = index,
-                            count = count,
+                            index = if (sectionCompact) itemIndex else itemIndex + 1,
+                            count = if (sectionCompact) itemCount else itemCount + 1,
                             contact = contact,
                             hasDraft = drafts[contact.id]?.hasMessengerPlusVisibleContent() == true,
                             onClick = { onOpenChat(contact) },
@@ -349,7 +357,7 @@ fun ContactsPage(
                                     }
                                 } else {
                                     sectionItems.forEachIndexed { index, contact ->
-                                        renderRow(index + 1, sectionItems.size + 1, contact)
+                                        renderRow(index, sectionItems.size, contact)
                                     }
                                 }
                             }
@@ -365,7 +373,7 @@ fun ContactsPage(
                             modifier = Modifier.testTag("section-$GROUPS_CATEGORY_ID"),
                         ) {
                             sectionItems.forEachIndexed { index, group ->
-                                renderRow(index + 1, sectionItems.size + 1, group)
+                                renderRow(index, sectionItems.size, group)
                             }
                             if (sectionItems.isEmpty()) {
                                 EmptySectionItem {
@@ -408,7 +416,7 @@ fun ContactsPage(
                                 }
                             } else {
                                 sectionItems.forEachIndexed { index, contact ->
-                                    renderRow(index + 1, sectionItems.size + 1, contact)
+                                    renderRow(index, sectionItems.size, contact)
                                 }
                             }
                         }
@@ -447,7 +455,7 @@ fun ContactsPage(
                                 }
                             } else {
                                 sectionItems.forEachIndexed { index, contact ->
-                                    renderRow(index + 1, sectionItems.size + 1, contact)
+                                    renderRow(index, sectionItems.size, contact)
                                 }
                             }
                         }
@@ -639,10 +647,13 @@ internal fun ContactSectionHeader(
 @Composable
 private fun EmptySectionItem(content: @Composable () -> Unit) {
     if (LocalLayoutSettings.current.isCompact) {
-        Box(
+        SegmentedListItem(
+            shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .heightIn(min = 38.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         ) {
             ProvideTextStyle(
                 MaterialTheme.typography.bodySmall.copy(
@@ -689,20 +700,12 @@ private fun ExpandableContactSection(
             enter = expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()),
             exit = shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec()),
         ) {
-            if (compact) {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) { content() }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = ListItemDefaults.SegmentedGap),
-                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-                ) { content() }
-            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (compact) 0.dp else ListItemDefaults.SegmentedGap),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+            ) { content() }
         }
     }
 }

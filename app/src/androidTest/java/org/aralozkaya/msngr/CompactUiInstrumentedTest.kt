@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -29,15 +31,19 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import org.aralozkaya.msngr.data.Contact
+import org.aralozkaya.msngr.data.FAVORITES_CATEGORY_ID
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.AppearanceSettingsScreen
 import org.aralozkaya.msngr.pages.BlockedContactsPage
 import org.aralozkaya.msngr.pages.ContactsPage
 import org.aralozkaya.msngr.pages.LayoutSettingsScreen
+import org.aralozkaya.msngr.pages.components.ContactRow
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -58,6 +64,10 @@ class CompactUiInstrumentedTest {
     }.also {
         AccountPreferences.preferences(it, "msngr_appearance").edit().clear().commit()
         AppearancePrefs.reload(it)
+    }
+
+    @After fun resetAppearancePrefs() {
+        isolatedContext()
     }
 
     @Test fun appearanceLayoutOptionOpensSubpageAndAllFourSizesScalePreview() {
@@ -187,6 +197,7 @@ class CompactUiInstrumentedTest {
         )
         var openedChatId: String? = null
         var blockedId: String? = null
+        var readStateChanged = 0
 
         compose.setContent {
             CompositionLocalProvider(LocalContext provides context) {
@@ -200,14 +211,17 @@ class CompactUiInstrumentedTest {
                         onEditProfile = {},
                         onOpenChat = { openedChatId = it.id },
                         onBlockContact = { blockedId = it.id },
-                        onReadStateChange = { _, _ -> },
+                        onReadStateChange = { _, _ -> readStateChanged++ },
                     )
                 }
             }
         }
 
-        val regularUserCardHeight = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot.height
-        val regularSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+        val regularUserCardBounds = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot
+        val regularSearchBounds = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot
+        val regularFirstSectionBounds = compose.onNodeWithTag("section-$FAVORITES_CATEGORY_ID").fetchSemanticsNode().boundsInRoot
+        val regularGapAboveSearch = regularSearchBounds.top - regularUserCardBounds.bottom
+        val regularGapBelowSearch = regularFirstSectionBounds.top - regularSearchBounds.bottom
 
         compose.runOnIdle {
             AppearancePrefs.setUiDensity(context, UiDensity.Minimal)
@@ -216,18 +230,31 @@ class CompactUiInstrumentedTest {
         }
         compose.waitForIdle()
 
-        val minimalUserCardHeight = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot.height
+        val minimalUserCardBounds = compose.onNodeWithTag("logged_in_user_card").fetchSemanticsNode().boundsInRoot
         assertEquals(
             "Logged-in user card should never compact",
-            regularUserCardHeight,
-            minimalUserCardHeight,
+            regularUserCardBounds.height,
+            minimalUserCardBounds.height,
             1f,
         )
-        val defaultMinimalSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+        val defaultMinimalSearchBounds = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot
+        val defaultMinimalFirstSectionBounds = compose.onNodeWithTag("section-$FAVORITES_CATEGORY_ID").fetchSemanticsNode().boundsInRoot
         assertEquals(
             "Search bar should stay regular when compact search and sort toggle is off",
-            regularSearchHeight,
-            defaultMinimalSearchHeight,
+            regularSearchBounds.height,
+            defaultMinimalSearchBounds.height,
+            1f,
+        )
+        assertEquals(
+            "Space above search bar should not narrow unless compact search and sort is on",
+            regularGapAboveSearch,
+            defaultMinimalSearchBounds.top - minimalUserCardBounds.bottom,
+            1f,
+        )
+        assertEquals(
+            "Space below search bar should not narrow unless compact search and sort is on",
+            regularGapBelowSearch,
+            defaultMinimalFirstSectionBounds.top - defaultMinimalSearchBounds.bottom,
             1f,
         )
 
@@ -236,10 +263,15 @@ class CompactUiInstrumentedTest {
         }
         compose.waitForIdle()
 
-        val compactSearchHeight = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot.height
+        val compactSearchBounds = compose.onNodeWithTag("contacts_search_bar").fetchSemanticsNode().boundsInRoot
+        val compactFirstSectionBounds = compose.onNodeWithTag("section-$FAVORITES_CATEGORY_ID").fetchSemanticsNode().boundsInRoot
         assertTrue(
-            "Compact search bar ($compactSearchHeight) should be shorter than regular ($regularSearchHeight)",
-            compactSearchHeight < regularSearchHeight,
+            "Compact search bar (${compactSearchBounds.height}) should be shorter than regular (${regularSearchBounds.height})",
+            compactSearchBounds.height < regularSearchBounds.height,
+        )
+        assertTrue(
+            "Space below search bar should narrow when compact search and sort is on",
+            (compactFirstSectionBounds.top - compactSearchBounds.bottom) < regularGapBelowSearch,
         )
 
         compose.onNodeWithTag("contacts_sort_button").assertIsDisplayed().performClick()
@@ -249,7 +281,13 @@ class CompactUiInstrumentedTest {
         compose.onNodeWithTag("contact-row-friend-1").performClick()
         compose.runOnIdle { assertEquals("friend-1", openedChatId) }
 
+        compose.onNodeWithTag("contact-row-friend-2").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Mark as read").assertDoesNotExist()
+        compose.runOnIdle { assertEquals("Swipe should not mark read/unread in compact mode", 0, readStateChanged) }
+
         compose.onNodeWithTag("contact-row-friend-2").performTouchInput { longClick() }
+        compose.onNodeWithText("Mark as read").assertIsDisplayed()
         compose.onNodeWithText("Block").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("friend-2", blockedId) }
 
@@ -283,5 +321,39 @@ class CompactUiInstrumentedTest {
         compose.waitForIdle()
         val minimalHeight = compose.onNodeWithTag("contact-row-blocked-1").fetchSemanticsNode().boundsInRoot.height
         assertEquals("Blocked contacts row should not compact", regularHeight, minimalHeight, 1f)
+    }
+
+    @Test fun compactRowMatchesRegularSegmentedContainerColor() {
+        val contact = Contact("color-1", "Alice", "alice@example.com", Presence.Online, statusMessage = "Hello")
+        val density = mutableStateOf(UiDensity.Regular)
+
+        compose.setContent {
+            MsngrTheme {
+                CompositionLocalProvider(LocalLayoutSettings provides LayoutSettings(density = density.value)) {
+                    ContactRow(
+                        index = 0,
+                        count = 1,
+                        contact = contact,
+                        onClick = {},
+                    )
+                }
+            }
+        }
+
+        val regularNode = compose.onNodeWithTag("contact-row-color-1")
+        val regularHeight = regularNode.fetchSemanticsNode().boundsInRoot.height
+        val regularBitmap = regularNode.captureToImage().asAndroidBitmap()
+        val regularColor = regularBitmap.getPixel(regularBitmap.width / 2, 2)
+
+        density.value = UiDensity.Small
+        compose.waitForIdle()
+
+        val compactNode = compose.onNodeWithTag("contact-row-color-1")
+        val compactHeight = compactNode.fetchSemanticsNode().boundsInRoot.height
+        val compactBitmap = compactNode.captureToImage().asAndroidBitmap()
+        val compactColor = compactBitmap.getPixel(compactBitmap.width / 2, 2)
+
+        assertTrue("Compact row ($compactHeight) should be shorter than regular ($regularHeight)", compactHeight < regularHeight)
+        assertEquals("Compact row container color should match regular SegmentedListItem", regularColor, compactColor)
     }
 }

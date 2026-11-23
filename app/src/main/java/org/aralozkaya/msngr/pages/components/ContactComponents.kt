@@ -5,7 +5,6 @@ package org.aralozkaya.msngr.pages.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,14 +12,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
@@ -34,9 +31,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.SegmentedListItem
@@ -44,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +50,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -264,6 +261,7 @@ fun ContactRow(
             unread = contact.isUnread,
             onReadStateChange = onReadStateChange,
             onClick = onClick ?: {},
+            swipeEnabled = !compact,
         ) { rowModifier, onRowClick ->
             val rowContent: @Composable () -> Unit = {
                 Row(
@@ -496,6 +494,7 @@ fun ContactRow(
                 }
             }
             val modifier = rowModifier.fillMaxWidth().testTag("contact-row-${contact.id}")
+            val shapes = ListItemDefaults.segmentedShapes(index, count)
             if (compact) {
                 val minHeight = when (density) {
                     UiDensity.Minimal -> if (inlineStatus) 34.dp else 38.dp
@@ -510,51 +509,33 @@ fun ContactRow(
                     UiDensity.Medium -> 8.dp
                     UiDensity.Regular -> 8.dp
                 }
-                val compactCorner = MaterialTheme.shapes.small
-                val zeroCorner = CornerSize(0.dp)
-                val compactShape = when {
-                    count <= 1 -> compactCorner
-                    index == 0 -> compactCorner.copy(bottomStart = zeroCorner, bottomEnd = zeroCorner)
-                    index == count - 1 -> compactCorner.copy(topStart = zeroCorner, topEnd = zeroCorner)
-                    else -> RectangleShape
-                }
-                Surface(
-                    shape = compactShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = modifier,
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        val clickModifier = if (onClick == null) {
-                            Modifier
-                        } else {
-                            Modifier.combinedClickable(
-                                onClick = onRowClick,
-                                onLongClick = if (hasLongClickActions) {
-                                    { contextMenuExpanded = true }
-                                } else null,
-                                onLongClickLabel = if (hasLongClickActions) longClickLabel else null,
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(clickModifier)
-                                .heightIn(min = minHeight)
-                                .padding(horizontal = horizontalPad, vertical = verticalPad),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            rowContent()
-                        }
-                        if (index < count - 1) {
-                            HorizontalDivider(
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                            )
-                        }
+                val compactModifier = modifier.heightIn(min = minHeight)
+                val compactPadding = PaddingValues(horizontal = horizontalPad, vertical = verticalPad)
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                    if (onClick == null) {
+                        SegmentedListItem(
+                            shapes = shapes,
+                            modifier = compactModifier,
+                            verticalAlignment = Alignment.CenterVertically,
+                            contentPadding = compactPadding,
+                            content = rowContent,
+                        )
+                    } else {
+                        SegmentedListItem(
+                            onClick = onRowClick,
+                            onLongClick = if (hasLongClickActions) {
+                                { contextMenuExpanded = true }
+                            } else null,
+                            onLongClickLabel = if (hasLongClickActions) longClickLabel else null,
+                            shapes = shapes,
+                            modifier = compactModifier,
+                            verticalAlignment = Alignment.CenterVertically,
+                            contentPadding = compactPadding,
+                            content = rowContent,
+                        )
                     }
                 }
             } else {
-                val shapes = ListItemDefaults.segmentedShapes(index, count)
                 if (onClick == null) {
                     SegmentedListItem(shapes = shapes, modifier = modifier, content = rowContent)
                 } else {
@@ -626,22 +607,14 @@ fun ContactRow(
                     interactionSource = groupInteractionSource,
                 ) {
                     categoryActions.forEachIndexed { actionIndex, (label, leading, action) ->
-                        val itemShape = MenuDefaults.itemShape(actionIndex, categoryActions.size).shape
-                        val isFavoriteAction = leading != null
                         DropdownMenuItem(
                             text = { Text(label) },
                             leadingIcon = leading,
-                            colors = if (isFavoriteAction) MenuDefaults.itemVibrantColors() else MenuDefaults.itemColors(),
-                            modifier = if (isFavoriteAction) {
-                                Modifier.background(MenuDefaults.groupVibrantContainerColor, itemShape)
-                            } else {
-                                Modifier
-                            },
                             onClick = {
                                 contextMenuExpanded = false
                                 action()
                             },
-                            shape = itemShape,
+                            shape = MenuDefaults.itemShape(actionIndex, categoryActions.size).shape,
                         )
                     }
                 }
