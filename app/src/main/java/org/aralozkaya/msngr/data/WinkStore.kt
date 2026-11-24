@@ -18,7 +18,8 @@ internal class WinkStore(
 
     @Synchronized fun catalog(account: String): List<WinkReference> =
         (defaults.values.map { it.first } + area(account, "library").listFiles().orEmpty()
-            .filter { it.extension == "properties" }.mapNotNull { readReference(it) }).distinctBy { it.metadata.sha1d }
+            .filter { it.extension == "properties" }.mapNotNull { readReference(it) }
+            .sortedBy { it.name.lowercase() }).distinctBy { it.metadata.sha1d }
 
     @Synchronized fun isSaved(account: String, metadata: MsnDisplayPicture): Boolean {
         if (defaults[metadata.sha1d]?.first?.metadata?.size == metadata.size) return true
@@ -30,6 +31,13 @@ internal class WinkStore(
     }
 
     @Synchronized fun isDefault(metadata: MsnDisplayPicture): Boolean = defaults.containsKey(metadata.sha1d)
+
+    @Synchronized fun knownName(account: String, metadata: MsnDisplayPicture): String? {
+        defaults[metadata.sha1d]?.first?.name?.takeIf(String::isNotBlank)?.let { return it }
+        if (account.isBlank()) return null
+        val saved = readReference(File(area(account, "library"), metadata.sha1d.key() + ".properties"))
+        return saved?.name?.takeIf { it.isNotBlank() && !it.equals("Unused", true) && !it.equals("Wink", true) }
+    }
 
     @Synchronized fun remove(account: String, metadata: MsnDisplayPicture) {
         require(!isDefault(metadata)) { "Default winks cannot be deleted." }

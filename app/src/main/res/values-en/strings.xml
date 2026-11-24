@@ -1129,6 +1129,12 @@
     <string name="wink_not_configured">Third-party winks are not configured for this service.</string>
     <string name="wink_download_failed_generic">Could not download wink.</string>
     <string name="wink_get_more">Get more winks</string>
+    <string name="wink_more_options">More wink options</string>
+    <string name="wink_import">Import from MCO file</string>
+    <string name="wink_export">Export .mco</string>
+    <string name="wink_import_failed">Could not import wink.</string>
+    <string name="wink_export_failed">Could not export wink.</string>
+    <string name="wink_exported">Wink exported.</string>
     <string name="wink_catalog_stopped">The catalog stopped. Close it and try again.</string>
     <string name="wink_add_dialog_title">Add winks</string>
     <string name="wink_account_changed">The selected account changed. Try again.</string>
@@ -1152,8 +1158,6 @@
     <string name="wink_not_cached">This wink is no longer cached.</string>
     <string name="wink_play_failed">There was a problem playing the wink.</string>
     <string name="wink_close_player">Close wink</string>
-    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="wink_title_plural">Winks</string>
     <string name="wink_unavailable">Wink is unavailable.</string>
     <string name="wink_delete_failed">Could not delete wink.</string>
     <string name="wink_send_label">Send wink</string>

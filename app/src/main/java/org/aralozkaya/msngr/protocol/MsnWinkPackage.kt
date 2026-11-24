@@ -13,6 +13,8 @@ import javax.xml.parsers.DocumentBuilderFactory
 object MsnWinkPackage {
     private const val MAX_FILES = 32
     private const val MAX_BLOCKS = 512
+    private const val MAX_BLOCK_BYTES = 32_768
+    private const val WINK_NAMESPACE = "http://messenger.msn.com/winks/1.0"
 
     fun parse(bytes: ByteArray): WinkPackage? = runCatching { read(bytes) }.getOrNull()
 
@@ -29,10 +31,20 @@ object MsnWinkPackage {
         val expanded = ByteBuffer.wrap(swf, 4, 4).order(ByteOrder.LITTLE_ENDIAN).int
         require(expanded in 8..MsnWink.MAX_EXPANDED_BYTES) { "SWF is too large." }
         val thumb = item("thumbnail")?.let { files[safeName(it.getAttribute("file"))] }
+        val manifestName = winkAttribute(manifest, "name")
+            .ifBlank { manifest.getAttribute("name") }
+            .trim()
+            .takeIf { it.isNotEmpty() }
+            ?.take(120)
         // Bound image dimensions before Android decodes an untrusted thumbnail.
-        return WinkPackage(bytes.copyOf(), swf, thumb,
-            animation.getAttribute("wink:sizex").toIntOrNull()?.coerceIn(1, 2048) ?: 640,
-            animation.getAttribute("wink:sizey").toIntOrNull()?.coerceIn(1, 2048) ?: 480)
+        return WinkPackage(
+            cabinet = bytes.copyOf(),
+            animation = swf,
+            thumbnail = thumb,
+            width = winkAttribute(animation, "sizex").toIntOrNull()?.coerceIn(1, 2048) ?: 640,
+            height = winkAttribute(animation, "sizey").toIntOrNull()?.coerceIn(1, 2048) ?: 480,
+            name = manifestName,
+        )
     }
 
     /** MCO installers wrap one or more signed wink CABs in a theme CAB. */
@@ -40,24 +52,154 @@ object MsnWinkPackage {
         val files = cabinet(bytes)
         val manifest = xml(files["content.xml"] ?: error("Missing package manifest."))
         if (manifest.getAttribute("type").equals("wink", true)) {
-            read(bytes)
-            return listOf(WinkReference(MsnDisplayPicture.create("msngr", bytes, 8), fallbackName.take(120)) to bytes)
+            val wink = read(bytes)
+            val name = wink.name?.ifBlank { null } ?: fallbackName.trim().ifBlank { "Wink" }.take(120)
+            return listOf(WinkReference(MsnDisplayPicture.create("msngr", bytes, 8), name) to bytes)
         }
         require(manifest.getAttribute("type").equals("theme", true)) { "Unsupported content package." }
         val items = manifest.getElementsByTagNameNS("*", "item")
-        val result = (0 until items.length).mapNotNull { index ->
-            val item = items.item(index) as Element
-            if (!item.getAttribute("type").equals("wink", true)) return@mapNotNull null
-            val file = safeName(item.getAttribute("file"))
+        val winkItems = (0 until items.length).map { items.item(it) as Element }
+            .filter { it.getAttribute("type").equals("wink", true) }
+        val result = winkItems.map { item ->
+            val rawFile = item.getAttribute("file")
+            val file = safeName(rawFile)
             val cab = files[file] ?: error("Missing wink in installer.")
-            read(cab)
-            val name = item.getAttribute("name").ifBlank { if (items.length == 1) fallbackName else file.substringBeforeLast('.').replace('_', ' ') }.take(120)
-            val metadata = MsnDisplayPicture.create("msngr", cab, 8).copy(
-                extraAttributes = mapOf("stamp" to item.getAttribute("stamp")))
+            val wink = read(cab)
+            val name = item.getAttribute("name").trim()
+                .ifBlank { wink.name.orEmpty() }
+                .ifBlank { if (winkItems.size == 1) fallbackName else file.substringBeforeLast('.').replace('_', ' ') }
+                .trim()
+                .ifBlank { "Wink" }
+                .take(120)
+            val location = rawFile.replace('\\', '/').substringAfterLast('/').ifBlank { file }
+            val extra = buildMap {
+                item.getAttribute("contenttype").trim().takeIf { it.isNotEmpty() }?.let { put("contenttype", it) }
+                item.getAttribute("contentid").trim().takeIf { it.isNotEmpty() }?.let { put("contentid", it) }
+                item.getAttribute("stamp").trim().takeIf { it.isNotEmpty() }?.let { put("stamp", it) }
+            }
+            val metadata = MsnDisplayPicture.create("msngr", cab, 8, location = location)
+                .copy(extraAttributes = extra)
             WinkReference(metadata, name) to cab
         }
         require(result.isNotEmpty()) { "This installer contains no winks." }
         return result
+    }
+
+    /** Packages a wink CAB and its metadata/signature back into a standard .mco installer CAB. */
+    fun exportMco(reference: WinkReference, cabBytes: ByteArray): ByteArray {
+        require(reference.metadata.matches(cabBytes)) { "Wink data does not match its metadata." }
+        read(cabBytes)
+        val cabFileName = sanitizeExportCabName(reference.metadata.location)
+        val contentType = reference.metadata.extraAttributes["contenttype"]?.trim()?.takeIf { it.isNotEmpty() } ?: "P"
+        val contentId = reference.metadata.extraAttributes["contentid"]?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "msngr_${cabFileName.substringBeforeLast('.')}"
+        val stamp = reference.metadata.extraAttributes["stamp"]?.trim()?.takeIf { it.isNotEmpty() }
+        val cleanName = reference.name.trim().take(120)
+        val contentXml = buildString {
+            append("<package version=\"1.0\" type=\"theme\">\r\n")
+            append("   <item contentid=\"").append(contentId.escapeXmlAttr())
+            append("\" type=\"wink\" contenttype=\"").append(contentType.escapeXmlAttr())
+            append("\" mimetype=\"application/messengercontent\" file=\"")
+            append(cabFileName.escapeXmlAttr()).append("\"")
+            if (cleanName.isNotEmpty()) {
+                append(" name=\"").append(cleanName.escapeXmlAttr()).append("\"")
+            }
+            if (stamp != null) {
+                append(" stamp=\"").append(stamp.escapeXmlAttr()).append("\"")
+            }
+            append("/>\r\n</package>\r\n")
+        }.toByteArray(Charsets.UTF_8)
+        return buildStoredCabinet(listOf("content.xml" to contentXml, cabFileName to cabBytes))
+    }
+
+    fun suggestedMcoFileName(name: String): String {
+        val base = name.trim()
+            .replace(Regex("""[\\/:*?"<>|\u0000-\u001F]"""), "_")
+            .replace(Regex("""\s+"""), " ")
+            .trim('.', ' ')
+            .take(80)
+            .ifBlank { "wink" }
+        return "$base.mco"
+    }
+
+    fun fallbackNameFromFileName(fileName: String?): String {
+        val stem = fileName?.replace('\\', '/')?.substringAfterLast('/')
+            ?.replace(Regex("""\.(mco|cab|mct)$""", RegexOption.IGNORE_CASE), "")
+            ?.replace('_', ' ')
+            ?.trim()
+        return stem?.takeIf { it.isNotEmpty() }?.take(120) ?: "Wink"
+    }
+
+    private fun winkAttribute(element: Element, localName: String): String =
+        element.getAttributeNS(WINK_NAMESPACE, localName).ifBlank { element.getAttribute("wink:$localName") }
+
+    private fun sanitizeExportCabName(location: String): String {
+        val base = location.replace('\\', '/').substringAfterLast('/')
+            .substringBeforeLast('.')
+            .replace(Regex("""[^A-Za-z0-9_-]"""), "")
+            .take(32)
+            .ifBlank { "wink" }
+        return "$base.cab"
+    }
+
+    private fun String.escapeXmlAttr(): String = this
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+
+    private fun buildStoredCabinet(files: List<Pair<String, ByteArray>>): ByteArray {
+        require(files.isNotEmpty() && files.size <= MAX_FILES)
+        val payloadStream = ByteArrayOutputStream()
+        val offsets = IntArray(files.size)
+        val encodedNames = files.mapIndexed { index, (name, data) ->
+            safeName(name)
+            offsets[index] = payloadStream.size()
+            payloadStream.write(data)
+            name.toByteArray(Charsets.UTF_8)
+        }
+        val payload = payloadStream.toByteArray()
+        require(payload.size in 1..MsnWink.MAX_EXPANDED_BYTES)
+        val blockCount = (payload.size + MAX_BLOCK_BYTES - 1) / MAX_BLOCK_BYTES
+        require(blockCount in 1..MAX_BLOCKS)
+        val entriesSize = encodedNames.sumOf { 16 + it.size + 1 }
+        val dataOffset = 44 + entriesSize
+        val totalSize = dataOffset + blockCount * 8 + payload.size
+        require(totalSize <= MsnWink.MAX_CAB_BYTES) { "Wink package is too large." }
+        val out = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN)
+        out.putInt(0x4643534d).putInt(0).putInt(totalSize).putInt(0).putInt(44).putInt(0)
+            .put(3).put(1).putShort(1).putShort(files.size.toShort()).putShort(0).putShort(0).putShort(0)
+        out.putInt(dataOffset).putShort(blockCount.toShort()).putShort(0)
+        files.forEachIndexed { index, (_, data) ->
+            val nameBytes = encodedNames[index]
+            out.putInt(data.size)
+                .putInt(offsets[index])
+                .putShort(0)
+                .putShort(0x3261)
+                .putShort(0)
+                .putShort(0x00A0)
+                .put(nameBytes)
+                .put(0)
+        }
+        var position = 0
+        while (position < payload.size) {
+            val chunkSize = minOf(MAX_BLOCK_BYTES, payload.size - position)
+            val chunk = payload.copyOfRange(position, position + chunkSize)
+            val sizes = byteArrayOf(
+                chunkSize.toByte(),
+                (chunkSize shr 8).toByte(),
+                chunkSize.toByte(),
+                (chunkSize shr 8).toByte(),
+            )
+            val checksum = cabChecksum(chunk) xor cabChecksum(sizes)
+            out.putInt(checksum)
+                .putShort(chunkSize.toShort())
+                .putShort(chunkSize.toShort())
+                .put(chunk)
+            position += chunkSize
+        }
+        return out.array()
     }
 
     internal fun xml(bytes: ByteArray): Element {

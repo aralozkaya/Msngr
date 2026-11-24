@@ -9,13 +9,14 @@ class WinkPackage internal constructor(
     val thumbnail: ByteArray?,
     val width: Int,
     val height: Int,
+    val name: String? = null,
 ) {
     fun bytes(): ByteArray = cabinet.copyOf()
 }
 
 object MsnWink {
     const val OBJECT_TYPE = 8
-    const val APP_ID = 1
+    const val APP_ID = 17
     const val MAX_CAB_BYTES = 2 * 1024 * 1024
     const val MAX_EXPANDED_BYTES = 8 * 1024 * 1024
     const val MAX_PLAYBACK_MILLIS = 12_000L

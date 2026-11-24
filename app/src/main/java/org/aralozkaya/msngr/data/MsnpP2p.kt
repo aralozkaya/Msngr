@@ -279,7 +279,8 @@ internal class MsnpP2pSession(
         sendMessage(
             sessionId = sessionId,
             flags = P2P_MSN_OBJECT_DATA,
-            appId = MsnpP2pUtil.objectAppId(picture.metadata.objectType),
+            appId = message.body.field("AppID")?.toIntOrNull()
+                ?: MsnpP2pUtil.objectAppId(picture.metadata.objectType),
             body = picture.bytes,
         )
         if (picture.metadata.objectType in listOf(8, 11, 15)) closeObjectSession(message.callId, sessionId)

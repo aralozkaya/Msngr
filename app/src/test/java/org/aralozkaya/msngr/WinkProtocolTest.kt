@@ -44,8 +44,48 @@ class WinkProtocolTest {
         assertEquals(metadata, parsed.metadata)
         assertEquals(metadata, MsnDisplayPicture.parseObject(metadata.toEncodedValue(), 8))
         val content = MsnpP2pUtil.displayPictureRequestContent(123, metadata)
-        assertEquals("1", content.field("AppID"))
+        assertEquals("17", content.field("AppID"))
         assertEquals("{A4268EEC-FEC5-49E5-95C3-F126696BDBF6}", content.field("EUF-GUID"))
+        assertTrue(MsnpP2pUtil.acceptsObjectAppId(8, "17"))
+        assertTrue(MsnpP2pUtil.acceptsObjectAppId(8, "1"))
+        assertTrue(MsnpP2pUtil.acceptsObjectAppId(8, "12"))
+        assertFalse(MsnpP2pUtil.acceptsObjectAppId(8, "20"))
+    }
+
+    @Test fun readsInnerWinkNameAndRoundTripsExportedMcoPackages() {
+        val originalCab = cab()
+        val originalWink = MsnWinkPackage.read(originalCab)
+        val innerXml = """<?xml version="1.0" encoding="UTF-8" ?>
+            <package xmlns="http://messenger.msn.com/messengercontent/1.0" version="1.0" type="wink" xmlns:wink="http://messenger.msn.com/winks/1.0" wink:version="1.0" wink:name="Birthday Cat" partnerid="AG">
+             <item type="animation" mimetype="application/x-shockwave-flash" file="cat.swf" wink:sizex="350" wink:sizey="235" />
+             <item type="thumbnail" mimetype="image/png" file="cat.png" />
+            </package>""".trimIndent().toByteArray()
+        val bigSwf = originalWink.animation + ByteArray(25_000) // Force multi-block (>32 KiB) CAB export.
+        val namedCab = multiBlockStoredCab(listOf(
+            "content.xml" to innerXml,
+            "cat.swf" to bigSwf,
+            "cat.png" to originalWink.thumbnail!!,
+        ))
+        val parsed = MsnWinkPackage.read(namedCab)
+        assertEquals("Birthday Cat", parsed.name)
+        assertEquals(350, parsed.width)
+        assertEquals(235, parsed.height)
+        assertArrayEquals(originalWink.thumbnail, parsed.thumbnail)
+
+        val stamp = "MIII-test-signature-stamp"
+        val metadata = MsnDisplayPicture.create("msngr", namedCab, 8, location = "TFR255.cab")
+            .copy(extraAttributes = mapOf("contenttype" to "P", "contentid" to "1022452565TFR255", "stamp" to stamp))
+        val reference = WinkReference(metadata, "Birthday Cat")
+        val exported = MsnWinkPackage.exportMco(reference, namedCab)
+        val reimported = MsnWinkPackage.install(exported, fallbackName = "ignored-filename").single()
+        assertEquals("Birthday Cat", reimported.first.name)
+        assertArrayEquals(namedCab, reimported.second)
+        assertEquals(stamp, reimported.first.metadata.extraAttributes["stamp"])
+        assertEquals("P", reimported.first.metadata.extraAttributes["contenttype"])
+        assertEquals("1022452565TFR255", reimported.first.metadata.extraAttributes["contentid"])
+        assertEquals("TFR255.cab", reimported.first.metadata.location)
+        assertEquals("Birthday Cat.mco", MsnWinkPackage.suggestedMcoFileName("Birthday Cat"))
+        assertEquals("my wink", MsnWinkPackage.fallbackNameFromFileName("my_wink.MCO"))
     }
 
     @Test fun rejectsBrokenChecksumsBombsBadXmlTraversalAndOversizeOffers() {
@@ -208,6 +248,31 @@ class WinkProtocolTest {
             "https://winks.example/files/demo.mco",
             WinkDownloads.trustedPackageUrl("http://winks.example/files/demo.mco", catalogUrl = "https://winks.example/catalog/"),
         )
+        assertFalse(WINK_IMPORT_MIME_TYPES.contains("*/*"))
+        assertTrue(WINK_IMPORT_MIME_TYPES.contains("application/octet-stream"))
+    }
+
+    private fun multiBlockStoredCab(files: List<Pair<String, ByteArray>>): ByteArray {
+        val payload = files.fold(byteArrayOf()) { bytes, file -> bytes + file.second }
+        val entriesSize = files.sumOf { 16 + it.first.toByteArray().size + 1 }
+        val blockCount = (payload.size + 32767) / 32768
+        val offset = 44 + entriesSize
+        val out = ByteBuffer.allocate(offset + blockCount * 8 + payload.size).order(ByteOrder.LITTLE_ENDIAN)
+        out.putInt(0x4643534d).putInt(0).putInt(out.capacity()).putInt(0).putInt(44).putInt(0)
+            .put(3).put(1).putShort(1).putShort(files.size.toShort()).putShort(0).putShort(0).putShort(0)
+        out.putInt(offset).putShort(blockCount.toShort()).putShort(0)
+        var position = 0
+        for ((name, data) in files) {
+            out.putInt(data.size).putInt(position).putShort(0).putShort(0).putShort(0).putShort(0).put(name.toByteArray()).put(0)
+            position += data.size
+        }
+        var cursor = 0
+        while (cursor < payload.size) {
+            val size = minOf(32768, payload.size - cursor)
+            out.putInt(0).putShort(size.toShort()).putShort(size.toShort()).put(payload, cursor, size)
+            cursor += size
+        }
+        return out.array()
     }
 
     private fun storedCab(files: List<Pair<String, ByteArray>>): ByteArray {
