@@ -177,12 +177,17 @@ import java.text.DateFormat
 import java.util.Date
 
 class ChatActivity : MsngrActivity() {
-    internal val notificationConversationId: String? get() = intent.getStringExtra(EXTRA_CONTACT_ID)
+    private var contactIdState by mutableStateOf("")
+    private var openPhotoShareRequest by mutableIntStateOf(0)
+
+    internal val notificationConversationId: String?
+        get() = contactIdState.ifBlank { intent.getStringExtra(EXTRA_CONTACT_ID) }
 
     override fun onResume() {
         super.onResume()
         notificationConversationId?.let { (application as MsngrApplication).inAppNotifications.dismissConversation(it) }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (redirectToLoginIfNeeded()) return
@@ -191,6 +196,45 @@ class ChatActivity : MsngrActivity() {
             finish()
             return
         }
+        contactIdState = contactId
+        if (intent.getBooleanExtra(EXTRA_OPEN_PHOTO_SHARE, false)) {
+            openPhotoShareRequest++
+            intent.removeExtra(EXTRA_OPEN_PHOTO_SHARE)
+        }
+        updateLocusContext(contactId)
+        setContent {
+            MsngrTheme {
+                ChatRoute(
+                    repository = appContainer.messengerRepository,
+                    contactId = contactIdState,
+                    openPhotoShareRequest = openPhotoShareRequest,
+                    onBack = {
+                        if (isTaskRoot) {
+                            startActivity(Intent(this@ChatActivity, MainActivity::class.java))
+                        }
+                        finish()
+                    },
+                )
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val newContactId = intent.getStringExtra(EXTRA_CONTACT_ID)
+        if (!newContactId.isNullOrBlank()) {
+            contactIdState = newContactId
+            updateLocusContext(newContactId)
+            (application as MsngrApplication).inAppNotifications.dismissConversation(newContactId)
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_PHOTO_SHARE, false)) {
+            openPhotoShareRequest++
+            intent.removeExtra(EXTRA_OPEN_PHOTO_SHARE)
+        }
+    }
+
+    private fun updateLocusContext(contactId: String) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             setLocusContext(
                 android.content.LocusId(
@@ -199,22 +243,19 @@ class ChatActivity : MsngrActivity() {
                 null,
             )
         }
-        setContent {
-            MsngrTheme {
-                ChatRoute(
-                    repository = appContainer.messengerRepository,
-                    contactId = contactId,
-                    onBack = ::finish,
-                )
-            }
-        }
     }
 
     companion object {
         private const val EXTRA_CONTACT_ID = "contact_id"
+        internal const val EXTRA_OPEN_PHOTO_SHARE = "open_photo_share"
 
-        fun createIntent(context: Context, contactId: String): Intent =
-            Intent(context, ChatActivity::class.java).putExtra(EXTRA_CONTACT_ID, contactId)
+        fun createIntent(
+            context: Context,
+            contactId: String,
+            openPhotoShare: Boolean = false,
+        ): Intent = Intent(context, ChatActivity::class.java)
+            .putExtra(EXTRA_CONTACT_ID, contactId)
+            .putExtra(EXTRA_OPEN_PHOTO_SHARE, openPhotoShare)
     }
 }
 
@@ -222,6 +263,7 @@ class ChatActivity : MsngrActivity() {
 private fun ChatRoute(
     repository: MessengerRepository,
     contactId: String,
+    openPhotoShareRequest: Int = 0,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -316,6 +358,7 @@ private fun ChatRoute(
 
     ChatScreen(
         photoShare = photoShares[contactId],
+        openPhotoShareRequest = openPhotoShareRequest,
         gameSession = gameSessions[contactId.lowercase(java.util.Locale.ROOT)] ?: gameSessions[contactId],
         ownName = profile.username.ifBlank { profile.email },
         onSendEmotionSound = { repository.sendEmotionSound(contactId, it) },
@@ -381,6 +424,7 @@ internal fun ChatScreen(
     ownEmail: String = "",
     ownName: String = "",
     photoShare: org.aralozkaya.msngr.data.PhotoShare? = null,
+    openPhotoShareRequest: Int = 0,
     gameSession: org.aralozkaya.msngr.data.GameSession? = null,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -597,6 +641,7 @@ internal fun ChatScreen(
                             contactId = contact.id,
                             share = photoShare,
                             canAddPhotos = sharingBaseEnabled && recipientFeatures.photos,
+                            openSheetRequest = openPhotoShareRequest,
                         )
                     }
                     if (gameSession != null) {

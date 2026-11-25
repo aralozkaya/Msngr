@@ -27,6 +27,7 @@ internal class MsnpP2pSession(
     private val localOriginal: (String) -> OriginalPhoto? = { null },
     private val publishOriginal: (String, OriginalPhoto) -> Unit = { _, _ -> },
     private val onGameSession: (GameSession) -> Unit = {},
+    private val onPhotoObjectProgress: (String, Long, Long) -> Unit = { _, _, _ -> },
 ) {
     private val v2 = remoteEndpointId?.takeIf(String::isNotBlank)?.let {
         MsnpP2pV2Session(
@@ -42,6 +43,7 @@ internal class MsnpP2pSession(
             localWink = localWink, onWink = onWink,
             fileDirectory = fileDirectory, onFileTransfer = onFileTransfer, onPhotoShare = onPhotoShare, localPhoto = localPhoto, publishPhoto = publishPhoto, localOriginal = localOriginal, publishOriginal = publishOriginal,
             onGameSession = onGameSession,
+            onPhotoObjectProgress = onPhotoObjectProgress,
         )
     }
     val destination: String get() = v2?.destination ?: remoteEmail
@@ -276,12 +278,27 @@ internal class MsnpP2pSession(
             appId = 0,
             body = ByteArray(4),
         )
+        val progressCallback: ((Int) -> Unit)? = if (picture.metadata.objectType == 15) {
+            { sent ->
+                if (photoApplicationLazy.isInitialized()) {
+                    photos.recordObjectSentProgress(
+                        picture.metadata.sha1d,
+                        sent.toLong(),
+                        picture.bytes.size.toLong(),
+                    )
+                }
+                onPhotoObjectProgress(picture.metadata.sha1d, sent.toLong(), picture.bytes.size.toLong())
+            }
+        } else {
+            null
+        }
         sendMessage(
             sessionId = sessionId,
             flags = P2P_MSN_OBJECT_DATA,
             appId = message.body.field("AppID")?.toIntOrNull()
                 ?: MsnpP2pUtil.objectAppId(picture.metadata.objectType),
             body = picture.bytes,
+            onProgress = progressCallback,
         )
         if (picture.metadata.objectType in listOf(8, 11, 15)) closeObjectSession(message.callId, sessionId)
     }
@@ -336,6 +353,7 @@ internal class MsnpP2pSession(
         flags: Int,
         appId: Int,
         body: ByteArray,
+        onProgress: ((Int) -> Unit)? = null,
     ) {
         val id = nextId()
         val acknowledgementId = nextId()
@@ -371,6 +389,7 @@ internal class MsnpP2pSession(
                 ).encode(),
             )
             offset += length
+            onProgress?.invoke(offset)
         }
     }
 

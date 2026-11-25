@@ -39,15 +39,19 @@ class NotificationConfigurationInstrumentedTest {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)
             val channelIds = NotificationChannels.userConfigurable +
-                NotificationChannels.BACKGROUND_CONNECTION
+                NotificationChannels.BACKGROUND_CONNECTION +
+                NotificationChannels.SHARING
 
-            assertEquals(8, channelIds.toSet().size)
+            assertEquals(9, channelIds.toSet().size)
             channelIds.forEach { channelId ->
                 assertNotNull(
                     "Missing notification channel $channelId",
                     manager.getNotificationChannel(channelId),
                 )
             }
+            val sharingChannel = manager.getNotificationChannel(NotificationChannels.SHARING)
+            assertEquals(NotificationManager.IMPORTANCE_LOW, sharingChannel.importance)
+            assertFalse(sharingChannel.canShowBadge())
             val signedInChannel = manager.getNotificationChannel(NotificationChannels.CONTACT_SIGNED_IN)
             assertEquals("Contact signed in", signedInChannel.name.toString())
             assertEquals("Contacts who have just signed in", signedInChannel.description)
@@ -226,6 +230,7 @@ class NotificationConfigurationInstrumentedTest {
         for (receiver in listOf(
             NotificationNudgeReceiver::class.java,
             NotificationMarkReadReceiver::class.java,
+            NotificationShareCancelReceiver::class.java,
         )) {
             val receiverInfo = context.packageManager.getReceiverInfo(
                 ComponentName(context, receiver),

@@ -3788,4 +3788,85 @@
     <string name="settings_layout_compact_search_sort_title"></string>
     <!-- Reference (en): Use a compact search bar and text-only Sort button on the Contacts page. -->
     <string name="settings_layout_compact_search_sort_supporting"></string>
+
+    <!-- Sharing notifications & external share target -->
+    <!-- Reference (en): File &amp; photo sharing -->
+    <string name="notification_channel_sharing"></string>
+    <!-- Reference (en): Ongoing file transfers and photo sharing progress -->
+    <string name="notification_channel_sharing_description"></string>
+    <!-- Reference (en): Waiting for %1$s to accept · %2$s -->
+    <string name="notification_sharing_file_waiting"></string>
+    <!-- Reference (en): Sending %1$s to %2$s -->
+    <string name="notification_sharing_file_sending"></string>
+    <!-- Reference (en): Waiting for %1$s to accept photos -->
+    <string name="notification_sharing_photos_waiting"></string>
+    <!-- Reference (en): Sharing photos with %1$s -->
+    <string name="notification_sharing_photos_uploading"></string>
+    <!-- Reference (en): %1$s shared · %2$s remaining -->
+    <string name="notification_sharing_sizes"></string>
+    <!-- Reference (en): Choose a recipient -->
+    <string name="share_choose_recipient"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <!-- Reference (en): Files -->
+    <string name="share_option_files_title"></string>
+    <!-- Reference (en): Photos -->
+    <string name="share_option_photos_title"></string>
+    <!-- Reference (en): Optional message -->
+    <string name="share_optional_message_label"></string>
+    <!-- Reference (en): Add a message… -->
+    <string name="share_optional_message_placeholder"></string>
+    <!-- Reference (en): Send -->
+    <string name="share_send_file_action"></string>
+    <!-- Reference (en): Share photos -->
+    <string name="share_send_photos_action"></string>
+    <!-- Reference (en): Signing in… -->
+    <string name="share_signing_in"></string>
+    <!-- Reference (en): Preparing shared content… -->
+    <string name="share_preparing"></string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <!-- Reference (en): You appear offline. Go online to share files or photos. -->
+    <string name="share_appear_offline_notice_you_singular"></string>
+    <!-- Reference (en): Go online -->
+    <string name="share_go_online_action"></string>
+    <!-- Reference (en): Offline -->
+    <string name="share_recipient_offline"></string>
+    <!-- Reference (en): Client does not support file transfers -->
+    <string name="share_recipient_unsupported_files"></string>
+    <!-- Reference (en): Client does not support photo sharing -->
+    <string name="share_recipient_unsupported_photos"></string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <!-- Reference (en): Go online to share -->
+    <string name="share_recipient_unavailable_appear_offline_you_singular"></string>
+    <!-- Reference (en): No contacts found. -->
+    <string name="share_no_contacts"></string>
+    <!-- Reference (en): No file was provided to share. -->
+    <string name="share_error_no_file"></string>
+    <!-- Reference (en): Multiple files can only be shared using Photo sharing. -->
+    <string name="share_error_multiple_non_photos"></string>
+    <!-- Reference (en): Import custom wink -->
+    <string name="share_wink_import_dialog_title"></string>
+    <!-- Reference (en): Import -->
+    <string name="share_wink_import_confirm"></string>
+    <!-- Reference (en): Search contacts -->
+    <string name="share_search_placeholder"></string>
+    <!-- Reference (en): Clear search -->
+    <string name="share_search_clear"></string>
+    <!-- Note: singular text variant -->
+    <!-- Reference (en):  -->
+    <string name="share_photos_count_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <!-- Reference (en): photo -->
+    <string name="share_photos_count_singular_after_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <!-- Reference (en):  -->
+    <string name="share_photos_count_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <!-- Reference (en): photos -->
+    <string name="share_photos_count_plural_after_number"></string>
+    <!-- Reference (en): %1$s · %2$s -->
+    <string name="share_summary_photos_format"></string>
+    <!-- Reference (en): Shared photo preview -->
+    <string name="share_preview_image_desc"></string>
+    <!-- Reference (en): Sharing… -->
+    <string name="share_sending"></string>
 </resources>

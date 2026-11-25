@@ -20,6 +20,7 @@ import org.aralozkaya.msngr.notifications.InAppNotificationController
 import org.aralozkaya.msngr.notifications.MsngrNotificationManager
 import org.aralozkaya.msngr.notifications.NotificationChannels
 import org.aralozkaya.msngr.notifications.RealtimeNotificationBridge
+import org.aralozkaya.msngr.notifications.SharingNotificationController
 import java.io.File
 
 class MsngrApplication : Application() {
@@ -62,6 +63,7 @@ class MsngrApplication : Application() {
     }
     internal val notificationManager by lazy { MsngrNotificationManager(this) { visibilityTracker.isForeground } }
     internal val inAppNotifications by lazy { InAppNotificationController(this, visibilityTracker) }
+    internal val sharingNotifications by lazy { SharingNotificationController(this) }
     private val realtimeNotificationBridge by lazy {
         RealtimeNotificationBridge(visibilityTracker, notificationManager, inAppNotifications = inAppNotifications)
     }
@@ -71,7 +73,7 @@ class MsngrApplication : Application() {
         AppContainer(
             clientFactory = { useMockServer ->
                 if (useMockServer) {
-                    MockMsnp18Client()
+                    MockMsnp18Client(photoCacheDirectory = File(cacheDir, "mock-photos"))
                 } else {
                     LiveMsnp18Client(
                         winkStore = winkStore,
@@ -91,6 +93,7 @@ class MsngrApplication : Application() {
             onRepositoryCreated = { repository ->
                 transferAutomation.attach(repository)
                 realtimeNotificationBridge.attach(repository)
+                sharingNotifications.attach(repository)
                 displayPictureSync.attach(repository)
                 nowPlayingController.attach(repository)
                 displayPictureSync.setForeground(visibilityTracker.isForeground)
@@ -112,6 +115,7 @@ class MsngrApplication : Application() {
                 // A remote sign-out must survive process restart and background service restore.
                 SessionPrefs.recordRemoteSignOut(this)
                 SessionPrefs.logout()
+                sharingNotifications.dismissAll()
                 BackgroundConnectionController.stop(this)
                 AppShortcuts.clearRecentChats(this)
             },

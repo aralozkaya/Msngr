@@ -183,6 +183,7 @@ class MainActivity : MsngrActivity() {
                     },
                     onLogout = {
                         BackgroundConnectionController.stop(this)
+                        (application as MsngrApplication).sharingNotifications.dismissAll()
                         AppShortcuts.clearRecentChats(this)
                         repository.logout()
                         SessionPrefs.logout()

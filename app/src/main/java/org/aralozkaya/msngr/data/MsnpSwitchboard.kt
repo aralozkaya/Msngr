@@ -71,6 +71,7 @@ internal class MsnpSwitchboardSession(
     private val publishPhoto: (String, LocalDisplayPicture) -> Unit = { _, _ -> },
     private val localOriginal: (String, String) -> OriginalPhoto? = { _, _ -> null },
     private val publishOriginal: (String, String, OriginalPhoto) -> Unit = { _, _, _ -> },
+    private val onPhotoObjectProgress: (String, Long, Long) -> Unit = { _, _, _ -> },
 ) : AutoCloseable {
     // A sibling endpoint can invite us before it calls the conversation's contact.
     @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
@@ -113,6 +114,7 @@ internal class MsnpSwitchboardSession(
             localWink = localWink,
             onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(this.contactEmail, metadata, bytes)) },
             onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(this.contactEmail, metadata, bytes)) },
+            onPhotoObjectProgress = onPhotoObjectProgress,
         ) }
         val identity = remoteEndpointId?.let { "${this.contactEmail};{${normalizeEndpointId(it)}}" } ?: this.contactEmail
         (sharedP2pPeers?.computeIfAbsent(identity) { create() } ?: create()).also { peer ->
@@ -433,7 +435,8 @@ internal class MsnpSwitchboardSession(
                 },
                 localWink = { hash -> if (sender == contactEmail || sender.equals(signedInEmail, true)) localWink(hash) else null },
                 onWink = { metadata, bytes -> eventSink(SwitchboardEvent.WinkReceived(sender, metadata, bytes)) },
-                onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) }) }
+                onVoiceClip = { metadata, bytes -> eventSink(SwitchboardEvent.VoiceClipReceived(sender, metadata, bytes)) },
+                onPhotoObjectProgress = onPhotoObjectProgress) }
             sharedP2pPeers?.computeIfAbsent(identity) { create() } ?: create()
         }.also { peer -> peer.bindPacketSender { queueP2pPacket(identity, it) } }
     }

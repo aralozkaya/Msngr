@@ -217,11 +217,37 @@ internal class LiveMsnp18Client(
     }?.data
     private data class SharedOriginal(val recipients: Set<String>, val original: OriginalPhoto)
     private val sharedOriginals = ConcurrentHashMap<String, SharedOriginal>()
+    private val photoProgressTimestamps = ConcurrentHashMap<String, Long>()
     private fun localOriginalPhoto(peer: String, id: String): OriginalPhoto? = sharedOriginals[id.uppercase()]?.takeIf {
         peer.lowercase() in it.recipients || peer.equals(signedInEmail, true)
     }?.original
     private fun publishOriginalPhoto(peer: String, id: String, original: OriginalPhoto) {
         sharedOriginals[id.uppercase()] = SharedOriginal(setOf(peer.lowercase()), original)
+    }
+    private fun recordOutgoingPhotoProgress(contactEmail: String, sha1d: String, sent: Long, total: Long) {
+        val contactId = contactEmail.lowercase()
+        if (contactId.isBlank()) return
+        val now = System.nanoTime()
+        val key = "$contactId\n$sha1d"
+        val previous = photoProgressTimestamps[key] ?: 0L
+        if (sent < total && now - previous < 200_000_000L) return
+        photoProgressTimestamps[key] = now
+        mutablePhotoShares.update { all ->
+            val share = all[contactId] ?: return@update all
+            if (share.photos.none { it.outgoing && it.preview.sha1d == sha1d }) return@update all
+            all + (contactId to share.copy(photos = share.photos.map { photo ->
+                if (photo.outgoing && photo.preview.sha1d == sha1d) {
+                    photo.copy(
+                        previewSentBytes = maxOf(
+                            photo.previewSentBytes,
+                            sent.coerceIn(0L, photo.preview.size.toLong()),
+                        ),
+                    )
+                } else {
+                    photo
+                }
+            }))
+        }
     }
     private fun publishPhotoObject(peer: String, data: LocalDisplayPicture) {
         sharedPhotoObjects.entries.removeIf { System.nanoTime() - it.value.created > 600_000_000_000L }
@@ -3424,6 +3450,9 @@ internal class LiveMsnp18Client(
                 acceptWink = { winkLimiter.allowReceivedAlert(session.contactEmail, session.contactEmail) },
                 remoteEndpointId = contactEndpointIds[id],
                 sharedPictureSession = reusablePictureSession(id),
+                onPhotoObjectProgress = { sha1d, sent, total ->
+                    recordOutgoingPhotoProgress(session.contactEmail, sha1d, sent, total)
+                },
             )
             pictureSessions[id] = session.pictureSession
             activeSwitchboards.add(session)
@@ -3553,6 +3582,9 @@ internal class LiveMsnp18Client(
             acceptWink = { winkLimiter.allowReceivedAlert(session.contactEmail, session.contactEmail) },
             remoteEndpointId = contactEndpointIds[id],
             sharedPictureSession = reusablePictureSession(id),
+            onPhotoObjectProgress = { sha1d, sent, total ->
+                recordOutgoingPhotoProgress(session.contactEmail, sha1d, sent, total)
+            },
         )
         if (!fromOwnSession) pictureSessions[id] = session.pictureSession
         activeSwitchboards.add(session)
@@ -3664,7 +3696,10 @@ internal class LiveMsnp18Client(
                     merged = if (oldShare?.id == event.share.id) event.share.copy(photos = event.share.photos.map { photo ->
                         oldShare.photos.firstOrNull { it.id == photo.id }?.let { old -> photo.copy(
                             originalPath = old.originalPath ?: photo.originalPath, originalPending = old.originalPending,
-                            originalError = old.originalError, originalSentToPeer = old.originalSentToPeer || photo.originalSentToPeer)
+                            originalError = old.originalError, originalSentToPeer = old.originalSentToPeer || photo.originalSentToPeer,
+                            previewSentBytes = maxOf(old.previewSentBytes, photo.previewSentBytes),
+                            originalSize = maxOf(old.originalSize, photo.originalSize),
+                            originalTransferredBytes = maxOf(old.originalTransferredBytes, photo.originalTransferredBytes))
                         } ?: photo
                     }) else event.share
                     all + (contactId to merged)
@@ -3746,11 +3781,29 @@ internal class LiveMsnp18Client(
                 if (event.transfer.photoId != null) {
                     val transfer = event.transfer
                     mutablePhotoShares.update { all -> all[contactId]?.let { share -> all + (contactId to share.copy(photos = share.photos.map { photo ->
-                        if (!photo.id.equals(transfer.photoId, true)) photo else photo.copy(
-                            originalPath = if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete) transfer.localPath else photo.originalPath,
-                            originalPending = !transfer.outgoing && transfer.active,
-                            originalError = transfer.error,
-                            originalSentToPeer = photo.originalSentToPeer || (transfer.outgoing && transfer.status == FileTransferStatus.Complete))
+                        if (!photo.id.equals(transfer.photoId, true)) photo else {
+                            val nextOrigSize = when {
+                                !transfer.outgoing -> photo.originalSize
+                                transfer.active || transfer.status == FileTransferStatus.Complete -> transfer.size
+                                photo.originalSentToPeer -> photo.originalSize
+                                else -> 0L
+                            }
+                            val nextOrigTransferred = when {
+                                !transfer.outgoing -> photo.originalTransferredBytes
+                                transfer.status == FileTransferStatus.Complete -> transfer.size
+                                transfer.active -> transfer.transferred
+                                photo.originalSentToPeer -> photo.originalSize
+                                else -> 0L
+                            }
+                            photo.copy(
+                                originalPath = if (!transfer.outgoing && transfer.status == FileTransferStatus.Complete) transfer.localPath else photo.originalPath,
+                                originalPending = !transfer.outgoing && transfer.active,
+                                originalError = transfer.error,
+                                originalSentToPeer = photo.originalSentToPeer || (transfer.outgoing && transfer.status == FileTransferStatus.Complete),
+                                originalSize = nextOrigSize,
+                                originalTransferredBytes = nextOrigTransferred,
+                            )
+                        }
                     })) } ?: all }
                     return
                 }
@@ -4141,6 +4194,7 @@ internal class LiveMsnp18Client(
         applicationP2pPeers.clear()
         sharedPhotoObjects.clear()
         sharedOriginals.clear()
+        photoProgressTimestamps.clear()
         mutablePhotoShares.value = emptyMap()
         mutableGameSessions.value = emptyMap()
         sharedWinks.clear()

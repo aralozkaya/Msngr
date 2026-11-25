@@ -96,7 +96,10 @@ The playback origin intercepts every request and serves only the fixed HTML, bun
 and the selected SWF. All other requests and navigation are blocked. File/content access and
 JavaScript interfaces are disabled. Ruffle networking, script access, URL opening and context menus
 are disabled. The catalog uses a separate WebView; only trusted Escargot archive URLs can trigger a
-network install, and installations require the native Add action.
+network install, and installations require the native Add action. Opening a local `.mco` package
+from an Android file manager ("Open with" / "Open as") launches `WinkImportActivity`, displaying
+a translucent modal dialog with thumbnail preview and `WinkOverlay` playback before confirming import
+into `WinkStore` (while sharing `.mco` via `ACTION_SEND` routes through `ShareActivity` as a normal file).
 
 ## Verification
 
@@ -105,7 +108,9 @@ archives, chunked signature preservation, both P2P transports, account isolation
 and history version 7. Earlier history versions remain readable.
 
 `WinkInstrumentedTest` checks the shared picker, actual Ruffle rendering, muted playback,
-request blocking, disposal, and activity pause cleanup. `WinkCatalogInstrumentedTest` is opt-in with
+request blocking, disposal, and activity pause cleanup. `ExternalShareInstrumentedTest` verifies
+`ACTION_VIEW` intent matching for `.mco` URIs and `application/octet-stream`, pre-import wink preview
+playback, confirmation import in `WinkImportActivity`, and regular file sharing of `.mco` in `ShareActivity`. `WinkCatalogInstrumentedTest` is opt-in with
 `-e winkCatalogInterop true`; it exercises the live catalog's translated ActiveX installer without
 messaging another account. Existing handwriting and voice clip instrumentation should run as
 regression coverage. Real desktop-to-Android interoperability and physical-device battery use must
