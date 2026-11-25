@@ -387,6 +387,8 @@ class MockMsnp18Client(
         else emptyList()
     },
     private val groupInvitationFixtures: (String) -> List<GroupInvitation> = { emptyList() },
+    private val photoCacheDirectory: java.io.File? = null,
+    private val transferStepDelayMillis: Long = 350L,
 ) : MsnpClient {
     private val mutableContacts = MutableStateFlow<List<Contact>>(emptyList())
     private val mutableCategories = MutableStateFlow<List<ContactCategory>>(emptyList())
@@ -417,6 +419,11 @@ class MockMsnp18Client(
     override val sessions = mutableSessions.asStateFlow()
     private val mutableGameSessions = MutableStateFlow<Map<String, GameSession>>(emptyMap())
     override val gameSessions = mutableGameSessions.asStateFlow()
+    private val mutablePhotoShares = MutableStateFlow<Map<String, PhotoShare>>(emptyMap())
+    override val photoShares = mutablePhotoShares.asStateFlow()
+    private val mockFileTransferJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
+    private val mockPhotoShareJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
+    private val mockTempPhotoFiles = java.util.concurrent.ConcurrentHashMap.newKeySet<java.io.File>()
 
     override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> {
         if (signInDelayMillis > 0) delay(signInDelayMillis)
@@ -441,6 +448,7 @@ class MockMsnp18Client(
         mutableSessions.value = listOf(AccountSession("mock-current", "This device", isCurrent = true,
             presence = request.initialPresence))
         mutableMessages.value = emptyMap()
+        resetMockTransfers()
         startPresenceUpdates()
         return Result.success(
             UserProfileSnapshot(
@@ -1023,6 +1031,316 @@ class MockMsnp18Client(
         }
     }
 
+    override suspend fun sendFile(contactId: String, file: java.io.File, name: String): Result<Unit> = runCatching {
+        check(signedInEmail.isNotBlank()) { "Sign in before sharing files." }
+        val contact = resolveMockContact(contactId)
+        check(contact?.isGroup != true) { "File transfers are only available in one-to-one chats." }
+        check(contact != null && !contact.isBlocked && contact.presence.isOnline) {
+            "This contact is unavailable for file transfers."
+        }
+        check(contact.recipientFeatures(signedInEmail).files) {
+            "This contact's client does not support file transfers."
+        }
+        require(file.isFile) { "The selected file is unavailable." }
+        require(org.aralozkaya.msngr.protocol.MsnFileContext.validName(name)) { "The file name is unsupported." }
+        require(!org.aralozkaya.msngr.protocol.MsnFileContext.isExecutable(name)) {
+            "Executable files cannot be shared."
+        }
+        val activeForPeer = mutableMessages.value[contact.id].orEmpty().count { it.fileTransfer?.active == true }
+        check(activeForPeer < 8) { "Too many active file transfers." }
+
+        val id = MsnpP2pUtil.randomGuid()
+        val size = file.length()
+        val generation = sessionGeneration
+        val initial = FileTransfer(
+            id = id,
+            name = name,
+            size = size,
+            outgoing = true,
+            status = FileTransferStatus.Offered,
+            transferred = 0L,
+            localPath = file.absolutePath,
+        )
+        appendMessage(
+            ChatMessage(
+                id = ids.incrementAndGet(),
+                contactId = contact.id,
+                author = MessageAuthor.Me,
+                text = "File: $name",
+                timestampMillis = System.currentTimeMillis(),
+                fileTransfer = initial,
+            ),
+        )
+        val job = scope.launch {
+            delay(transferStepDelayMillis)
+            if (sessionGeneration != generation) return@launch
+            updateMockFileTransfer(contact.id, id) {
+                if (it.status == FileTransferStatus.Offered) it.copy(status = FileTransferStatus.Transferring) else it
+            }
+            val steps = 4
+            for (step in 1..steps) {
+                delay(transferStepDelayMillis)
+                if (sessionGeneration != generation) return@launch
+                val transferred = if (step == steps || size == 0L) size else (size * step) / steps
+                val done = step == steps
+                updateMockFileTransfer(contact.id, id) { current ->
+                    if (current.status != FileTransferStatus.Transferring) current
+                    else current.copy(
+                        transferred = transferred,
+                        status = if (done) FileTransferStatus.Complete else FileTransferStatus.Transferring,
+                    )
+                }
+            }
+        }
+        mockFileTransferJobs[id] = job
+        job.invokeOnCompletion { mockFileTransferJobs.remove(id, job) }
+    }
+
+    override suspend fun acceptFile(contactId: String, id: String): Result<Unit> = runCatching {
+        val resolvedId = resolveMockContact(contactId)?.id ?: contactId
+        val existing = mutableMessages.value[resolvedId].orEmpty().firstOrNull { it.fileTransfer?.id == id }?.fileTransfer
+            ?: error("This file offer has ended.")
+        check(!existing.outgoing && existing.status == FileTransferStatus.Offered)
+        val generation = sessionGeneration
+        updateMockFileTransfer(resolvedId, id) { it.copy(status = FileTransferStatus.Transferring) }
+        val job = scope.launch {
+            val steps = 4
+            for (step in 1..steps) {
+                delay(transferStepDelayMillis)
+                if (sessionGeneration != generation) return@launch
+                val transferred = if (step == steps || existing.size == 0L) existing.size else (existing.size * step) / steps
+                val done = step == steps
+                updateMockFileTransfer(resolvedId, id) { current ->
+                    if (current.status != FileTransferStatus.Transferring) current
+                    else current.copy(
+                        transferred = transferred,
+                        status = if (done) FileTransferStatus.Complete else FileTransferStatus.Transferring,
+                    )
+                }
+            }
+        }
+        mockFileTransferJobs[id] = job
+        job.invokeOnCompletion { mockFileTransferJobs.remove(id, job) }
+    }
+
+    override suspend fun cancelFile(contactId: String, id: String): Result<Unit> = runCatching {
+        val resolvedId = resolveMockContact(contactId)?.id ?: contactId
+        mockFileTransferJobs.remove(id)?.cancel()
+        updateMockFileTransfer(resolvedId, id) { current ->
+            if (!current.active) current
+            else {
+                val declined = !current.outgoing && current.status == FileTransferStatus.Offered
+                current.copy(status = if (declined) FileTransferStatus.Declined else FileTransferStatus.Cancelled)
+            }
+        }
+    }
+
+    override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = runCatching {
+        check(signedInEmail.isNotBlank()) { "Sign in before sharing photos." }
+        val contact = resolveMockContact(contactId)
+        check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence.isOnline) {
+            "This contact is unavailable for photo sharing."
+        }
+        check(contact.recipientFeatures(signedInEmail).photos) {
+            "This contact's client does not support photo sharing."
+        }
+        require(photos.size in 1..32)
+        val existing = mutablePhotoShares.value[contact.id]
+        check(existing?.status != PhotoShareStatus.Invited) { "Wait for the photo invitation to be accepted." }
+        val generation = sessionGeneration
+
+        if (existing?.status == PhotoShareStatus.Active) {
+            require(existing.photos.size + photos.size <= 32) { "A photo share can contain up to 32 photos." }
+            val startIndex = existing.photos.maxOfOrNull { it.sortIndex ?: 0 } ?: 0
+            val added = photos.mapIndexed { idx, item ->
+                buildMockSharedPhoto(item, existing.id, startIndex + idx + 1)
+            }
+            mutablePhotoShares.update { all ->
+                val current = all[contact.id]?.takeIf { it.id == existing.id && it.status == PhotoShareStatus.Active }
+                    ?: return@update all
+                all + (contact.id to current.copy(
+                    photos = current.photos + added,
+                    selectedId = added.lastOrNull()?.id ?: current.selectedId,
+                ))
+            }
+            launchMockPhotoProgress(contact.id, existing.id, added.map { it.id }.toSet(), generation)
+        } else {
+            mockPhotoShareJobs.remove(contact.id)?.cancel()
+            val id = MsnpP2pUtil.randomGuid()
+            val pendingBytes = photos.sumOf { MsnpPhotoSession.scopedPreview(it.preview, id).size.toLong() }
+            mutablePhotoShares.update { it + (contact.id to PhotoShare(id = id, outgoing = true, pendingBytes = pendingBytes)) }
+            appendMessage(
+                ChatMessage(
+                    id = ids.incrementAndGet(),
+                    contactId = contact.id,
+                    author = MessageAuthor.System,
+                    text = "Photo sharing invitation sent.",
+                    timestampMillis = System.currentTimeMillis(),
+                ),
+            )
+            val job = scope.launch {
+                delay(transferStepDelayMillis)
+                if (sessionGeneration != generation) return@launch
+                val items = photos.mapIndexed { idx, item -> buildMockSharedPhoto(item, id, idx + 1) }
+                mutablePhotoShares.update { all ->
+                    val current = all[contact.id]?.takeIf { it.id == id && it.status == PhotoShareStatus.Invited }
+                        ?: return@update all
+                    all + (contact.id to current.copy(
+                        status = PhotoShareStatus.Active,
+                        pendingBytes = 0L,
+                        photos = items,
+                        selectedId = items.firstOrNull()?.id,
+                    ))
+                }
+                stepMockPhotoProgress(contact.id, id, items.map { it.id }.toSet(), generation)
+            }
+            mockPhotoShareJobs[contact.id] = job
+            job.invokeOnCompletion { mockPhotoShareJobs.remove(contact.id, job) }
+        }
+    }
+
+    override suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = runCatching {
+        val resolvedId = resolveMockContact(contactId)?.id ?: contactId
+        mutablePhotoShares.update { all ->
+            val current = all[resolvedId]?.takeIf { it.id == id && !it.outgoing && it.status == PhotoShareStatus.Invited }
+                ?: return@update all
+            all + (resolvedId to current.copy(status = PhotoShareStatus.Active))
+        }
+    }
+
+    override suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = runCatching {
+        val resolvedId = resolveMockContact(contactId)?.id ?: contactId
+        mockPhotoShareJobs.remove(resolvedId)?.cancel()
+        var stoppedStatus: PhotoShareStatus? = null
+        mutablePhotoShares.update { all ->
+            val current = all[resolvedId]?.takeIf {
+                it.id == id && it.status in listOf(PhotoShareStatus.Invited, PhotoShareStatus.Active)
+            } ?: return@update all
+            val nextStatus = if (!current.outgoing && current.status == PhotoShareStatus.Invited) {
+                PhotoShareStatus.Declined
+            } else {
+                PhotoShareStatus.Stopped
+            }
+            stoppedStatus = nextStatus
+            all + (resolvedId to current.copy(status = nextStatus, pendingBytes = 0L))
+        }
+        stoppedStatus?.let { status ->
+            appendMessage(
+                ChatMessage(
+                    id = ids.incrementAndGet(),
+                    contactId = resolvedId,
+                    author = MessageAuthor.System,
+                    text = if (status == PhotoShareStatus.Declined) {
+                        "Photo sharing invitation declined."
+                    } else {
+                        "You stopped sharing photos."
+                    },
+                    timestampMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    override suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = runCatching {
+        val resolvedId = resolveMockContact(contactId)?.id ?: contactId
+        mutablePhotoShares.update { all ->
+            val current = all[resolvedId]?.takeIf { it.id == id } ?: return@update all
+            if (current.photos.none { it.id.equals(photoId, true) }) return@update all
+            all + (resolvedId to current.copy(selectedId = photoId))
+        }
+    }
+
+    private fun resolveMockContact(contactId: String): Contact? =
+        mutableContacts.value.firstOrNull { it.id.equals(contactId, true) || it.email.equals(contactId, true) }
+
+    private fun updateMockFileTransfer(contactId: String, transferId: String, transform: (FileTransfer) -> FileTransfer) {
+        mutableMessages.update { all ->
+            val entries = all[contactId] ?: return@update all
+            var changed = false
+            val updated = entries.map { msg ->
+                val transfer = msg.fileTransfer
+                if (transfer?.id == transferId) {
+                    val next = transform(transfer)
+                    if (next != transfer) {
+                        changed = true
+                        msg.copy(fileTransfer = next)
+                    } else msg
+                } else msg
+            }
+            if (changed) all + (contactId to updated) else all
+        }
+    }
+
+    private fun buildMockSharedPhoto(item: PhotoToShare, shareId: String, sortIndex: Int): SharedPhoto {
+        val creator = signedInEmail.ifBlank { MockServerData.ACCOUNT_EMAIL }
+        val scopedPreview = MsnpPhotoSession.scopedPreview(item.preview, shareId)
+        val thumbMeta = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create(creator, item.thumbnail, 15, "0")
+        val previewMeta = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create(creator, scopedPreview, 15, "0")
+        val previewPath = runCatching {
+            val dir = photoCacheDirectory?.apply { mkdirs() }
+            val file = if (dir != null) java.io.File.createTempFile("mock-photo-", ".jpg", dir)
+            else java.io.File.createTempFile("mock-photo-", ".jpg")
+            file.outputStream().use { it.write(scopedPreview) }
+            mockTempPhotoFiles.add(file)
+            file.absolutePath
+        }.getOrNull()
+        return SharedPhoto(
+            id = MsnpP2pUtil.randomGuid(),
+            name = item.name,
+            hash = item.hash,
+            thumbnail = thumbMeta,
+            preview = previewMeta,
+            localPath = previewPath,
+            originalPath = item.originalPath,
+            sortIndex = sortIndex,
+            outgoing = true,
+            previewSentBytes = 0L,
+        )
+    }
+
+    private fun launchMockPhotoProgress(contactId: String, shareId: String, photoIds: Set<String>, generation: Long) {
+        mockPhotoShareJobs.remove(contactId)?.cancel()
+        val job = scope.launch { stepMockPhotoProgress(contactId, shareId, photoIds, generation) }
+        mockPhotoShareJobs[contactId] = job
+        job.invokeOnCompletion { mockPhotoShareJobs.remove(contactId, job) }
+    }
+
+    private suspend fun stepMockPhotoProgress(contactId: String, shareId: String, photoIds: Set<String>, generation: Long) {
+        val steps = 4
+        for (step in 1..steps) {
+            delay(transferStepDelayMillis)
+            if (sessionGeneration != generation) return
+            val done = step == steps
+            mutablePhotoShares.update { all ->
+                val current = all[contactId]?.takeIf { it.id == shareId && it.status == PhotoShareStatus.Active }
+                    ?: return@update all
+                all + (contactId to current.copy(photos = current.photos.map { photo ->
+                    if (photo.id !in photoIds) photo
+                    else {
+                        val size = photo.preview.size.toLong()
+                        val sent = if (done) size else (size * step) / steps
+                        photo.copy(
+                            previewSentBytes = maxOf(photo.previewSentBytes, sent),
+                            downloadedByPeer = photo.downloadedByPeer || done,
+                        )
+                    }
+                }))
+            }
+        }
+    }
+
+    private fun resetMockTransfers() {
+        mockFileTransferJobs.values.toList().forEach(Job::cancel)
+        mockFileTransferJobs.clear()
+        mockPhotoShareJobs.values.toList().forEach(Job::cancel)
+        mockPhotoShareJobs.clear()
+        mutablePhotoShares.value = emptyMap()
+        mockTempPhotoFiles.toList().forEach {
+            it.delete()
+            mockTempPhotoFiles.remove(it)
+        }
+    }
+
     override fun close() {
         mutableContactRequests.value = emptyList()
         mutableGroupInvitations.value = emptyList()
@@ -1036,6 +1354,7 @@ class MockMsnp18Client(
         mutableMessages.value = emptyMap()
         mutableTyping.value = emptyMap()
         mutableGameSessions.value = emptyMap()
+        resetMockTransfers()
     }
 
     private fun appendMessage(message: ChatMessage) {

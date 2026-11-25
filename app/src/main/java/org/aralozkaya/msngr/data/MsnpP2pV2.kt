@@ -29,6 +29,7 @@ internal class MsnpP2pV2Session(
     private val localOriginal: (String) -> OriginalPhoto? = { null },
     private val publishOriginal: (String, OriginalPhoto) -> Unit = { _, _ -> },
     private val onGameSession: (GameSession) -> Unit = {},
+    private val onPhotoObjectProgress: (String, Long, Long) -> Unit = { _, _, _ -> },
 ) {
     val destination = "$remoteEmail;${remoteEndpointId.asP2pGuid()}"
     private val source = "$localEmail;${localEndpointId.asP2pGuid()}"
@@ -231,6 +232,20 @@ internal class MsnpP2pV2Session(
             footer = 0,
             body = ByteArray(4),
         )
+        val progressCallback: ((Int) -> Unit)? = if (picture.metadata.objectType == 15) {
+            { sent ->
+                if (photoApplicationLazy.isInitialized()) {
+                    photos.recordObjectSentProgress(
+                        picture.metadata.sha1d,
+                        sent.toLong(),
+                        picture.bytes.size.toLong(),
+                    )
+                }
+                onPhotoObjectProgress(picture.metadata.sha1d, sent.toLong(), picture.bytes.size.toLong())
+            }
+        } else {
+            null
+        }
         sendMessage(
             sessionId = sessionId,
             firstTf = TF_MSN_OBJECT or TF_FIRST,
@@ -240,6 +255,7 @@ internal class MsnpP2pV2Session(
             footer = 0,
             packageNumber = packageNumbers.incrementAndGet() and 0xffff,
             body = picture.bytes,
+            onProgress = progressCallback,
         )
         if (picture.metadata.objectType in listOf(8, 11, 15)) closeObjectSession(message.callId, sessionId)
     }
@@ -332,6 +348,7 @@ internal class MsnpP2pV2Session(
         peerInfo: Boolean = false,
         packageNumber: Int = 0,
         body: ByteArray,
+        onProgress: ((Int) -> Unit)? = null,
     ) {
         var offset = 0
         do {
@@ -353,6 +370,7 @@ internal class MsnpP2pV2Session(
             val encoded = packet.copy(identifier = identifiers.getAndAdd(packet.messageSize.toLong()) and UINT_MASK).encode()
             sendPacket(encoded)
             offset += length
+            onProgress?.invoke(offset)
         } while (offset < body.size)
     }
 

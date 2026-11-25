@@ -2011,4 +2011,49 @@
     <string name="settings_layout_favorites_separate_supporting">Favoriler için farklı bir boyut ve kompakt seçenekler belirleyin</string>
     <string name="settings_layout_compact_search_sort_title">Kompakt arama ve sıralama</string>
     <string name="settings_layout_compact_search_sort_supporting">Kişiler sayfasında kompakt arama çubuğu ve yalnızca metin içeren Sırala düğmesi kullanır.</string>
+
+    <!-- Sharing notifications & external share target -->
+    <string name="notification_channel_sharing">Dosya ve fotoğraf paylaşımı</string>
+    <string name="notification_channel_sharing_description">Devam eden dosya aktarımları ve fotoğraf paylaşımı ilerlemesi</string>
+    <string name="notification_sharing_file_waiting">%1$s kabul etmesi bekleniyor · %2$s</string>
+    <string name="notification_sharing_file_sending">%1$s, %2$s kişisine gönderiliyor</string>
+    <string name="notification_sharing_photos_waiting">%1$s fotoğrafları kabul etmesi bekleniyor</string>
+    <string name="notification_sharing_photos_uploading">%1$s ile fotoğraflar paylaşılıyor</string>
+    <string name="notification_sharing_sizes">%1$s paylaşıldı · %2$s kaldı</string>
+    <string name="share_choose_recipient">Alıcı seçin</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_option_files_title">Dosyalar</string>
+    <string name="share_option_photos_title">Fotoğraflar</string>
+    <string name="share_optional_message_label">İsteğe bağlı mesaj</string>
+    <string name="share_optional_message_placeholder">Mesaj ekle…</string>
+    <string name="share_send_file_action">Gönder</string>
+    <string name="share_send_photos_action">Fotoğrafları paylaş</string>
+    <string name="share_signing_in">Oturum açılıyor…</string>
+    <string name="share_preparing">Paylaşılan içerik hazırlanıyor…</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="share_appear_offline_notice_you_singular">Çevrimdışı görünüyorsunuz. Dosya veya fotoğraf paylaşmak için çevrim içi olun.</string>
+    <string name="share_go_online_action">Çevrim içi ol</string>
+    <string name="share_recipient_offline">Çevrim dışı</string>
+    <string name="share_recipient_unsupported_files">İstemci dosya aktarımlarını desteklemiyor</string>
+    <string name="share_recipient_unsupported_photos">İstemci fotoğraf paylaşımını desteklemiyor</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="share_recipient_unavailable_appear_offline_you_singular">Paylaşmak için çevrim içi olun</string>
+    <string name="share_no_contacts">Kişi bulunamadı.</string>
+    <string name="share_error_no_file">Paylaşılacak bir dosya sağlanmadı.</string>
+    <string name="share_error_multiple_non_photos">Birden fazla dosya yalnızca Fotoğraf paylaşımı kullanılarak paylaşılabilir.</string>
+    <string name="share_wink_import_dialog_title">Özel göz kırpmasını içe aktar</string>
+    <string name="share_wink_import_confirm">İçe aktar</string>
+    <string name="share_search_placeholder">Kişilerde ara</string>
+    <string name="share_search_clear">Aramayı temizle</string>
+    <!-- Note: singular text variant -->
+    <string name="share_photos_count_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="share_photos_count_singular_after_number">fotoğraf</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_photos_count_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_photos_count_plural_after_number">fotoğraf</string>
+    <string name="share_summary_photos_format">%1$s · %2$s</string>
+    <string name="share_preview_image_desc">Paylaşılan fotoğraf önizlemesi</string>
+    <string name="share_sending">Paylaşılıyor…</string>
 </resources>

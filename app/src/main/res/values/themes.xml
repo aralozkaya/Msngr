@@ -20,4 +20,10 @@
         <item name="android:windowMinWidthMinor">88%</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+    <style name="Theme.Msngr.DialogHost" parent="Theme.Msngr">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

@@ -316,12 +316,16 @@ private fun WinkPickerTile(reference: WinkReference, canSend: Boolean, enabled: 
 }
 
 @Composable
-internal fun WinkThumbnail(reference: WinkReference, modifier: Modifier = Modifier) {
+internal fun WinkThumbnail(
+    reference: WinkReference,
+    modifier: Modifier = Modifier,
+    packageBytes: ByteArray? = null,
+) {
     val context = LocalContext.current
     val account = context.winkAccount()
-    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, reference.metadata.sha1d, account) {
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, reference.metadata.sha1d, account, packageBytes) {
         value = withContext(Dispatchers.IO) {
-            account?.let { context.winkStore().bytes(it, reference.metadata) }
+            (packageBytes ?: account?.let { context.winkStore().bytes(it, reference.metadata) })
                 ?.let(MsnWinkPackage::parse)?.thumbnail?.let(::winkThumbnail)?.asImageBitmap()
         }
     }
@@ -511,7 +515,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
     if (play) WinkOverlay(reference, { play = false })
 }
 
-private fun Context.queryDocumentDisplayName(uri: Uri): String? = runCatching {
+internal fun Context.queryDocumentDisplayName(uri: Uri): String? = runCatching {
     contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) cursor.getString(0) else null
     }

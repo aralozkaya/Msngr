@@ -98,6 +98,9 @@
             android:name=".notifications.NotificationNudgeReceiver"
             android:exported="false" />
         <receiver
+            android:name=".notifications.NotificationShareCancelReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".notifications.BackgroundConnectionBootReceiver"
             android:enabled="true"
             android:exported="true">
@@ -181,6 +184,83 @@
             android:name=".MainActivity"
             android:exported="false"
             android:theme="@style/Theme.Msngr" />
+        <activity
+            android:name=".ShareActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_share_target_files"
+            android:label="@string/share_option_files_title"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".SharePhotosActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_share_target_photos"
+            android:label="@string/share_option_photos_title"
+            android:theme="@style/Theme.Msngr"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".WinkImportActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Msngr.DialogHost">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:pathSuffix=".mco" tools:targetApi="31" />
+                <data android:pathSuffix=".MCO" tools:targetApi="31" />
+                <data android:pathPattern=".*\\.mco" />
+                <data android:pathPattern=".*\\..*\\.mco" />
+                <data android:pathPattern=".*\\..*\\..*\\.mco" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mco" />
+                <data android:pathPattern=".*\\.MCO" />
+                <data android:pathPattern=".*\\..*\\.MCO" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathSuffix=".mco" tools:targetApi="31" />
+                <data android:pathSuffix=".MCO" tools:targetApi="31" />
+                <data android:pathPattern=".*\\.mco" />
+                <data android:pathPattern=".*\\..*\\.mco" />
+                <data android:pathPattern=".*\\..*\\..*\\.mco" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.mco" />
+                <data android:pathPattern=".*\\.MCO" />
+                <data android:pathPattern=".*\\..*\\.MCO" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-msn-wink" />
+                <data android:mimeType="application/x-msnwink" />
+                <data android:mimeType="application/vnd.ms-cab-compressed" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+        </activity>
         <provider
             android:name=".FileSharingProvider"
             android:authorities="${applicationId}.files"

@@ -116,6 +116,11 @@ class LoginActivity : MsngrActivity() {
     }
 
     private fun openAuthenticatedDestination(clearTask: Boolean) {
+        if (intent.getBooleanExtra(EXTRA_RETURN_AFTER_LOGIN, false)) {
+            setResult(RESULT_OK)
+            finish()
+            return
+        }
         startActivity(
             Intent(this, MainActivity::class.java).apply {
                 addFlags(
@@ -146,6 +151,7 @@ class LoginActivity : MsngrActivity() {
     companion object {
         internal const val EXTRA_SIGN_OUT_REASON = "sign_out_reason"
         private const val EXTRA_ALLOW_AUTOMATIC_SIGN_IN = "allow_automatic_sign_in"
+        private const val EXTRA_RETURN_AFTER_LOGIN = "return_after_login"
         private const val EXTRA_OPEN_CONTACT_ID = "open_contact_id"
         private const val EXTRA_OPEN_CONTACT_NAME = "open_contact_name"
         private const val EXTRA_SHORTCUT_ACCOUNT = "shortcut_account"
@@ -173,6 +179,14 @@ class LoginActivity : MsngrActivity() {
         ): Intent = Intent(context, LoginActivity::class.java).putExtra(
             EXTRA_ALLOW_AUTOMATIC_SIGN_IN,
             allowAutomaticSignIn,
+        )
+
+        internal fun createReturnAfterLoginIntent(
+            context: Context,
+            allowAutomaticSignIn: Boolean = true,
+        ): Intent = createIntent(context, allowAutomaticSignIn).putExtra(
+            EXTRA_RETURN_AFTER_LOGIN,
+            true,
         )
 
         fun createNotificationIntent(

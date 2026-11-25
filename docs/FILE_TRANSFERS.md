@@ -144,15 +144,25 @@ last received peer sequence. P2Pv2 SYN establishes the peer bridge once; subsequ
 application invitations reuse it so requesting another photo does not reset an
 active slideshow or file transfer. Accepting an offer starts a fresh idle timeout.
 
+## Android Share Sheet Targets & Persistent Sharing Notifications
+
+Two exported share targets allow Android's native Share Sheet to present separate **Files** and **Photos** options when sharing pictures, without an extra in-app mode prompt:
+
+- **`ShareActivity`** (`exported=true`, label **Files**, icon `ic_share_target_files`): Registers `ACTION_SEND` (`*/*`) for single-file transfers (including `.mco` files and images shared as files) and shows the optional companion message field.
+- **`SharePhotosActivity`** (`exported=true`, label **Photos**, icon `ic_share_target_photos`): Registers `ACTION_SEND` (`image/*`) and `ACTION_SEND_MULTIPLE` (`image/*`) for single or multi-photo sharing (`1..32` images) with the message field omitted; non-image items or >32 images show an error dialog.
+- **Recipient validation**: Online 1:1 non-blocked contacts are checked against `Contact.recipientFeatures(ownEmail).files` vs `.photos`, sorted with eligible recipients first. If the signed-in account appears offline, an inline `Go online` banner restores online presence.
+- **Persistent progress notifications**: `SharingNotificationController` posts ongoing `CATEGORY_PROGRESS` notifications on `NotificationChannels.SHARING` (`IMPORTANCE_LOW`, badge disabled) for active incoming/outgoing file transfers and outgoing photo shares across both external shares and in-app transfers. Each notification uses the animated frame-list upload icon (`ic_notification_sharing_upload`), shows status, shared vs remaining bytes, a horizontal progress bar, and a `Cancel` / `Stop sharing` action backed by `NotificationShareCancelReceiver`. Tapping the notification opens `ChatActivity` for that conversation and sets `EXTRA_OPEN_PHOTO_SHARE` to reopen the `PhotoSharingHost` sheet when applicable.
+
 ## Verification
 
 `FileTransferProtocolTest` covers both P2P framings, acceptance before data,
 native version-2 contexts, executable rejection, malformed offsets, partial-file
 cleanup, selection and additions from both participants, retained photos after
-stop, endpoint object fetching, and original-photo hash validation.
+stop, endpoint object fetching, original-photo hash validation, outgoing photo byte progress accounting, and mock transfer lifecycles.
 `MsnpSwitchboardTest` covers migration during a 230,000-byte transfer.
 `ConversationHistoryStoreTest` covers file metadata and interrupted transfers.
 `FileSharingInstrumentedTest` covers file actions and the retained photo viewer.
+`ExternalShareInstrumentedTest` covers dual `Files`/`Photos` share-target resolution, `ACTION_VIEW` `.mco` resolution, recipient capability validation, optional message gating, single/multi-photo sharing, `.mco` file sharing and `WinkImportActivity` preview/import, and persistent animated upload notifications.
 `FileTransferLiveInteropInstrumentedTest` is opt-in, using privately provisioned
 credentials and a PNG; it never accepts credentials as command-line arguments.
 The transport probe subscribes only the known reciprocal test peer, avoiding repeated

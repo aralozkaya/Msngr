@@ -40,10 +40,34 @@ internal class MsnpPhotoSession(
     private var previewTimeout: Job? = null
     private var invitationTimeout: Job? = null
     @Volatile private var pendingPreview: String? = null
+    private val progressTimestamps = ConcurrentHashMap<String, Long>()
     fun owns(id: String): Boolean = share?.id == id
     fun owns(sessionId: Long): Boolean = session != 0L && sessionId == session
     fun localObject(hash: String): LocalDisplayPicture? = localObjects[hash]
     fun localOriginal(id: String): OriginalPhoto? = originals[id.uppercase()]
+
+    fun recordObjectSentProgress(sha1d: String, sentBytes: Long, totalBytes: Long) {
+        val current = share ?: return
+        if (current.photos.none { it.outgoing && it.preview.sha1d == sha1d }) return
+        val now = System.nanoTime()
+        val previous = progressTimestamps[sha1d] ?: 0L
+        if (sentBytes < totalBytes && now - previous < 200_000_000L) return
+        progressTimestamps[sha1d] = now
+        change(current.id) { latest ->
+            latest.copy(photos = latest.photos.map { photo ->
+                if (photo.outgoing && photo.preview.sha1d == sha1d) {
+                    photo.copy(
+                        previewSentBytes = maxOf(
+                            photo.previewSentBytes,
+                            sentBytes.coerceIn(0L, photo.preview.size.toLong()),
+                        ),
+                    )
+                } else {
+                    photo
+                }
+            })
+        }
+    }
 
     suspend fun start(photos: List<PhotoToShare>): String {
         check(share?.status != PhotoShareStatus.Invited) { "Wait for the photo invitation to be accepted." }
@@ -62,15 +86,17 @@ internal class MsnpPhotoSession(
             return active.id
         }
         previewTimeout?.cancel(); pendingPreview = null
+        progressTimestamps.clear()
         originals.clear()
         localObjects.clear(); prepared = photos; sequence = 0; remoteSequence = 0; nextPhotoIndex = 0
         session = ids.incrementAndGet().toLong()
         val id = MsnpP2pUtil.randomGuid()
+        val initialPendingBytes = photos.sumOf { scopedPreview(it.preview, id).size.toLong() }
         val bytes = sipMessage("INVITE MSNMSGR:$destination MSNSLP/1.0", destination, source,
             MsnpP2pUtil.randomGuid(), id, 0, MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE,
             "EUF-GUID: {$GUID}\r\nSessionID: $session\r\nAppID: 35\r\nRequestFlags: 16\r\n\r\n")
         invite = requireNotNull(SlpMessage.parse(bytes))
-        update(PhotoShare(id, true))
+        update(PhotoShare(id, true, pendingBytes = initialPendingBytes))
         startInvitationTimeout(id)
         try { sendControl(bytes) } catch (error: Exception) {
             update(requireNotNull(share).copy(status = PhotoShareStatus.Failed, error = "Photo invitation could not be sent."))
@@ -112,7 +138,7 @@ internal class MsnpPhotoSession(
                 message.contentType.equals(MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE, true) -> {
                 if (current.outgoing && current.status == PhotoShareStatus.Invited) {
                     invitationTimeout?.cancel()
-                    change(current.id) { it.copy(status = PhotoShareStatus.Active) }
+                    change(current.id) { it.copy(status = PhotoShareStatus.Active, pendingBytes = 0L) }
                     for (photo in prepared) add(photo)
                     share?.photos?.firstOrNull()?.let { select(it.id) }
                     prepared = emptyList()

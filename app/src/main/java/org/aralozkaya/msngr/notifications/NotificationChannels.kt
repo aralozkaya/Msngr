@@ -14,6 +14,7 @@ object NotificationChannels {
     const val CONTACT_REQUESTS = "contact_requests"
     const val GROUP_INVITATIONS = "group_invitations"
     const val BACKGROUND_CONNECTION = "background_connection"
+    const val SHARING = "file_photo_sharing"
     const val APP_UPDATES = "app_updates"
 
     val userConfigurable = listOf(MESSAGES, NUDGES, CONTACT_SIGNED_IN, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS, APP_UPDATES)
@@ -93,6 +94,14 @@ object NotificationChannels {
                     description = context.getString(
                         R.string.notification_channel_background_connection_description,
                     )
+                    setShowBadge(false)
+                },
+                NotificationChannel(
+                    SHARING,
+                    context.getString(R.string.notification_channel_sharing),
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = context.getString(R.string.notification_channel_sharing_description)
                     setShowBadge(false)
                 },
             ),

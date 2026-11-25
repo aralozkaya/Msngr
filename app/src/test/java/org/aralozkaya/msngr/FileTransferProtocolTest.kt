@@ -242,4 +242,212 @@ class FileTransferProtocolTest {
             } finally { a.closeFileTransfers(); b.closeFileTransfers(); directory.deleteRecursively() }
         }
     }
+
+    @Test fun photoShareOutgoingBytesTrackPendingPreviewAndOriginalProgress() {
+        val hashA = "AAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        val hashB = "BBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        val thumb = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("a@example.test", byteArrayOf(1, 2, 3), 15)
+        val previewBytes = ByteArray(1_000) { it.toByte() }
+        val preview = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("a@example.test", previewBytes, 15)
+
+        val invited = PhotoShare(
+            id = "invite-1",
+            outgoing = true,
+            status = PhotoShareStatus.Invited,
+            pendingBytes = 2_400L,
+        )
+        assertEquals(2_400L, invited.totalOutgoingBytes)
+        assertEquals(0L, invited.sharedOutgoingBytes)
+        assertEquals(2_400L, invited.remainingOutgoingBytes)
+
+        val active = PhotoShare(
+            id = "invite-1",
+            outgoing = true,
+            status = PhotoShareStatus.Active,
+            photos = listOf(
+                SharedPhoto(
+                    id = "p1",
+                    name = "one.jpg",
+                    hash = hashA,
+                    thumbnail = thumb,
+                    preview = preview,
+                    outgoing = true,
+                    previewSentBytes = 400L,
+                ),
+                SharedPhoto(
+                    id = "p2",
+                    name = "two.jpg",
+                    hash = hashB,
+                    thumbnail = thumb,
+                    preview = preview,
+                    outgoing = true,
+                    downloadedByPeer = true,
+                    originalSize = 2_000L,
+                    originalTransferredBytes = 500L,
+                ),
+                SharedPhoto(
+                    id = "p3",
+                    name = "peer.jpg",
+                    hash = "CCCCCCCCCCCCCCCCCCCCCCCCCCC=",
+                    thumbnail = thumb,
+                    preview = preview,
+                    outgoing = false,
+                    previewSentBytes = 999L,
+                ),
+            ),
+        )
+        assertEquals(4_000L, active.totalOutgoingBytes)
+        assertEquals(1_900L, active.sharedOutgoingBytes)
+        assertEquals(2_100L, active.remainingOutgoingBytes)
+    }
+
+    @Test fun photoSessionRecordsOutgoingPreviewBytesAcrossP2pTransports() = runBlocking {
+        for (v2 in listOf(false, true)) {
+            val directory = createTestTempDir("msngr-photo-progress")
+            val hostChanges = java.util.concurrent.CopyOnWriteArrayList<PhotoShare>()
+            val guestChanges = java.util.concurrent.CopyOnWriteArrayList<PhotoShare>()
+            lateinit var hostP2p: MsnpP2pSession
+            lateinit var guestP2p: MsnpP2pSession
+            val hostPhotos = java.util.concurrent.ConcurrentHashMap<String, LocalDisplayPicture>()
+            hostP2p = MsnpP2pSession(
+                localEmail = "a@example.test",
+                remoteEmail = "b@example.test",
+                sendPacket = { guestP2p.handle(it) },
+                localPicture = { null },
+                onDisplayPicture = {},
+                localEndpointId = "11111111-1111-1111-1111-111111111111",
+                remoteEndpointId = if (v2) "22222222-2222-2222-2222-222222222222" else null,
+                fileDirectory = { java.io.File(directory, "a") },
+                onPhotoShare = { hostChanges.add(it) },
+                publishPhoto = { pic -> hostPhotos[pic.metadata.sha1d] = pic },
+                localPhoto = { hash -> hostPhotos[hash] },
+            )
+            guestP2p = MsnpP2pSession(
+                localEmail = "b@example.test",
+                remoteEmail = "a@example.test",
+                sendPacket = { hostP2p.handle(it) },
+                localPicture = { null },
+                onDisplayPicture = {},
+                localEndpointId = "22222222-2222-2222-2222-222222222222",
+                remoteEndpointId = if (v2) "11111111-1111-1111-1111-111111111111" else null,
+                fileDirectory = { java.io.File(directory, "b") },
+                onPhotoShare = { guestChanges.add(it) },
+            )
+
+            try {
+                val previewPayload = ByteArray(140_000) { (it * 13).toByte() }
+                val photo = PhotoToShare("landscape.jpg", "DDDDDDDDDDDDDDDDDDDDDDDDDDD=", byteArrayOf(7, 8, 9), previewPayload)
+                val shareId = hostP2p.startPhotos(listOf(photo))
+                val initial = hostChanges.last()
+                assertEquals(PhotoShareStatus.Invited, initial.status)
+                assertTrue(initial.pendingBytes > 0L)
+                assertTrue(initial.totalOutgoingBytes > 0L)
+
+                guestP2p.acceptPhotos(shareId)
+                withTimeout(5_000) {
+                    while (hostChanges.last().sharedOutgoingBytes < hostChanges.last().totalOutgoingBytes ||
+                        hostChanges.last().totalOutgoingBytes == 0L
+                    ) {
+                        delay(15)
+                    }
+                }
+                val latest = hostChanges.last()
+                assertEquals(0L, latest.pendingBytes)
+                assertEquals(latest.totalOutgoingBytes, latest.sharedOutgoingBytes)
+                assertEquals(0L, latest.remainingOutgoingBytes)
+                assertTrue(hostChanges.any { it.photos.any { p -> p.previewSentBytes > 0L } })
+            } finally {
+                hostP2p.closeFileTransfers()
+                guestP2p.closeFileTransfers()
+                directory.deleteRecursively()
+            }
+        }
+    }
+
+    @Test fun mockClientTracksAndCancelsOutgoingFileAndPhotoShares() = runBlocking {
+        val dir = createTestTempDir("msngr-mock-transfers")
+        val file = java.io.File(dir, "sample.bin").apply { writeBytes(ByteArray(4_096) { it.toByte() }) }
+        val client = MockMsnp18Client(
+            photoCacheDirectory = java.io.File(dir, "photos"),
+            transferStepDelayMillis = 40L,
+        )
+        try {
+            val signIn = client.signIn(
+                SignInRequest(
+                    email = MockServerData.ACCOUNT_EMAIL,
+                    password = MockServerData.ACCOUNT_PASSWORD,
+                    serverConfig = ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()),
+                ),
+            )
+            assertTrue(signIn.isSuccess)
+
+            client.sendFile("selin", file, "sample.bin").getOrThrow()
+            withTimeout(2_000) {
+                while (client.messages.value["selin"].orEmpty().none { it.fileTransfer?.status == FileTransferStatus.Complete }) {
+                    delay(15)
+                }
+            }
+            val completed = client.messages.value["selin"].orEmpty().last().fileTransfer!!
+            assertEquals(4_096L, completed.transferred)
+
+            client.sendFile("mert", file, "abort.bin").getOrThrow()
+            val pendingId = client.messages.value["mert"].orEmpty().last().fileTransfer!!.id
+            client.cancelFile("mert", pendingId).getOrThrow()
+            assertEquals(
+                FileTransferStatus.Cancelled,
+                client.messages.value["mert"].orEmpty().last { it.fileTransfer?.id == pendingId }.fileTransfer?.status,
+            )
+
+            val photos = (1..2).map { index ->
+                PhotoToShare("p$index.png", "HASH$index", byteArrayOf(index.toByte()), ByteArray(512) { index.toByte() })
+            }
+            client.sharePhotos("selin", photos).getOrThrow()
+            withTimeout(2_000) {
+                val share = client.photoShares.value["selin"]
+                while (share == null || client.photoShares.value["selin"]?.sharedOutgoingBytes != client.photoShares.value["selin"]?.totalOutgoingBytes ||
+                    client.photoShares.value["selin"]?.totalOutgoingBytes == 0L
+                ) {
+                    delay(15)
+                }
+            }
+            val shareId = client.photoShares.value["selin"]!!.id
+            client.stopPhotos("selin", shareId).getOrThrow()
+            assertEquals(PhotoShareStatus.Stopped, client.photoShares.value["selin"]?.status)
+        } finally {
+            client.close()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test fun recipientFeaturesDifferentiateFileAndPhotoSupport() {
+        val full = Contact(
+            id = "full",
+            nickname = "Full",
+            email = "full@example.test",
+            presence = org.aralozkaya.msngr.enums.Presence.Online,
+            clientCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.CLIENT_ID,
+            extendedCapabilities = org.aralozkaya.msngr.protocol.Msnp18Protocol.EXTENDED_CAPABILITIES.toLong(),
+        )
+        val fullFeatures = full.recipientFeatures("me@example.test")
+        assertTrue(fullFeatures.files)
+        assertTrue(fullFeatures.photos)
+
+        val msnc1FilesOnly = Contact(
+            id = "msnc1",
+            nickname = "Legacy",
+            email = "legacy@example.test",
+            presence = org.aralozkaya.msngr.enums.Presence.Online,
+            // Chunking (0x20) + MSNC1 (0x10000000) without MSNC10 / P2Pv2.
+            clientCapabilities = 0x1000_0020L,
+            extendedCapabilities = 0L,
+        )
+        val legacyFeatures = msnc1FilesOnly.recipientFeatures("me@example.test")
+        assertTrue(legacyFeatures.files)
+        assertFalse(legacyFeatures.photos)
+
+        val offline = full.copy(presence = org.aralozkaya.msngr.enums.Presence.Offline)
+        val offlineFeatures = offline.recipientFeatures("me@example.test")
+        assertFalse(offlineFeatures.files)
+        assertFalse(offlineFeatures.photos)
+    }
 }

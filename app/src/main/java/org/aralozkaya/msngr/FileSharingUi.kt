@@ -281,6 +281,7 @@ private fun FileTransferThumbnail(transfer: FileTransfer) {
 @Composable
 internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
     canAddPhotos: Boolean = true,
+    openSheetRequest: Int = 0,
     onAccept: (suspend () -> Result<Unit>)? = null,
     onStop: (suspend () -> Result<Unit>)? = null,
     onSelect: (suspend (String) -> Result<Unit>)? = null,
@@ -294,6 +295,12 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
         mutableStateOf(ongoing)
     }
     var closed by rememberSaveable(contactId, share?.id) { mutableStateOf(!ongoing) }
+    LaunchedEffect(openSheetRequest, share?.id) {
+        if (openSheetRequest > 0 && share != null) {
+            closed = false
+            visible = true
+        }
+    }
     var error by remember(share?.id) { mutableStateOf<String?>(null) }
     var savePhotoId by rememberSaveable(share?.id) { mutableStateOf<String?>(null) }
     var saveRequested by rememberSaveable(share?.id) { mutableStateOf(false) }
@@ -521,7 +528,7 @@ internal fun decodeFileTransferThumbnail(path: String): Bitmap? {
     } catch (_: Exception) { decoded.recycle(); null }
 }
 
-private fun prepareSharedPhotos(context: Context, uris: List<Uri>): List<PhotoToShare> {
+internal fun prepareSharedPhotos(context: Context, uris: List<Uri>): List<PhotoToShare> {
     require(uris.size in 1..32) { context.getNumberSentence(R.string.photo_sharing_limit_before_number, 32, R.string.photo_sharing_limit_after_number) }
     val prepared = mutableListOf<PhotoToShare>()
     try {
@@ -533,7 +540,7 @@ private fun prepareSharedPhotos(context: Context, uris: List<Uri>): List<PhotoTo
     }
 }
 
-private fun stageSharedFile(context: Context, uri: Uri): Pair<File, String> {
+internal fun stageSharedFile(context: Context, uri: Uri): Pair<File, String> {
     val name = runCatching { context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0) else null
     } }.getOrNull() ?: uri.lastPathSegment ?: "shared-file"

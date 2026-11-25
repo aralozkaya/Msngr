@@ -128,7 +128,13 @@ internal class WinkWebView(context: Context, private val movie: ByteArray, muted
 }
 
 @Composable
-internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automatic: Boolean = false, onPlayerCreated: (WinkWebView) -> Unit = {}) {
+internal fun WinkOverlay(
+    reference: WinkReference,
+    onDismiss: () -> Unit,
+    automatic: Boolean = false,
+    packageBytes: ByteArray? = null,
+    onPlayerCreated: (WinkWebView) -> Unit = {},
+) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val account = context.winkAccount()
@@ -144,8 +150,11 @@ internal fun WinkOverlay(reference: WinkReference, onDismiss: () -> Unit, automa
         android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
     val animate = motionAllowed && (!automatic || settings.playWinks)
     val muted = !settings.sounds
-    LaunchedEffect(reference.metadata.sha1d, account) {
-        wink = withContext(Dispatchers.IO) { account?.let { context.winkStore().bytes(it, reference.metadata) }?.let(MsnWinkPackage::parse) }
+    LaunchedEffect(reference.metadata.sha1d, account, packageBytes) {
+        wink = withContext(Dispatchers.IO) {
+            (packageBytes ?: account?.let { context.winkStore().bytes(it, reference.metadata) })
+                ?.let(MsnWinkPackage::parse)
+        }
         if (wink == null) error = resources.getString(R.string.wink_not_cached)
     }
     LaunchedEffect(Unit) { delay(18_000); dismiss() } // Also bounds a stalled WebAssembly startup.

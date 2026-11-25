@@ -2011,4 +2011,49 @@
     <string name="settings_layout_favorites_separate_supporting">Choose a different density and compact options for Favorites</string>
     <string name="settings_layout_compact_search_sort_title">Compact search and sort</string>
     <string name="settings_layout_compact_search_sort_supporting">Use a compact search bar and text-only Sort button on the Contacts page.</string>
+
+    <!-- Sharing notifications & external share target -->
+    <string name="notification_channel_sharing">File &amp; photo sharing</string>
+    <string name="notification_channel_sharing_description">Ongoing file transfers and photo sharing progress</string>
+    <string name="notification_sharing_file_waiting">Waiting for %1$s to accept · %2$s</string>
+    <string name="notification_sharing_file_sending">Sending %1$s to %2$s</string>
+    <string name="notification_sharing_photos_waiting">Waiting for %1$s to accept photos</string>
+    <string name="notification_sharing_photos_uploading">Sharing photos with %1$s</string>
+    <string name="notification_sharing_sizes">%1$s shared · %2$s remaining</string>
+    <string name="share_choose_recipient">Choose a recipient</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_option_files_title">Files</string>
+    <string name="share_option_photos_title">Photos</string>
+    <string name="share_optional_message_label">Optional message</string>
+    <string name="share_optional_message_placeholder">Add a message…</string>
+    <string name="share_send_file_action">Send</string>
+    <string name="share_send_photos_action">Share photos</string>
+    <string name="share_signing_in">Signing in…</string>
+    <string name="share_preparing">Preparing shared content…</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="share_appear_offline_notice_you_singular">You appear offline. Go online to share files or photos.</string>
+    <string name="share_go_online_action">Go online</string>
+    <string name="share_recipient_offline">Offline</string>
+    <string name="share_recipient_unsupported_files">Client does not support file transfers</string>
+    <string name="share_recipient_unsupported_photos">Client does not support photo sharing</string>
+    <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
+    <string name="share_recipient_unavailable_appear_offline_you_singular">Go online to share</string>
+    <string name="share_no_contacts">No contacts found.</string>
+    <string name="share_error_no_file">No file was provided to share.</string>
+    <string name="share_error_multiple_non_photos">Multiple files can only be shared using Photo sharing.</string>
+    <string name="share_wink_import_dialog_title">Import custom wink</string>
+    <string name="share_wink_import_confirm">Import</string>
+    <string name="share_search_placeholder">Search contacts</string>
+    <string name="share_search_clear">Clear search</string>
+    <!-- Note: singular text variant -->
+    <string name="share_photos_count_singular_before_number"></string>
+    <!-- Note: singular text variant -->
+    <string name="share_photos_count_singular_after_number">photo</string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_photos_count_plural_before_number"></string>
+    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
+    <string name="share_photos_count_plural_after_number">photos</string>
+    <string name="share_summary_photos_format">%1$s · %2$s</string>
+    <string name="share_preview_image_desc">Shared photo preview</string>
+    <string name="share_sending">Sharing…</string>
 </resources>
