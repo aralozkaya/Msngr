@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotFocused
@@ -20,6 +22,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -79,6 +84,28 @@ class ContactsSectionsInstrumentedTest {
         compose.onNodeWithText("Alice").assertDoesNotExist()
         compose.onNodeWithText("Zulu group").assertIsDisplayed()
         compose.onNodeWithText("Zoe").assertIsDisplayed()
+    }
+
+    @Test fun sortSheetOpensDirectlyToSingleExpandedAnchor() {
+        showContacts()
+        compose.onNodeWithTag("contacts_sort_button").performScrollTo().performClick()
+        val hideOffline = compose.onNodeWithTag("hide_offline_contacts").assertIsDisplayed()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand)).assertDoesNotExist()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse)).assertDoesNotExist()
+
+        val initialTop = hideOffline.fetchSemanticsNode().positionInRoot.y
+        hideOffline.performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        assertEquals(
+            "Sort sheet should already be at its single expanded anchor",
+            initialTop,
+            hideOffline.fetchSemanticsNode().positionInRoot.y,
+            1f,
+        )
+
+        hideOffline.performTouchInput { swipeDown() }
+        compose.waitForIdle()
+        hideOffline.assertDoesNotExist()
     }
 
     @Test fun searchMatchesVisibleNamesAndEmailsAcrossBothSections() {
