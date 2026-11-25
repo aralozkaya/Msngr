@@ -1,12 +1,15 @@
 package org.aralozkaya.msngr
 
+import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.data.MessengerBannerAd
 import org.aralozkaya.msngr.data.MessengerTabSite
 import org.aralozkaya.msngr.data.MessengerTextAd
 import org.aralozkaya.msngr.data.MsnpClientConfigService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 class MsnpClientConfigTest {
     @Test
@@ -160,5 +163,117 @@ class MsnpClientConfigTest {
             ),
             MsnpClientConfigService.parseTextAdXml(textXml),
         )
+    }
+
+    @Test
+    fun parsesDynamicServiceDiscoveryTagsAndPreservesCustomSchemes() {
+        val communityXml = """
+            <?xml version="1.0" encoding="utf-8" ?>
+            <MsgrConfig>
+                <AbchCfg>
+                    <abchconfig>
+                        <url>http://contacts.ctsrv.xyz/abservice/abservice.asmx</url>
+                    </abchconfig>
+                </AbchCfg>
+                <AppDirConfig>
+                    <AppDirPageURL>http://apps.ctsrv.xyz/AppDirectory/Directory.aspx</AppDirPageURL>
+                    <AppDirSeviceURL>http://apps.ctsrv.xyz/AppDirectory/AppDirectory.asmx</AppDirSeviceURL>
+                </AppDirConfig>
+                <ContactCard>
+                    <GetItemVerUrl>http://storage.ctsrv.xyz/storageservice/SchematizedStore.asmx</GetItemVerUrl>
+                </ContactCard>
+            </MsgrConfig>
+        """.trimIndent()
+        val parsedCommunity = MsnpClientConfigService.parseMsgrConfig(communityXml)
+        assertEquals(
+            "https://contacts.ctsrv.xyz/abservice/abservice.asmx",
+            parsedCommunity.addressBookUrl,
+        )
+        assertEquals(
+            "https://apps.ctsrv.xyz/AppDirectory/AppDirectory.asmx",
+            parsedCommunity.appDirServiceUrl,
+        )
+        assertEquals(
+            "https://storage.ctsrv.xyz/storageservice/SchematizedStore.asmx",
+            parsedCommunity.storageServiceUrl,
+        )
+
+        val customXml = """
+            <?xml version="1.0" encoding="utf-8" ?>
+            <MsgrConfig>
+                <AbchCfg>
+                    <abchconfig>
+                        <url>http://127.0.0.1:18080/abservice/abservice.asmx</url>
+                    </abchconfig>
+                </AbchCfg>
+                <AppDirConfig>
+                    <AppDirPageURL>http://127.0.0.1:18080/AppDirectory/Directory.aspx</AppDirPageURL>
+                </AppDirConfig>
+                <ContactCard>
+                    <GetItemVerUrl>http://127.0.0.1:18080/storageservice/SchematizedStore.asmx</GetItemVerUrl>
+                </ContactCard>
+            </MsgrConfig>
+        """.trimIndent()
+        val parsedCustom = MsnpClientConfigService.parseMsgrConfig(customXml)
+        assertEquals(
+            "http://127.0.0.1:18080/abservice/abservice.asmx",
+            parsedCustom.addressBookUrl,
+        )
+        assertEquals(
+            "http://127.0.0.1:18080/AppDirectory/AppDirectory.asmx",
+            parsedCustom.appDirServiceUrl,
+        )
+        assertEquals(
+            "http://127.0.0.1:18080/storageservice/SchematizedStore.asmx",
+            parsedCustom.storageServiceUrl,
+        )
+    }
+
+    @Test
+    fun candidateServiceEndpointsAndFallbackHandleHttpsToHttpOnlyOnIoErrors() {
+        assertEquals(
+            listOf(
+                "https://custom.example.test:8080/RST.srf",
+                "http://custom.example.test:8080/RST.srf",
+            ),
+            MsnpClientConfigService.candidateServiceEndpoints("custom.example.test:8080", "/RST.srf"),
+        )
+        assertEquals(
+            listOf("http://custom.example.test:8080/RST.srf"),
+            MsnpClientConfigService.candidateServiceEndpoints("http://custom.example.test:8080", "/RST.srf"),
+        )
+
+        val attemptedIo = mutableListOf<String>()
+        val result = runBlocking {
+            MsnpClientConfigService.withServiceEndpointFallback(
+                listOf("https://custom.example.test/RST.srf", "http://custom.example.test/RST.srf"),
+            ) { endpoint ->
+                attemptedIo += endpoint
+                if (endpoint.startsWith("https://")) throw IOException("TLS unavailable")
+                "ok"
+            }
+        }
+        assertEquals("ok", result)
+        assertEquals(
+            listOf("https://custom.example.test/RST.srf", "http://custom.example.test/RST.srf"),
+            attemptedIo,
+        )
+
+        val attemptedAuthError = mutableListOf<String>()
+        var nonIoThrown = false
+        try {
+            runBlocking {
+                MsnpClientConfigService.withServiceEndpointFallback(
+                    listOf("https://custom.example.test/RST.srf", "http://custom.example.test/RST.srf"),
+                ) { endpoint ->
+                    attemptedAuthError += endpoint
+                    throw IllegalStateException("HTTP 401")
+                }
+            }
+        } catch (_: IllegalStateException) {
+            nonIoThrown = true
+        }
+        assertTrue(nonIoThrown)
+        assertEquals(listOf("https://custom.example.test/RST.srf"), attemptedAuthError)
     }
 }

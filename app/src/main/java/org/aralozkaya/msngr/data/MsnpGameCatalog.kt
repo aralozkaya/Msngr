@@ -4,7 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
 import org.w3c.dom.Element
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
@@ -68,9 +70,9 @@ data class GameCatalog(
 
 object MsnpGameCatalogService {
     const val DEFAULT_ACTIVITIES_SERVER = "apps.escargot.nina.chat"
-    private const val DEFAULT_SERVICE_URL = "https://apps.escargot.nina.chat/activities/service/"
     private const val CLIENT_VERSION = "14.0.8117.416"
     private const val TIMEOUT_MILLIS = 10_000
+    private const val RESOLVE_TIMEOUT_MILLIS = 3_000
 
     private val cachedCatalogs = ConcurrentHashMap<String, GameCatalog>()
 
@@ -82,35 +84,60 @@ object MsnpGameCatalogService {
         entries = DEFAULT_ENTRIES,
     )
 
+    fun cachedCatalog(activitiesServer: String = currentActivitiesServer): GameCatalog? {
+        val cacheKey = activitiesServer.trim().lowercase().ifEmpty { DEFAULT_ACTIVITIES_SERVER }
+        return cachedCatalogs[cacheKey]
+    }
+
     internal fun candidateServiceUrls(activitiesServer: String = DEFAULT_ACTIVITIES_SERVER): List<String> {
         val trimmed = activitiesServer.trim().removeSuffix("/")
-        if (trimmed.isEmpty()) return listOf(DEFAULT_SERVICE_URL)
-        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-            val upgraded = upgradeKnownHttpsUrl(trimmed)
-            val afterScheme = upgraded.substringAfter("://")
-            return if ('/' in afterScheme) {
-                listOf(if (upgraded.endsWith(".asmx", ignoreCase = true)) upgraded else "$upgraded/")
+        if (trimmed.isEmpty()) return candidateServiceUrls(DEFAULT_ACTIVITIES_SERVER)
+        val upgraded = upgradeKnownHttpsUrl(trimmed)
+        if (upgraded.startsWith("http://", ignoreCase = true) ||
+            upgraded.startsWith("https://", ignoreCase = true)
+        ) {
+            val normalized = MsnpClientConfigService.normalizeAppDirServiceUrl(upgraded) ?: upgraded
+            val path = runCatching { URI(normalized).path.orEmpty() }.getOrDefault("")
+            return if (path.isNotEmpty() && path != "/") {
+                listOf(formatExplicitServiceUrl(normalized))
             } else {
-                candidateServiceUrlsForHost(afterScheme)
+                val base = normalized.trimEnd('/')
+                listOf(
+                    "$base/AppDirectory/AppDirectory.asmx",
+                    "$base/activities/service/",
+                )
             }
         }
-        return if ('/' in trimmed) {
-            val normalized = "https://$trimmed"
-            listOf(if (normalized.endsWith(".asmx", ignoreCase = true)) normalized else "$normalized/")
+        if ("://" in upgraded) return emptyList()
+        val bare = upgraded.trimStart('/')
+        val isCommunityHttps = MsnpClientConfigService
+            .upgradeCommunityHttpsUrl("http://$bare")
+            .startsWith("https://", ignoreCase = true)
+        val schemes = if (isCommunityHttps) listOf("https") else listOf("https", "http")
+        return if ('/' in bare) {
+            schemes.map { scheme ->
+                val raw = "$scheme://$bare"
+                val normalized = MsnpClientConfigService.normalizeAppDirServiceUrl(raw) ?: raw
+                formatExplicitServiceUrl(normalized)
+            }
         } else {
-            candidateServiceUrlsForHost(trimmed)
+            schemes.flatMap { scheme ->
+                listOf(
+                    "$scheme://$bare/AppDirectory/AppDirectory.asmx",
+                    "$scheme://$bare/activities/service/",
+                )
+            }
         }
     }
 
-    private fun candidateServiceUrlsForHost(host: String): List<String> {
-        val escargotEndpoint = "https://$host/activities/service/"
-        val wlmEndpoint = "https://$host/AppDirectory/AppDirectory.asmx"
-        val lower = host.lowercase()
-        return if (lower.contains("ctsrv") || lower.contains("ugnet")) {
-            listOf(wlmEndpoint, escargotEndpoint)
-        } else {
-            listOf(escargotEndpoint, wlmEndpoint)
-        }
+    private fun formatExplicitServiceUrl(url: String): String =
+        if (url.endsWith(".asmx", ignoreCase = true) || '?' in url) url else "${url.trimEnd('/')}/"
+
+    private fun serviceOriginKey(serviceUrl: String): String? {
+        val uri = runCatching { URI(serviceUrl) }.getOrNull() ?: return null
+        val scheme = uri.scheme?.lowercase() ?: return null
+        val authority = uri.authority?.takeIf { it.isNotBlank() } ?: return null
+        return "$scheme://$authority"
     }
 
     suspend fun fetchCatalog(
@@ -123,8 +150,11 @@ object MsnpGameCatalogService {
         if (!forceRefresh) {
             cachedCatalogs[cacheKey]?.let { return it }
         }
+        val unreachableOrigins = HashSet<String>()
         for (serviceUrl in candidateServiceUrls(activitiesServer)) {
-            val fetched = runCatching {
+            val origin = serviceOriginKey(serviceUrl)
+            if (origin != null && origin in unreachableOrigins) continue
+            try {
                 val gamesXml = getUrl(
                     "$serviceUrl?op=GetFilteredDataSet2&locale=$locale&Page=1&Kids=-1&AppType=0&ver=$CLIENT_VERSION",
                 )
@@ -150,14 +180,19 @@ object MsnpGameCatalogService {
                     .sortedWith(compareBy<GameCatalogEntry> { it.categoryId }.thenBy { it.sequence })
                 check(entries.isNotEmpty()) { "Empty game catalog from $serviceUrl" }
 
-                GameCatalog(categories = categories, entries = entries)
-            }.getOrNull()
-            if (fetched != null) {
+                val fetched = GameCatalog(categories = categories, entries = entries)
                 cachedCatalogs[cacheKey] = fetched
                 return fetched
+            } catch (error: IOException) {
+                if (origin != null) unreachableOrigins += origin
+            } catch (_: Exception) {
             }
         }
-        return cachedCatalogs[cacheKey] ?: defaultCatalog()
+        return cachedCatalogs[cacheKey] ?: if (cacheKey == DEFAULT_ACTIVITIES_SERVER) {
+            defaultCatalog()
+        } else {
+            GameCatalog(emptyList(), emptyList())
+        }
     }
 
     suspend fun resolveEntry(
@@ -168,18 +203,32 @@ object MsnpGameCatalogService {
     ): GameCatalogEntry? {
         val cacheKey = activitiesServer.trim().lowercase().ifEmpty { DEFAULT_ACTIVITIES_SERVER }
         cachedCatalogs[cacheKey]?.findEntry(appId)?.let { return it }
+        if (cacheKey == DEFAULT_ACTIVITIES_SERVER) {
+            defaultCatalog().findEntry(appId)?.let { return it }
+        }
 
+        val unreachableOrigins = HashSet<String>()
         for (serviceUrl in candidateServiceUrls(activitiesServer)) {
-            val fetchedEntry = runCatching {
-                val xml = getUrl("$serviceUrl?op=GetAppEntry&ID=$appId&EntryID=$appId&locale=$locale&ver=$CLIENT_VERSION")
-                parseAppEntryXml(xml)
-            }.getOrNull()
-            if (fetchedEntry != null && fetchedEntry.error.isBlank()) return fetchedEntry
+            val origin = serviceOriginKey(serviceUrl)
+            if (origin != null && origin in unreachableOrigins) continue
+            try {
+                val xml = getUrl(
+                    "$serviceUrl?op=GetAppEntry&ID=$appId&EntryID=$appId&locale=$locale&ver=$CLIENT_VERSION",
+                    timeoutMillis = RESOLVE_TIMEOUT_MILLIS,
+                )
+                val fetchedEntry = parseAppEntryXml(xml)
+                if (fetchedEntry != null && fetchedEntry.error.isBlank()) return fetchedEntry
+            } catch (error: IOException) {
+                if (origin != null) unreachableOrigins += origin
+            } catch (_: Exception) {
+            }
         }
 
         val catalog = fetchCatalog(locale = locale, activitiesServer = activitiesServer)
         catalog.findEntry(appId)?.let { return it }
-        defaultCatalog().findEntry(appId)?.let { return it }
+        if (cacheKey == DEFAULT_ACTIVITIES_SERVER) {
+            defaultCatalog().findEntry(appId)?.let { return it }
+        }
         return null
     }
 
@@ -289,11 +338,11 @@ object MsnpGameCatalogService {
     internal fun upgradeKnownHttpsUrl(rawUrl: String): String =
         MsnpClientConfigService.upgradeCommunityHttpsUrl(rawUrl)
 
-    private suspend fun getUrl(url: String): String = withContext(Dispatchers.IO) {
+    private suspend fun getUrl(url: String, timeoutMillis: Int = TIMEOUT_MILLIS): String = withContext(Dispatchers.IO) {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = TIMEOUT_MILLIS
-            readTimeout = TIMEOUT_MILLIS
+            connectTimeout = timeoutMillis
+            readTimeout = timeoutMillis
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
         }

@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -7,6 +8,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
 import org.aralozkaya.msngr.protocol.MsnGameProtocol
@@ -55,6 +58,7 @@ internal class MsnpGameSession(
     private val resolveCatalogEntry: suspend (Int, String) -> GameCatalogEntry? = { appId, fallbackName ->
         MsnpGameCatalogService.resolveEntry(appId, fallbackName)
     },
+    private val loadedHandshakeGraceMillis: Long = DEFAULT_LOADED_HANDSHAKE_GRACE_MILLIS,
 ) {
     private val ids = AtomicInteger(700_000)
     private val packetSequence = AtomicLong(0L)
@@ -64,6 +68,10 @@ internal class MsnpGameSession(
     private var currentGame: GameSession? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var invitationTimeout: Job? = null
+    private val loadedSendMutex = Mutex()
+    private var loadedSendJob: Job? = null
+    @Volatile
+    private var remoteLoadedSent = false
 
     fun owns(id: String): Boolean = currentGame?.id?.equals(id, ignoreCase = true) == true
     fun owns(sessionId: Long): Boolean = session != 0L && sessionId == session
@@ -76,6 +84,9 @@ internal class MsnpGameSession(
             runCatching { stop() }
         }
         invitationTimeout?.cancel()
+        loadedSendJob?.cancel()
+        loadedSendJob = null
+        remoteLoadedSent = false
         packetSequence.set(0L)
 
         val id = MsnpP2pUtil.randomGuid()
@@ -164,6 +175,9 @@ internal class MsnpGameSession(
                 return true
             }
             invitationTimeout?.cancel()
+            loadedSendJob?.cancel()
+            loadedSendJob = null
+            remoteLoadedSent = false
             packetSequence.set(0L)
             invite = message
             session = incomingSessionId
@@ -186,6 +200,8 @@ internal class MsnpGameSession(
         when {
             message.firstLine.startsWith("BYE ", ignoreCase = true) -> {
                 invitationTimeout?.cancel()
+                loadedSendJob?.cancel()
+                loadedSendJob = null
                 change(current.id) {
                     it.copy(
                         status = GameSessionStatus.Stopped,
@@ -196,6 +212,8 @@ internal class MsnpGameSession(
             }
             message.firstLine.startsWith("MSNSLP/1.0 603", ignoreCase = true) -> {
                 invitationTimeout?.cancel()
+                loadedSendJob?.cancel()
+                loadedSendJob = null
                 change(current.id) {
                     it.copy(
                         status = GameSessionStatus.Declined,
@@ -207,18 +225,10 @@ internal class MsnpGameSession(
                 message.contentType.equals(MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE, ignoreCase = true) -> {
                 if (current.outgoing && current.status == GameSessionStatus.Invited) {
                     invitationTimeout?.cancel()
-                    var shouldSendLoaded = false
                     change(current.id) {
-                        shouldSendLoaded = it.localChannelInitialized
                         it.copy(status = GameSessionStatus.Active)
                     }
-                    if (shouldSendLoaded && session != 0L) {
-                        sendData(
-                            session,
-                            MsnGameProtocol.appIdForEntry(current.appId),
-                            MsnGameProtocol.encodeRemoteAppLoaded(),
-                        )
-                    }
+                    triggerRemoteAppLoadedHandshake()
                 }
             }
             else -> return false
@@ -230,19 +240,11 @@ internal class MsnpGameSession(
         val current = requireNotNull(currentGame)
         check(!current.outgoing && current.status == GameSessionStatus.Invited)
         invitationTimeout?.cancel()
-        var shouldSendLoaded = false
         change(current.id) {
-            shouldSendLoaded = it.localChannelInitialized
             it.copy(status = GameSessionStatus.Active)
         }
         respond(requireNotNull(invite), session, accepted = true)
-        if (shouldSendLoaded && session != 0L) {
-            sendData(
-                session,
-                MsnGameProtocol.appIdForEntry(current.appId),
-                MsnGameProtocol.encodeRemoteAppLoaded(),
-            )
-        }
+        triggerRemoteAppLoadedHandshake()
     }
 
     suspend fun initializeChannel() {
@@ -253,18 +255,10 @@ internal class MsnpGameSession(
             }
             return
         }
-        val wasInitialized = current.localChannelInitialized
         change(current.id) {
             it.copy(localChannelInitialized = true)
         }
-        val updated = currentGame ?: return
-        if (!wasInitialized && updated.status == GameSessionStatus.Active && session != 0L) {
-            sendData(
-                session,
-                MsnGameProtocol.appIdForEntry(updated.appId),
-                MsnGameProtocol.encodeRemoteAppLoaded(),
-            )
-        }
+        triggerRemoteAppLoadedHandshake()
     }
 
     suspend fun sendGameData(payload: String) {
@@ -276,12 +270,36 @@ internal class MsnpGameSession(
 
     fun receive(bytes: ByteArray) {
         val current = currentGame ?: return
-        if (current.status != GameSessionStatus.Active) return
         when (val packet = MsnGameProtocol.decodePacket(bytes)) {
             is P4Packet.RemoteAppLoaded -> {
-                change(current.id) { it.copy(remoteAppLoaded = true) }
+                if (current.status != GameSessionStatus.Active &&
+                    !(current.outgoing && current.status == GameSessionStatus.Invited)
+                ) {
+                    return
+                }
+                loadedSendJob?.cancel()
+                loadedSendJob = null
+                var shouldSendNow = false
+                change(current.id) {
+                    shouldSendNow = it.status == GameSessionStatus.Active &&
+                        it.localChannelInitialized &&
+                        !remoteLoadedSent
+                    it.copy(remoteAppLoaded = true)
+                }
+                val targetSession = session
+                if (shouldSendNow && targetSession != 0L) {
+                    scope.launch {
+                        try {
+                            sendRemoteAppLoadedOnce(current.id, current.appId, targetSession)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
             }
             is P4Packet.Data -> {
+                if (current.status != GameSessionStatus.Active) return
                 val item = GameDataPacket(
                     sequence = packetSequence.incrementAndGet(),
                     payload = packet.textValue,
@@ -302,6 +320,8 @@ internal class MsnpGameSession(
         if (current.status !in listOf(GameSessionStatus.Invited, GameSessionStatus.Active)) return
         val declined = !current.outgoing && current.status == GameSessionStatus.Invited
         invitationTimeout?.cancel()
+        loadedSendJob?.cancel()
+        loadedSendJob = null
         change(current.id) {
             it.copy(
                 status = if (declined) GameSessionStatus.Declined else GameSessionStatus.Stopped,
@@ -329,6 +349,8 @@ internal class MsnpGameSession(
 
     fun disconnect() {
         invitationTimeout?.cancel()
+        loadedSendJob?.cancel()
+        loadedSendJob = null
         scope.cancel()
         currentGame?.takeIf {
             it.status in listOf(GameSessionStatus.Active, GameSessionStatus.Invited)
@@ -399,8 +421,57 @@ internal class MsnpGameSession(
         }
     }
 
+    private suspend fun triggerRemoteAppLoadedHandshake() {
+        val current = currentGame ?: return
+        val targetSession = session
+        if (targetSession == 0L ||
+            current.status != GameSessionStatus.Active ||
+            !current.localChannelInitialized ||
+            remoteLoadedSent
+        ) {
+            return
+        }
+        if (current.remoteAppLoaded || loadedHandshakeGraceMillis <= 0L) {
+            loadedSendJob?.cancel()
+            loadedSendJob = null
+            sendRemoteAppLoadedOnce(current.id, current.appId, targetSession)
+            return
+        }
+        if (loadedSendJob?.isActive == true) return
+        loadedSendJob = scope.launch {
+            delay(loadedHandshakeGraceMillis)
+            try {
+                sendRemoteAppLoadedOnce(current.id, current.appId, targetSession)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private suspend fun sendRemoteAppLoadedOnce(callId: String, appId: Int, targetSession: Long) {
+        if (targetSession == 0L) return
+        loadedSendMutex.withLock {
+            val current = currentGame ?: return
+            if (!current.id.equals(callId, ignoreCase = true) ||
+                current.status != GameSessionStatus.Active ||
+                !current.localChannelInitialized ||
+                remoteLoadedSent
+            ) {
+                return
+            }
+            remoteLoadedSent = true
+            sendData(
+                targetSession,
+                MsnGameProtocol.appIdForEntry(appId),
+                MsnGameProtocol.encodeRemoteAppLoaded(),
+            )
+        }
+    }
+
     companion object {
         private const val INVITATION_TIMEOUT_MILLIS = 600_000L
         private const val MAX_BUFFERED_PACKETS = 512
+        const val DEFAULT_LOADED_HANDSHAKE_GRACE_MILLIS = 800L
     }
 }

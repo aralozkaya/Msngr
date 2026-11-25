@@ -72,10 +72,12 @@ internal class MsnpSwitchboardSession(
     private val localOriginal: (String, String) -> OriginalPhoto? = { _, _ -> null },
     private val publishOriginal: (String, String, OriginalPhoto) -> Unit = { _, _, _ -> },
     private val onPhotoObjectProgress: (String, Long, Long) -> Unit = { _, _, _ -> },
+    private val onContactEndpoint: (String, String) -> Unit = { _, _ -> },
 ) : AutoCloseable {
     // A sibling endpoint can invite us before it calls the conversation's contact.
     @Volatile var contactEmail: String = contactEmail.normalizedSwitchboardIdentity()
         private set
+    @Volatile private var latestContactEndpointId: String? = remoteEndpointId?.let(::normalizeEndpointId)
     internal val isClosed: Boolean get() = closed.get()
     private val transactionIds = AtomicInteger(0)
     private val sendMutex = Mutex()
@@ -86,6 +88,7 @@ internal class MsnpSwitchboardSession(
     private val outgoingP2pPackets = Channel<OutgoingPicturePacket>(Channel.UNLIMITED,
         onUndeliveredElement = { it.delivered?.cancel() })
     private val otherPicturePeers = ConcurrentHashMap<String, MsnpP2pSession>()
+    private val routedDestinations = ConcurrentHashMap<MsnpP2pSession, String>()
     private val winkPeers = ConcurrentHashMap<String, MsnpP2pSession>()
     private val pendingOwnMessages = ArrayDeque<MsnpCommand>()
     private val chunkAssembler = SwitchboardChunkAssembler()
@@ -194,7 +197,20 @@ internal class MsnpSwitchboardSession(
     private fun photoPeer(id: String): MsnpP2pSession? =
         applicationPeers().firstOrNull { it.hasPhotoShare(id) }?.also(::bindApplicationPeer)
 
-    suspend fun startGame(entry: GameCatalogEntry): String = pictureSession.startGame(entry)
+    suspend fun startGame(entry: GameCatalogEntry): String {
+        val targetEndpoint = latestContactEndpointId
+        val currentEndpoint = if (pictureSessionLazy.isInitialized()) {
+            normalizeEndpointId(pictureSession.destination.substringAfter(';', ""))
+        } else {
+            remoteEndpointId?.let(::normalizeEndpointId)
+        }
+        val peer = if (targetEndpoint != null && targetEndpoint != currentEndpoint) {
+            p2pPeer(contactEmail, targetEndpoint) ?: pictureSession
+        } else {
+            pictureSession
+        }
+        return peer.startGame(entry)
+    }
     fun hasGameSession(id: String): Boolean = applicationPeers().any { it.hasGameSession(id) }
     suspend fun acceptGame(id: String) { requireNotNull(gamePeer(id)) { "This game invitation has ended." }.acceptGame(id) }
     suspend fun stopGame(id: String) { gamePeer(id)?.stopGame(id) }
@@ -212,7 +228,8 @@ internal class MsnpSwitchboardSession(
     private fun applicationPeers(): List<MsnpP2pSession> = initializedPicturePeers() +
         sharedP2pPeers?.values.orEmpty().filter { it.destination.substringBefore(';').equals(contactEmail, true) }
     private fun bindApplicationPeer(peer: MsnpP2pSession) {
-        peer.bindPacketSender { queueP2pPacket(peer.destination, it) }
+        val dest = routedDestinations[peer] ?: peer.destination
+        peer.bindPacketSender { queueP2pPacket(dest, it) }
     }
     fun closeFileTransfers() {
         initializedPicturePeers().distinct().forEach { it.closeFileTransfers() }
@@ -359,7 +376,8 @@ internal class MsnpSwitchboardSession(
         if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
         val reassembledPayload = chunkAssembler.feed(rawSender, command.payload ?: return) ?: return
         val message = parseSwitchboardMime(reassembledPayload)
-        if (contactEmail.isEmpty() && !mine) addParticipant(sender)
+        if (!mine) recordContactEndpoint(rawSender)
+        if (contactEmail.isEmpty() && !mine) addParticipant(rawSender)
         if (mine && normalizeEndpointId(rawSender.substringAfter(';', "")) == normalizeEndpointId(machineGuid)) return
         if (mine && contactEmail == sender && message !is SwitchboardMimeMessage.P2p) return
         // Keep sibling picture controls routable without treating them as conversation history.
@@ -373,7 +391,7 @@ internal class MsnpSwitchboardSession(
                 pendingOwnMessages.addLast(command.copy(payload = reassembledPayload))
                 return
             }
-            addParticipant(sender)
+            addParticipant(rawSender)
         }
         if (!mine && sender != contactEmail && message !is SwitchboardMimeMessage.P2p) return
         when (message) {
@@ -404,7 +422,11 @@ internal class MsnpSwitchboardSession(
                     if (source.normalizedSwitchboardIdentity() != sender) return
                     val sourceEndpoint = normalizeEndpointId(source.substringAfter(';', ""))
                     if (mine && sourceEndpoint == normalizeEndpointId(machineGuid)) return
-                    val peer = p2pPeer(sender, sourceEndpoint) ?: return
+                    if (!mine && sourceEndpoint != null) recordContactEndpoint("$sender;{$sourceEndpoint}")
+                    val (sessionIdHint, callIdHint) = p2pRoutingHint(message.bytes)
+                    val peer = existingRoutingPeer(sender, sourceEndpoint, sessionIdHint, callIdHint)
+                        ?: p2pPeer(sender, sourceEndpoint)
+                        ?: return
                     peer.handle(message.bytes)
                 }
             }
@@ -441,9 +463,60 @@ internal class MsnpSwitchboardSession(
         }.also { peer -> peer.bindPacketSender { queueP2pPacket(identity, it) } }
     }
 
+    private fun existingRoutingPeer(
+        sender: String,
+        sourceEndpoint: String?,
+        sessionIdHint: Long,
+        callIdHint: String?,
+    ): MsnpP2pSession? {
+        if (sessionIdHint == 0L && callIdHint.isNullOrBlank()) return null
+        val identity = sourceEndpoint?.let { "$sender;{$it}" } ?: sender
+        val targetDestination = sourceEndpoint?.let { "$sender;{$it}" }
+        val exactPeer = when {
+            sender == contactEmail.normalizedSwitchboardIdentity() &&
+                pictureSessionLazy.isInitialized() &&
+                (sourceEndpoint == null || sourceEndpoint == normalizeEndpointId(pictureSession.destination.substringAfter(';', ""))) ->
+                pictureSession
+            otherPicturePeers.containsKey(identity) -> otherPicturePeers[identity]
+            else -> null
+        }
+        if (exactPeer != null &&
+            ((sessionIdHint != 0L && exactPeer.hasActiveSessionId(sessionIdHint)) ||
+                (!callIdHint.isNullOrBlank() && exactPeer.hasCallId(callIdHint)))
+        ) {
+            return exactPeer.also { peer ->
+                peer.bindPacketSender { queueP2pPacket(targetDestination ?: peer.destination, it) }
+            }
+        }
+        val candidates = applicationPeers().filter {
+            it.destination.substringBefore(';').equals(sender, true)
+        }.distinct()
+        val matched = candidates.firstOrNull {
+            sessionIdHint != 0L && it.hasActiveSessionId(sessionIdHint)
+        } ?: candidates.firstOrNull {
+            !callIdHint.isNullOrBlank() && it.hasCallId(callIdHint)
+        } ?: return null
+        return matched.also { peer ->
+            val dest = targetDestination ?: peer.destination
+            routedDestinations[peer] = dest
+            peer.bindPacketSender { queueP2pPacket(dest, it) }
+        }
+    }
+
+    private fun recordContactEndpoint(rawIdentity: String) {
+        val identity = rawIdentity.normalizedSwitchboardIdentity()
+        if (identity.isEmpty() || identity == signedInEmail.normalizedSwitchboardIdentity()) return
+        val endpoint = normalizeEndpointId(rawIdentity.substringAfter(';', "")) ?: return
+        if (contactEmail.isEmpty() || identity == contactEmail) {
+            latestContactEndpointId = endpoint
+        }
+        onContactEndpoint(identity, endpoint)
+    }
+
     private suspend fun addParticipant(rawIdentity: String) {
         val identity = rawIdentity.normalizedSwitchboardIdentity()
         participants += identity
+        recordContactEndpoint(rawIdentity)
         if (contactEmail.isEmpty() && identity.isNotEmpty() &&
             identity != signedInEmail.normalizedSwitchboardIdentity()
         ) {

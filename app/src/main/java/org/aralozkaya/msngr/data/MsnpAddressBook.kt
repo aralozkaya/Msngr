@@ -246,53 +246,71 @@ internal object MsnpAddressBookService {
         }
     }
 
-    private fun postSoap(
+    private suspend fun postSoap(
         host: String,
         path: String,
         soapAction: String,
         body: String,
     ): String {
-        val connection = (URL(
-            "https://${host.addressBookHost()}$path",
-        ).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = HTTP_TIMEOUT_MILLIS
-            readTimeout = HTTP_TIMEOUT_MILLIS
-            instanceFollowRedirects = true
-            doOutput = true
-            setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-            setRequestProperty("SOAPAction", soapAction)
-            setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+        val endpoints = resolveAddressBookEndpoints(host, path)
+        if (endpoints.isEmpty()) {
+            throw AddressBookException("The address-book server is not configured.")
         }
-        try {
-            connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
-            val status = connection.responseCode
-            val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader(StandardCharsets.UTF_8)
-                ?.use { it.readText() }
-                .orEmpty()
-            if (status !in 200..299) {
-                if (soapAction.endsWith("/AddMember") || soapAction.endsWith("/DeleteMember"))
-                    parseMembershipChangeResponse(responseBody, soapAction.substringAfterLast('/'))
-                if (soapAction.endsWith("/ABContactAdd")) parseAddContactResponse(responseBody)
-                if (soapAction.endsWith("/ABContactUpdate")) parseContactUpdateResponse(responseBody)
-                if (soapAction.endsWith("/ABGroupAdd")) parseCreateCategoryResponse(responseBody)
-                if (soapAction.endsWith("/ABGroupUpdate") ||
-                    soapAction.endsWith("/ABGroupDelete") ||
-                    soapAction.endsWith("/ABGroupContactAdd") ||
-                    soapAction.endsWith("/ABGroupContactDelete")
-                ) {
-                    parseCategoryOperationResponse(responseBody, soapAction.substringAfterLast('/'))
-                }
-                val fault = parseAddressBookFault(responseBody)
-                throw AddressBookException(
-                    fault.ifBlank { "The address-book service returned HTTP $status." },
-                )
+        return MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
+            val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = HTTP_TIMEOUT_MILLIS
+                readTimeout = HTTP_TIMEOUT_MILLIS
+                instanceFollowRedirects = true
+                doOutput = true
+                setRequestProperty("Content-Type", "text/xml; charset=utf-8")
+                setRequestProperty("SOAPAction", soapAction)
+                setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
             }
-            return responseBody
-        } finally {
-            connection.disconnect()
+            try {
+                connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
+                val status = connection.responseCode
+                val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader(StandardCharsets.UTF_8)
+                    ?.use { it.readText() }
+                    .orEmpty()
+                if (status !in 200..299) {
+                    if (soapAction.endsWith("/AddMember") || soapAction.endsWith("/DeleteMember"))
+                        parseMembershipChangeResponse(responseBody, soapAction.substringAfterLast('/'))
+                    if (soapAction.endsWith("/ABContactAdd")) parseAddContactResponse(responseBody)
+                    if (soapAction.endsWith("/ABContactUpdate")) parseContactUpdateResponse(responseBody)
+                    if (soapAction.endsWith("/ABGroupAdd")) parseCreateCategoryResponse(responseBody)
+                    if (soapAction.endsWith("/ABGroupUpdate") ||
+                        soapAction.endsWith("/ABGroupDelete") ||
+                        soapAction.endsWith("/ABGroupContactAdd") ||
+                        soapAction.endsWith("/ABGroupContactDelete")
+                    ) {
+                        parseCategoryOperationResponse(responseBody, soapAction.substringAfterLast('/'))
+                    }
+                    val fault = parseAddressBookFault(responseBody)
+                    throw AddressBookException(
+                        fault.ifBlank { "The address-book service returned HTTP $status." },
+                    )
+                }
+                responseBody
+            } finally {
+                connection.disconnect()
+            }
         }
+    }
+
+    private fun resolveAddressBookEndpoints(host: String, path: String): List<String> {
+        val trimmed = host.trim()
+        val baseNoQuery = trimmed.substringBefore('?').substringBefore('#')
+        val rewrittenTarget = if (
+            baseNoQuery.endsWith("/abservice.asmx", ignoreCase = true) &&
+            path.endsWith("/SharingService.asmx", ignoreCase = true)
+        ) {
+            baseNoQuery.dropLast("abservice.asmx".length) + "SharingService.asmx"
+        } else {
+            trimmed
+        }
+        return MsnpClientConfigService.candidateServiceEndpoints(rewrittenTarget, path)
     }
 
     internal fun buildRequest(ticket: String): String = buildAddressBookRequest(ticket)
