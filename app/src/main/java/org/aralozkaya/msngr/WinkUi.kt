@@ -5,10 +5,17 @@
 
 package org.aralozkaya.msngr
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,11 +26,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -38,6 +49,12 @@ import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.protocol.*
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
 
+internal val WINK_IMPORT_MIME_TYPES = arrayOf(
+    "application/octet-stream",
+    "application/vnd.ms-cab-compressed",
+    "application/x-mco",
+)
+
 @Composable
 internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Unit,
     onSend: suspend (WinkReference, ByteArray) -> Result<Unit>) {
@@ -49,10 +66,78 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
     var generation by remember { mutableIntStateOf(0) }
     var catalog by remember { mutableStateOf<List<WinkReference>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var moreMenuExpanded by remember { mutableStateOf(false) }
+    var pendingExport by remember(account) { mutableStateOf<WinkReference?>(null) }
     val libraryChanges by context.winkStore().libraryChanges.collectAsState()
     var preview by remember(account) { mutableStateOf<WinkReference?>(null) }
     val catalogConfigured = SessionPrefs.readServerConfig(context).winkCatalogServer.isNotBlank()
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val owner = account ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            error = null
+            status = null
+            try {
+                val importedCount = withContext(Dispatchers.IO) {
+                    check(context.winkAccount() == owner) { resources.getString(R.string.wink_account_changed) }
+                    val displayName = context.queryDocumentDisplayName(uri)
+                    val fallbackName = MsnWinkPackage.fallbackNameFromFileName(displayName)
+                    val rawBytes = context.contentResolver.openInputStream(uri)?.use {
+                        it.readBytesBounded(MsnWink.MAX_CAB_BYTES)
+                    } ?: error(resources.getString(R.string.wink_import_failed))
+                    val items = MsnWinkPackage.install(rawBytes, fallbackName)
+                    for ((reference, cab) in items) {
+                        context.winkStore().install(owner, reference, cab)
+                    }
+                    items.size
+                }
+                status = context.getQuantityNumberSentence(
+                    count = importedCount,
+                    oneBeforeRes = R.string.wink_added_count_singular_you_singular_before_number,
+                    oneAfterRes = R.string.wink_added_count_singular_you_singular_after_number,
+                    otherBeforeRes = R.string.wink_added_count_plural_you_singular_before_number,
+                    otherAfterRes = R.string.wink_added_count_plural_you_singular_after_number,
+                )
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                error = failure.message ?: resources.getString(R.string.wink_import_failed)
+            } finally {
+                busy = false
+            }
+        }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val reference = pendingExport
+        pendingExport = null
+        val owner = account ?: return@rememberLauncherForActivityResult
+        if (uri == null || reference == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            error = null
+            status = null
+            try {
+                withContext(Dispatchers.IO) {
+                    check(context.winkAccount() == owner) { resources.getString(R.string.wink_account_changed) }
+                    val cabBytes = context.winkStore().bytes(owner, reference.metadata)
+                        ?: error(resources.getString(R.string.wink_unavailable))
+                    val mcoBytes = MsnWinkPackage.exportMco(reference, cabBytes)
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(mcoBytes) }
+                        ?: error(resources.getString(R.string.wink_export_failed))
+                }
+                status = resources.getString(R.string.wink_exported)
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                error = failure.message ?: resources.getString(R.string.wink_export_failed)
+            } finally {
+                busy = false
+            }
+        }
+    }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) generation++ }
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
@@ -60,22 +145,91 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
     LaunchedEffect(visible, account, generation, libraryChanges) {
         if (visible && account != null) catalog = withContext(Dispatchers.IO) { context.winkStore().catalog(account) }
     }
-    KeyboardPickerSheet(visible, onDismiss, stringResource(R.string.wink_title_plural), "wink_picker", expandable = true,
-        header = {
-            Text(stringResource(R.string.wink_title_plural), style = MaterialTheme.typography.titleMedium)
-            error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        }, footer = if (catalogConfigured) {
+    KeyboardPickerSheet(visible, onDismiss, stringResource(R.string.chat_menu_winks_plural), "wink_picker", expandable = true,
+        header = if (status != null || error != null) {
             {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) }) { Text(stringResource(R.string.wink_get_more)) }
-                }
+                status?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
+                error?.let { Text(localizeUserMessage(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         } else {
             null
+        }, footer = {
+            val moreOptionsDescription = stringResource(R.string.wink_more_options)
+            val menuState = stringResource(
+                if (moreMenuExpanded) R.string.contacts_actions_expanded else R.string.contacts_actions_collapsed,
+            )
+            val menuInteractionSource = remember { MutableInteractionSource() }
+            SplitButtonLayout(
+                modifier = Modifier.testTag("wink_get_more_split_button"),
+                leadingButton = {
+                    SplitButtonDefaults.TonalLeadingButton(
+                        onClick = { context.startActivity(Intent(context, WinkCatalogActivity::class.java)) },
+                        enabled = catalogConfigured && !busy,
+                        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
+                        modifier = Modifier.testTag("wink_get_more_button"),
+                    ) {
+                        Text(stringResource(R.string.wink_get_more))
+                    }
+                },
+                trailingButton = {
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                        tooltip = { PlainTooltip { Text(moreOptionsDescription) } },
+                        state = rememberTooltipState(),
+                    ) {
+                        SplitButtonDefaults.TonalTrailingButton(
+                            checked = moreMenuExpanded,
+                            onCheckedChange = { moreMenuExpanded = it },
+                            enabled = !busy && account != null,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .testTag("wink_more_options")
+                                .semantics {
+                                    contentDescription = moreOptionsDescription
+                                    stateDescription = menuState
+                                },
+                        ) {
+                            val rotation by animateFloatAsState(
+                                targetValue = if (moreMenuExpanded) 180f else 0f,
+                                label = "WinkMoreOptionsIconRotation",
+                            )
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(SplitButtonDefaults.TrailingIconSize)
+                                    .graphicsLayer { rotationZ = rotation },
+                            )
+                        }
+                    }
+                    DropdownMenuPopup(
+                        expanded = moreMenuExpanded,
+                        onDismissRequest = { moreMenuExpanded = false },
+                    ) {
+                        DropdownMenuGroup(
+                            shapes = MenuDefaults.groupShape(0, 1),
+                            interactionSource = menuInteractionSource,
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.wink_import)) },
+                                leadingIcon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
+                                shape = MenuDefaults.itemShape(0, 1).shape,
+                                enabled = !busy && account != null,
+                                modifier = Modifier.testTag("wink_import_mco"),
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    importLauncher.launch(WINK_IMPORT_MIME_TYPES)
+                                },
+                            )
+                        }
+                    }
+                },
+            )
         }) {
         catalog.chunked(4).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { reference ->
+                    val isDefault = context.winkStore().isDefault(reference.metadata)
                     WinkPickerTile(reference, canSend = enabled, enabled = !busy,
                         modifier = Modifier.weight(1f), onPreview = { preview = reference }, onSend = {
                             if (account != null) scope.launch {
@@ -85,10 +239,14 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                                     val result = if (bytes != null) onSend(reference, bytes)
                                         else Result.failure(IllegalStateException(resources.getString(R.string.wink_unavailable)))
                                     error = result.exceptionOrNull()?.message
+                                    status = null
                                     if (result.isSuccess) onDismiss()
                                 } finally { busy = false }
                             }
-                        }, onDelete = if (context.winkStore().isDefault(reference.metadata)) null else ({
+                        }, onExport = if (isDefault) null else ({
+                            pendingExport = reference
+                            exportLauncher.launch(MsnWinkPackage.suggestedMcoFileName(reference.name))
+                        }), onDelete = if (isDefault) null else ({
                             if (account != null) scope.launch {
                                 busy = true
                                 try {
@@ -97,6 +255,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                                         context.winkStore().remove(account, reference.metadata)
                                     }
                                     error = null
+                                    status = null
                                 } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
                                 catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.wink_delete_failed) }
                                 finally { busy = false }
@@ -108,13 +267,20 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
         }
         if (busy) MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth())
     }
-    LaunchedEffect(visible) { if (!visible) preview = null }
+    LaunchedEffect(visible) {
+        if (!visible) {
+            preview = null
+            status = null
+            error = null
+            moreMenuExpanded = false
+        }
+    }
     if (visible) preview?.let { WinkOverlay(it, { preview = null }) }
 }
 
 @Composable
 private fun WinkPickerTile(reference: WinkReference, canSend: Boolean, enabled: Boolean,
-    modifier: Modifier, onPreview: () -> Unit, onSend: () -> Unit, onDelete: (() -> Unit)?) {
+    modifier: Modifier, onPreview: () -> Unit, onSend: () -> Unit, onExport: (() -> Unit)?, onDelete: (() -> Unit)?) {
     var menuExpanded by remember(reference.metadata.sha1d) { mutableStateOf(false) }
     Box(modifier) {
         Column(Modifier.fillMaxWidth().combinedClickable(
@@ -133,6 +299,10 @@ private fun WinkPickerTile(reference: WinkReference, canSend: Boolean, enabled: 
                     leadingIcon = { Icon(Icons.Default.PlayArrow, null) },
                     shape = MaterialTheme.shapes.medium,
                     onClick = { menuExpanded = false; onPreview() })
+                if (onExport != null) DropdownMenuItem(text = { Text(stringResource(R.string.wink_export)) },
+                    leadingIcon = { Icon(Icons.Default.Download, null) },
+                    shape = MaterialTheme.shapes.medium,
+                    onClick = { menuExpanded = false; onExport() })
                 if (onDelete != null) DropdownMenuItem(text = { Text(stringResource(R.string.common_delete)) },
                     leadingIcon = { Icon(Icons.Default.Delete, null) },
                     colors = MenuDefaults.itemColors(
@@ -168,7 +338,7 @@ internal fun WinkMessage(message: ChatMessage, onShowOptions: () -> Unit, onRetr
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         key(message.isWinkPending, message.winkTransferError) { WinkThumbnail(reference, Modifier.size(72.dp)) }
-        Text(reference.name, style = MaterialTheme.typography.titleSmall)
+        Text(localizedWinkName(reference.name), style = MaterialTheme.typography.titleSmall)
         if (message.isWinkPending) {
             MsngrLinearWavyProgressIndicator(Modifier.width(120.dp).padding(bottom = 8.dp))
             Text(stringResource(R.string.wink_downloading), style = MaterialTheme.typography.labelSmall)
@@ -212,11 +382,40 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
     }
     var busy by remember(account, reference.metadata.sha1d) { mutableStateOf(false) }
     var error by remember(account, reference.metadata.sha1d) { mutableStateOf<String?>(null) }
+    var status by remember(account, reference.metadata.sha1d) { mutableStateOf<String?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val owner = account ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            error = null
+            status = null
+            try {
+                withContext(Dispatchers.IO) {
+                    check(context.winkAccount() == owner) { resources.getString(R.string.wink_account_changed) }
+                    val cabBytes = store.bytes(owner, reference.metadata)
+                        ?: error(resources.getString(R.string.wink_not_cached))
+                    val mcoBytes = MsnWinkPackage.exportMco(reference, cabBytes)
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(mcoBytes) }
+                        ?: error(resources.getString(R.string.wink_export_failed))
+                }
+                status = resources.getString(R.string.wink_exported)
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                error = failure.message ?: resources.getString(R.string.wink_export_failed)
+            } finally {
+                busy = false
+            }
+        }
+    }
     val optionsEnabled = !busy && !message.isWinkPending && message.winkTransferError == null
     val canChangeSaved = libraryState == WinkLibraryState.Saved || libraryState == WinkLibraryState.Unsaved
+    val canExport = canChangeSaved
     val canRetry = !message.isWinkPending && message.winkTransferError != null &&
         message.author == MessageAuthor.Contact
-    val actionCount = 1 + (if (canChangeSaved) 1 else 0) + (if (canRetry) 1 else 0)
+    val actionCount = 1 + (if (canChangeSaved) 1 else 0) + (if (canExport) 1 else 0) + (if (canRetry) 1 else 0)
+    var actionIndex = 0
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden,
@@ -234,13 +433,29 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
             }
             Text(localizedWinkName(reference.name), Modifier.padding(top = 8.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
             if (message.isWinkPending) {
-                MsngrLinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp))
-                Text(stringResource(R.string.wink_downloading), style = MaterialTheme.typography.bodySmall)
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MsngrLinearWavyProgressIndicator(
+                        Modifier.fillMaxWidth().testTag("wink_sheet_progress"),
+                    )
+                    Text(
+                        stringResource(R.string.wink_downloading),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             } else message.winkTransferError?.let { transferError ->
-                Text(localizeUserMessage(transferError), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    localizeUserMessage(transferError),
+                    Modifier.padding(bottom = 16.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             SegmentedListItem(onClick = { play = true }, enabled = optionsEnabled,
-                shapes = ListItemDefaults.segmentedShapes(0, actionCount),
+                shapes = ListItemDefaults.segmentedShapes(actionIndex++, actionCount),
                 leadingContent = { Icon(Icons.Default.PlayArrow, null) },
                 content = { Text(stringResource(R.string.common_play)) })
             if (canChangeSaved) {
@@ -250,6 +465,7 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
                     scope.launch {
                         busy = true
                         error = null
+                        status = null
                         try {
                             withContext(Dispatchers.IO) {
                                 check(context.winkAccount() == owner) { resources.getString(R.string.wink_account_changed) }
@@ -266,24 +482,40 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
                         catch (failure: Exception) { error = failure.message ?: resources.getString(R.string.wink_update_saved_failed) }
                         finally { busy = false }
                     }
-                }, enabled = optionsEnabled, shapes = ListItemDefaults.segmentedShapes(1, actionCount),
+                }, enabled = optionsEnabled, shapes = ListItemDefaults.segmentedShapes(actionIndex++, actionCount),
                     leadingContent = { Icon(if (remove) Icons.Default.Delete else Icons.Default.Add, null,
                         tint = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) },
                     trailingContent = { if (busy) MsngrCircularWavyProgressIndicator(Modifier.size(20.dp)) },
                     content = { Text(stringResource(if (remove) R.string.wink_save_remove else R.string.wink_save_add),
                         color = if (remove && optionsEnabled) MaterialTheme.colorScheme.error else LocalContentColor.current) })
             }
+            if (canExport) {
+                SegmentedListItem(
+                    onClick = { exportLauncher.launch(MsnWinkPackage.suggestedMcoFileName(reference.name)) },
+                    enabled = optionsEnabled,
+                    shapes = ListItemDefaults.segmentedShapes(actionIndex++, actionCount),
+                    leadingContent = { Icon(Icons.Default.Download, null) },
+                    content = { Text(stringResource(R.string.wink_export)) },
+                )
+            }
             if (canRetry) {
                 SegmentedListItem(onClick = onRetry, enabled = !busy,
-                    shapes = ListItemDefaults.segmentedShapes(actionCount - 1, actionCount),
+                    shapes = ListItemDefaults.segmentedShapes(actionIndex++, actionCount),
                     leadingContent = { Icon(Icons.Default.Refresh, null) },
                     content = { Text(stringResource(R.string.common_retry)) })
             }
+            status?.let { Text(localizeUserMessage(it), Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
             error?.let { Text(localizeUserMessage(it), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }
     if (play) WinkOverlay(reference, { play = false })
 }
+
+private fun Context.queryDocumentDisplayName(uri: Uri): String? = runCatching {
+    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0) else null
+    }
+}.getOrNull() ?: uri.lastPathSegment
 
 internal fun java.io.InputStream.readBytesBounded(limit: Int): ByteArray {
     val result = java.io.ByteArrayOutputStream()

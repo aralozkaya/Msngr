@@ -11,16 +11,24 @@ Preview is available even when sending is unavailable. Custom saved winks also o
 in this menu; bundled defaults cannot be deleted. Opening the emoticon button's menu keeps the
 keyboard open until a picker is selected.
 
-**Get more winks** opens Escargot's wink catalog in an in-app browser. The site's **InstallContent**
-button originally called a Windows ActiveX object, rather than a custom URL handler. Msngr translates
-that call into a bounded HTTPS download and asks which package to add. The original nested CAB and
-its signature are retained. The catalog itself remains remote, so its contents can change.
-The selector offers downloads from the catalog; it has no local-file picker.
+**Get more winks** is a split button at the bottom of the picker. Its main action opens Escargot's wink
+catalog in an in-app browser when configured (and stays visible in a disabled state when the current
+server has no wink catalog configured). The split menu remains enabled and offers **Import from MCO file**,
+which opens the system file picker to import local `.mco` (or direct wink `.cab`/`.mct`) packages into
+the signed-in account's wink library. Names come from the package manifest (`wink:name` or installer `name`)
+with filename fallback, and thumbnails come from the package CAB. Long-pressing any custom wink in the
+picker (or opening its message bottom sheet) offers **Export .mco** to repackage the wink CAB and its
+original signature/attributes back into a standard `.mco` installer file, as well as **Delete** for custom
+library winks.
+
+In the wink catalog browser, the site's **InstallContent** button originally called a Windows ActiveX object,
+rather than a custom URL handler. Msngr translates that call into a bounded HTTPS download and asks which
+package to add. The original nested CAB and its signature are retained. The catalog itself remains remote,
+so its contents can change.
 
 An external browser can also launch an Escargot package import with
 `msngr://winks?url=<percent-encoded HTTPS package URL>`. This is a Msngr handler, not an existing
-Escargot protocol. Local-file and content-provider imports are not supported. Additional winks received from
-contacts can still be saved to the collection.
+Escargot protocol. Additional winks received from contacts can still be saved to the collection.
 
 Tap a wink in a conversation to open its standard Material bottom sheet with the thumbnail,
 name, and **Play** action. Custom winks offer **Add to saved winks** or **Remove from saved winks**.
@@ -71,9 +79,10 @@ the originating group conversation. Cached packages avoid another transfer. Grou
 tests exercise real P2P packets with in-memory transports; live desktop group wink interoperability
 has not been verified.
 
-Downloads use the MSNObject EUF GUID `A4268EEC-FEC5-49E5-95C3-F126696BDBF6`, SLP AppID 1 and the
-P2Pv1 footer 1. P2Pv2's bridge footer stays zero. The existing bounded P2P transport is reused;
-only a pending wink request can allocate more than the display-picture limit.
+Downloads use the MSNObject EUF GUID `A4268EEC-FEC5-49E5-95C3-F126696BDBF6` and SLP AppID 17
+(matching Windows Live Messenger 2009; incoming requests also accept legacy AppIDs 1 and 12).
+P2Pv1 echoes the request AppID in the footer while P2Pv2's bridge footer stays zero. The existing
+bounded P2P transport is reused; only a pending wink request can allocate more than the display-picture limit.
 The packet conventions are corroborated by [aMSN's MSNObject requests](https://github.com/tomhennigan/amsn/blob/master/amsn/msnp2p.tcl)
 and its [wink implementation](https://github.com/tomhennigan/amsn/blob/master/amsn/plugins/winks/winks.tcl).
 

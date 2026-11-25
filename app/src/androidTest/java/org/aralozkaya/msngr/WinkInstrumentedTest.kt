@@ -167,9 +167,11 @@ class WinkInstrumentedTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Bouncy Ball").performTouchInput { longClick() }
         compose.onNodeWithText("Preview").assertIsDisplayed()
+        compose.onNodeWithText("Export .mco").assertDoesNotExist()
         compose.onNodeWithText("Delete").assertDoesNotExist()
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("Screen Punch").performScrollTo().assertIsDisplayed().performTouchInput { longClick() }
+        compose.onNodeWithText("Export .mco").assertIsDisplayed()
         compose.onNodeWithText("Delete").assertIsDisplayed().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Screen Punch").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("Bouncy Ball").performScrollTo().assertIsDisplayed()
@@ -186,8 +188,11 @@ class WinkInstrumentedTest {
         compose.onNodeWithContentDescription("Show emoticons").performTouchInput { longClick() }
         compose.onNodeWithText("Winks").performClick()
         compose.onNodeWithTag("wink_picker").assertIsDisplayed()
-        compose.onNodeWithText("Get more winks").assertIsDisplayed()
-        compose.onNodeWithText("Import a file").assertDoesNotExist()
+        compose.onNodeWithText("Winks").assertDoesNotExist()
+        compose.onNodeWithText("Get more winks").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("wink_more_options").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithText("Import from MCO file").assertIsDisplayed().assertIsEnabled()
+        androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("Auto-play").assertDoesNotExist()
         compose.onNodeWithText("Sound").assertDoesNotExist()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
@@ -450,6 +455,26 @@ class WinkInstrumentedTest {
         } } }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Bouncy Ball").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Bouncy Ball").assertIsDisplayed()
-        compose.onNodeWithText("Get more winks").assertDoesNotExist()
+        compose.onNodeWithText("Get more winks").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("wink_more_options").assertIsDisplayed().assertIsEnabled().performClick()
+        compose.onNodeWithText("Import from MCO file").assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test fun downloadingWinkSheetHasClearSpacingAboveActionItems() {
+        installedFixture()
+        val reference = org.aralozkaya.msngr.protocol.WinkReference(
+            org.aralozkaya.msngr.protocol.MsnDisplayPicture.create("peer@example.test", byteArrayOf(1), 8), "Custom Wink")
+        val message = org.aralozkaya.msngr.data.ChatMessage(1, "peer",
+            org.aralozkaya.msngr.data.MessageAuthor.Contact, "Wink", 1, wink = reference, isWinkPending = true)
+        compose.setContent { MaterialTheme { Surface {
+            WinkMessageSheet(message, onDismiss = {}, onRetry = {})
+        } } }
+        compose.onNodeWithTag("wink_sheet_progress").assertIsDisplayed()
+        val downloadingBounds = compose.onNodeWithText("Downloading wink…").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val playBounds = compose.onNodeWithText("Play").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(
+            "Expected >= 14.dp spacing between downloading indicator label and Play item, got ${playBounds.top - downloadingBounds.bottom}",
+            playBounds.top - downloadingBounds.bottom >= 14.dp,
+        )
     }
 }

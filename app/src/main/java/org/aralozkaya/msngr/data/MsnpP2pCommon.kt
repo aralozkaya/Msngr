@@ -19,7 +19,12 @@ internal object MsnpP2pUtil {
     private const val DISPLAY_PICTURE_GUID = "A4268EEC-FEC5-49E5-95C3-F126696BDBF6"
     private const val ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 
-    fun objectAppId(type: Int): Int = when (type) { 11 -> 20; 15 -> 33; 8, 3 -> 1; else -> error("Unsupported MSNObject type.") }
+    fun objectAppId(type: Int): Int = when (type) { 8 -> org.aralozkaya.msngr.protocol.MsnWink.APP_ID; 11 -> 20; 15 -> 33; 3 -> 1; else -> error("Unsupported MSNObject type.") }
+
+    fun acceptsObjectAppId(type: Int, appId: String?): Boolean = when (type) {
+        8 -> appId == org.aralozkaya.msngr.protocol.MsnWink.APP_ID.toString() || appId == "1" || appId == "12"
+        else -> appId == objectAppId(type).toString()
+    }
 
     fun objectByteLimit(picture: MsnDisplayPicture?): Int = when (picture?.objectType) {
         8 -> picture.size.coerceAtMost(org.aralozkaya.msngr.protocol.MsnWink.MAX_CAB_BYTES)
@@ -55,7 +60,7 @@ internal object MsnpP2pUtil {
         }.getOrNull() ?: return null
         return localPicture?.takeIf { picture ->
             (picture.metadata.objectType !in listOf(8, 11, 15) ||
-                (requestBody.field("AppID") == objectAppId(picture.metadata.objectType).toString() &&
+                (acceptsObjectAppId(picture.metadata.objectType, requestBody.field("AppID")) &&
                     requestBody.field("EUF-GUID")?.trim('{', '}')?.equals(DISPLAY_PICTURE_GUID, true) == true)) &&
                 picture.metadata.sha1d == requestedObject.sha1d &&
                 picture.metadata.creator.equals(requestedObject.creator, true) &&

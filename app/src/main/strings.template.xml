@@ -2111,6 +2111,18 @@
     <string name="wink_download_failed_generic"></string>
     <!-- Reference (en): Get more winks -->
     <string name="wink_get_more"></string>
+    <!-- Reference (en): More wink options -->
+    <string name="wink_more_options"></string>
+    <!-- Reference (en): Import from MCO file -->
+    <string name="wink_import"></string>
+    <!-- Reference (en): Export .mco -->
+    <string name="wink_export"></string>
+    <!-- Reference (en): Could not import wink. -->
+    <string name="wink_import_failed"></string>
+    <!-- Reference (en): Could not export wink. -->
+    <string name="wink_export_failed"></string>
+    <!-- Reference (en): Wink exported. -->
+    <string name="wink_exported"></string>
     <!-- Reference (en): The catalog stopped. Close it and try again. -->
     <string name="wink_catalog_stopped"></string>
     <!-- Reference (en): Add winks -->
@@ -2153,9 +2165,6 @@
     <string name="wink_play_failed"></string>
     <!-- Reference (en): Close wink -->
     <string name="wink_close_player"></string>
-    <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <!-- Reference (en): Winks -->
-    <string name="wink_title_plural"></string>
     <!-- Reference (en): Wink is unavailable. -->
     <string name="wink_unavailable"></string>
     <!-- Reference (en): Could not delete wink. -->

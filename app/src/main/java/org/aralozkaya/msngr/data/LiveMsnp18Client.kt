@@ -2643,8 +2643,8 @@ internal class LiveMsnp18Client(
     }
 
     private fun winkName(metadata: MsnDisplayPicture): String = runCatching {
-        MsnBase64.decode(metadata.friendly)?.toString(Charsets.UTF_16LE)?.trimEnd('\u0000')
-    }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 120 } ?: "Wink"
+        MsnBase64.decode(metadata.friendly)?.toString(Charsets.UTF_16LE)?.trimEnd('\u0000')?.trim()
+    }.getOrNull()?.takeIf { it.isNotBlank() && it.length <= 120 && !it.equals("Unused", ignoreCase = true) } ?: "Wink"
 
     /** One object download can satisfy offers in several conversations with the same sender. */
     private fun completeWinkTransfer(sender: String, metadata: MsnDisplayPicture, bytes: ByteArray) {
@@ -2654,19 +2654,29 @@ internal class LiveMsnp18Client(
         if (waiting.isEmpty()) return
         val account = signedInStorageAccount
         scope.launch {
+            var parsedPackage: org.aralozkaya.msngr.protocol.WinkPackage? = null
             val validationError = runCatching {
                 check(metadata.matches(bytes)) { "Wink data does not match its metadata." }
-                requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes)) { "Unsupported or invalid wink package." }
+                parsedPackage = requireNotNull(org.aralozkaya.msngr.protocol.MsnWinkPackage.parse(bytes)) { "Unsupported or invalid wink package." }
             }.exceptionOrNull()
             for ((key, pending) in waiting) {
                 if (account != signedInStorageAccount) return@launch
                 val contactId = key.substringBefore('\n')
-                val reference = mutableMessages.value[contactId]?.firstOrNull { it.id == pending.messageId }?.wink ?: continue
+                val currentReference = mutableMessages.value[contactId]?.firstOrNull { it.id == pending.messageId }?.wink ?: continue
+                val resolvedName = winkStore?.knownName(account, metadata)
+                    ?: parsedPackage?.name?.takeIf(String::isNotBlank)
+                    ?: currentReference.name.takeUnless { it.equals("Unused", ignoreCase = true) }
+                    ?: "Wink"
+                val reference = currentReference.copy(name = resolvedName)
                 val error = validationError ?: runCatching {
                     winkStore?.receive(account, contactId, reference, bytes)
                 }.exceptionOrNull()
-                if (account == signedInStorageAccount) updateWink(contactId, pending.messageId,
-                    error?.let { "Wink could not be opened: ${it.message ?: "invalid package"}" })
+                if (account == signedInStorageAccount) updateWink(
+                    contactId = contactId,
+                    id = pending.messageId,
+                    error = error?.let { "Wink could not be opened: ${it.message ?: "invalid package"}" },
+                    resolvedName = if (error == null) resolvedName else null,
+                )
             }
         }
     }
@@ -3884,10 +3894,20 @@ internal class LiveMsnp18Client(
                 System.nanoTime() - it.createdAt <= 600_000_000_000L
         }?.data
 
-    private fun updateWink(contactId: String, id: Long, error: String?) {
+    private fun updateWink(contactId: String, id: Long, error: String?, resolvedName: String? = null) {
         mutableMessages.update { conversations ->
             conversations + (contactId to conversations[contactId].orEmpty().map {
-                if (it.id == id) it.copy(isWinkPending = false, winkTransferError = error, autoPlayWink = error == null) else it
+                if (it.id == id) {
+                    val currentWink = it.wink
+                    val nameChanged = resolvedName != null && currentWink != null && resolvedName != currentWink.name
+                    it.copy(
+                        text = if (nameChanged) "Wink: $resolvedName" else it.text,
+                        wink = if (nameChanged) currentWink.copy(name = resolvedName) else currentWink,
+                        isWinkPending = false,
+                        winkTransferError = error,
+                        autoPlayWink = error == null,
+                    )
+                } else it
             })
         }
     }
