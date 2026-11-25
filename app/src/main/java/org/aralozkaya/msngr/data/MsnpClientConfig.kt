@@ -8,7 +8,9 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.ServerConfig
 import org.w3c.dom.Element
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import javax.xml.parsers.DocumentBuilderFactory
@@ -39,6 +41,9 @@ data class MsgrClientConfig(
     val textAdUrl: String? = null,
     val textAdRotationSeconds: Int = DEFAULT_TEXT_AD_ROTATION_SECONDS,
     val tabs: List<MessengerTabSite> = emptyList(),
+    val appDirServiceUrl: String? = null,
+    val addressBookUrl: String? = null,
+    val storageServiceUrl: String? = null,
 ) {
     companion object {
         const val DEFAULT_AD_REFRESH_SECONDS = 300
@@ -54,6 +59,9 @@ internal data class ParsedMsgrConfig(
     val textAdRotationSeconds: Int = MsgrClientConfig.DEFAULT_TEXT_AD_ROTATION_SECONDS,
     val slotUrls: List<Pair<String, String>> = emptyList(),
     val inlineTabs: List<MessengerTabSite> = emptyList(),
+    val appDirServiceUrl: String? = null,
+    val addressBookUrl: String? = null,
+    val storageServiceUrl: String? = null,
 )
 
 /**
@@ -67,14 +75,26 @@ object MsnpClientConfigService {
     private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
     suspend fun fetchConfig(serverConfig: ServerConfig): MsgrClientConfig {
-        val configHost = serverConfig.configServer.normalizedHttpHost()
-        if (configHost.isEmpty()) return MsgrClientConfig()
+        val getEndpoints = candidateServiceEndpoints(
+            hostOrUrl = serverConfig.configServer,
+            defaultPath = "/Config/MsgrConfig.asmx?ver=$CLIENT_VERSION",
+        )
+        if (getEndpoints.isEmpty()) return MsgrClientConfig()
 
-        val wlmUrl = "https://$configHost/Config/MsgrConfig.asmx?ver=$CLIENT_VERSION"
-        val rawXml = runCatching { getText(wlmUrl) }
-            .getOrElse {
-                postGetClientConfigSoap("https://$configHost/Config/MsgrConfig.asmx")
+        val soapEndpoints = candidateServiceEndpoints(
+            hostOrUrl = serverConfig.configServer,
+            defaultPath = "/Config/MsgrConfig.asmx",
+        )
+        var succeededEndpoint: String? = null
+        val rawXml = runCatching {
+            withServiceEndpointFallback(getEndpoints) { url ->
+                getText(url).also { succeededEndpoint = url }
             }
+        }.getOrElse {
+            withServiceEndpointFallback(soapEndpoints) { url ->
+                postGetClientConfigSoap(url).also { succeededEndpoint = url }
+            }
+        }
 
         val parsed = parseMsgrConfig(rawXml)
         val resolvedTabs = if (parsed.slotUrls.isNotEmpty()) {
@@ -92,11 +112,10 @@ object MsnpClientConfigService {
             parsed.inlineTabs
         }
 
-        val fallbackAdsHost = serverConfig.adsServer.normalizedHttpHost()
         val bannerAdUrl = parsed.bannerAdUrl
-            ?: fallbackAdsHost.takeIf { it.isNotEmpty() }?.let { "https://$it/ads/banner" }
+            ?: resolveFallbackAdUrl(serverConfig.adsServer, serverConfig.configServer, succeededEndpoint, "/ads/banner")
         val textAdUrl = parsed.textAdUrl
-            ?: fallbackAdsHost.takeIf { it.isNotEmpty() }?.let { "https://$it/ads/txt" }
+            ?: resolveFallbackAdUrl(serverConfig.adsServer, serverConfig.configServer, succeededEndpoint, "/ads/txt")
 
         return MsgrClientConfig(
             todayUrl = parsed.todayUrl,
@@ -105,7 +124,28 @@ object MsnpClientConfigService {
             textAdUrl = textAdUrl,
             textAdRotationSeconds = parsed.textAdRotationSeconds,
             tabs = resolvedTabs,
+            appDirServiceUrl = parsed.appDirServiceUrl,
+            addressBookUrl = parsed.addressBookUrl,
+            storageServiceUrl = parsed.storageServiceUrl,
         )
+    }
+
+    private fun resolveFallbackAdUrl(
+        adsServer: String,
+        configServer: String,
+        succeededConfigEndpoint: String?,
+        path: String,
+    ): String? {
+        val normalizedAdsHost = adsServer.normalizedHttpHost()
+        if (normalizedAdsHost.isEmpty()) return null
+        val trimmedAds = adsServer.trim()
+        if (normalizedAdsHost.equals(configServer.normalizedHttpHost(), ignoreCase = true) &&
+            succeededConfigEndpoint?.startsWith("http://", ignoreCase = true) == true &&
+            !trimmedAds.startsWith("https://", ignoreCase = true)
+        ) {
+            return "http://$normalizedAdsHost$path"
+        }
+        return candidateServiceEndpoints(trimmedAds, path).firstOrNull()
     }
 
     suspend fun fetchBannerAd(url: String): MessengerBannerAd? {
@@ -188,6 +228,33 @@ object MsnpClientConfigService {
             }
         }
 
+        val appDirConfig = (configRoot.getElementsByTagNameNS("*", "AppDirConfig").item(0) as? Element)
+            ?: (localized.getElementsByTagNameNS("*", "AppDirConfig").item(0) as? Element)
+        val appDirServiceUrl = appDirConfig?.let { el ->
+            sequenceOf("AppDirSeviceURL", "AppDirServiceURL", "AppDirPageURL")
+                .mapNotNull { tag -> el.firstDescendantText(tag).takeIf { it.isNotEmpty() } }
+                .mapNotNull(::normalizeAppDirServiceUrl)
+                .firstOrNull()
+        }
+
+        val abchCfg = (configRoot.getElementsByTagNameNS("*", "AbchCfg").item(0) as? Element)
+            ?: (localized.getElementsByTagNameNS("*", "AbchCfg").item(0) as? Element)
+        val addressBookUrl = abchCfg?.let { el ->
+            sequenceOf("url", "Url", "URL")
+                .mapNotNull { tag -> el.firstDescendantText(tag).takeIf { it.isNotEmpty() } }
+                .mapNotNull(::normalizeWebUrl)
+                .firstOrNull()
+        }
+
+        val contactCard = (configRoot.getElementsByTagNameNS("*", "ContactCard").item(0) as? Element)
+            ?: (localized.getElementsByTagNameNS("*", "ContactCard").item(0) as? Element)
+        val storageServiceUrl = contactCard?.let { el ->
+            sequenceOf("GetItemVerUrl", "StorageServiceUrl", "GetItemUrl")
+                .mapNotNull { tag -> el.firstDescendantText(tag).takeIf { it.isNotEmpty() } }
+                .mapNotNull(::normalizeWebUrl)
+                .firstOrNull()
+        }
+
         return ParsedMsgrConfig(
             todayUrl = todayUrl,
             bannerAdUrl = bannerAdUrl,
@@ -196,6 +263,9 @@ object MsnpClientConfigService {
             textAdRotationSeconds = textAdRotation,
             slotUrls = slotUrls,
             inlineTabs = inlineTabs,
+            appDirServiceUrl = appDirServiceUrl,
+            addressBookUrl = addressBookUrl,
+            storageServiceUrl = storageServiceUrl,
         )
     }
 
@@ -265,6 +335,70 @@ object MsnpClientConfigService {
         if (trimmed.isEmpty()) return null
         val resolved = runCatching { URL(URL(baseUrl), trimmed).toString() }.getOrDefault(trimmed)
         return normalizeWebUrl(resolved)
+    }
+
+    internal fun candidateServiceEndpoints(hostOrUrl: String, defaultPath: String = ""): List<String> {
+        val trimmed = hostOrUrl.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val normalizedPath = when {
+            defaultPath.isBlank() -> ""
+            defaultPath.startsWith("/") -> defaultPath
+            else -> "/$defaultPath"
+        }
+        val upgraded = upgradeCommunityHttpsUrl(trimmed)
+        if (upgraded.startsWith("http://", ignoreCase = true) ||
+            upgraded.startsWith("https://", ignoreCase = true)
+        ) {
+            return listOfNotNull(appendPathIfMissing(upgraded, normalizedPath))
+        }
+        if ("://" in upgraded) return emptyList()
+        val bare = upgraded.trimStart('/')
+        return listOfNotNull(
+            appendPathIfMissing("https://$bare", normalizedPath),
+            appendPathIfMissing("http://$bare", normalizedPath),
+        ).distinct()
+    }
+
+    internal suspend fun <T> withServiceEndpointFallback(
+        endpoints: List<String>,
+        block: suspend (String) -> T,
+    ): T {
+        require(endpoints.isNotEmpty()) { "No service endpoints configured." }
+        var lastError: IOException? = null
+        for ((index, endpoint) in endpoints.withIndex()) {
+            try {
+                return block(endpoint)
+            } catch (error: IOException) {
+                lastError = error
+                if (index == endpoints.lastIndex) throw error
+            }
+        }
+        throw requireNotNull(lastError)
+    }
+
+    internal fun normalizeAppDirServiceUrl(rawUrl: String): String? {
+        val normalized = normalizeWebUrl(rawUrl) ?: return null
+        val uri = runCatching { URI(normalized) }.getOrNull() ?: return normalized
+        val path = uri.path.orEmpty()
+        if (!path.endsWith("/Directory.aspx", ignoreCase = true)) return normalized
+        val rewrittenPath = path.dropLast("Directory.aspx".length) + "AppDirectory.asmx"
+        return runCatching {
+            URI(uri.scheme, uri.userInfo, uri.host, uri.port, rewrittenPath, uri.query, uri.fragment)
+                .toASCIIString()
+        }.getOrDefault(normalized)
+    }
+
+    private fun appendPathIfMissing(rawUrl: String, normalizedPath: String): String? {
+        val uri = runCatching { URI(rawUrl) }.getOrNull() ?: return null
+        val scheme = uri.scheme?.lowercase() ?: return null
+        if (scheme != "http" && scheme != "https") return null
+        if (uri.host.isNullOrBlank()) return null
+        val currentPath = uri.path.orEmpty()
+        if (normalizedPath.isEmpty() || (currentPath.isNotEmpty() && currentPath != "/")) {
+            return rawUrl
+        }
+        val base = rawUrl.substringBefore('#').substringBefore('?').trimEnd('/')
+        return "$base$normalizedPath"
     }
 
     internal fun upgradeCommunityHttpsUrl(rawUrl: String): String {

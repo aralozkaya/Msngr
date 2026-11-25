@@ -75,6 +75,7 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
@@ -160,18 +161,50 @@ internal fun GameCatalogDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val activitiesServer = remember(context) {
-        runCatching { SessionPrefs.readServerConfig(context).activitiesServer }
-            .getOrDefault(MsnpGameCatalogService.DEFAULT_ACTIVITIES_SERVER)
+    val portalStateFlow = remember(context) {
+        (context.applicationContext as? MsngrApplication)?.container?.messengerRepository?.portalState
     }
-    var catalog by remember { mutableStateOf(MsnpGameCatalogService.defaultCatalog()) }
+    val portalState by portalStateFlow?.collectAsState() ?: remember { mutableStateOf(PortalState()) }
+    val discoveredActivitiesServer = portalState.config.appDirServiceUrl
+    val activitiesServer = remember(context, discoveredActivitiesServer) {
+        val configured = runCatching { SessionPrefs.readServerConfig(context) }.getOrNull()
+        val rawActivities = configured?.activitiesServer?.takeIf { it.isNotBlank() }
+        val rawMain = configured?.mainServer?.takeIf { it.isNotBlank() }
+        when {
+            !discoveredActivitiesServer.isNullOrBlank() &&
+                (rawActivities == null || rawMain == null || rawActivities.equals(rawMain, ignoreCase = true)) ->
+                discoveredActivitiesServer
+            rawActivities != null -> rawActivities
+            else -> MsnpGameCatalogService.currentActivitiesServer.ifBlank {
+                MsnpGameCatalogService.DEFAULT_ACTIVITIES_SERVER
+            }
+        }
+    }
+    var catalog by remember(activitiesServer) {
+        mutableStateOf(
+            MsnpGameCatalogService.cachedCatalog(activitiesServer)
+                ?: if (activitiesServer.equals(MsnpGameCatalogService.DEFAULT_ACTIVITIES_SERVER, ignoreCase = true)) {
+                    MsnpGameCatalogService.defaultCatalog()
+                } else {
+                    GameCatalog(emptyList(), emptyList())
+                },
+        )
+    }
+    var loadingCatalog by remember(activitiesServer) {
+        mutableStateOf(catalog.visibleEntries.isEmpty())
+    }
     var startingAppId by remember { mutableStateOf<Int?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val backProgress = remember { Animatable(0f) }
 
     LaunchedEffect(activitiesServer) {
-        catalog = MsnpGameCatalogService.fetchCatalog(activitiesServer = activitiesServer)
+        loadingCatalog = catalog.visibleEntries.isEmpty()
+        try {
+            catalog = MsnpGameCatalogService.fetchCatalog(activitiesServer = activitiesServer)
+        } finally {
+            loadingCatalog = false
+        }
     }
 
     Dialog(
@@ -229,6 +262,7 @@ internal fun GameCatalogDialog(
             ) { padding ->
                 GameCatalogContent(
                     catalog = catalog,
+                    loading = loadingCatalog,
                     startingAppId = startingAppId,
                     error = error,
                     onStart = { entry ->
@@ -257,6 +291,7 @@ internal fun GameCatalogDialog(
 @Composable
 private fun GameCatalogContent(
     catalog: GameCatalog,
+    loading: Boolean = false,
     startingAppId: Int?,
     error: String?,
     onStart: (GameCatalogEntry) -> Unit,
@@ -282,6 +317,14 @@ private fun GameCatalogContent(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+        if (loading && catalog.visibleEntries.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                MsngrCircularWavyProgressIndicator()
+            }
         }
 
         val entriesByCategory = remember(catalog) {
@@ -392,18 +435,46 @@ internal const val WORDLE_NATIVE_PANE_HEIGHT = 560
 internal fun nativeGamePaneDimensions(entry: GameCatalogEntry): Pair<Int, Int> {
     val width = entry.width.takeIf { it > 0 }?.coerceAtLeast(DEFAULT_NATIVE_GAME_PANE_WIDTH)
         ?: DEFAULT_NATIVE_GAME_PANE_WIDTH
-    val minHeight = when (entry.appId) {
-        100000 -> WHITEBOARD_NATIVE_PANE_HEIGHT
-        103000 -> WORDLE_NATIVE_PANE_HEIGHT
+    val minHeight = when {
+        entry.appId == 100000 || entry.name.contains("Whiteboard", ignoreCase = true) -> WHITEBOARD_NATIVE_PANE_HEIGHT
+        entry.appId == 103000 || entry.name.contains("Wordle", ignoreCase = true) -> WORDLE_NATIVE_PANE_HEIGHT
         else -> DEFAULT_NATIVE_GAME_PANE_HEIGHT
     }
     val height = entry.height.takeIf { it > 0 }?.coerceAtLeast(minHeight) ?: minHeight
     return width to height
 }
 
+internal fun isAllowedGameHost(entryUrl: String, requestUrl: String): Boolean {
+    val upgradedEntry = MsnpGameCatalogService.upgradeKnownHttpsUrl(entryUrl)
+    val parsedEntry = runCatching { URL(upgradedEntry) }.getOrNull() ?: return false
+    val entryProtocol = parsedEntry.protocol.lowercase()
+    if ((entryProtocol != "http" && entryProtocol != "https") || parsedEntry.host.isNullOrBlank()) {
+        return false
+    }
+    val upgradedReq = MsnpGameCatalogService.upgradeKnownHttpsUrl(requestUrl)
+    val parsedReq = runCatching { URL(upgradedReq) }.getOrNull() ?: return false
+    val reqProtocol = parsedReq.protocol.lowercase()
+    return (reqProtocol == "http" || reqProtocol == "https") && !parsedReq.host.isNullOrBlank()
+}
+
+internal fun shouldInjectGameBridgeHtml(
+    entryUrl: String,
+    requestUrl: String,
+    isMainFrame: Boolean,
+): Boolean {
+    if (!isAllowedGameHost(entryUrl, requestUrl)) return false
+    val upgradedReq = MsnpGameCatalogService.upgradeKnownHttpsUrl(requestUrl)
+    val path = runCatching { URL(upgradedReq).path.orEmpty().lowercase() }.getOrDefault("")
+    if (path.contains("help")) return false
+    return isMainFrame || path.endsWith(".htm") || path.endsWith(".html")
+}
+
+internal const val DEFAULT_GAME_PANE_BG_HEX = "#516CA1"
+internal const val DEFAULT_GAME_PANE_BG_COLOR_INT = 0xFF516CA1.toInt()
+internal val DefaultGamePaneBackgroundColor = Color(0xFF516CA1)
+
 private const val P4_BASE_CSS = """
 html {
-    background-color: #ffffff;
     height: 100%;
 }
 body[scroll="no"] {
@@ -469,7 +540,7 @@ internal class NativeGamePaneContainer(context: Context) : FrameLayout(context) 
     var paneHeightPx: Int = 0
 
     init {
-        setBackgroundColor(AndroidColor.WHITE)
+        setBackgroundColor(DEFAULT_GAME_PANE_BG_COLOR_INT)
         clipChildren = true
         clipToPadding = true
     }
@@ -648,7 +719,7 @@ internal class GameWebViewController(
         val initialWidthPx = (paneWidth * density).roundToInt()
         val initialHeightPx = (paneHeight * density).roundToInt()
         layoutParams = FrameLayout.LayoutParams(initialWidthPx, initialHeightPx)
-        setBackgroundColor(AndroidColor.WHITE)
+        setBackgroundColor(DEFAULT_GAME_PANE_BG_COLOR_INT)
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -679,16 +750,15 @@ internal class GameWebViewController(
         addJavascriptInterface(BridgeInterface(), "AndroidP4Bridge")
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val target = MsnpGameCatalogService.upgradeKnownHttpsUrl(request.url.toString())
+                val rawTarget = request.url.toString()
+                val target = MsnpGameCatalogService.upgradeKnownHttpsUrl(rawTarget)
                 if (target.contains("help", ignoreCase = true) &&
                     (target.endsWith(".htm", ignoreCase = true) || target.endsWith(".html", ignoreCase = true))
                 ) {
                     mainHandler.post { onOpenHelpUrl(target) }
                     return true
                 }
-                val entryHost = runCatching { URL(entry.url).host.lowercase() }.getOrDefault("")
-                val reqHost = request.url.host?.lowercase().orEmpty()
-                if (reqHost == entryHost || reqHost == "static.levelleap.com" || reqHost.endsWith(".nina.chat")) {
+                if (isAllowedGameHost(entry.url, rawTarget)) {
                     return false
                 }
                 // Never delegate to an external browser.
@@ -701,15 +771,7 @@ internal class GameWebViewController(
             ): WebResourceResponse? {
                 val rawUrl = request.url.toString()
                 val upgraded = MsnpGameCatalogService.upgradeKnownHttpsUrl(rawUrl)
-                val path = request.url.path.orEmpty().lowercase()
-                val isHtmlDocument = request.isForMainFrame ||
-                    path.endsWith(".htm") ||
-                    path.endsWith(".html")
-                val isHelpPage = path.contains("help")
-                if (isHtmlDocument && !isHelpPage &&
-                    (upgraded.startsWith("https://static.levelleap.com/") ||
-                        upgraded.startsWith("https://apps.escargot.nina.chat/"))
-                ) {
+                if (shouldInjectGameBridgeHtml(entry.url, rawUrl, request.isForMainFrame)) {
                     return runCatching {
                         fetchAndInjectHtml(upgraded, bridgeScript)
                     }.getOrNull()
@@ -938,6 +1000,21 @@ private fun normalizeNonScriptHtmlChunk(chunk: String): String {
     )
 }
 
+private val headerCharsetRegex = Regex("""charset\s*=\s*["']?([A-Za-z0-9_.:-]+)""", RegexOption.IGNORE_CASE)
+
+private fun resolveHtmlCharset(contentType: String?, bytes: ByteArray): Charset {
+    val headerCharset = contentType?.let { headerCharsetRegex.find(it)?.groupValues?.getOrNull(1) }
+    val metaCharset = headerCharset ?: String(
+        bytes,
+        0,
+        bytes.size.coerceAtMost(2048),
+        StandardCharsets.ISO_8859_1,
+    ).let { head -> headerCharsetRegex.find(head)?.groupValues?.getOrNull(1) }
+    return metaCharset?.let { name ->
+        runCatching { Charset.forName(name) }.getOrNull()
+    } ?: StandardCharsets.UTF_8
+}
+
 private fun fetchAndInjectHtml(url: String, script: String): WebResourceResponse {
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
@@ -947,8 +1024,11 @@ private fun fetchAndInjectHtml(url: String, script: String): WebResourceResponse
         setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
     }
     try {
+        check(connection.responseCode in 200..299) {
+            "Game HTML request failed with HTTP ${connection.responseCode}"
+        }
         val bytes = connection.inputStream.use { it.readBytes() }
-        val html = normalizeLegacyGameHtml(String(bytes, StandardCharsets.UTF_8))
+        val html = normalizeLegacyGameHtml(String(bytes, resolveHtmlCharset(connection.contentType, bytes)))
         val injection = "<style id=\"__p4_base_style\">$P4_BASE_CSS</style><script>$script</script>"
         val headRegex = Regex("<head[^>]*>", RegexOption.IGNORE_CASE)
         val match = headRegex.find(html)
@@ -1012,6 +1092,9 @@ internal fun buildP4PolyfillScript(
 
     return """
 (function() {
+    if (window.__p4SyncDefaultBg) {
+        try { window.__p4SyncDefaultBg(); } catch (e) {}
+    }
     if (window.__p4PolyfillInstalled) return;
     window.__p4PolyfillInstalled = true;
     window.__p4TargetWidth = $targetWidth;
@@ -1030,8 +1113,45 @@ internal fun buildP4PolyfillScript(
             root.insertBefore(styleEl, root.firstChild);
         } catch (e) {}
     };
+    var syncDefaultBackground = function() {
+        try {
+            var existing = document.getElementById('__p4_default_bg');
+            if (existing) existing.disabled = true;
+            var hasCustomBg = function(el) {
+                if (!el) return false;
+                if (el.getAttribute && el.getAttribute('bgcolor')) return true;
+                var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+                if (!cs) return false;
+                var bgImg = cs.backgroundImage;
+                if (bgImg && bgImg !== 'none') return true;
+                var bgColor = cs.backgroundColor;
+                return !!bgColor && bgColor !== 'transparent' && bgColor !== 'rgba(0, 0, 0, 0)';
+            };
+            var custom = hasCustomBg(document.documentElement) || hasCustomBg(document.body);
+            if (custom) {
+                if (existing && existing.parentNode) {
+                    existing.parentNode.removeChild(existing);
+                }
+            } else if (existing) {
+                existing.disabled = false;
+            } else {
+                var root = document.head || document.documentElement;
+                if (!root) return;
+                var bgStyle = document.createElement('style');
+                bgStyle.id = '__p4_default_bg';
+                bgStyle.textContent = 'html { background-color: $DEFAULT_GAME_PANE_BG_HEX; }';
+                root.appendChild(bgStyle);
+            }
+        } catch (e) {}
+    };
+    window.__p4SyncDefaultBg = syncDefaultBackground;
     ensureBaseStyle();
-    window.addEventListener('DOMContentLoaded', ensureBaseStyle);
+    syncDefaultBackground();
+    window.addEventListener('DOMContentLoaded', function() {
+        ensureBaseStyle();
+        syncDefaultBackground();
+    });
+    window.addEventListener('load', syncDefaultBackground);
 
     try {
         if (!navigator.browserLanguage) {
@@ -1464,7 +1584,13 @@ internal fun GameHost(
 
     // Automatically surface the sheet when an invitation is accepted by the peer.
     var previousStatus by remember(session?.id) { mutableStateOf(session?.status) }
+    var hasActivated by remember(session?.id) {
+        mutableStateOf(session?.status == GameSessionStatus.Active)
+    }
     LaunchedEffect(session?.id, session?.status) {
+        if (session?.status == GameSessionStatus.Active) {
+            hasActivated = true
+        }
         if (previousStatus == GameSessionStatus.Invited && session?.status == GameSessionStatus.Active) {
             visible = true
             closed = false
@@ -1480,84 +1606,90 @@ internal fun GameHost(
 
     if (session == null || closed) return
 
-    val controller = remember(session.id) {
-        GameWebViewController(
-            context = context,
-            sessionId = session.id,
-            entry = session.entry,
-            isInviter = session.outgoing,
-            localName = localDisplayName,
-            localEmail = localEmail,
-            peerName = peerDisplayName,
-            peerEmail = peerEmail,
-            onInitialize = {
-                scope.launch {
-                    (onInitializeChannel?.invoke()
-                        ?: context.gameRepository().initializeGameChannel(contactId, session.id))
-                }
-            },
-            onSendData = { payload ->
-                scope.launch {
-                    (onSendGameData?.invoke(payload)
-                        ?: context.gameRepository().sendGameData(contactId, session.id, payload))
-                }
-            },
-            onSendImAsUser = { text ->
-                if (text.isNotBlank()) {
-                    if (onSendImAsUser != null) {
-                        onSendImAsUser(text)
-                    } else {
-                        context.gameRepository().sendMessage(contactId, text)
+    val controller = remember(session.id, hasActivated) {
+        if (hasActivated) {
+            GameWebViewController(
+                context = context,
+                sessionId = session.id,
+                entry = session.entry,
+                isInviter = session.outgoing,
+                localName = localDisplayName,
+                localEmail = localEmail,
+                peerName = peerDisplayName,
+                peerEmail = peerEmail,
+                onInitialize = {
+                    scope.launch {
+                        (onInitializeChannel?.invoke()
+                            ?: context.gameRepository().initializeGameChannel(contactId, session.id))
                     }
-                }
-            },
-            onCloseApp = {
-                scope.launch {
-                    (onStop?.invoke() ?: context.gameRepository().stopGame(contactId, session.id))
-                    visible = false
-                    closed = true
-                }
-            },
-            onOpenHelpUrl = { url -> helpUrl = url },
-        )
+                },
+                onSendData = { payload ->
+                    scope.launch {
+                        (onSendGameData?.invoke(payload)
+                            ?: context.gameRepository().sendGameData(contactId, session.id, payload))
+                    }
+                },
+                onSendImAsUser = { text ->
+                    if (text.isNotBlank()) {
+                        if (onSendImAsUser != null) {
+                            onSendImAsUser(text)
+                        } else {
+                            context.gameRepository().sendMessage(contactId, text)
+                        }
+                    }
+                },
+                onCloseApp = {
+                    scope.launch {
+                        (onStop?.invoke() ?: context.gameRepository().stopGame(contactId, session.id))
+                        visible = false
+                        closed = true
+                    }
+                },
+                onOpenHelpUrl = { url -> helpUrl = url },
+            )
+        } else {
+            null
+        }
     }
 
     DisposableEffect(controller) {
-        onDispose { controller.destroy() }
+        onDispose { controller?.destroy() }
     }
 
     // Keep delivering P4 events to the live WebView even while minimized into the FAB!
     LaunchedEffect(
-        controller.pageFinished,
+        controller,
+        controller?.pageFinished,
         session.status,
         session.remoteAppLoaded,
         session.remoteAppClosed,
         session.receivedPackets.size,
     ) {
-        if (!controller.pageFinished) return@LaunchedEffect
+        val activeController = controller ?: return@LaunchedEffect
+        if (!activeController.pageFinished) return@LaunchedEffect
         if (session.remoteAppLoaded) {
-            controller.dispatchRemoteAppLoaded()
+            activeController.dispatchRemoteAppLoaded()
         }
-        val undelivered = session.receivedPackets.filter { it.sequence > controller.lastDeliveredSequence }
+        val undelivered = session.receivedPackets.filter { it.sequence > activeController.lastDeliveredSequence }
         for (packet in undelivered) {
-            controller.lastDeliveredSequence = packet.sequence
-            controller.dispatchDataReceived(packet.payload)
+            activeController.lastDeliveredSequence = packet.sequence
+            activeController.dispatchDataReceived(packet.payload)
         }
         if (session.remoteAppClosed) {
-            controller.dispatchRemoteAppClosed()
+            activeController.dispatchRemoteAppClosed()
         }
     }
 
-    LaunchedEffect(session.status) {
+    LaunchedEffect(controller, session.status) {
         if (session.status != GameSessionStatus.Active) {
-            controller.dismissInteractiveJsDialogs()
+            controller?.dismissInteractiveJsDialogs()
         }
     }
 
     // Surface the full-screen game dialog when a running game requests user confirmation/alert
     // while minimized into the corner button (for example, a peer requesting a game restart).
-    LaunchedEffect(controller.activeJsDialog?.id) {
-        if (controller.activeJsDialog != null && ongoing) {
+    LaunchedEffect(controller?.activeJsDialog?.id) {
+        if (controller?.activeJsDialog != null && ongoing) {
             visible = true
             closed = false
         }
@@ -1573,7 +1705,7 @@ internal fun GameHost(
         if (!ongoing) closed = true
     }
     val stop: () -> Unit = {
-        controller.dismissAllJsDialogs()
+        controller?.dismissAllJsDialogs()
         scope.launch {
             error = (onStop?.invoke() ?: context.gameRepository().stopGame(contactId, session.id))
                 .exceptionOrNull()?.message
@@ -1617,7 +1749,7 @@ internal fun GameHost(
         ) {
             BadgedBox(
                 badge = {
-                    if (hasPendingInvite || controller.activeJsDialog != null) {
+                    if (hasPendingInvite || controller?.activeJsDialog != null) {
                         Badge { Text(stringResource(R.string.game_attention_badge)) }
                     } else if (unreadMoves > 0) {
                         Badge { Text(unreadMoves.toString()) }
@@ -1665,7 +1797,7 @@ internal fun GameHost(
             decorFitsSystemWindows = false,
         ),
     ) {
-        PredictiveBackHandler(enabled = controller.activeJsDialog == null && helpUrl == null) { events ->
+        PredictiveBackHandler(enabled = controller?.activeJsDialog == null && helpUrl == null) { events ->
             try {
                 events.collect { backProgress.snapTo(it.progress) }
                 currentMinimize()
@@ -1823,68 +1955,75 @@ internal fun GameHost(
                         GameSessionStatus.Stopped,
                         GameSessionStatus.Declined,
                         GameSessionStatus.Failed -> {
-                            val paneWidthDp = controller.paneWidth.dp
-                            val paneHeightDp = controller.paneHeight.dp
-                            BoxWithConstraints(
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                val fitScale = minOf(
-                                    maxWidth / paneWidthDp,
-                                    maxHeight / paneHeightDp,
-                                ).coerceAtLeast(0.1f)
-                                val scaledWidth = paneWidthDp * fitScale
-                                val scaledHeight = paneHeightDp * fitScale
-                                val paneShape = RoundedCornerShape(4.dp)
-                                Surface(
-                                    shape = paneShape,
-                                    color = Color.White,
-                                    contentColor = Color.Black,
-                                    tonalElevation = 0.dp,
-                                    shadowElevation = 1.dp,
-                                    modifier = Modifier
-                                        .size(width = scaledWidth, height = scaledHeight)
-                                        .clip(paneShape)
-                                        .testTag("game_webview_container"),
+                            if (controller != null) {
+                                val paneWidthDp = controller.paneWidth.dp
+                                val paneHeightDp = controller.paneHeight.dp
+                                BoxWithConstraints(
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    AndroidView(
-                                        modifier = Modifier.fillMaxSize(),
-                                        factory = { ctx ->
-                                            val density = ctx.resources.displayMetrics.density.coerceAtLeast(1f)
-                                            NativeGamePaneContainer(ctx).apply {
-                                                updatePaneSize(
+                                    val fitScale = minOf(
+                                        maxWidth / paneWidthDp,
+                                        maxHeight / paneHeightDp,
+                                    ).coerceAtLeast(0.1f)
+                                    val scaledWidth = paneWidthDp * fitScale
+                                    val scaledHeight = paneHeightDp * fitScale
+                                    val paneShape = RoundedCornerShape(4.dp)
+                                    Surface(
+                                        shape = paneShape,
+                                        color = DefaultGamePaneBackgroundColor,
+                                        contentColor = Color.Black,
+                                        tonalElevation = 0.dp,
+                                        shadowElevation = 1.dp,
+                                        modifier = Modifier
+                                            .size(width = scaledWidth, height = scaledHeight)
+                                            .clip(paneShape)
+                                            .testTag("game_webview_container"),
+                                    ) {
+                                        AndroidView(
+                                            modifier = Modifier.fillMaxSize(),
+                                            factory = { ctx ->
+                                                val density = ctx.resources.displayMetrics.density.coerceAtLeast(1f)
+                                                NativeGamePaneContainer(ctx).apply {
+                                                    updatePaneSize(
+                                                        widthPx = (controller.paneWidth * density).roundToInt(),
+                                                        heightPx = (controller.paneHeight * density).roundToInt(),
+                                                    )
+                                                    (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
+                                                    addView(controller.webView)
+                                                }
+                                            },
+                                            update = { container ->
+                                                val density = container.resources.displayMetrics.density.coerceAtLeast(1f)
+                                                container.updatePaneSize(
                                                     widthPx = (controller.paneWidth * density).roundToInt(),
                                                     heightPx = (controller.paneHeight * density).roundToInt(),
                                                 )
-                                                (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
-                                                addView(controller.webView)
-                                            }
-                                        },
-                                        update = { container ->
-                                            val density = container.resources.displayMetrics.density.coerceAtLeast(1f)
-                                            container.updatePaneSize(
-                                                widthPx = (controller.paneWidth * density).roundToInt(),
-                                                heightPx = (controller.paneHeight * density).roundToInt(),
-                                            )
-                                            if (controller.webView.parent !== container) {
-                                                (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
-                                                container.addView(controller.webView)
-                                            }
-                                        },
+                                                if (controller.webView.parent !== container) {
+                                                    (controller.webView.parent as? ViewGroup)?.removeView(controller.webView)
+                                                    container.addView(controller.webView)
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+
+                                if ((session.appId == 103000 || session.entry.name.contains("Wordle", ignoreCase = true)) &&
+                                    session.status == GameSessionStatus.Active
+                                ) {
+                                    WordleTouchKeyboard(
+                                        onLetter = { ch -> controller.sendKey("keyup", ch.code, ch.toString()) },
+                                        onBackspace = { controller.sendKey("keyup", 8, "Backspace") },
+                                        onEnter = { controller.sendKey("keyup", 13, "Enter") },
+                                    )
+                                } else if ((session.appId == 102007 || session.appId == 20601359 ||
+                                        session.entry.name.contains("Tetris", ignoreCase = true)) &&
+                                    session.status == GameSessionStatus.Active
+                                ) {
+                                    TetrisTouchControls(
+                                        onKey = { code, name -> controller.sendKey("keydown", code, name) },
                                     )
                                 }
-                            }
-
-                            if (session.appId == 103000 && session.status == GameSessionStatus.Active) {
-                                WordleTouchKeyboard(
-                                    onLetter = { ch -> controller.sendKey("keyup", ch.code, ch.toString()) },
-                                    onBackspace = { controller.sendKey("keyup", 8, "Backspace") },
-                                    onEnter = { controller.sendKey("keyup", 13, "Enter") },
-                                )
-                            } else if (session.appId == 102007 && session.status == GameSessionStatus.Active) {
-                                TetrisTouchControls(
-                                    onKey = { code, name -> controller.sendKey("keydown", code, name) },
-                                )
                             }
                         }
                     }
@@ -1893,7 +2032,7 @@ internal fun GameHost(
         }
     }
 
-    controller.activeJsDialog?.let { jsDialog ->
+    controller?.activeJsDialog?.let { jsDialog ->
         GameJsDialog(
             appName = session.appName,
             dialog = jsDialog,

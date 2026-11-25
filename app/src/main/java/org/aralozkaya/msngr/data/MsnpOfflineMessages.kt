@@ -149,37 +149,40 @@ internal object MsnpOfflineMessages : OfflineMessageService {
     }
 
     private suspend fun post(host: String, action: String, ticket: String, id: String? = null): String = withContext(Dispatchers.IO) {
-        val authority = host.trim().removePrefix("https://").removePrefix("http://").substringBefore('/')
-        val connection = URL("https://$authority/rsi/rsi.asmx").openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 15_000
-            connection.instanceFollowRedirects = false
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-            connection.setRequestProperty("SOAPAction", "$NAMESPACE/$action")
-            connection.setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
-            connection.outputStream.use { it.write(buildRequest(action, ticket, id).toByteArray(Charsets.UTF_8)) }
-            val status = connection.responseCode
-            if (BuildConfig.DEBUG) runCatching { Log.i("MsnpOffline", "$action HTTP $status") }
-            val bytes = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.use { stream ->
-                    val output = java.io.ByteArrayOutputStream()
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = stream.read(buffer)
-                        if (count < 0) break
-                        check(output.size() + count <= MAX_RESPONSE_BYTES) { "The offline message response is too large." }
-                        output.write(buffer, 0, count)
-                    }
-                    output.toByteArray()
-                } ?: error("The offline message service returned no response.")
-            val response = bytes.toString(Charsets.UTF_8)
-            checkSoapFault(offlineXml(response).documentElement)
-            check(status in 200..299) { "The offline message service returned HTTP $status." }
-            response
-        } finally { connection.disconnect() }
+        val endpoints = MsnpClientConfigService.candidateServiceEndpoints(host, "/rsi/rsi.asmx")
+        check(endpoints.isNotEmpty()) { "The offline message service host is not configured." }
+        MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
+            val connection = URL(endpointUrl).openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 15_000
+                connection.instanceFollowRedirects = false
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "text/xml; charset=utf-8")
+                connection.setRequestProperty("SOAPAction", "$NAMESPACE/$action")
+                connection.setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+                connection.outputStream.use { it.write(buildRequest(action, ticket, id).toByteArray(Charsets.UTF_8)) }
+                val status = connection.responseCode
+                if (BuildConfig.DEBUG) runCatching { Log.i("MsnpOffline", "$action HTTP $status") }
+                val bytes = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.use { stream ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            check(output.size() + count <= MAX_RESPONSE_BYTES) { "The offline message response is too large." }
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    } ?: error("The offline message service returned no response.")
+                val response = bytes.toString(Charsets.UTF_8)
+                checkSoapFault(offlineXml(response).documentElement)
+                check(status in 200..299) { "The offline message service returned HTTP $status." }
+                response
+            } finally { connection.disconnect() }
+        }
     }
 }
 

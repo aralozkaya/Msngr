@@ -1,5 +1,11 @@
 package org.aralozkaya.msngr
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -7,9 +13,13 @@ import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
 import org.aralozkaya.msngr.protocol.MsnGameProtocol
+import org.aralozkaya.msngr.protocol.Msnp18Protocol
+import org.aralozkaya.msngr.protocol.MsnpCommand
+import org.aralozkaya.msngr.protocol.MsnpTransport
 import org.aralozkaya.msngr.protocol.P4Packet
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.Collections
 import java.util.concurrent.CopyOnWriteArrayList
 
 class GameProtocolTest {
@@ -63,8 +73,8 @@ class GameProtocolTest {
     fun catalogServiceResolvesEscargotAndCrossTalkCandidateEndpointsAndUpgradesHttps() {
         assertEquals(
             listOf(
-                "https://apps.escargot.nina.chat/activities/service/",
                 "https://apps.escargot.nina.chat/AppDirectory/AppDirectory.asmx",
+                "https://apps.escargot.nina.chat/activities/service/",
             ),
             MsnpGameCatalogService.candidateServiceUrls("apps.escargot.nina.chat"),
         )
@@ -74,6 +84,26 @@ class GameProtocolTest {
                 "https://mactivities.msgrsvcs.ctsrv.xyz/activities/service/",
             ),
             MsnpGameCatalogService.candidateServiceUrls("mactivities.msgrsvcs.ctsrv.xyz"),
+        )
+        assertEquals(
+            listOf(
+                "https://127.0.0.1:18080/AppDirectory/AppDirectory.asmx",
+                "https://127.0.0.1:18080/activities/service/",
+                "http://127.0.0.1:18080/AppDirectory/AppDirectory.asmx",
+                "http://127.0.0.1:18080/activities/service/",
+            ),
+            MsnpGameCatalogService.candidateServiceUrls("127.0.0.1:18080"),
+        )
+        assertEquals(
+            listOf(
+                "http://127.0.0.1:18080/AppDirectory/AppDirectory.asmx",
+                "http://127.0.0.1:18080/activities/service/",
+            ),
+            MsnpGameCatalogService.candidateServiceUrls("http://127.0.0.1:18080"),
+        )
+        assertEquals(
+            listOf("https://apps.example.org/AppDirectory/AppDirectory.asmx"),
+            MsnpGameCatalogService.candidateServiceUrls("https://apps.example.org/AppDirectory/Directory.aspx"),
         )
         assertEquals(
             "https://static.levelleap.com/app-data/tic-tac-toe/tictactoe.htm",
@@ -357,5 +387,420 @@ class GameProtocolTest {
         assertEquals(1, confirmed)
         assertEquals(1, cancelled)
         assertEquals(null, receivedPrompt)
+    }
+
+    @Test
+    fun p2pV2PacketRoundTripsNakSeqStartsWithSynOnReplyAndResyncsAfterNak() = runBlocking {
+        val nakEncoded = P2pV2Packet(operationCode = 0, identifier = 100L, nakIdentifier = 777L).encode()
+        assertTrue(P2pV2Packet.looksLike(nakEncoded))
+        val nakParsed = requireNotNull(P2pV2Packet.parse(nakEncoded))
+        assertEquals(777L, nakParsed.nakIdentifier)
+
+        val outgoing = mutableListOf<P2pV2Packet>()
+        val peer = MsnpP2pV2Session(
+            localEmail = "mobile@example.test",
+            localEndpointId = "11111111-1111-1111-1111-111111111111",
+            remoteEmail = "pc@example.test",
+            remoteEndpointId = "22222222-2222-2222-2222-222222222222",
+            sendPacket = { outgoing.add(requireNotNull(P2pV2Packet.parse(it))) },
+            localPicture = { null },
+            onDisplayPicture = {},
+        )
+        // Remote speaks first without OP_SYN; our transresp reply must initiate OP_SYN | OP_RAK + peerInfo.
+        val transReq = sipMessage(
+            firstLine = "INVITE MSNMSGR:mobile@example.test MSNSLP/1.0",
+            to = "mobile@example.test",
+            from = "pc@example.test",
+            branch = MsnpP2pUtil.randomGuid(),
+            callId = MsnpP2pUtil.randomGuid(),
+            cseq = 0,
+            contentType = MsnpP2pUtil.TRANSPORT_REQUEST_CONTENT_TYPE,
+            content = "Bridges: TCPv1 SBBridge\r\nHashed-Nonce: {55555555-5555-5555-5555-555555555555}\r\n\r\n",
+        )
+        peer.handle(P2pV2Packet(operationCode = 0, identifier = 10L, sessionId = 0L, tfCombination = 1, body = transReq).encode())
+
+        assertEquals(1, outgoing.size)
+        assertEquals(3, outgoing.single().operationCode and 3)
+        assertTrue(outgoing.single().peerInfo)
+
+        // Subsequent message reuses bridge without OP_SYN.
+        val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        val gameId = peer.startGame(entry)
+        val invitePacket = outgoing.last()
+        assertEquals(0, invitePacket.operationCode and 1)
+
+        // Transition session to Active so sendGameData emits a data frame.
+        val inviteSlp = requireNotNull(SlpMessage.parse(invitePacket.body))
+        val acceptBody = sipMessage(
+            firstLine = "MSNSLP/1.0 200 OK",
+            to = "mobile@example.test;{11111111-1111-1111-1111-111111111111}",
+            from = "pc@example.test;{22222222-2222-2222-2222-222222222222}",
+            branch = inviteSlp.branch,
+            callId = inviteSlp.callId,
+            cseq = 1,
+            contentType = MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE,
+            content = "SessionID: ${inviteSlp.body.field("SessionID")}\r\n\r\n",
+        )
+        peer.handle(P2pV2Packet(operationCode = 0, identifier = 50L, sessionId = 0L, tfCombination = 1, body = acceptBody).encode())
+
+        // Incoming NAK_SEQ resets localSynSent and aligns next sequence identifier to nakIdentifier.
+        val beforeNakCount = outgoing.size
+        peer.handle(P2pV2Packet(operationCode = 0, identifier = 20L, nakIdentifier = 777L).encode())
+        peer.sendGameData(gameId, "0")
+        assertEquals(beforeNakCount + 1, outgoing.size)
+        val afterNak = outgoing.last()
+        assertEquals(3, afterNak.operationCode and 3)
+        assertTrue(afterNak.peerInfo)
+        assertEquals(777L, afterNak.identifier)
+        peer.closeFileTransfers()
+    }
+
+    @Test
+    fun p2pV2ConcurrentSendsProduceStrictlyContiguousIdentifiers() = runBlocking {
+        val sent = Collections.synchronizedList(mutableListOf<P2pV2Packet>())
+        val peer = MsnpP2pV2Session(
+            localEmail = "mobile@example.test",
+            localEndpointId = "11111111-1111-1111-1111-111111111111",
+            remoteEmail = "pc@example.test",
+            remoteEndpointId = "22222222-2222-2222-2222-222222222222",
+            sendPacket = { raw ->
+                delay(2)
+                sent.add(requireNotNull(P2pV2Packet.parse(raw)))
+            },
+            localPicture = { null },
+            onDisplayPicture = {},
+        )
+        val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+        val id = peer.startGame(entry)
+        // Transition session to Active cleanly
+        val invitePacket = sent.first()
+        val inviteSlp = requireNotNull(SlpMessage.parse(invitePacket.body))
+        val acceptBody = sipMessage(
+            firstLine = "MSNSLP/1.0 200 OK",
+            to = "mobile@example.test;{11111111-1111-1111-1111-111111111111}",
+            from = "pc@example.test;{22222222-2222-2222-2222-222222222222}",
+            branch = inviteSlp.branch,
+            callId = inviteSlp.callId,
+            cseq = 1,
+            contentType = MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE,
+            content = "SessionID: ${inviteSlp.body.field("SessionID")}\r\n\r\n",
+        )
+        peer.handle(P2pV2Packet(operationCode = 0, identifier = 50L, sessionId = 0L, tfCombination = 1, body = acceptBody).encode())
+
+        val jobs = (1..16).map { idx ->
+            async(Dispatchers.Default) {
+                peer.sendGameData(id, "move-$idx")
+            }
+        }
+        jobs.awaitAll()
+
+        val dataPackets = sent.filter { it.messageSize > 0 }
+        assertTrue(dataPackets.size >= 17)
+        for (i in 1 until dataPackets.size) {
+            val prev = dataPackets[i - 1]
+            val curr = dataPackets[i]
+            assertEquals(
+                "Packet $i identifier must equal previous identifier + previous messageSize",
+                (prev.identifier + prev.messageSize) and 0xffff_ffffL,
+                curr.identifier,
+            )
+        }
+        peer.closeFileTransfers()
+    }
+
+    @Test
+    fun bothP2pVersionsDeclineIncomingTransportResponseInvitesWith603() = runBlocking {
+        for (v2 in listOf(false, true)) {
+            val responses = mutableListOf<ByteArray>()
+            val receiver = MsnpP2pSession(
+                localEmail = "mobile@example.test",
+                remoteEmail = "pc@example.test",
+                localEndpointId = "11111111-1111-1111-1111-111111111111",
+                remoteEndpointId = if (v2) "22222222-2222-2222-2222-222222222222" else null,
+                sendPacket = responses::add,
+                localPicture = { null },
+                onDisplayPicture = {},
+            )
+            val callId = MsnpP2pUtil.randomGuid()
+            val transRespInvite = sipMessage(
+                firstLine = "INVITE MSNMSGR:mobile@example.test MSNSLP/1.0",
+                to = "mobile@example.test",
+                from = "pc@example.test",
+                branch = MsnpP2pUtil.randomGuid(),
+                callId = callId,
+                cseq = 0,
+                contentType = MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE,
+                content = "Bridge: TCPv1\r\nListening: true\r\nSessionID: 99\r\n\r\n",
+            )
+            val wirePacket = if (v2) {
+                P2pV2Packet(operationCode = 3, identifier = 100L, sessionId = 0L, tfCombination = 1, body = transRespInvite, peerInfo = true).encode()
+            } else {
+                java.nio.ByteBuffer.allocate(48 + transRespInvite.size + 4)
+                    .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                    .putInt(0) // sessionId
+                    .putInt(500) // id
+                    .putLong(0L) // offset
+                    .putLong(transRespInvite.size.toLong()) // totalSize
+                    .putInt(transRespInvite.size) // length
+                    .putInt(0) // flags
+                    .putInt(501) // ackId
+                    .putInt(0) // ackSubId
+                    .putLong(0L) // ackSize
+                    .put(transRespInvite)
+                    .putInt(0)
+                    .array()
+            }
+            receiver.handle(wirePacket)
+
+            val responseSlp = responses.mapNotNull { bytes ->
+                val slpBytes = if (v2) P2pV2Packet.parse(bytes)?.body else bytes.copyOfRange(48, bytes.size - 4)
+                slpBytes?.takeIf { it.isNotEmpty() }?.let(SlpMessage::parse)
+            }.single()
+            assertEquals("V2=$v2 must reply 603 Decline", "MSNSLP/1.0 603 Decline", responseSlp.firstLine)
+            assertEquals(callId, responseSlp.callId)
+            assertEquals(MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE, responseSlp.contentType)
+        }
+    }
+
+    @Test
+    fun switchboardLearnsEndpointsTargetsLatestForStartGameAndRoutesCrossEndpointReplies() = runBlocking {
+        val localEmail = "mobile@example.test"
+        val peerEmail = "pc@example.test"
+        val localGuid = "11111111-1111-1111-1111-111111111111"
+        val staleEp = "22222222-2222-2222-2222-222222222222"
+        val liveEp = "33333333-3333-3333-3333-333333333333"
+        val thirdEp = "44444444-4444-4444-4444-444444444444"
+
+        val events = CopyOnWriteArrayList<SwitchboardEvent>()
+        val learnedEndpoints = CopyOnWriteArrayList<Pair<String, String>>()
+        val sentP2pMessages = CopyOnWriteArrayList<SwitchboardMimeMessage.P2p>()
+        val incomingCommands = Channel<MsnpCommand>(Channel.UNLIMITED)
+
+        val transport = object : MsnpTransport {
+            override suspend fun connect(host: String, port: Int, timeoutMillis: Int) = Unit
+            override suspend fun send(command: MsnpCommand) {
+                when (command.verb) {
+                    "USR" -> incomingCommands.trySend(MsnpCommand("USR", command.transactionId, listOf("OK", localEmail, "Mobile")))
+                    "CAL" -> {
+                        val invitee = command.parameters.first()
+                        incomingCommands.trySend(MsnpCommand("CAL", command.transactionId, listOf("RINGING", "1")))
+                        incomingCommands.trySend(MsnpCommand("JOI", parameters = listOf("$invitee;{$staleEp}", "PC", "0:0")))
+                    }
+                    "MSG" -> {
+                        val parsed = parseSwitchboardMime(requireNotNull(command.payload))
+                        if (parsed is SwitchboardMimeMessage.P2p) sentP2pMessages.add(parsed)
+                        if (command.parameters.firstOrNull() == "D") {
+                            incomingCommands.trySend(MsnpCommand("ACK", command.transactionId))
+                        }
+                    }
+                }
+            }
+            override suspend fun receive(): MsnpCommand = incomingCommands.receive()
+            override fun setReadTimeout(timeoutMillis: Int) = Unit
+            override fun close() { incomingCommands.close() }
+        }
+
+        val sb = MsnpSwitchboardSession(
+            signedInEmail = localEmail,
+            machineGuid = localGuid,
+            contactEmail = peerEmail,
+            invitation = SwitchboardInvitation("sb.example", 1864, "auth"),
+            transport = transport,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            eventSink = events::add,
+            remoteEndpointId = staleEp,
+            handshakeTimeoutMillis = 1_000,
+            onContactEndpoint = { contact, ep -> learnedEndpoints.add(contact to ep) },
+        )
+        try {
+            sb.connect()
+            incomingCommands.trySend(MsnpCommand("JOI", parameters = listOf("$peerEmail;{$liveEp}", "PC", "0:0")))
+            withTimeout(2_000) {
+                while (learnedEndpoints.none { it.first == peerEmail && it.second.equals(liveEp, ignoreCase = true) }) {
+                    delay(5)
+                }
+            }
+
+            val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+            val gameId = sb.startGame(entry)
+            withTimeout(2_000) {
+                while (sentP2pMessages.isEmpty()) delay(5)
+            }
+            val firstSent = sentP2pMessages.first()
+            assertEquals("$peerEmail;{$liveEp}", firstSent.destination)
+
+            // Remote accepts and sends Loaded + move from a third endpoint (thirdEp), testing cross-endpoint routing!
+            val remoteReplies = CopyOnWriteArrayList<ByteArray>()
+            val remoteP2p = MsnpP2pSession(
+                localEmail = peerEmail,
+                remoteEmail = localEmail,
+                localEndpointId = thirdEp,
+                remoteEndpointId = localGuid,
+                sendPacket = { raw ->
+                    remoteReplies.add(raw)
+                    val p2pPayload = Msnp18Protocol.p2pPayload("$localEmail;{$localGuid}", raw, "$peerEmail;{$thirdEp}")
+                    incomingCommands.trySend(
+                        MsnpCommand("MSG", parameters = listOf("$peerEmail;{$thirdEp}", "PC", p2pPayload.size.toString()), payload = p2pPayload),
+                    )
+                },
+                localPicture = { null },
+                onDisplayPicture = {},
+            )
+            // Feed Android's outgoing INVITE bytes to remoteP2p (re-wrapping SLP for direct handoff)
+            val invitePacket = requireNotNull(P2pV2Packet.parse(firstSent.bytes))
+            remoteP2p.handle(invitePacket.encode())
+            remoteP2p.acceptGame(gameId)
+            remoteP2p.initializeGameChannel(gameId)
+            withTimeout(3_000) {
+                while (events.none { it is SwitchboardEvent.GameChanged && it.session.status == GameSessionStatus.Active && it.session.remoteAppLoaded }) {
+                    delay(10)
+                }
+            }
+            remoteP2p.sendGameData(gameId, "4")
+            withTimeout(2_000) {
+                while (events.none { it is SwitchboardEvent.GameChanged && it.session.receivedPackets.any { p -> p.payload == "4" } }) {
+                    delay(10)
+                }
+            }
+            sb.sendGameData(gameId, "2")
+            withTimeout(2_000) {
+                while (sentP2pMessages.none { msg ->
+                        val pkt = P2pV2Packet.parse(msg.bytes)
+                        pkt != null && pkt.sessionId != 0L &&
+                            (MsnGameProtocol.decodePacket(pkt.body) as? P4Packet.Data)?.textValue == "2"
+                    }) {
+                    delay(10)
+                }
+            }
+            val moveMsg = sentP2pMessages.last { msg ->
+                val pkt = P2pV2Packet.parse(msg.bytes)
+                pkt != null && pkt.sessionId != 0L &&
+                    (MsnGameProtocol.decodePacket(pkt.body) as? P4Packet.Data)?.textValue == "2"
+            }
+            assertEquals("$peerEmail;{$thirdEp}", moveMsg.destination)
+            remoteP2p.closeFileTransfers()
+        } finally {
+            sb.close()
+        }
+    }
+
+    @Test
+    fun gameSessionDefersLoadedControlDuringGraceWindowAndSendsImmediatelyWhenPeerAlreadyLoaded() = runBlocking {
+        val entry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!
+
+        // 1) Deferral + single-send guarantee
+        val hostSentData = CopyOnWriteArrayList<ByteArray>()
+        lateinit var host: MsnpGameSession
+        lateinit var guest: MsnpGameSession
+        val hostState = CopyOnWriteArrayList<GameSession>()
+        val guestState = CopyOnWriteArrayList<GameSession>()
+        host = MsnpGameSession(
+            source = "alice@example.test",
+            destination = "bob@example.test",
+            publish = hostState::add,
+            sendControl = { SlpMessage.parse(it)?.let { msg -> guest.handle(msg) } },
+            sendData = { _, _, bytes -> hostSentData.add(bytes); guest.receive(bytes) },
+            loadedHandshakeGraceMillis = 250L,
+        )
+        guest = MsnpGameSession(
+            source = "bob@example.test",
+            destination = "alice@example.test",
+            publish = guestState::add,
+            sendControl = { SlpMessage.parse(it)?.let { msg -> host.handle(msg) } },
+            sendData = { _, _, bytes -> host.receive(bytes) },
+            resolveCatalogEntry = { _, _ -> entry },
+            loadedHandshakeGraceMillis = 5_000L,
+        )
+        try {
+            host.start(entry)
+            guest.accept()
+            host.initializeChannel()
+            host.initializeChannel() // duplicate call must not send twice
+            delay(50)
+            assertEquals("Loaded packet must be deferred during grace window", 0, hostSentData.size)
+
+            withTimeout(2_000) {
+                while (guestState.lastOrNull()?.remoteAppLoaded != true) delay(10)
+            }
+            assertEquals(1, hostSentData.count { MsnGameProtocol.decodePacket(it) is P4Packet.RemoteAppLoaded })
+        } finally {
+            host.disconnect()
+            guest.disconnect()
+        }
+
+        // 2) Early RemoteAppLoaded while outgoing && Invited cancels 5s grace and sends immediately on initializeChannel
+        val earlySentData = CopyOnWriteArrayList<ByteArray>()
+        val earlyStates = CopyOnWriteArrayList<GameSession>()
+        lateinit var earlyHost: MsnpGameSession
+        lateinit var earlyGuest: MsnpGameSession
+        earlyHost = MsnpGameSession(
+            source = "alice@example.test",
+            destination = "bob@example.test",
+            publish = earlyStates::add,
+            sendControl = { SlpMessage.parse(it)?.let { msg -> earlyGuest.handle(msg) } },
+            sendData = { _, _, bytes -> earlySentData.add(bytes) },
+            loadedHandshakeGraceMillis = 5_000L,
+        )
+        earlyGuest = MsnpGameSession(
+            source = "bob@example.test",
+            destination = "alice@example.test",
+            publish = {},
+            sendControl = { SlpMessage.parse(it)?.let { msg -> earlyHost.handle(msg) } },
+            sendData = { _, _, _ -> },
+            resolveCatalogEntry = { _, _ -> entry },
+            loadedHandshakeGraceMillis = 5_000L,
+        )
+        try {
+            earlyHost.start(entry)
+            earlyHost.receive(MsnGameProtocol.encodeRemoteAppLoaded())
+            assertTrue(
+                "Outgoing Invited session must record early RemoteAppLoaded",
+                earlyStates.last().remoteAppLoaded,
+            )
+            earlyGuest.accept()
+            earlyHost.initializeChannel()
+            withTimeout(500) {
+                while (earlySentData.none { MsnGameProtocol.decodePacket(it) is P4Packet.RemoteAppLoaded }) {
+                    delay(10)
+                }
+            }
+            assertEquals(1, earlySentData.size)
+        } finally {
+            earlyHost.disconnect()
+            earlyGuest.disconnect()
+        }
+    }
+
+    @Test
+    fun bridgeHtmlInjectionAndHostAllowlistCoverCrossTalkEscargotAndCustomServers() {
+        val crossTalkTtt = "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/tic-tac-toe/tictactoe.htm"
+        val crossTalkBattleships = "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/battleships/battleships.htm"
+        assertTrue(isAllowedGameHost(crossTalkTtt, crossTalkTtt))
+        assertTrue(shouldInjectGameBridgeHtml(crossTalkTtt, crossTalkTtt, isMainFrame = true))
+        assertTrue(shouldInjectGameBridgeHtml(crossTalkBattleships, crossTalkBattleships, isMainFrame = false))
+        assertTrue(isAllowedGameHost(crossTalkBattleships, "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/common/common.js"))
+        assertFalse(shouldInjectGameBridgeHtml(crossTalkBattleships, "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/common/common.js", isMainFrame = false))
+        assertTrue(isAllowedGameHost(crossTalkBattleships, "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/battleships/help.htm"))
+        assertFalse(shouldInjectGameBridgeHtml(crossTalkBattleships, "http://mactivities.msgrsvcs.ctsrv.xyz/static/app-data/messbe/battleships/help.htm", isMainFrame = true))
+
+        val escargotTtt = "https://static.levelleap.com/sites/messaging/apps.escargot.nina.chat/app-data/tic-tac-toe/tictactoe.htm"
+        assertTrue(isAllowedGameHost(escargotTtt, escargotTtt))
+        assertTrue(shouldInjectGameBridgeHtml(escargotTtt, escargotTtt, isMainFrame = true))
+        assertTrue(shouldInjectGameBridgeHtml(escargotTtt, "https://apps.escargot.nina.chat/activities/play", isMainFrame = true))
+
+        val customEntry = "http://games.custom.example:8080/play/index.htm"
+        assertTrue(isAllowedGameHost(customEntry, "http://games.custom.example:8080/play/board.html"))
+        assertTrue(shouldInjectGameBridgeHtml(customEntry, "http://games.custom.example:8080/play/board.html", isMainFrame = false))
+
+        assertFalse(isAllowedGameHost(crossTalkTtt, "about:blank"))
+        assertFalse(shouldInjectGameBridgeHtml(crossTalkTtt, "about:blank", isMainFrame = true))
+        assertFalse(isAllowedGameHost(crossTalkTtt, "javascript:alert(1)"))
+        assertFalse(isAllowedGameHost(crossTalkTtt, "file:///etc/passwd"))
+        assertFalse(isAllowedGameHost(crossTalkTtt, "intent://scan/#Intent;end"))
+        assertTrue(isAllowedGameHost(customEntry, "https://cdn.unrelated.example/index.html"))
+        assertTrue(shouldInjectGameBridgeHtml(customEntry, "https://cdn.unrelated.example/index.html", isMainFrame = true))
+
+        val crossTalkWordle = MsnpGameCatalogService.defaultCatalog().findEntry(103000)!!.copy(appId = 999999)
+        assertEquals(500 to WORDLE_NATIVE_PANE_HEIGHT, nativeGamePaneDimensions(crossTalkWordle))
     }
 }

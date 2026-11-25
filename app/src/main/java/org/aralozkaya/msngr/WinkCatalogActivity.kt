@@ -195,7 +195,11 @@ internal object WinkDownloads {
             uri.rawUserInfo == null && (escargotHost && uri.port == -1 || sameCatalogOrigin) && uri.fragment == null &&
             uri.path.lowercase().let { it.endsWith(".mco") || it.endsWith(".cab") || it.endsWith(".mct") } &&
             uri.path.split('/').none { it == ".." || it == "." })
-        val resolvedScheme = if (uri.port == -1) "https" else uri.scheme
+        val resolvedScheme = when {
+            escargotHost -> "https"
+            sameCatalogOrigin && catalog.scheme.equals("https", ignoreCase = true) && uri.port == -1 -> "https"
+            else -> uri.scheme
+        }
         URI(resolvedScheme, null, uri.host, uri.port, uri.path, uri.query, null).toASCIIString()
     }.getOrNull()
 

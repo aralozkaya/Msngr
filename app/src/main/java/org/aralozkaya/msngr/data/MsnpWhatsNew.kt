@@ -51,11 +51,8 @@ object MsnpWhatsNewService {
         count: Int = 25,
         locale: String = "en-us",
     ): List<WhatsNewActivity> = withContext(Dispatchers.IO) {
-        val normalizedHost = host.trim()
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .substringBefore('/')
-        require(normalizedHost.isNotEmpty()) { "Social service host is not configured." }
+        val endpoints = MsnpClientConfigService.candidateServiceEndpoints(host, ENDPOINT_PATH)
+        require(endpoints.isNotEmpty()) { "Social service host is not configured." }
         require(ticket.isNotBlank()) { "Social service authentication ticket is missing." }
 
         val envelope = buildGetContactsRecentActivityRequest(
@@ -63,35 +60,37 @@ object MsnpWhatsNewService {
             count = count.coerceIn(1, 50),
             locale = locale,
         )
-        val connection = (URL("https://$normalizedHost$ENDPOINT_PATH").openConnection() as HttpURLConnection)
-            .apply {
-                requestMethod = "POST"
-                connectTimeout = TIMEOUT_MILLIS
-                readTimeout = TIMEOUT_MILLIS
-                instanceFollowRedirects = true
-                doOutput = true
-                setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                setRequestProperty("SOAPAction", "\"$SOAP_ACTION\"")
-                setRequestProperty("User-Agent", USER_AGENT)
+        MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
+            val connection = (URL(endpointUrl).openConnection() as HttpURLConnection)
+                .apply {
+                    requestMethod = "POST"
+                    connectTimeout = TIMEOUT_MILLIS
+                    readTimeout = TIMEOUT_MILLIS
+                    instanceFollowRedirects = true
+                    doOutput = true
+                    setRequestProperty("Content-Type", "text/xml; charset=utf-8")
+                    setRequestProperty("SOAPAction", "\"$SOAP_ACTION\"")
+                    setRequestProperty("User-Agent", USER_AGENT)
+                }
+            try {
+                connection.outputStream.use { it.write(envelope.toByteArray(StandardCharsets.UTF_8)) }
+                val status = connection.responseCode
+                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader(StandardCharsets.UTF_8)
+                    ?.use { it.readText() }
+                    .orEmpty()
+                if (status !in 200..299) {
+                    val fault = runCatching {
+                        parseXml(body).documentElement.firstDescendantText("faultstring")
+                    }.getOrDefault("")
+                    throw IllegalStateException(
+                        fault.ifBlank { "What's New request failed with HTTP $status." },
+                    )
+                }
+                parseActivitiesResponse(body)
+            } finally {
+                connection.disconnect()
             }
-        try {
-            connection.outputStream.use { it.write(envelope.toByteArray(StandardCharsets.UTF_8)) }
-            val status = connection.responseCode
-            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader(StandardCharsets.UTF_8)
-                ?.use { it.readText() }
-                .orEmpty()
-            if (status !in 200..299) {
-                val fault = runCatching {
-                    parseXml(body).documentElement.firstDescendantText("faultstring")
-                }.getOrDefault("")
-                throw IllegalStateException(
-                    fault.ifBlank { "What's New request failed with HTTP $status." },
-                )
-            }
-            parseActivitiesResponse(body)
-        } finally {
-            connection.disconnect()
         }
     }
 

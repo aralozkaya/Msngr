@@ -1,5 +1,8 @@
 package org.aralozkaya.msngr.data
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -7,6 +10,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 
 /** Endpoint-aware MSNP18 P2Pv2 transport for MSNObject display pictures. */
 internal class MsnpP2pV2Session(
@@ -36,14 +42,24 @@ internal class MsnpP2pV2Session(
     private val identifiers = AtomicLong((System.nanoTime() and 0x3fff_ffffL).coerceAtLeast(1))
     private val sessionIds = AtomicInteger(2_000)
     private val packageNumbers = AtomicInteger(0)
-    private val bridgeStarted = AtomicBoolean(false)
+    private val localSynSent = AtomicBoolean(false)
+    private val sendMutex = Mutex()
     private val incoming = ConcurrentHashMap<Pair<Long, Int>, IncomingV2Message>()
     private val pendingCalls = ConcurrentHashMap<Long, PendingV2Picture>()
 
     private val photoApplicationLazy = lazy {
         MsnpPhotoSession(source, destination, fileDirectory, onPhotoShare,
             sendControl = { sendApplicationControl(it) },
-            sendData = { session, bytes -> sendMessage(session, TF_FIRST, OP_NONE, 0, body = bytes) }, requestObject = { requestDisplayPicture(it) }, publishObject = publishPhoto, publishOriginal = publishOriginal)
+            sendData = { session, bytes ->
+                sendMessage(
+                    session,
+                    TF_FIRST,
+                    OP_NONE,
+                    0,
+                    packageNumber = packageNumbers.incrementAndGet() and 0xffff,
+                    body = bytes,
+                )
+            }, requestObject = { requestDisplayPicture(it) }, publishObject = publishPhoto, publishOriginal = publishOriginal)
     }
     private val photos get() = photoApplicationLazy.value
     suspend fun startPhotos(items: List<PhotoToShare>): String = photos.start(items)
@@ -58,12 +74,35 @@ internal class MsnpP2pV2Session(
             destination = destination,
             publish = onGameSession,
             sendControl = { sendApplicationControl(it) },
-            sendData = { session, _, bytes -> sendMessage(session, TF_FIRST, OP_NONE, 0, body = bytes) },
+            sendData = { session, _, bytes ->
+                sendMessage(
+                    session,
+                    TF_FIRST,
+                    OP_NONE,
+                    0,
+                    packageNumber = packageNumbers.incrementAndGet() and 0xffff,
+                    body = bytes,
+                )
+            },
         )
     }
     private val games get() = gameApplicationLazy.value
     suspend fun startGame(entry: GameCatalogEntry): String = games.start(entry)
     fun hasGameSession(id: String): Boolean = gameApplicationLazy.isInitialized() && games.owns(id)
+    fun hasActiveSessionId(sessionId: Long): Boolean = sessionId != 0L && (
+        pendingCalls.containsKey(sessionId) ||
+            (photoApplicationLazy.isInitialized() && photos.owns(sessionId)) ||
+            (gameApplicationLazy.isInitialized() && games.owns(sessionId)) ||
+            (fileApplicationLazy.isInitialized() && files.owns(sessionId))
+        )
+    fun hasCallId(callId: String): Boolean {
+        val normalized = callId.trim('{', '}')
+        if (normalized.isEmpty()) return false
+        return pendingCalls.values.any { it.callId.trim('{', '}').equals(normalized, ignoreCase = true) } ||
+            (photoApplicationLazy.isInitialized() && photos.owns(normalized)) ||
+            (gameApplicationLazy.isInitialized() && games.owns(normalized)) ||
+            (fileApplicationLazy.isInitialized() && files.owns(normalized))
+    }
     suspend fun acceptGame(id: String) { check(games.owns(id)); games.accept() }
     suspend fun stopGame(id: String) { if (games.owns(id)) games.stop() }
     suspend fun initializeGameChannel(id: String) { if (games.owns(id)) games.initializeChannel() }
@@ -112,21 +151,33 @@ internal class MsnpP2pV2Session(
             .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
             .forEach { incoming.remove(it.key, it.value) }
         val packet = P2pV2Packet.parse(bytes) ?: return
-        if (packet.operationCode and OP_SYN != 0) bridgeStarted.set(true)
-        val fileData = packet.sessionId != 0L && packet.tfCombination and 6 == 6
-        if (packet.operationCode and OP_RAK != 0 && !fileData) sendAcknowledgement(packet)
+        if (packet.nakIdentifier != null) {
+            runCatching {
+                if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i(
+                    "MsnpP2p",
+                    "V2 rx NAK_SEQ nak=${packet.nakIdentifier} localSeq=${identifiers.get()} localSynSent=${localSynSent.get()}",
+                )
+            }
+            withSendLock {
+                localSynSent.set(false)
+                if (packet.nakIdentifier > 0L) identifiers.set(packet.nakIdentifier and UINT_MASK)
+            }
+        } else if (packet.operationCode and (OP_SYN or OP_RAK) == (OP_SYN or OP_RAK)) {
+            localSynSent.set(true)
+        }
+        val ownedFileData = packet.sessionId != 0L && (packet.tfCombination and 6 == 6) &&
+            fileApplicationLazy.isInitialized() && files.owns(packet.sessionId)
+        if (packet.operationCode and OP_RAK != 0 && !ownedFileData) sendAcknowledgement(packet)
         if (packet.acknowledgementIdentifier != null && fileApplicationLazy.isInitialized())
             files.acknowledged(packet.acknowledgementIdentifier)
         if (packet.body.isEmpty()) return
 
         val baseTf = packet.tfCombination and TF_FIRST.inv()
-        if (baseTf == 6) {
-            if (fileApplicationLazy.isInitialized() && files.owns(packet.sessionId)) {
-                val offset = files.received(packet.sessionId)
-                val actualOffset = if (packet.tfCombination and TF_FIRST != 0) 0L else offset
-                files.receive(packet.sessionId, actualOffset, offset + packet.body.size + packet.dataRemaining, packet.body)
-                if (packet.operationCode and OP_RAK != 0) sendAcknowledgement(packet)
-            }
+        if (baseTf == 6 && fileApplicationLazy.isInitialized() && files.owns(packet.sessionId)) {
+            val offset = files.received(packet.sessionId)
+            val actualOffset = if (packet.tfCombination and TF_FIRST != 0) 0L else offset
+            files.receive(packet.sessionId, actualOffset, offset + packet.body.size + packet.dataRemaining, packet.body)
+            if (packet.operationCode and OP_RAK != 0) sendAcknowledgement(packet)
             return
         }
         val key = packet.sessionId to baseTf
@@ -149,7 +200,7 @@ internal class MsnpP2pV2Session(
             packet.sessionId == 0L && baseTf == TF_NONE -> handleSlp(message.body)
             packet.sessionId != 0L && photoApplicationLazy.isInitialized() && photos.owns(packet.sessionId) -> photos.receive(message.body)
             packet.sessionId != 0L && gameApplicationLazy.isInitialized() && games.owns(packet.sessionId) -> games.receive(message.body)
-            baseTf and TF_MSN_OBJECT != 0 -> {
+            baseTf and TF_MSN_OBJECT != 0 && (baseTf != 6 || pendingCalls.containsKey(packet.sessionId)) -> {
                 val pending = pendingCalls.remove(packet.sessionId)
                 if (pending?.picture?.objectType in listOf(8, 11, 15)) {
                     if (pending!!.picture.matches(message.body)) {
@@ -191,7 +242,21 @@ internal class MsnpP2pV2Session(
                 ignoreCase = true,
             )
         ) {
+            runCatching {
+                if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i("MsnpP2p", "V2 rx transreq -> SB fallback")
+            }
             sendTransportFallback(message)
+            return
+        }
+        if (message.contentType.equals(
+                MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE,
+                ignoreCase = true,
+            )
+        ) {
+            runCatching {
+                if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i("MsnpP2p", "V2 rx transresp -> 603 Decline")
+            }
+            sendTransportDecline(message)
             return
         }
         if (!message.contentType.equals(
@@ -278,24 +343,31 @@ internal class MsnpP2pV2Session(
                 val count = input.read(buffer, 0, minOf(buffer.size.toLong(), size - offset).toInt())
                 check(count > 0) { "The file changed during transfer." }
                 val remaining = size - offset - count
-                val packet = P2pV2Packet(operationCode = if (remaining == 0L) OP_RAK else OP_NONE,
-                    identifier = identifiers.getAndAdd(8L + count + if (remaining > 0L) 12L else 0L) and UINT_MASK,
-                    sessionId = session, tfCombination = 6 or if (offset == 0L) TF_FIRST else 0,
-                    packageNumber = packageNumber, dataRemaining = remaining, body = buffer.copyOf(count))
-                if (remaining == 0L) files.expectAcknowledgement(session, (packet.identifier + packet.messageSize) and UINT_MASK)
-                // Publish before sending: an in-memory or fast peer can acknowledge synchronously.
-                offset += count; progress(offset)
-                sendPacket(packet.encode())
+                withSendLock {
+                    val firstOnBridge = localSynSent.compareAndSet(false, true)
+                    val op = (if (remaining == 0L) OP_RAK else OP_NONE) or
+                        (if (firstOnBridge) OP_SYN or OP_RAK else OP_NONE)
+                    val packet = P2pV2Packet(
+                        operationCode = op,
+                        identifier = identifiers.getAndAdd(8L + count + if (remaining > 0L) 12L else 0L) and UINT_MASK,
+                        sessionId = session,
+                        tfCombination = 6 or if (offset == 0L) TF_FIRST else 0,
+                        packageNumber = packageNumber,
+                        dataRemaining = remaining,
+                        body = buffer.copyOf(count),
+                        peerInfo = firstOnBridge,
+                    )
+                    if (remaining == 0L) files.expectAcknowledgement(session, (packet.identifier + packet.messageSize) and UINT_MASK)
+                    // Publish before sending: an in-memory or fast peer can acknowledge synchronously.
+                    offset += count; progress(offset)
+                    sendPacket(packet.encode())
+                }
             }
         }
     }
 
     private suspend fun sendApplicationControl(bytes: ByteArray) {
-        val initial = bytes.take(7).toByteArray().toString(Charsets.US_ASCII) == "INVITE " &&
-            SlpMessage.parse(bytes)?.contentType == MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE &&
-            bridgeStarted.compareAndSet(false, true)
-        sendMessage(0, TF_FIRST, if (initial) OP_SYN or OP_RAK else OP_NONE, 0,
-            peerInfo = initial, body = bytes)
+        sendMessage(0, TF_FIRST, OP_NONE, 0, body = bytes)
     }
 
     private suspend fun sendTransportFallback(message: SlpMessage) {
@@ -313,6 +385,27 @@ internal class MsnpP2pV2Session(
                 cseq = 1,
                 contentType = MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE,
                 content = MsnpP2pUtil.transportResponseContent(message.body),
+            ),
+        )
+    }
+
+    private suspend fun sendTransportDecline(message: SlpMessage) {
+        val sessionId = message.body.field("SessionID")?.toLongOrNull()
+        val content = if (sessionId != null) "SessionID: $sessionId\r\n\r\n" else "\r\n"
+        sendMessage(
+            sessionId = 0,
+            firstTf = TF_FIRST,
+            operationCode = OP_NONE,
+            footer = 0,
+            body = sipMessage(
+                firstLine = "MSNSLP/1.0 603 Decline",
+                to = destination,
+                from = source,
+                branch = message.branch,
+                callId = message.callId,
+                cseq = 1,
+                contentType = message.contentType,
+                content = content,
             ),
         )
     }
@@ -340,6 +433,14 @@ internal class MsnpP2pV2Session(
         )
     }
 
+    private suspend fun <T> withSendLock(block: suspend () -> T): T {
+        val current = coroutineContext[SendLockElement]
+        if (current != null && this in current.sessions) return block()
+        return sendMutex.withLock {
+            withContext(SendLockElement((current?.sessions ?: emptySet()) + this)) { block() }
+        }
+    }
+
     private suspend fun sendMessage(
         sessionId: Long,
         firstTf: Int,
@@ -350,41 +451,60 @@ internal class MsnpP2pV2Session(
         body: ByteArray,
         onProgress: ((Int) -> Unit)? = null,
     ) {
-        var offset = 0
-        do {
-            val length = minOf(MAX_CHUNK_BYTES, body.size - offset)
-            val chunk = body.copyOfRange(offset, offset + length)
-            val remaining = (body.size - offset - length).toLong()
-            val tf = if (offset == 0) firstTf else firstTf and TF_FIRST.inv()
-            val packet = P2pV2Packet(
-                operationCode = if (offset == 0) operationCode else OP_NONE,
-                identifier = 0,
-                sessionId = sessionId,
-                tfCombination = tf,
-                packageNumber = packageNumber,
-                dataRemaining = remaining,
-                body = chunk,
-                footer = footer,
-                peerInfo = peerInfo && offset == 0,
-            )
-            val encoded = packet.copy(identifier = identifiers.getAndAdd(packet.messageSize.toLong()) and UINT_MASK).encode()
-            sendPacket(encoded)
-            offset += length
-            onProgress?.invoke(offset)
-        } while (offset < body.size)
+        withSendLock {
+            var offset = 0
+            do {
+                val length = minOf(MAX_CHUNK_BYTES, body.size - offset)
+                val chunk = body.copyOfRange(offset, offset + length)
+                val remaining = (body.size - offset - length).toLong()
+                val tf = if (offset == 0) firstTf else firstTf and TF_FIRST.inv()
+                val firstOnBridge = offset == 0 && chunk.isNotEmpty() && localSynSent.compareAndSet(false, true)
+                val op = if (offset == 0) operationCode or (if (firstOnBridge) OP_SYN or OP_RAK else OP_NONE) else OP_NONE
+                val packet = P2pV2Packet(
+                    operationCode = op,
+                    identifier = 0,
+                    sessionId = sessionId,
+                    tfCombination = tf,
+                    packageNumber = packageNumber,
+                    dataRemaining = remaining,
+                    body = chunk,
+                    footer = footer,
+                    peerInfo = (peerInfo && offset == 0) || firstOnBridge,
+                )
+                val assigned = packet.copy(identifier = identifiers.getAndAdd(packet.messageSize.toLong()) and UINT_MASK)
+                if (firstOnBridge) {
+                    runCatching {
+                        if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i(
+                            "MsnpP2p",
+                            "V2 tx SYN seq=${assigned.identifier} session=$sessionId len=${chunk.size}",
+                        )
+                    }
+                }
+                sendPacket(assigned.encode())
+                offset += length
+                onProgress?.invoke(offset)
+            } while (offset < body.size)
+        }
     }
 
     private suspend fun sendAcknowledgement(packet: P2pV2Packet) {
-        // Only a data-bearing SYN copies peer info and requests the reciprocal sync ACK.
-        // An ACK frame has MessageSize=0 and must not start an endless SYN/RAK exchange.
-        val sync = packet.messageSize > 0 && packet.operationCode and OP_SYN != 0
-        val acknowledgement = P2pV2Packet(
-            operationCode = if (sync) OP_SYN or OP_RAK else OP_NONE,
-            identifier = identifiers.get(),
-            acknowledgementIdentifier = (packet.identifier + packet.messageSize) and UINT_MASK,
-            peerInfo = sync,
-        )
-        sendPacket(acknowledgement.encode())
+        withSendLock {
+            // Only a data-bearing SYN copies peer info and requests the reciprocal sync ACK.
+            // An ACK frame has MessageSize=0 and must not start an endless SYN/RAK exchange.
+            val sync = packet.messageSize > 0 && packet.operationCode and OP_SYN != 0
+            val acknowledgement = P2pV2Packet(
+                operationCode = if (sync) OP_SYN or OP_RAK else OP_NONE,
+                identifier = identifiers.get(),
+                acknowledgementIdentifier = (packet.identifier + packet.messageSize) and UINT_MASK,
+                peerInfo = sync,
+            )
+            sendPacket(acknowledgement.encode())
+        }
+    }
+
+    private class SendLockElement(val sessions: Set<MsnpP2pV2Session>) :
+        AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<SendLockElement>
     }
 
     private fun nextSessionId(): Long = (sessionIds.incrementAndGet().toLong() and UINT_MASK)
@@ -411,7 +531,7 @@ internal class MsnpP2pV2Session(
     }
 }
 
-private class IncomingV2Message(val body: ByteArray) {
+internal class IncomingV2Message(val body: ByteArray) {
     val createdAtNanos: Long = System.nanoTime()
     private var received = 0
     val complete get() = received == body.size
@@ -436,10 +556,15 @@ internal data class P2pV2Packet(
     val body: ByteArray = byteArrayOf(),
     val footer: Int = 0,
     val peerInfo: Boolean = false,
+    val nakIdentifier: Long? = null,
 ) {
     val messageSize: Int get() = if (body.isEmpty()) 0 else dataHeaderLength + body.size
     private val mainHeaderLength: Int
-        get() = padded(8 + (if (peerInfo) 14 else 0) + (if (acknowledgementIdentifier != null) 6 else 0))
+        get() = padded(
+            8 + (if (peerInfo) 14 else 0) +
+                (if (acknowledgementIdentifier != null) 6 else 0) +
+                (if (nakIdentifier != null) 6 else 0),
+        )
     private val dataHeaderLength: Int
         get() = if (body.isEmpty()) 0 else padded(8 + if (dataRemaining > 0) 10 else 0)
 
@@ -458,6 +583,9 @@ internal data class P2pV2Packet(
         }
         acknowledgementIdentifier?.let {
             buffer.put(2).put(4).putInt(it.toInt())
+        }
+        nakIdentifier?.let {
+            buffer.put(3).put(4).putInt(it.toInt())
         }
         while (buffer.position() < mainHeaderLength) buffer.put(0)
         if (body.isNotEmpty()) {
@@ -491,11 +619,14 @@ internal data class P2pV2Packet(
             val messageSize = buffer.short.toInt() and 0xffff
             val identifier = buffer.int.toLong() and 0xffff_ffffL
             var acknowledgementIdentifier: Long? = null
+            var nakIdentifier: Long? = null
             var peerInfo = false
             parseTlvs(buffer, mainHeaderLength) { type, value ->
                 when {
                     type == 1 && value.size == 12 -> peerInfo = true
                     type == 2 && value.size == 4 -> acknowledgementIdentifier =
+                        ByteBuffer.wrap(value).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xffff_ffffL
+                    type == 3 && value.size == 4 -> nakIdentifier =
                         ByteBuffer.wrap(value).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xffff_ffffL
                 }
             }
@@ -532,6 +663,7 @@ internal data class P2pV2Packet(
                 body = body,
                 footer = footer,
                 peerInfo = peerInfo,
+                nakIdentifier = nakIdentifier,
             )
         }.getOrNull()
 

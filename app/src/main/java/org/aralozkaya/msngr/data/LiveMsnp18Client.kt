@@ -466,12 +466,12 @@ internal class LiveMsnp18Client(
         }.getOrDefault(emptyMap())
         groupMembers.forEach { member -> member.storageId?.let { contactStorageIds[member.email.lowercase()] = it } }
         contactStorageIds.putAll(addressBook.contactStorageIds)
-        contactTileHosts = listOf(
-            request.serverConfig.mainServer,
-            request.serverConfig.storageServer,
-            request.serverConfig.addressBookServer,
-            notificationServerHost,
-        ).mapNotNull(String::httpHostOrNull).distinct()
+        contactTileHosts = listOfNotNull(
+            request.serverConfig.storageServer.serviceOriginOrNull(),
+            request.serverConfig.addressBookServer.serviceOriginOrNull(),
+            request.serverConfig.mainServer.httpHostOrNull(),
+            notificationServerHost.httpHostOrNull(),
+        ).distinct()
         contactTileHashes.putAll(
             cachedPictures.mapValues { (_, cached) -> cached.bytes.sha256() },
         )
@@ -683,6 +683,36 @@ internal class LiveMsnp18Client(
         val configResult = runCatching { fetchClientConfig(serverConfig) }
         if (endpoint != machineGuid) return
         val resolvedConfig = configResult.getOrNull()
+        if (resolvedConfig != null) {
+            resolvedConfig.appDirServiceUrl?.let { discoveredUrl ->
+                if (serverConfig.activitiesServer.isBlank() ||
+                    serverConfig.activitiesServer.equals(serverConfig.mainServer, ignoreCase = true)
+                ) {
+                    MsnpGameCatalogService.currentActivitiesServer = discoveredUrl
+                }
+            }
+            resolvedConfig.addressBookUrl?.let { discoveredUrl ->
+                if (serverConfig.addressBookServer.isBlank() ||
+                    serverConfig.addressBookServer.equals(serverConfig.mainServer, ignoreCase = true)
+                ) {
+                    addressBookServer = discoveredUrl
+                }
+            }
+            resolvedConfig.storageServiceUrl?.let { discoveredUrl ->
+                if (serverConfig.storageServer.isBlank() ||
+                    serverConfig.storageServer.equals(serverConfig.mainServer, ignoreCase = true)
+                ) {
+                    storageServer = discoveredUrl
+                }
+            }
+            val discoveredTileOrigins = listOfNotNull(
+                resolvedConfig.storageServiceUrl?.serviceOriginOrNull(),
+                resolvedConfig.addressBookUrl?.serviceOriginOrNull(),
+            )
+            if (discoveredTileOrigins.isNotEmpty()) {
+                contactTileHosts = (discoveredTileOrigins + contactTileHosts).distinct()
+            }
+        }
         mutablePortalState.update { current ->
             current.copy(
                 config = resolvedConfig ?: current.config,
@@ -2363,13 +2393,14 @@ internal class LiveMsnp18Client(
                 for (attempt in 0..2) {
                     try {
                         rosterMutationMutex.withLock {
-                            var snapshot = fetchAddressBook(host, ticket, email)
+                            val currentAddressBookHost = addressBookServer.ifBlank { host }
+                            var snapshot = fetchAddressBook(currentAddressBookHost, ticket, email)
                             if (machineGuid != endpoint || signedInEmail != email) return@launch
                             leftGroupIds.retainAll(snapshot.contacts.filter(Contact::isGroup).map(Contact::id).toSet())
                             snapshot = snapshot.copy(contacts = snapshot.contacts.filterNot { it.id in leftGroupIds })
                             snapshot.contacts.filter(Contact::isGroup).forEach { pendingRosterGroups.remove(it.id) }
                             val supplemental = pendingRosterGroups.values.toList().mapNotNull { group ->
-                                val members = fetchAddressBookGroupMembers(host, ticket, group.email.substringBefore('@'))
+                                val members = fetchAddressBookGroupMembers(currentAddressBookHost, ticket, group.email.substringBefore('@'))
                                 checkGroupSession(email, endpoint)
                                 if (members.none { !it.isPending && it.email.equals(email, true) }) {
                                     pendingRosterGroups.remove(group.id)
@@ -3110,12 +3141,23 @@ internal class LiveMsnp18Client(
             }
             return
         }
-        val endpointId = ENDPOINT_DATA_ID.find(String(payload, StandardCharsets.UTF_8))
-            ?.groupValues
-            ?.getOrNull(1)
-        if (!endpointId.isNullOrBlank()) {
+        val announcedEndpoints = ENDPOINT_DATA_ID.findAll(String(payload, StandardCharsets.UTF_8))
+            .mapNotNull { it.groupValues.getOrNull(1)?.let(::normalizeEndpointId) }
+            .distinctBy { it.lowercase() }
+            .toList()
+        if (announcedEndpoints.isNotEmpty()) {
             val id = email.lowercase()
-            contactEndpointIds[id] = endpointId
+            val current = contactEndpointIds[id]?.let(::normalizeEndpointId)
+            val hasLiveSwitchboard = current != null && (
+                switchboards[id]?.isClosed == false ||
+                    activeSwitchboards.any { !it.isClosed && it.contactEmail.equals(id, ignoreCase = true) }
+                )
+            val keepCurrent = current != null && (
+                announcedEndpoints.any { it.equals(current, ignoreCase = true) } || hasLiveSwitchboard
+                )
+            if (!keepCurrent) {
+                contactEndpointIds[id] = announcedEndpoints.first()
+            }
             pictureTrace("ENDPOINT announced")
             contactEndpointWaiters.remove(id)?.complete(Unit)
         }
@@ -3406,11 +3448,15 @@ internal class LiveMsnp18Client(
 
     private suspend fun fetchContactTile(storageId: String, size: String): ByteArray? {
         for (host in contactTileHosts) {
+            val urls = MsnpClientConfigService.candidateServiceEndpoints(
+                hostOrUrl = host,
+                defaultPath = "/storage/usertile/$storageId/$size",
+            )
+            if (urls.isEmpty()) continue
             val bytes = runCatching {
-                fetchDisplayPicture(
-                    "https://$host/storage/usertile/$storageId/$size",
-                    MAX_CONTACT_TILE_BYTES,
-                )
+                MsnpClientConfigService.withServiceEndpointFallback(urls) { url ->
+                    fetchDisplayPicture(url, MAX_CONTACT_TILE_BYTES)
+                }
             }.getOrNull()
             if (bytes != null) return bytes
         }
@@ -3452,6 +3498,11 @@ internal class LiveMsnp18Client(
                 sharedPictureSession = reusablePictureSession(id),
                 onPhotoObjectProgress = { sha1d, sent, total ->
                     recordOutgoingPhotoProgress(session.contactEmail, sha1d, sent, total)
+                },
+                onContactEndpoint = { contact, endpoint ->
+                    val contactKey = contact.lowercase()
+                    contactEndpointIds[contactKey] = endpoint
+                    contactEndpointWaiters.remove(contactKey)?.complete(Unit)
                 },
             )
             pictureSessions[id] = session.pictureSession
@@ -3584,6 +3635,11 @@ internal class LiveMsnp18Client(
             sharedPictureSession = reusablePictureSession(id),
             onPhotoObjectProgress = { sha1d, sent, total ->
                 recordOutgoingPhotoProgress(session.contactEmail, sha1d, sent, total)
+            },
+            onContactEndpoint = { contact, endpoint ->
+                val contactKey = contact.lowercase()
+                contactEndpointIds[contactKey] = endpoint
+                contactEndpointWaiters.remove(contactKey)?.complete(Unit)
             },
         )
         if (!fromOwnSession) pictureSessions[id] = session.pictureSession
@@ -4354,67 +4410,75 @@ private object MsnpSsoAuthenticator {
         nonce: String,
     ): SsoToken = withContext(Dispatchers.IO) {
         val body = buildRequest(email, password, policy)
-        val connection = (URL("https://${host.normalizedHost()}/RST.srf").openConnection()
-            as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = HTTP_TIMEOUT_MILLIS
-            readTimeout = HTTP_TIMEOUT_MILLIS
-            instanceFollowRedirects = true
-            doOutput = true
-            setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-            setRequestProperty("SOAPAction", SOAP_ACTION)
-            setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+        val endpoints = MsnpClientConfigService.candidateServiceEndpoints(host, "/RST.srf")
+        if (endpoints.isEmpty()) {
+            throw LiveMsnpException("The authentication service host is not configured.")
         }
 
         try {
-            connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
-            val status = connection.responseCode
-            val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader(StandardCharsets.UTF_8)
-                ?.use { it.readText() }
-                .orEmpty()
-            if (status !in 200..299) {
-                val detail = responseBody.xmlText("faultstring")
-                    .ifBlank { "The authentication service rejected these credentials." }
-                throw LiveMsnpException(detail)
-            }
+            MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
+                val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = HTTP_TIMEOUT_MILLIS
+                    readTimeout = HTTP_TIMEOUT_MILLIS
+                    instanceFollowRedirects = true
+                    doOutput = true
+                    setRequestProperty("Content-Type", "text/xml; charset=utf-8")
+                    setRequestProperty("SOAPAction", SOAP_ACTION)
+                    setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+                }
 
-            val credentials = parseSsoCredentials(responseBody)
-            val credential = credentials[MESSENGER_DOMAIN]
-                ?.takeIf { it.ticket.isNotBlank() && it.secret.isNotBlank() }
-                ?: throw LiveMsnpException(
-                    "The authentication service did not return a Messenger credential.",
-                )
-            val contactsTicket = credentials[CONTACTS_DOMAIN]
-                ?.ticket
-                ?.takeIf(String::isNotBlank)
-                ?: throw LiveMsnpException(
-                    "The authentication service did not return an address-book credential.",
-                )
-            val storageTicket = credentials[STORAGE_DOMAIN]
-                ?.ticket
-                ?.takeIf(String::isNotBlank)
-                ?: throw LiveMsnpException(
-                    "The authentication service did not return a storage credential.",
-                )
-            SsoToken(
-                ticket = credential.ticket,
-                response = createRpsResponse(credential.secret, nonce),
-                contactsTicket = contactsTicket,
-                storageTicket = storageTicket,
-                offlineTicket = credentials["messenger.msn.com"]?.ticket
-                    ?.takeIf(String::isNotBlank)
-                    ?: throw LiveMsnpException("The authentication service did not return an offline-message credential."),
-                socialTicket = credentials["sup.live.com"]?.ticket
-                    ?.takeIf(String::isNotBlank)
-                    ?: contactsTicket,
-            )
+                try {
+                    connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
+                    val status = connection.responseCode
+                    val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                        ?.bufferedReader(StandardCharsets.UTF_8)
+                        ?.use { it.readText() }
+                        .orEmpty()
+                    if (status !in 200..299) {
+                        val detail = responseBody.xmlText("faultstring")
+                            .ifBlank { "The authentication service rejected these credentials." }
+                        throw LiveMsnpException(detail)
+                    }
+
+                    val credentials = parseSsoCredentials(responseBody)
+                    val credential = credentials[MESSENGER_DOMAIN]
+                        ?.takeIf { it.ticket.isNotBlank() && it.secret.isNotBlank() }
+                        ?: throw LiveMsnpException(
+                            "The authentication service did not return a Messenger credential.",
+                        )
+                    val contactsTicket = credentials[CONTACTS_DOMAIN]
+                        ?.ticket
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw LiveMsnpException(
+                            "The authentication service did not return an address-book credential.",
+                        )
+                    val storageTicket = credentials[STORAGE_DOMAIN]
+                        ?.ticket
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw LiveMsnpException(
+                            "The authentication service did not return a storage credential.",
+                        )
+                    SsoToken(
+                        ticket = credential.ticket,
+                        response = createRpsResponse(credential.secret, nonce),
+                        contactsTicket = contactsTicket,
+                        storageTicket = storageTicket,
+                        offlineTicket = credentials["messenger.msn.com"]?.ticket
+                            ?.takeIf(String::isNotBlank)
+                            ?: throw LiveMsnpException("The authentication service did not return an offline-message credential."),
+                        socialTicket = credentials["sup.live.com"]?.ticket
+                            ?.takeIf(String::isNotBlank)
+                            ?: contactsTicket,
+                    )
+                } finally {
+                    connection.disconnect()
+                }
+            }
         } catch (error: LiveMsnpException) {
             throw error
         } catch (error: Exception) {
             throw LiveMsnpException("Could not authenticate with the community service.", error)
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -4685,6 +4749,28 @@ private fun String.httpHostOrNull(): String? = trim()
     .takeIf { host ->
         host.isNotEmpty() && host.all { it.isLetterOrDigit() || it == '.' || it == '-' }
     }
+
+private fun String.serviceOriginOrNull(): String? {
+    val trimmed = trim()
+    if (trimmed.isEmpty()) return null
+    val hasScheme = trimmed.startsWith("http://", ignoreCase = true) ||
+        trimmed.startsWith("https://", ignoreCase = true)
+    if (hasScheme) {
+        val uri = runCatching { java.net.URI(trimmed) }.getOrNull() ?: return httpHostOrNull()
+        val host = uri.host?.takeIf { it.isNotBlank() } ?: return httpHostOrNull()
+        val portSuffix = if (uri.port > 0) ":${uri.port}" else ""
+        return "${uri.scheme.lowercase()}://$host$portSuffix"
+    }
+    if ("://" !in trimmed) {
+        val uri = runCatching { java.net.URI("http://${trimmed.trimStart('/')}") }.getOrNull()
+        val host = uri?.host?.takeIf { it.isNotBlank() }
+        if (host != null && uri.port != 1863) {
+            val portSuffix = if (uri.port > 0) ":${uri.port}" else ""
+            return "$host$portSuffix"
+        }
+    }
+    return httpHostOrNull()
+}
 
 private fun MsnpCommand.isInitialDataNotification(): Boolean = payload
     ?.toString(StandardCharsets.UTF_8)

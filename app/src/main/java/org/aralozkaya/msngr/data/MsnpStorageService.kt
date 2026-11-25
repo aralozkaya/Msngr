@@ -288,45 +288,51 @@ internal object MsnpStorageService {
 
     private suspend fun post(host: String, action: String, body: String): String =
         withContext(Dispatchers.IO) {
-            val connection = (URL(
-                "https://${host.storageNormalizedHost()}$ENDPOINT_PATH",
-            ).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = TIMEOUT_MILLIS
-                readTimeout = TIMEOUT_MILLIS
-                instanceFollowRedirects = true
-                doOutput = true
-                setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                setRequestProperty("SOAPAction", "\"$NAMESPACE/$action\"")
-                setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+            val endpoints = MsnpClientConfigService.candidateServiceEndpoints(host, ENDPOINT_PATH)
+            if (endpoints.isEmpty()) {
+                throw LiveMsnpStorageException("Storage server is not configured.")
             }
             try {
-                connection.outputStream.use {
-                    it.write(body.toByteArray(StandardCharsets.UTF_8))
+                MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
+                    val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        connectTimeout = TIMEOUT_MILLIS
+                        readTimeout = TIMEOUT_MILLIS
+                        instanceFollowRedirects = true
+                        doOutput = true
+                        setRequestProperty("Content-Type", "text/xml; charset=utf-8")
+                        setRequestProperty("SOAPAction", "\"$NAMESPACE/$action\"")
+                        setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+                    }
+                    try {
+                        connection.outputStream.use {
+                            it.write(body.toByteArray(StandardCharsets.UTF_8))
+                        }
+                        val status = connection.responseCode
+                        val response = (if (status in 200..299) {
+                            connection.inputStream
+                        } else {
+                            connection.errorStream
+                        })?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
+                        if (status !in 200..299) {
+                            val fault = runCatching {
+                                val document = storageDocumentBuilderFactory().newDocumentBuilder()
+                                    .parse(response.byteInputStream(StandardCharsets.UTF_8))
+                                document.documentElement.storageFirstText("faultstring")
+                            }.getOrDefault("")
+                            throw LiveMsnpStorageException(
+                                fault.ifBlank { "Storage $action failed with HTTP $status." },
+                            )
+                        }
+                        response
+                    } finally {
+                        connection.disconnect()
+                    }
                 }
-                val status = connection.responseCode
-                val response = (if (status in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                })?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
-                if (status !in 200..299) {
-                    val fault = runCatching {
-                        val document = storageDocumentBuilderFactory().newDocumentBuilder()
-                            .parse(response.byteInputStream(StandardCharsets.UTF_8))
-                        document.documentElement.storageFirstText("faultstring")
-                    }.getOrDefault("")
-                    throw LiveMsnpStorageException(
-                        fault.ifBlank { "Storage $action failed with HTTP $status." },
-                    )
-                }
-                response
             } catch (error: LiveMsnpStorageException) {
                 throw error
             } catch (error: Exception) {
                 throw LiveMsnpStorageException("Could not complete storage $action.", error)
-            } finally {
-                connection.disconnect()
             }
         }
 
