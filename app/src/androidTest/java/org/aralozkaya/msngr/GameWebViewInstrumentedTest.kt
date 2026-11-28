@@ -48,6 +48,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class GameWebViewInstrumentedTest {
@@ -1133,6 +1134,8 @@ class GameWebViewInstrumentedTest {
 
     @Test fun arbitraryPlainHttpMsnpServerLoadsCatalogDefaultBlueAndCustomPageBackgroundsAndPlaysEndToEnd() {
         val closed = AtomicBoolean(false)
+        val gamePageRequests = AtomicInteger()
+        val loopRequests = AtomicInteger()
         val serverSocket = ServerSocket(0)
         val port = serverSocket.localPort
         val serverThread = Thread {
@@ -1157,6 +1160,21 @@ class GameWebViewInstrumentedTest {
                     val headerText = requestHeaderBytes.toString(StandardCharsets.ISO_8859_1.name())
                     val requestLine = headerText.lineSequence().firstOrNull().orEmpty()
                     val path = requestLine.split(' ').getOrNull(1).orEmpty()
+                    val redirect = when (path) {
+                        "/games/start" -> "http://127.0.0.1:$port/games/unstyled.htm"
+                        "/games/loop-a.htm", "/games/loop-b.htm" -> {
+                            if (loopRequests.incrementAndGet() >= 20) null
+                            else if (path.endsWith("a.htm")) "loop-b.htm" else "loop-a.htm"
+                        }
+                        else -> null
+                    }
+                    if (redirect != null) {
+                        val response = "HTTP/1.1 302 Found\r\nLocation: $redirect\r\n" +
+                            "Content-Length: 0\r\nConnection: close\r\n\r\n"
+                        socket.getOutputStream().write(response.toByteArray(StandardCharsets.US_ASCII))
+                        continue
+                    }
+                    if (path == "/games/unstyled.htm") gamePageRequests.incrementAndGet()
                     val (contentType, body) = when {
                         path.startsWith("/Config/MsgrConfig.asmx") -> "text/xml; charset=utf-8" to """
                             <?xml version="1.0" encoding="utf-8"?>
@@ -1187,7 +1205,7 @@ class GameWebViewInstrumentedTest {
                                     <CategoryID>700</CategoryID>
                                     <Sequence>1</Sequence>
                                     <Name>Plain Blue Game</Name>
-                                    <URL>http://127.0.0.1:$port/games/unstyled.htm</URL>
+                                    <URL>http://localhost:$port/games/start</URL>
                                     <Width>500</Width>
                                     <Height>500</Height>
                                     <MinUsers>2</MinUsers>
@@ -1296,6 +1314,8 @@ class GameWebViewInstrumentedTest {
                 compose.waitUntil(10_000) {
                     evaluateOnWebView(webView, "String(window.__remoteReady === true)") == "\"true\""
                 }
+                assertEquals("\"http://127.0.0.1:$port/games/unstyled.htm\"", evaluateOnWebView(webView, "location.href"))
+                assertEquals(1, gamePageRequests.get())
                 compose.waitUntil(5_000) {
                     evaluateOnWebView(webView, "getComputedStyle(document.documentElement).backgroundColor") == "\"rgb(81, 108, 161)\""
                 }
@@ -1322,6 +1342,18 @@ class GameWebViewInstrumentedTest {
                 assertEquals("\"false\"", hasDefaultStyle)
             } finally {
                 instrumentation.runOnMainSync { customController.destroy() }
+            }
+            val loopController = createController(customBgEntry.copy(url = "http://127.0.0.1:$port/games/loop-a.htm"))
+            try {
+                compose.waitUntil(10_000) {
+                    loopRequests.get() >= 11 && evaluate(loopController, """
+                        document.readyState === 'complete' && location.pathname === '/games/loop-a.htm' &&
+                            !document.getElementById('__p4_redirect')
+                    """.trimIndent()) == "true"
+                }
+                assertEquals(11, loopRequests.get())
+            } finally {
+                instrumentation.runOnMainSync { loopController.destroy() }
             }
         } finally {
             closed.set(true)

@@ -112,7 +112,7 @@ internal fun CompactSearchField(
                 hint = "",
                 contentDescription = placeholder,
                 contentPadding = PaddingValues(0.dp),
-                onSearch = controller::hideKeyboard,
+                onSearch = controller::clearFocusAndHideKeyboard,
                 onSelectionChanged = { selection ->
                     val value = controller.snapshot().text
                     state.edit {

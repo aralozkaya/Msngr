@@ -177,7 +177,7 @@ def pack_member(directory, name):
     path = PureWindowsPath(name)
     if not path.parts or path.anchor or ".." in path.parts or ":" in name:
         raise ValueError(f"Invalid scene pack member: {name}")
-    member = directory.joinpath(*path.parts)
+    member = directory.resolve().joinpath(*path.parts)
     if member.resolve() != member or not member.is_file():
         raise ValueError(f"Missing or linked scene pack member: {name}")
     return member

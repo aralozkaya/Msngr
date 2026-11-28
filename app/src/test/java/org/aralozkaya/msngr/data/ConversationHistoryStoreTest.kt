@@ -91,6 +91,39 @@ class ConversationHistoryStoreTest {
     }
 
     @Test
+    fun failedBackupRecoveryKeepsReceivingMessagesAndRetriesForTheOriginalAccount() {
+        withHistoryDirectory("msngr-history-pending-recovery") { directory ->
+            val store = FileConversationHistoryStore(directory)
+            store.selectAccount(ACCOUNT)
+            store.merge(mapOf(CONTACT to listOf(message(1))))
+            val contact = directory.walkTopDown().first { it.name == "chunk-00000000.bin" }.parentFile!!
+            val original = File(contact.parentFile, "original")
+            val backup = File(contact.parentFile, "${contact.name}.offline-backup")
+            assertTrue(contact.renameTo(original))
+            backup.writeText("invalid backup")
+            store.deselectAccount()
+            store.selectAccount(ACCOUNT)
+
+            val other = message(3).copy(contactId = "another-friend")
+            store.merge(mapOf(CONTACT to listOf(message(2)), other.contactId to listOf(other)))
+            assertEquals(listOf(2L), store.loadedIds())
+            assertEquals(listOf(other), store.messages.value[other.contactId])
+            store.selectAccount("another-account")
+            store.loadLatest(CONTACT)
+            assertTrue(store.loadedIds().isEmpty())
+            assertTrue(backup.delete())
+            assertTrue(original.renameTo(backup))
+            store.selectAccount(ACCOUNT)
+            assertEquals(listOf(1L, 2L), store.loadedIds())
+
+            val restarted = FileConversationHistoryStore(directory)
+            restarted.selectAccount(ACCOUNT)
+            restarted.loadLatest(CONTACT)
+            assertEquals(listOf(1L, 2L), restarted.loadedIds())
+        }
+    }
+
+    @Test
     fun appendAfterInterruptedChunkReplacementKeepsThePreviousMessages() {
         withHistoryDirectory("msngr-history-chunk-recovery") { directory ->
             FileConversationHistoryStore(directory).apply {
@@ -211,6 +244,11 @@ class ConversationHistoryStoreTest {
             store.merge(snapshot)
             assertEquals(entries, store.messages.value[CONTACT])
             assertEquals(1, directory.historyChunkCount())
+            store.deselectAccount()
+            store.selectAccount("another-account")
+            assertTrue(store.messages.value.isEmpty())
+            store.selectAccount(ACCOUNT)
+            assertEquals(entries, store.messages.value[CONTACT])
             assertTrue(obstruction.deleteRecursively())
 
             store.merge(snapshot)

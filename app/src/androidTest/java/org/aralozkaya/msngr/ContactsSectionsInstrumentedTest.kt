@@ -1,6 +1,7 @@
 package org.aralozkaya.msngr
 
 import android.os.Build
+import android.view.inputmethod.EditorInfo
 import androidx.test.filters.SdkSuppress
 import android.widget.EditText
 import androidx.compose.foundation.layout.PaddingValues
@@ -263,6 +264,22 @@ class ContactsSectionsInstrumentedTest {
         compose.onNodeWithContentDescription("Search").assertIsNotFocused()
         pressBack()
         assertSearchStopped()
+    }
+
+    @Test fun submittingSearchHidesTheKeyboardAndKeepsTheFilter() {
+        showContacts()
+        compose.onNodeWithContentDescription("Search").performClick().performTextReplacement("group")
+        lateinit var editor: EditText
+        onView(withContentDescription("Search")).check { view, error ->
+            if (error != null) throw error
+            editor = view as EditText
+        }
+        compose.waitUntil(5_000) { ViewCompat.getRootWindowInsets(editor)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
+        compose.runOnIdle { editor.onEditorAction(EditorInfo.IME_ACTION_SEARCH) }
+        compose.waitUntil(5_000) { ViewCompat.getRootWindowInsets(editor)?.isVisible(WindowInsetsCompat.Type.ime()) == false }
+        compose.runOnIdle { assertEquals("group", editor.text.toString()) }
+        compose.onNodeWithText("Alice").assertDoesNotExist()
+        compose.onNodeWithText("Alpha group").assertIsDisplayed()
     }
 
     @Test fun backStopsSearchWhenTheKeyboardIsOpen() {

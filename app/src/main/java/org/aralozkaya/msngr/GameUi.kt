@@ -82,6 +82,7 @@ import java.util.UUID
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToInt
 
 private fun Context.gameRepository() =
@@ -720,6 +721,8 @@ internal class GameWebViewController(
     private var messagePort: WebMessagePort? = null
     private var navigation = 0L
     @Volatile private var topPageUrl = entry.url
+    private val remainingMainRedirects = AtomicInteger(MAX_GAME_REDIRECTS)
+    private val childDocumentRedirects = LruCache<String, Int>(64)
     private val gameScript = buildP4PolyfillScript(paneWidth)
     private val hostScript = """
         if (window === window.top && !window.__p4Host) {
@@ -802,6 +805,10 @@ internal class GameWebViewController(
                     mainHandler.post { onOpenHelpUrl(target) }
                     return true
                 }
+                if (request.isForMainFrame && target != rawTarget && request.method == "GET") {
+                    view.loadUrl(target)
+                    return true
+                }
                 return false
             }
 
@@ -822,11 +829,24 @@ internal class GameWebViewController(
                 val upgraded = MsnpGameCatalogService.upgradeKnownHttpsUrl(rawUrl)
                 val mainFrame = request.isForMainFrame
                 if (mainFrame) topPageUrl = rawUrl
-                if (request.method == "GET" && shouldInjectGameBridgeHtml(topPageUrl, rawUrl, mainFrame)) {
-                    return fetchGameResource(upgraded, if (mainFrame) mainFrameScript else gameScript)
+                if (rawUrl != upgraded && gameOrigin(rawUrl) == null) return unavailableGameResource()
+                val inject = shouldInjectGameBridgeHtml(topPageUrl, rawUrl, mainFrame)
+                if (request.method == "GET" && (inject || mainFrame && rawUrl != upgraded)) {
+                    val remaining = if (mainFrame) remainingMainRedirects.getAndSet(MAX_GAME_REDIRECTS)
+                    else childDocumentRedirects.remove(gameRedirectKey(rawUrl)) ?: MAX_GAME_REDIRECTS
+                    fun redirect(next: String): WebResourceResponse {
+                        if (remaining == 0) return unavailableGameResource()
+                        if (mainFrame) remainingMainRedirects.set(remaining - 1)
+                        else childDocumentRedirects.put(gameRedirectKey(next), remaining - 1)
+                        return gameDocumentRedirect(next)
+                    }
+                    if (rawUrl != upgraded) return redirect(upgraded)
+                    return fetchGameResource(upgraded, if (mainFrame) mainFrameScript else gameScript, ::redirect)
                 }
-                if (request.method == "GET" && rawUrl != upgraded && gameOrigin(upgraded) != null) {
-                    return fetchGameResource(upgraded, script = null)
+                if (rawUrl != upgraded) {
+                    return if (request.method == "GET" && gameOrigin(upgraded) != null) {
+                        fetchGameResource(upgraded, script = null)
+                    } else unavailableGameResource()
                 }
                 return super.shouldInterceptRequest(view, request)
             }
@@ -835,11 +855,18 @@ internal class GameWebViewController(
                 super.onPageFinished(view, url)
                 if (url == null) return
                 val origin = gameOrigin(url) ?: return
-                if (url != view.url || !shouldInjectGameBridgeHtml(entry.url, url, true)) return
+                if (url != view.url || url != MsnpGameCatalogService.upgradeKnownHttpsUrl(url) ||
+                    !shouldInjectGameBridgeHtml(entry.url, url, true)) return
                 val generation = navigation
-                val script = "if (window.location.origin === ${JSONObject.quote(origin)}) { $mainFrameScript }"
-                view.evaluateJavascript(script) {
-                    if (generation != navigation || url != view.url || messagePort != null) return@evaluateJavascript
+                val script = """
+                    (function() {
+                        if (window.location.origin !== ${JSONObject.quote(origin)} || document.getElementById('__p4_redirect')) return false;
+                        $mainFrameScript
+                        return true;
+                    })()
+                """.trimIndent()
+                view.evaluateJavascript(script) { installed ->
+                    if (installed != "true" || generation != navigation || url != view.url || messagePort != null) return@evaluateJavascript
                     val ports = view.createWebMessageChannel()
                     messagePort = ports[0]
                     ports[0].setWebMessageCallback(object : WebMessagePort.WebMessageCallback() {
@@ -1058,44 +1085,69 @@ private fun resolveHtmlCharset(contentType: String?, bytes: ByteArray): Charset 
 }
 
 private val gameHeadTag = Regex("<head\\b[^>]*>", RegexOption.IGNORE_CASE)
+private const val MAX_GAME_REDIRECTS = 10
 
-private fun fetchGameResource(url: String, script: String?): WebResourceResponse? {
-    val target = URL(url)
-    val connection = (target.openConnection() as HttpURLConnection).apply {
-        connectTimeout = 10_000
-        readTimeout = 10_000
-        instanceFollowRedirects = false
-        setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
-    }
-    try {
-        val status = connection.responseCode
-        if (status in 300..399) {
-            val location = connection.getHeaderField("Location")
-            val redirect = location?.let { URL(target, it).toString() }
-            if (gameOrigin(redirect) == null) return unavailableGameResource()
-            // Let WebView follow redirects so the final document gets its actual security origin.
-            return null
+private fun gameRedirectKey(url: String): String {
+    val uri = URI(url).normalize()
+    return gameOrigin(url) + uri.rawPath.ifEmpty { "/" } + (uri.rawQuery?.let { "?$it" } ?: "")
+}
+
+private fun gameDocumentRedirect(url: String): WebResourceResponse {
+    val target = JSONObject.quote(url).replace("<", "\\u003c")
+    val html = """<meta name="referrer" content="no-referrer"><script id="__p4_redirect">location.replace($target)</script>"""
+    return WebResourceResponse("text/html", "utf-8", html.byteInputStream())
+}
+
+private fun fetchGameResource(
+    url: String,
+    script: String?,
+    redirectDocument: ((String) -> WebResourceResponse)? = null,
+): WebResourceResponse {
+    var target = URL(url)
+    repeat(MAX_GAME_REDIRECTS + 1) {
+        val connection = (target.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            instanceFollowRedirects = false
+            setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
         }
-        if (status !in 200..299) return unavailableGameResource()
-        val limit = if (script != null) 2 * 1024 * 1024 else 16 * 1024 * 1024
-        val bytes = connection.inputStream.use { it.readBytesBounded(limit) { "Game resource is too large." } }
-        val contentType = connection.contentType
-        if (script == null) {
-            val mime = contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
-                ?: java.net.URLConnection.guessContentTypeFromName(target.path)
-                ?: "application/octet-stream"
-            return WebResourceResponse(mime, "utf-8", bytes.inputStream())
+        try {
+            val status = connection.responseCode
+            if (status in 200..299) return readGameResource(connection, script)
+            if (status !in setOf(301, 302, 303, 307, 308)) return unavailableGameResource()
+            val location = connection.getHeaderField("Location") ?: return unavailableGameResource()
+            val next = MsnpGameCatalogService.upgradeKnownHttpsUrl(URL(target, location).toString())
+            val origin = gameOrigin(next) ?: return unavailableGameResource()
+            if (target.protocol == "https" && !origin.startsWith("https://")) return unavailableGameResource()
+
+            // A fresh document navigation preserves its origin and runs interception before its scripts.
+            if (redirectDocument != null) return redirectDocument(next)
+            if (origin != gameOrigin(target.toString())) return unavailableGameResource()
+            target = URL(next)
+        } catch (_: Exception) {
+            return unavailableGameResource()
+        } finally {
+            connection.disconnect()
         }
-        val html = normalizeLegacyGameHtml(String(bytes, resolveHtmlCharset(contentType, bytes)))
-        val injection = "<style id=\"__p4_base_style\">$P4_BASE_CSS</style><script>$script</script>"
-        val offset = gameHeadTag.find(html)?.range?.last?.plus(1) ?: 0
-        val modified = StringBuilder(html).insert(offset, injection).toString()
-        return WebResourceResponse("text/html", "utf-8", modified.byteInputStream())
-    } catch (_: Exception) {
-        return unavailableGameResource()
-    } finally {
-        connection.disconnect()
     }
+    return unavailableGameResource()
+}
+
+private fun readGameResource(connection: HttpURLConnection, script: String?): WebResourceResponse {
+    val limit = if (script != null) 2 * 1024 * 1024 else 16 * 1024 * 1024
+    val bytes = connection.inputStream.use { it.readBytesBounded(limit) { "Game resource is too large." } }
+    val contentType = connection.contentType
+    if (script == null) {
+        val mime = contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
+            ?: java.net.URLConnection.guessContentTypeFromName(connection.url.path)
+            ?: "application/octet-stream"
+        return WebResourceResponse(mime, "utf-8", bytes.inputStream())
+    }
+    val html = normalizeLegacyGameHtml(String(bytes, resolveHtmlCharset(contentType, bytes)))
+    val injection = "<style id=\"__p4_base_style\">$P4_BASE_CSS</style><script>$script</script>"
+    val offset = gameHeadTag.find(html)?.range?.last?.plus(1) ?: 0
+    val modified = StringBuilder(html).insert(offset, injection).toString()
+    return WebResourceResponse("text/html", "utf-8", modified.byteInputStream())
 }
 
 private fun unavailableGameResource() = WebResourceResponse(

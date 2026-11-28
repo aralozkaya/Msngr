@@ -111,7 +111,7 @@ class MsngrApplication : Application() {
                 inAppNotifications.dismissConversation(contactId)
             },
             onRemoteSignOut = { account ->
-                if (SessionPrefs.recordRemoteSignOut(this, account)) {
+                SessionPrefs.recordRemoteSignOut(this, account) {
                     sharingNotifications.dismissAll()
                     BackgroundConnectionController.stop(this)
                     AppShortcuts.clearRecentChats(this)

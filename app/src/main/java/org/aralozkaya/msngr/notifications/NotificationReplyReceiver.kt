@@ -9,6 +9,7 @@ import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.withoutUnicodeEmoji
+import java.util.UUID
 
 class NotificationReplyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -46,20 +47,23 @@ class NotificationReplyReceiver : BroadcastReceiver() {
                 .build()
         } catch (_: IllegalStateException) {
             // WorkManager limits serialized bytes. A multibyte reply may exceed its budget.
-            notifications.markReplyFailed(contactId, contactName, notificationId)
+            notifications.markReplyFailed(contactId, contactName, notificationId, accountKey)
             return
         }
         repository?.markRead(contactId, dismissNotification = false)
         notifications.dismiss(MsngrNotificationManager.notificationId(NotificationEventType.Nudge, contactId))
         (context.applicationContext as? MsngrApplication)?.inAppNotifications?.dismissConversation(contactId)
+        val actionId = UUID.randomUUID()
         notifications.appendReply(
             contactId = contactId,
             contactName = contactName,
             replyText = reply,
             notificationId = notificationId,
             isGroup = isGroup,
+            accountKey = accountKey,
+            actionId = actionId,
         )
-        context.enqueueNotificationAction<ReplyMessageWorker>(input)
+        context.enqueueNotificationAction<ReplyMessageWorker>(input, actionId)
     }
 
     companion object {

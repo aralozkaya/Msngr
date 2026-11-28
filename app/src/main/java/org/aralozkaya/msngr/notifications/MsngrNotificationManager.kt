@@ -178,19 +178,22 @@ internal class MsngrNotificationManager(
 
     suspend fun show(event: NotificationEvent) {
         if (isForeground()) return
+        val currentAccount = context.notificationAccountKey()
+        if (event.accountKey != null && event.accountKey != currentAccount) return
         if (InAppNotificationPrefs.read(context).conversations[event.contactId.notificationKey()]?.backgroundEnabled == false) {
             dismiss(notificationId(event.type, event.contactId))
             return
         }
         if (!canPostNotifications()) return
         val displayEvent = event.copy(
-            accountKey = event.accountKey ?: context.notificationAccountKey(),
+            accountKey = event.accountKey ?: currentAccount,
             contactName = event.contactName.messengerPlusPlainText(),
             messageText = event.messageText?.messengerPlusPlainText(),
             senderName = event.senderName?.messengerPlusPlainText(),
         )
         val contactAvatar = context.loadAvatarBitmap(displayEvent.contactAvatarUri)
             ?: context.shortcutAvatarBitmap(displayEvent.contactName, null)
+        if (context.notificationAccountKey() != displayEvent.accountKey) return
         val contactIcon = IconCompat.createWithAdaptiveBitmap(contactAvatar)
         val contact = contactPerson(displayEvent, contactIcon)
         val posted = when (displayEvent.type) {
@@ -215,8 +218,10 @@ internal class MsngrNotificationManager(
         previousNotification: Notification? = activeNotification(notificationId, contactId),
         isGroup: Boolean = false,
         sentAtMillis: Long = System.currentTimeMillis(),
+        accountKey: String? = context.notificationAccountKey(),
+        actionId: UUID? = null,
     ) {
-        if (!canPostNotifications()) return
+        if (context.notificationAccountKey() != accountKey || !canPostNotifications()) return
         val cleanReply = replyText.messengerPlusPlainText().trim()
         if (cleanReply.isEmpty()) return
         val previousStyle = previousNotification?.let(
@@ -241,7 +246,7 @@ internal class MsngrNotificationManager(
             messageText = cleanReply,
             sentAtMillis = sentAtMillis,
             isGroup = resolvedIsGroup,
-            accountKey = context.notificationAccountKey(),
+            accountKey = accountKey,
         )
         val contact = contactPerson(event, contactIcon)
         val shortcut = publishConversationShortcut(event, contact, contactIcon)
@@ -266,6 +271,7 @@ internal class MsngrNotificationManager(
             onlyAlertOnce = true,
             forceSilent = true,
         )
+        if (actionId != null) notification.extras.putString(EXTRA_ACTION_ID, actionId.toString())
         notify(notificationId, notification, allowWhenForeground = true)
     }
 
@@ -275,8 +281,9 @@ internal class MsngrNotificationManager(
         replyText: String,
         notificationId: Int = notificationId(NotificationEventType.Message, contactId),
         isGroup: Boolean = false,
+        accountKey: String? = context.notificationAccountKey(),
     ) {
-        val active = activeNotification(notificationId, contactId) ?: return
+        val active = activeNotification(notificationId, contactId, accountKey) ?: return
         val cleanReply = replyText.messengerPlusPlainText().trim()
         if (cleanReply.isEmpty()) return
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
@@ -292,6 +299,7 @@ internal class MsngrNotificationManager(
                 notificationId = notificationId,
                 previousNotification = active,
                 isGroup = isGroup,
+                accountKey = accountKey,
             )
         }
     }
@@ -316,14 +324,16 @@ internal class MsngrNotificationManager(
         )
     }
 
-    fun markReplyFailed(contactId: String, contactName: String, notificationId: Int) {
-        if (!canPostNotifications()) return
+    fun markReplyFailed(
+        contactId: String, contactName: String, notificationId: Int, accountKey: String? = context.notificationAccountKey(),
+    ) {
+        if (context.notificationAccountKey() != accountKey || !canPostNotifications()) return
         notify(
             notificationId,
             actionStatusBuilder(
                 NotificationChannels.MESSAGES, contactId, contactName,
                 context.getString(R.string.notification_reply_failed),
-                activeNotification(notificationId, contactId),
+                activeNotification(notificationId, contactId, accountKey), accountKey,
             )
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
@@ -337,15 +347,19 @@ internal class MsngrNotificationManager(
         contactName: String,
         notificationId: Int,
         channelId: String,
+        accountKey: String? = context.notificationAccountKey(),
+        actionId: UUID? = null,
     ) {
-        if (!canPostNotifications()) return
+        if (context.notificationAccountKey() != accountKey || !canPostNotifications()) return
         notify(
             notificationId,
             actionStatusBuilder(
                 channelId, contactId, contactName,
                 context.getString(R.string.notification_sending_nudge),
-                activeNotification(notificationId, contactId),
+                activeNotification(notificationId, contactId, accountKey),
+                accountKey,
             )
+                .addExtras(Bundle().apply { putString(EXTRA_ACTION_ID, actionId?.toString()) })
                 .setProgress(0, 0, true)
                 .setOnlyAlertOnce(true)
                 .build(),
@@ -358,8 +372,9 @@ internal class MsngrNotificationManager(
         contactName: String,
         notificationId: Int,
         channelId: String,
+        accountKey: String? = context.notificationAccountKey(),
     ) {
-        if (!canPostNotifications()) return
+        if (context.notificationAccountKey() != accountKey || !canPostNotifications()) return
         notify(
             notificationId,
             actionStatusBuilder(
@@ -368,7 +383,7 @@ internal class MsngrNotificationManager(
                     R.string.notification_nudge_failed_text,
                     context.getString(R.string.notification_nudge_failed_title),
                 ),
-                activeNotification(notificationId, contactId),
+                activeNotification(notificationId, contactId, accountKey), accountKey,
             )
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
@@ -377,12 +392,21 @@ internal class MsngrNotificationManager(
         )
     }
 
-    fun dismiss(notificationId: Int) {
+    fun dismiss(notificationId: Int) = synchronized(recentNotifications) {
         recentNotifications.remove(notificationId)
         systemNotifications.cancel(notificationId)
     }
 
-    fun dismissContactSignedInNotifications() {
+    fun dismissAction(notificationId: Int, accountKey: String, actionId: UUID) = synchronized(recentNotifications) {
+        val latest = latestNotification(notificationId, systemActiveNotification(notificationId))
+        if (latest?.extras?.getString(EXTRA_ACTION_ID) == actionId.toString() &&
+            latest.extras.getString(NOTIFICATION_ACCOUNT) == accountKey
+        ) dismiss(notificationId)
+    }
+
+    fun dismissContactSignedInNotifications(
+        scheduleRecheck: (Runnable) -> Unit = { Handler(Looper.getMainLooper()).postDelayed(it, SIGN_IN_CANCEL_RECHECK_MILLIS) },
+    ) {
         val signIns = systemNotifications.activeNotifications.filter {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 it.notification.channelId == NotificationChannels.CONTACT_SIGNED_IN
@@ -395,11 +419,11 @@ internal class MsngrNotificationManager(
         signIns.forEach(::cancelPostedSignIn)
 
         // Android can silently drop rapid cancellations of the same key.
-        Handler(Looper.getMainLooper()).postDelayed({
+        scheduleRecheck {
             systemNotifications.activeNotifications.forEach {
                 if (posted[it.key] == it.postIdentity()) cancelPostedSignIn(it)
             }
-        }, SIGN_IN_CANCEL_RECHECK_MILLIS)
+        }
     }
 
     private fun StatusBarNotification.postIdentity() =
@@ -423,12 +447,16 @@ internal class MsngrNotificationManager(
             recentNotifications.remove(notificationId)
             return null
         }
-        val cached = recentNotifications[notificationId]
-        val systemSeq = systemNotification.extras.getLong(EXTRA_POST_SEQUENCE, 0L)
-        val latest = cached?.takeIf { it.extras.getLong(EXTRA_POST_SEQUENCE, 0L) > systemSeq } ?: systemNotification
-        return latest.takeIf {
+        return latestNotification(notificationId, systemNotification)?.takeIf {
             it.extras.getString(NOTIFICATION_ACCOUNT) == accountKey && it.extras.getString(EXTRA_CONVERSATION) == contactId
         }
+    }
+
+    private fun latestNotification(notificationId: Int, posted: Notification?): Notification? {
+        val cached = recentNotifications[notificationId]
+        if (posted == null) return cached
+        val postedSequence = posted.extras.getLong(EXTRA_POST_SEQUENCE)
+        return cached?.takeIf { it.extras.getLong(EXTRA_POST_SEQUENCE) > postedSequence } ?: posted
     }
 
     private fun systemActiveNotification(notificationId: Int): Notification? =
@@ -451,8 +479,9 @@ internal class MsngrNotificationManager(
             NotificationCompat.MessagingStyle::extractMessagingStyleFromNotification,
         )
         val keepExistingMessages = previousNotification?.extras?.getBoolean(EXTRA_IS_ACTION_STATUS) != true
-        val shortcut = publishConversationShortcut(event, sender, contactIcon)
         val messageSender = if (event.isGroup) groupSenderPerson(event) else sender
+        if (context.notificationAccountKey() != event.accountKey) return false
+        val shortcut = publishConversationShortcut(event, sender, contactIcon)
         val style = messagingStyle().setGroupConversation(event.isGroup).also { messagingStyle ->
             if (event.isGroup) {
                 messagingStyle.setConversationTitle(event.contactName)
@@ -631,6 +660,7 @@ internal class MsngrNotificationManager(
         contactName: String,
         text: String,
         previousNotification: Notification?,
+        accountKey: String? = context.notificationAccountKey(),
     ): NotificationCompat.Builder {
         val previousStyle = previousNotification?.let {
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it)
@@ -653,7 +683,7 @@ internal class MsngrNotificationManager(
         } else {
             val name = contactName.messengerPlusPlainText()
             val event = NotificationEvent(
-                NotificationEventType.Message, contactId, name, accountKey = context.notificationAccountKey(),
+                NotificationEventType.Message, contactId, name, accountKey = accountKey,
             )
             val icon = resolveConversationIcon(
                 contactId = contactId,
@@ -663,7 +693,7 @@ internal class MsngrNotificationManager(
                 isGroup = previousStyle?.isGroupConversation == true,
             )
             contact = contactPerson(event, icon)
-            builder = baseBuilder(channelId, contactId, name, contact)
+            builder = baseBuilder(channelId, contactId, name, contact, accountKey = accountKey)
                 .setShortcutInfo(publishConversationShortcut(event, contact, icon))
             style = messagingStyle().setGroupConversation(false)
         }
@@ -911,18 +941,22 @@ internal class MsngrNotificationManager(
         notificationId: Int,
         notification: Notification,
         allowWhenForeground: Boolean = false,
-    ): Boolean = synchronized(recentNotifications) {
-        if (!allowWhenForeground && isForeground()) return@synchronized false
-        if (!canPostNotifications()) return@synchronized false
-        notification.extras.putLong(EXTRA_POST_SEQUENCE, SystemClock.elapsedRealtimeNanos())
-        recentNotifications.put(notificationId, notification)
-        try {
-            systemNotifications.notify(notificationId, notification)
-            true
-        } catch (_: SecurityException) {
-            recentNotifications.remove(notificationId)
-            // Permission can be revoked between the explicit check and the framework call.
-            false
+    ): Boolean {
+        if (notification.extras.containsKey(NOTIFICATION_ACCOUNT) &&
+            notification.extras.getString(NOTIFICATION_ACCOUNT) != context.notificationAccountKey()
+        ) return false
+        return synchronized(recentNotifications) {
+            if (!allowWhenForeground && isForeground()) return@synchronized false
+            if (!canPostNotifications()) return@synchronized false
+            notification.extras.putLong(EXTRA_POST_SEQUENCE, SystemClock.elapsedRealtimeNanos())
+            recentNotifications.put(notificationId, notification)
+            try {
+                systemNotifications.notify(notificationId, notification)
+                true
+            } catch (_: SecurityException) {
+                recentNotifications.remove(notificationId)
+                false
+            }
         }
     }
 
@@ -934,9 +968,10 @@ internal class MsngrNotificationManager(
         private const val EVENT_NOTIFICATION_ID_COUNT = 90_000
         private const val NUDGE_REQUEST_CODE_OFFSET = 400_000
         private const val SELF_PERSON_KEY = "me"
+        private const val EXTRA_ACTION_ID = "msngr_action_id"
         private const val EXTRA_IS_ACTION_STATUS = "msngr_is_action_status"
         private const val EXTRA_CONVERSATION = "msngr_conversation"
-        internal const val SIGN_IN_CANCEL_RECHECK_MILLIS = 1_000L
+        private const val SIGN_IN_CANCEL_RECHECK_MILLIS = 1_000L
         private const val EXTRA_POST_SEQUENCE = "msngr_post_sequence"
         private val recentNotifications = LruCache<Int, Notification>(32)
 

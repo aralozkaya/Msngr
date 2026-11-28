@@ -16,6 +16,38 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class SoapTransportTest {
+    @Test fun unreadableRejectionBodyRetainsHttpStatusAndDoesNotReplayThePost() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val finishResponse = CountDownLatch(1)
+        server.createContext("/denied") { exchange ->
+            exchange.use {
+                it.requestBody.readBytes()
+                it.sendResponseHeaders(403, 10)
+                it.responseBody.write(1)
+                it.responseBody.flush()
+                finishResponse.await(5, TimeUnit.SECONDS)
+            }
+        }
+        server.start()
+        try {
+            val endpoint = "http://127.0.0.1:${server.address.port}/denied"
+            val attempted = mutableListOf<String>()
+            val response = runBlocking {
+                MsnpClientConfigService.withServiceEndpointFallback(listOf(endpoint, "$endpoint/alternate")) {
+                    attempted += it
+                    postSoapEnvelope(it, "ping", "", 500)
+                }
+            }
+            assertEquals(403, response.status)
+            assertEquals(null, response.body)
+            assertTrue(response.bodyReadFailure is java.io.IOException)
+            assertEquals(listOf(endpoint), attempted)
+        } finally {
+            finishResponse.countDown()
+            server.stop(0)
+        }
+    }
+
     @Test fun envelopeRedirectsRespectTheConfiguredServiceOrigin() {
         val origin = URL("https://example.test/service")
         assertTrue(origin.canRepeatSoapAt(URL("https://EXAMPLE.test:443/new")))

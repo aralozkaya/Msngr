@@ -14,6 +14,7 @@ import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.MessageNotSubmittedException
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
@@ -308,7 +309,7 @@ internal class MsnpSwitchboardSession(
     }
 
     private suspend fun sendPayload(payload: ByteArray, acknowledgement: String) {
-        check(!closed.get()) { "The switchboard is closed." }
+        if (closed.get()) throw MessageNotSubmittedException("The switchboard is closed.")
         require(payload.size <= MAX_SWITCHBOARD_PAYLOAD_BYTES) {
             "The message is too long for an MSNP switchboard."
         }

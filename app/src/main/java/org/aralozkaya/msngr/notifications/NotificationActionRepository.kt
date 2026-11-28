@@ -18,10 +18,11 @@ import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.accountIdentity
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.data.MessengerRepository
-import org.aralozkaya.msngr.data.NudgeCooldownException
+import org.aralozkaya.msngr.protocol.MessageNotSubmittedException
 import org.aralozkaya.msngr.data.SessionUnavailableException
 import org.aralozkaya.msngr.restoreRememberedRepository
 import org.aralozkaya.msngr.restoreSignedInProfile
+import java.util.UUID
 
 internal const val NOTIFICATION_ACCOUNT = "notification_account"
 internal const val NOTIFICATION_CONTACT_ID = "contact_id"
@@ -39,8 +40,9 @@ internal fun Intent.bindNotificationAccount(accountKey: String?) {
         .appendQueryParameter("account", accountKey).build()
 }
 
-internal inline fun <reified W : ListenableWorker> Context.enqueueNotificationAction(input: Data) {
+internal inline fun <reified W : ListenableWorker> Context.enqueueNotificationAction(input: Data, actionId: UUID) {
     val request = OneTimeWorkRequestBuilder<W>()
+        .setId(actionId)
         .setInputData(input)
         .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
     // Earlier Android versions implement expedited work as a foreground service.
@@ -55,19 +57,22 @@ internal suspend fun CoroutineWorker.deliverNudgeOrReply(reply: String?): WorkRe
     val contactId = inputData.getString(NOTIFICATION_CONTACT_ID)?.takeIf(String::isNotBlank)
         ?: return WorkResult.failure()
     fun sameAccount() = applicationContext.notificationAccountKey() == account
-    if (!sameAccount()) return WorkResult.failure()
-
     val contactName = inputData.getString(NOTIFICATION_CONTACT_NAME)?.takeIf(String::isNotBlank)
         ?: contactId.substringBefore('@')
     val notificationId = inputData.getInt(ACTION_NOTIFICATION_ID,
         MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId))
     val notifications = MsngrNotificationManager(applicationContext)
+    fun abandon(): WorkResult {
+        notifications.dismissAction(notificationId, account, id)
+        return WorkResult.failure()
+    }
+    if (!sameAccount()) return abandon()
     fun deliveryFailed(): WorkResult {
         if (reply == null) {
             val channel = NotificationChannels.nudgeChannel(inputData.getString(NudgeContactWorker.KEY_CHANNEL_ID))
-            notifications.markNudgeFailed(contactId, contactName, notificationId, channel)
+            notifications.markNudgeFailed(contactId, contactName, notificationId, channel, account)
         } else {
-            notifications.markReplyFailed(contactId, contactName, notificationId)
+            notifications.markReplyFailed(contactId, contactName, notificationId, account)
         }
         return WorkResult.failure()
     }
@@ -78,21 +83,21 @@ internal suspend fun CoroutineWorker.deliverNudgeOrReply(reply: String?): WorkRe
         if (runAttemptCount < MAX_ACTION_RETRIES && sameAccount()) return WorkResult.retry()
         null
     }
-    if (!sameAccount()) return WorkResult.failure()
+    if (!sameAccount()) return abandon()
     if (repository == null) return deliveryFailed()
     val sent = repository.sendNotificationAction(account, contactId, reply)
     val failure = sent.exceptionOrNull()
     if (failure is CancellationException) throw failure
-    if (failure is SessionUnavailableException || !sameAccount()) return WorkResult.failure()
+    if (failure is SessionUnavailableException || !sameAccount()) return abandon()
     if (failure != null) {
-        // A cooldown rejects this tap. Retrying would send a nudge the user never requested.
-        if (failure !is NudgeCooldownException && runAttemptCount < MAX_ACTION_RETRIES) return WorkResult.retry()
+        if (failure is MessageNotSubmittedException && runAttemptCount < MAX_ACTION_RETRIES) return WorkResult.retry()
         return deliveryFailed()
     }
     val contact = sent.getOrNull() ?: return deliveryFailed()
-    if (reply == null) notifications.dismiss(notificationId) else notifications.ensureReplyShown(
+    if (reply == null) notifications.dismissAction(notificationId, account, id) else notifications.ensureReplyShown(
         contactId, contact.displayName.ifBlank { contactName }, reply, notificationId,
         isGroup = contact.isGroup || inputData.getBoolean(ReplyMessageWorker.KEY_IS_GROUP, false),
+        accountKey = account,
     )
     return WorkResult.success()
 }

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.work.Data
+import java.util.UUID
 
 class NotificationNudgeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -28,16 +29,12 @@ class NotificationNudgeReceiver : BroadcastReceiver() {
                 .putString(NudgeContactWorker.KEY_CHANNEL_ID, channelId)
                 .build()
         } catch (_: IllegalStateException) {
-            notifications.markNudgeFailed(contactId, contactName, notificationId, channelId)
+            notifications.markNudgeFailed(contactId, contactName, notificationId, channelId, accountKey)
             return
         }
-        notifications.markNudging(
-            contactId,
-            contactName,
-            notificationId,
-            channelId,
-        )
-        context.enqueueNotificationAction<NudgeContactWorker>(input)
+        val actionId = UUID.randomUUID()
+        notifications.markNudging(contactId, contactName, notificationId, channelId, accountKey, actionId)
+        context.enqueueNotificationAction<NudgeContactWorker>(input, actionId)
     }
 
     companion object {

@@ -82,13 +82,14 @@ internal object AppShortcuts {
 
     suspend fun recordRecentChat(
         context: Context,
-        accountEmail: String,
+        owner: AccountIdentity,
         contactId: String,
         displayName: String,
         avatarUri: String?,
     ) {
         val appContext = context.applicationContext
-        val account = activeAccountKey(accountEmail) ?: return
+        if (SessionPrefs.activeAccount() != owner) return
+        val account = owner.storageKey
         val normalizedContactId = contactId.trim()
         if (normalizedContactId.isBlank()) return
         val opened = RecentChatShortcut(
@@ -104,7 +105,7 @@ internal object AppShortcuts {
         }
         withContext(Dispatchers.IO) {
             synchronized(this@AppShortcuts) {
-                if (activeAccountKey(accountEmail) != account) return@synchronized
+                if (SessionPrefs.activeAccount() != owner) return@synchronized
                 writeIcon(iconFile(appContext, account, normalizedContactId), icon)
                 val stored = readState(appContext)
                 val current = stored.recentChats.takeIf { stored.account == account }.orEmpty()

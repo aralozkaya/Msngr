@@ -37,9 +37,28 @@ class ArtworkImportTest(unittest.TestCase):
             image = root / "image.png"
             image.write_bytes(b"image")
             self.assertEqual(download_scenes.pack_member(root, "image.png"), image)
+            (root / "nested").mkdir()
+            self.assertEqual(download_scenes.pack_member(root / "nested" / "..", "image.png"), image)
             for name in ("../image.png", r"..\image.png", "C:/image.png", "/image.png", "image.png:extra"):
                 with self.subTest(name=name), self.assertRaises(ValueError):
                     download_scenes.pack_member(root, name)
+
+    def test_scene_pack_under_a_linked_temp_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            extracted = root / "pack"
+            extracted.mkdir()
+            manifest = extracted / "content.xml"
+            manifest.write_text("<scene/>", encoding="utf-8")
+            alias = root / "temp-link"
+            try:
+                alias.symlink_to(extracted, target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f"Directory symlinks unavailable: {error}")
+            self.assertEqual(download_scenes.pack_member(alias, "content.xml"), manifest)
+            (extracted / "nested").symlink_to(extracted, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                download_scenes.pack_member(alias, "nested/content.xml")
 
     def test_generated_scene_names_are_literal_kotlin_strings(self):
         with tempfile.TemporaryDirectory() as directory:

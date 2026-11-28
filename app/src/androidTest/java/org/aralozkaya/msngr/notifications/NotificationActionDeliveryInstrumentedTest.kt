@@ -119,6 +119,48 @@ class NotificationActionDeliveryInstrumentedTest {
         }
     }
 
+    @Test fun abandonedActionsDismissOnlyTheirOwnNotification() = runBlocking {
+        withAccount(useMockServer = true) {
+            val owner = requireNotNull(context.notificationAccountKey())
+            val peers = listOf("abandoned@example.test", "replaced@example.test")
+            val actions = peers.map { peer ->
+                val id = MsngrNotificationManager.notificationId(NotificationEventType.Nudge, peer)
+                val data = workDataOf(NOTIFICATION_ACCOUNT to owner, NOTIFICATION_CONTACT_ID to peer, ACTION_NOTIFICATION_ID to id)
+                val action = OneTimeWorkRequestBuilder<NudgeContactWorker>().setInputData(data).build()
+                notifications.markNudging(peer, peer, id, NotificationChannels.NUDGES, owner, action.id)
+                id to action
+            }
+            withTimeout(5_000) {
+                while (actions.any { (id, _) -> manager.activeNotifications.none { it.id == id } }) delay(25)
+            }
+
+            SessionPrefs.completeLogin(context, "replacement@example.test", "", false, ProviderOptions.ESCARGOT,
+                ServerOverrides(), useMockServer = true)
+            val peer = peers.last()
+            notifications.show(NotificationEvent(NotificationEventType.Nudge, peer, "Replacement account"))
+            val replacementId = actions.last().first
+            val replacementAccount = requireNotNull(context.notificationAccountKey())
+            withTimeout(5_000) {
+                while (manager.activeNotifications.none {
+                    it.id == replacementId && it.notification.extras.getString(NOTIFICATION_ACCOUNT) == replacementAccount
+                }) delay(25)
+            }
+            for ((_, action) in actions) {
+                requests += action.id
+                work.enqueue(action).result.get()
+                val result = withTimeout(15_000) {
+                    work.getWorkInfoByIdFlow(action.id).first { it?.state?.isFinished == true }
+                }
+                assertEquals(WorkInfo.State.FAILED, result?.state)
+            }
+            withTimeout(5_000) {
+                while (manager.activeNotifications.any { it.id == actions.first().first }) delay(25)
+            }
+            assertEquals(replacementAccount,
+                manager.activeNotifications.single { it.id == replacementId }.notification.extras.getString(NOTIFICATION_ACCOUNT))
+        }
+    }
+
     @Test fun replyRetriesWhenTheRememberedSessionCannotConnect() = runBlocking {
         checkRestoreRetry(reply = "Reply waiting for reconnection")
     }

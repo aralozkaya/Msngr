@@ -20,6 +20,7 @@ import org.aralozkaya.msngr.data.InMemoryConversationHistoryStore
 import org.aralozkaya.msngr.data.LiveMsnp18Client
 import org.aralozkaya.msngr.data.LocalDisplayPicture
 import org.aralozkaya.msngr.data.MessageAuthor
+import org.aralozkaya.msngr.protocol.MessageNotSubmittedException
 import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockServerData
@@ -228,6 +229,18 @@ class LiveMsnp18ClientContractTest {
             assertEquals(listOf(received), client.messages.value.getValue(contact.id))
             assertEquals(requestsBefore, winkRequests())
         } finally { client.close(); directory.deleteRecursively() }
+    }
+
+    @Test fun failedSwitchboardSetupMarksTheReplyAsSafeToRetry() = runBlocking {
+        val notification = ContractNotificationTransport(email)
+        val switchboard = ContractSwitchboardTransport(email, contact.email).apply { rejectInvitations = true }
+        val client = syncClient(notification, switchboard)
+        try {
+            client.signIn(SignInRequest(email, password, serverConfig)).getOrThrow()
+            val result = client.sendMessageWithResult(contact.id, "retry after reconnecting")
+            assertTrue(result.exceptionOrNull() is MessageNotSubmittedException)
+            assertTrue(switchboard.sent.none { it.verb == "MSG" })
+        } finally { client.close() }
     }
 
     @Test fun nudgeCooldownProtectsConcurrentSendsWithoutDisconnecting() = runBlocking {
@@ -2202,7 +2215,8 @@ class LiveMsnp18ClientContractTest {
         switchboard.rejectText = true
         val nativeStyle = NativeTextStyle(true, true, true, true, 0xFF8000, 18)
         val failedSend = client.sendStyledMessage(contact.id, "Keep this failed message", null, nativeStyle)
-        assertTrue(failedSend.isFailure)
+        assertTrue(failedSend.exceptionOrNull() is IOException)
+        assertTrue(switchboard.sent.any { it.payload?.toString(Charsets.UTF_8)?.contains("Keep this failed message") == true })
         val messages = client.messages.value.getValue(contact.id)
         assertEquals(4, messages.size)
         val failed = messages.last()
@@ -2973,6 +2987,7 @@ private class ContractSwitchboardTransport(
     var textDeliveryGate: CompletableDeferred<Unit>? = null
     var nudgeDeliveryGate: CompletableDeferred<Unit>? = null
     var rejectText: Boolean = false
+    var rejectInvitations: Boolean = false
     private var remotePeer: MsnpP2pSession? = null
     private val receivedPictures = Channel<ByteArray>(Channel.UNLIMITED)
 
@@ -2996,6 +3011,7 @@ private class ContractSwitchboardTransport(
                 MsnpCommand("USR", command.transactionId, listOf("OK", signedInEmail, "Mock User")),
             )
             "CAL" -> {
+                if (rejectInvitations) throw IOException("Switchboard invitation failed")
                 val invitee = command.parameters.first()
                 deliver(MsnpCommand("CAL", command.transactionId, listOf("RINGING", "4242")))
                 deliver(MsnpCommand("JOI", parameters = listOf(invitee, "NLN", "0:0")))

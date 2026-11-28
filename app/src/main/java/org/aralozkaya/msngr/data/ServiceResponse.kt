@@ -14,7 +14,7 @@ private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
 internal fun InputStream.readServiceText(maxBytes: Int = MAX_SERVICE_BYTES): String =
     readBytesBounded(maxBytes) { "Messenger service response exceeds $maxBytes bytes." }.toString(Charsets.UTF_8)
 
-internal data class SoapResponse(val status: Int, val body: String?)
+internal data class SoapResponse(val status: Int, val body: String?, val bodyReadFailure: Exception? = null)
 
 internal class SoapExchangeException(cause: IOException) : IOException(cause.message, cause)
 
@@ -58,8 +58,16 @@ internal fun postSoapEnvelope(
             val status = connection.responseCode
             val location = connection.getHeaderField("Location")
             if (!followRedirects || location == null || status !in REDIRECT_CODES) {
-                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-                return SoapResponse(status, stream?.use { it.readServiceText(maxResponseBytes) })
+                if (status in 200..299) {
+                    return SoapResponse(status, connection.inputStream.use { it.readServiceText(maxResponseBytes) })
+                }
+                return try {
+                    SoapResponse(status, connection.errorStream?.use { it.readServiceText(maxResponseBytes) })
+                } catch (error: IOException) {
+                    SoapResponse(status, null, error)
+                } catch (tooLarge: IllegalArgumentException) {
+                    SoapResponse(status, null, tooLarge)
+                }
             }
 
             val next = URL(url, location)

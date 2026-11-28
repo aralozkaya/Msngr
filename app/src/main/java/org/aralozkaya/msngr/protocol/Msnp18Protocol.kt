@@ -603,6 +603,9 @@ object MsnpFrameCodec {
     private const val MAX_PAYLOAD_BYTES = 16 * 1024 * 1024
 }
 
+/** The transport or conversation failed before the outgoing message could be written. */
+internal class MessageNotSubmittedException(message: String?, cause: Throwable? = null) : IllegalStateException(message, cause)
+
 /** Injectable MSNP command transport used by notification and switchboard connections. */
 interface MsnpTransport : Closeable {
     suspend fun connect(host: String, port: Int, timeoutMillis: Int = 10_000)
@@ -694,7 +697,7 @@ class Msnp18SocketTransport : MsnpTransport {
     }
 
     override suspend fun send(command: MsnpCommand) = withContext(Dispatchers.IO) {
-        val stream = checkNotNull(output) { "MSNP socket is not connected" }
+        val stream = output ?: throw MessageNotSubmittedException("MSNP socket is not connected")
         trace("SEND ${command.verb} payload=${command.payload?.size ?: 0}")
         stream.write(MsnpFrameCodec.encode(command))
         stream.flush()

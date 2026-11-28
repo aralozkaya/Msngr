@@ -282,6 +282,7 @@ private fun ChatRoute(
     val context = LocalContext.current
     val drafts by repository.drafts.collectAsState()
     val textStyles by repository.textStyles.collectAsState()
+    val owner = repository.signedInAccountIdentity
     val profile by repository.profile.collectAsState()
     val contacts by repository.contacts.collectAsState()
     val contact = remember(contacts, profile, contactId) { contacts.resolveContact(contactId, profile) }
@@ -309,11 +310,12 @@ private fun ChatRoute(
     LaunchedEffect(contactId) {
         repository.loadConversation(contactId)
     }
-    LaunchedEffect(profile.email, contact?.id, contact?.displayName, contact?.avatarUri) {
+    LaunchedEffect(owner, contact?.id, contact?.displayName, contact?.avatarUri) {
+        if (owner == null || contact != repository.contacts.value.resolveContact(contactId, repository.profile.value)) return@LaunchedEffect
         contact?.let { resolvedContact ->
             AppShortcuts.recordRecentChat(
                 context = context,
-                accountEmail = profile.email,
+                owner = owner,
                 contactId = resolvedContact.id,
                 displayName = resolvedContact.displayName.messengerPlusPlainText(),
                 avatarUri = resolvedContact.avatarUri,

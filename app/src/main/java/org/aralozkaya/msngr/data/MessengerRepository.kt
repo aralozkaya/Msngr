@@ -35,7 +35,7 @@ import org.aralozkaya.msngr.protocol.CurrentMedia
 import org.aralozkaya.msngr.protocol.InkDrawing
 import java.util.Locale
 
-internal class CredentialsRejectedException(message: String) : IllegalStateException(message)
+internal class CredentialsRejectedException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 internal class SessionUnavailableException(message: String) : IllegalStateException(message)
 
 data class SignInRequest(
@@ -343,10 +343,11 @@ class MessengerRepository(
     }
 
     suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> =
-        signIn(request, activateRemembered = null)
+        signIn(request, isRememberedCurrent = { true }, activateRemembered = null)
 
     internal suspend fun signIn(
         request: SignInRequest,
+        isRememberedCurrent: () -> Boolean,
         activateRemembered: (() -> Boolean)?,
     ): Result<UserProfileSnapshot> = connectionMutex.withLock {
         val account = AccountIdentity.forServer(request.email, request.serverConfig, useMockServer)
@@ -363,7 +364,7 @@ class MessengerRepository(
             if (lastSignInRequest == null) sessionGeneration++
             sessionGeneration
         }
-        authenticate(request, account, generation, activateRemembered)
+        authenticate(request, account, generation, isRememberedCurrent, activateRemembered)
     }
 
     suspend fun reconnect(expected: AccountIdentity? = null): Result<UserProfileSnapshot> = connectionMutex.withLock {
@@ -388,6 +389,7 @@ class MessengerRepository(
         request: SignInRequest,
         account: AccountIdentity,
         generation: Long,
+        isRememberedCurrent: () -> Boolean = { true },
         activateRemembered: (() -> Boolean)? = null,
     ): Result<UserProfileSnapshot> {
         var clientAccepted = false
@@ -396,6 +398,7 @@ class MessengerRepository(
             clientAccepted = true
             synchronized(sessionLock) { requireCurrentSession(generation) }
             if (signOutOtherSessionsOnSignIn(account)) {
+                if (!isRememberedCurrent()) throw SessionUnavailableException("The selected account has changed.")
                 try {
                     client.logOutOtherSessions()
                 } catch (cancelled: CancellationException) {
@@ -646,10 +649,20 @@ class MessengerRepository(
         contactId: String,
         text: String,
         renderedEmoticonRanges: List<MsnEmoticonRange>? = null,
-    ) {
+    ) = synchronized(sessionLock) {
         val outgoing = prepareOutgoingMessage(text, renderedEmoticonRanges)
         val style = textStyles.value[contactId.lowercase(java.util.Locale.ROOT)] ?: NativeTextStyle()
-        repositoryScope.launch { client.sendStyledMessage(contactId, outgoing.first, outgoing.second, style) }
+        queueSessionSend { client.sendStyledMessage(contactId, outgoing.first, outgoing.second, style) }
+    }
+
+    private fun queueSessionSend(action: suspend () -> Unit) {
+        val generation = sessionGeneration
+        val account = mutableRequestAccount.value
+        repositoryScope.launch {
+            connectionMutex.withLock {
+                if (sessionGeneration == generation && mutableRequestAccount.value == account) action()
+            }
+        }
     }
 
     suspend fun sendMessageNow(contactId: String, text: String): Result<Unit> =
@@ -683,7 +696,7 @@ class MessengerRepository(
     }
 
     fun sendInk(contactId: String, drawing: InkDrawing) {
-        repositoryScope.launch { client.sendInkMessage(contactId, drawing) }
+        queueSessionSend { client.sendInkMessage(contactId, drawing) }
     }
 
     suspend fun sendInkNow(contactId: String, drawing: InkDrawing): Result<Unit> =
@@ -723,8 +736,8 @@ class MessengerRepository(
         client.sendVoiceClip(contactId, clip)
 
     fun retryMessage(contactId: String, messageId: Long) {
-        repositoryScope.launch {
-            val message = messageSnapshot(contactId, messageId) ?: return@launch
+        queueSessionSend {
+            val message = messageSnapshot(contactId, messageId) ?: return@queueSessionSend
             if ((message.author == MessageAuthor.Me && !message.isNudge &&
                 !message.isSending && message.deliveryError != null) ||
                 (message.author == MessageAuthor.Contact && message.wink != null &&
@@ -760,11 +773,11 @@ class MessengerRepository(
     }
 
     fun sendTyping(contactId: String) {
-        repositoryScope.launch { client.sendTyping(contactId) }
+        queueSessionSend { client.sendTyping(contactId) }
     }
 
     fun sendNudge(contactId: String) {
-        repositoryScope.launch { client.sendNudge(contactId) }
+        queueSessionSend { client.sendNudge(contactId) }
     }
 
     suspend fun sendNudgeNow(contactId: String): Result<Unit> =

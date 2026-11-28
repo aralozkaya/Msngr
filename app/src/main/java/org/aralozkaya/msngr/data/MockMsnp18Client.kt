@@ -1,6 +1,7 @@
 package org.aralozkaya.msngr.data
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -93,6 +94,7 @@ class MockMsnp18Client(
     private val mutableTyping = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     private val mutableSessions = MutableStateFlow<List<AccountSession>>(emptyList())
     private val mutableEvents = MutableSharedFlow<MessengerEvent>(extraBufferCapacity = 16)
+    private val sessionLock = Any()
     private val ids = AtomicLong(System.currentTimeMillis() shl 16)
     private val nudgeLimiter = NudgeRateLimiter()
     override val nudgeCooldowns = nudgeLimiter.cooldowns
@@ -132,6 +134,10 @@ class MockMsnp18Client(
             )
         }
 
+        return Result.success(openSession(request))
+    }
+
+    private fun openSession(request: SignInRequest): UserProfileSnapshot = synchronized(sessionLock) {
         sessionScope.cancel()
         sessionScope = newSessionScope()
         sessionGeneration++
@@ -152,16 +158,14 @@ class MockMsnp18Client(
         mutableMessages.value = emptyMap()
         resetMockTransfers()
         startPresenceUpdates()
-        return Result.success(
-            UserProfileSnapshot(
-                username = request.email.substringBefore('@').ifBlank { "You" },
-                email = request.email,
-                presence = request.initialPresence,
-                avatarUri = ownDisplayPicture?.let { bytes ->
-                    "data:${org.aralozkaya.msngr.protocol.DisplayPictureFormat.detect(bytes)?.mimeType};base64," +
-                        org.aralozkaya.msngr.protocol.MsnBase64.encode(bytes)
-                },
-            ),
+        UserProfileSnapshot(
+            username = request.email.substringBefore('@').ifBlank { "You" },
+            email = request.email,
+            presence = request.initialPresence,
+            avatarUri = ownDisplayPicture?.let { bytes ->
+                "data:${org.aralozkaya.msngr.protocol.DisplayPictureFormat.detect(bytes)?.mimeType};base64," +
+                    org.aralozkaya.msngr.protocol.MsnBase64.encode(bytes)
+            },
         )
     }
 
@@ -397,13 +401,13 @@ class MockMsnp18Client(
     override suspend fun sendStyledMessage(
         contactId: String, text: String, renderedEmoticonRanges: List<MsnEmoticonRange>?,
         style: NativeTextStyle,
-    ): Result<Unit> {
+    ): Result<Unit> = synchronized(sessionLock) {
         val encoded = MessengerPlusTextCodec.normalizeProfileMarkupForChat(
             text.withoutUnicodeEmoji(),
         )
         val normalized = if (org.aralozkaya.msngr.protocol.MsnEmotionSound.parse(encoded) != null) encoded
             else encoded.trimMessengerPlusWhitespace().text
-        if (normalized.isEmpty()) return Result.success(Unit)
+        if (normalized.isEmpty()) return@synchronized Result.success(Unit)
         appendMessage(
             ChatMessage(
                 id = ids.incrementAndGet(),
@@ -415,28 +419,46 @@ class MockMsnp18Client(
                 nativeStyle = style,
             ),
         )
+        scheduleReply(contactId, MockServerData.replyTo(normalized.messengerPlusPlainText()))
+        Result.success(Unit)
+    }
+
+    private inline fun inSession(generation: Long, action: () -> Unit): Unit = synchronized(sessionLock) {
+        if (generation == sessionGeneration) action()
+    }
+
+    private fun scheduleReply(contactId: String, text: String, ink: InkDrawing? = null) {
+        val generation = sessionGeneration
         sessionScope.launch {
             delay(500)
-            mutableTyping.update { it + (contactId to true) }
+            inSession(generation) { mutableTyping.update { it + (contactId to true) } }
             delay(1_000)
-            mutableTyping.update { it + (contactId to false) }
-            val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
-            val groupSender = group?.joinedMembers?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
-                ?: group?.joinedMembers?.firstOrNull()
-            val incoming = ChatMessage(
-                id = ids.incrementAndGet(),
-                contactId = contactId,
-                author = MessageAuthor.Contact,
-                text = MockServerData.replyTo(normalized.messengerPlusPlainText()),
-                timestampMillis = System.currentTimeMillis(),
-                senderEmail = groupSender?.email,
-                senderName = groupSender?.displayName,
-            )
-            appendMessage(incoming)
-            incrementUnread(contactId)
-            mutableEvents.emit(MessengerEvent.IncomingMessage(contactId, incoming.id))
+            inSession(generation) { mutableTyping.update { it + (contactId to false) } }
+            inSession(generation) {
+                val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
+                val groupSender = group?.joinedMembers?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
+                    ?: group?.joinedMembers?.firstOrNull()
+                val incoming = ChatMessage(
+                    id = ids.incrementAndGet(),
+                    contactId = contactId,
+                    author = MessageAuthor.Contact,
+                    text = text,
+                    inkDrawing = ink,
+                    timestampMillis = System.currentTimeMillis(),
+                    senderEmail = groupSender?.email,
+                    senderName = groupSender?.displayName,
+                )
+                appendMessage(incoming)
+                incrementUnread(contactId)
+                publishSessionEvent(MessengerEvent.IncomingMessage(contactId, incoming.id))
+            }
         }
-        return Result.success(Unit)
+    }
+
+    private fun publishSessionEvent(event: MessengerEvent) {
+        if (!mutableEvents.tryEmit(event)) {
+            sessionScope.launch(start = CoroutineStart.UNDISPATCHED) { mutableEvents.emit(event) }
+        }
     }
 
     override suspend fun sendTyping(contactId: String) {
@@ -468,14 +490,14 @@ class MockMsnp18Client(
             System.currentTimeMillis(), voiceClip = clip))
     }
 
-    override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> {
+    override suspend fun sendInkMessage(contactId: String, drawing: InkDrawing): Result<Unit> = synchronized(sessionLock) {
         val nonEmpty = drawing.strokes.filter { it.points.isNotEmpty() }
-        if (nonEmpty.isEmpty()) return Result.success(Unit)
+        if (nonEmpty.isEmpty()) return@synchronized Result.success(Unit)
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
         if (contact == null || !contact.presence.isOnline || contact.isBlocked ||
             contact.recipientFeatures(signedInEmail).inkFormat == null
         ) {
-            return Result.failure(IllegalStateException(
+            return@synchronized Result.failure(IllegalStateException(
                 if (contact?.isGroup == true) "All online group members must support handwriting."
                 else "This contact's client does not support handwriting.",
             ))
@@ -490,53 +512,35 @@ class MockMsnp18Client(
                 inkDrawing = drawing.copy(strokes = nonEmpty),
             ),
         )
-        sessionScope.launch {
-            delay(500)
-            mutableTyping.update { it + (contactId to true) }
-            delay(1_000)
-            mutableTyping.update { it + (contactId to false) }
-            val replyDrawing = InkDrawing(
-                canvasWidthPx = 220f,
-                canvasHeightPx = 90f,
-                strokes = listOf(
-                    InkStroke(
-                        points = listOf(
-                            InkPoint(24f, 45f),
-                            InkPoint(58f, 24f),
-                            InkPoint(96f, 64f),
-                            InkPoint(142f, 28f),
-                            InkPoint(188f, 52f),
-                        ),
-                        colorRgb = 0x0000FF,
-                        widthHimetric = 100,
+        val replyDrawing = InkDrawing(
+            canvasWidthPx = 220f,
+            canvasHeightPx = 90f,
+            strokes = listOf(
+                InkStroke(
+                    points = listOf(
+                        InkPoint(24f, 45f),
+                        InkPoint(58f, 24f),
+                        InkPoint(96f, 64f),
+                        InkPoint(142f, 28f),
+                        InkPoint(188f, 52f),
                     ),
+                    colorRgb = 0x0000FF,
+                    widthHimetric = 100,
                 ),
-            )
-            val group = mutableContacts.value.firstOrNull { it.id == contactId && it.isGroup }
-            val groupSender = group?.joinedMembers?.firstOrNull { !it.email.equals(signedInEmail, ignoreCase = true) }
-                ?: group?.joinedMembers?.firstOrNull()
-            val incoming = ChatMessage(
-                id = ids.incrementAndGet(),
-                contactId = contactId,
-                author = MessageAuthor.Contact,
-                text = "Handwriting",
-                timestampMillis = System.currentTimeMillis(),
-                senderEmail = groupSender?.email,
-                senderName = groupSender?.displayName,
-                inkDrawing = replyDrawing,
-            )
-            appendMessage(incoming)
-            incrementUnread(contactId)
-            mutableEvents.emit(MessengerEvent.IncomingMessage(contactId, incoming.id))
-        }
-        return Result.success(Unit)
+            ),
+        )
+        scheduleReply(contactId, "Handwriting", replyDrawing)
+        Result.success(Unit)
     }
 
     override suspend fun sendNudge(contactId: String) {
         sendNudgeWithResult(contactId)
     }
 
-    override suspend fun sendNudgeWithResult(contactId: String): Result<Unit> = runCatching {
+    private inline fun <T> sessionOperation(action: () -> T): Result<T> =
+        runCatching { synchronized(sessionLock, action) }
+
+    override suspend fun sendNudgeWithResult(contactId: String): Result<Unit> = sessionOperation {
         val contact = mutableContacts.value.firstOrNull { it.id == contactId }
         check(contact != null && !contact.isBlocked && contact.presence.isOnline) {
             "Nudges require an online contact."
@@ -557,19 +561,22 @@ class MockMsnp18Client(
             ),
         )
         nudgeLimiter.finishSend(reservation, succeeded = true)
+        val generation = sessionGeneration
         sessionScope.launch {
             delay(900)
-            val incoming = ChatMessage(
-                id = ids.incrementAndGet(),
-                contactId = contactId,
-                author = MessageAuthor.System,
-                text = "You received a nudge!",
-                timestampMillis = System.currentTimeMillis(),
-                isNudge = true,
-            )
-            appendMessage(incoming)
-            if (nudgeLimiter.allowReceivedAlert(contactId, contactId)) {
-                mutableEvents.emit(MessengerEvent.IncomingNudge(contactId))
+            inSession(generation) {
+                val incoming = ChatMessage(
+                    id = ids.incrementAndGet(),
+                    contactId = contactId,
+                    author = MessageAuthor.System,
+                    text = "You received a nudge!",
+                    timestampMillis = System.currentTimeMillis(),
+                    isNudge = true,
+                )
+                appendMessage(incoming)
+                if (nudgeLimiter.allowReceivedAlert(contactId, contactId)) {
+                    publishSessionEvent(MessengerEvent.IncomingNudge(contactId))
+                }
             }
         }
     }
@@ -833,7 +840,7 @@ class MockMsnp18Client(
         }
     }
 
-    override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = runCatching {
+    override suspend fun sharePhotos(contactId: String, photos: List<PhotoToShare>): Result<Unit> = sessionOperation {
         check(signedInEmail.isNotBlank()) { "Sign in before sharing photos." }
         val contact = resolveMockContact(contactId)
         check(contact != null && !contact.isGroup && !contact.isBlocked && contact.presence.isOnline) {
@@ -861,9 +868,10 @@ class MockMsnp18Client(
                     selectedId = added.lastOrNull()?.id ?: current.selectedId,
                 ))
             }
-            launchMockPhotoProgress(contact.id, existing.id, added.map { it.id }.toSet(), generation)
+            val unfinished = mutablePhotoShares.value.getValue(contact.id).photos
+                .filterNot { it.downloadedByPeer }.mapTo(mutableSetOf()) { it.id }
+            launchMockPhotoProgress(contact.id, existing.id, unfinished, generation)
         } else {
-            mockPhotoShareJobs.remove(contact.id)?.cancel()
             val id = MsnpP2pUtil.randomGuid()
             val pendingBytes = photos.sumOf { MsnpPhotoSession.scopedPreview(it.preview, id).size.toLong() }
             mutablePhotoShares.update { it + (contact.id to PhotoShare(id = id, outgoing = true, pendingBytes = pendingBytes)) }
@@ -878,26 +886,26 @@ class MockMsnp18Client(
             )
             val job = sessionScope.launch {
                 delay(transferStepDelayMillis)
-                if (sessionGeneration != generation) return@launch
-                val items = photos.mapIndexed { idx, item -> buildMockSharedPhoto(item, id, idx + 1) }
-                mutablePhotoShares.update { all ->
-                    val current = all[contact.id]?.takeIf { it.id == id && it.status == PhotoShareStatus.Invited }
-                        ?: return@update all
-                    all + (contact.id to current.copy(
+                val photoIds = synchronized(sessionLock) {
+                    val current = mutablePhotoShares.value[contact.id]
+                    if (sessionGeneration != generation || current?.id != id || current.status != PhotoShareStatus.Invited) return@launch
+                    val items = photos.mapIndexed { idx, item -> buildMockSharedPhoto(item, id, idx + 1) }
+                    mutablePhotoShares.update { all -> all + (contact.id to current.copy(
                         status = PhotoShareStatus.Active,
                         pendingBytes = 0L,
                         photos = items,
                         selectedId = items.firstOrNull()?.id,
-                    ))
+                    )) }
+                    items.mapTo(mutableSetOf()) { it.id }
                 }
-                stepMockPhotoProgress(contact.id, id, items.map { it.id }.toSet(), generation)
+                stepMockPhotoProgress(contact.id, id, photoIds, generation)
             }
-            mockPhotoShareJobs[contact.id] = job
-            job.invokeOnCompletion { mockPhotoShareJobs.remove(contact.id, job) }
+            mockPhotoShareJobs[id] = job
+            job.invokeOnCompletion { mockPhotoShareJobs.remove(id, job) }
         }
     }
 
-    override suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = runCatching {
+    override suspend fun acceptPhotos(contactId: String, id: String): Result<Unit> = sessionOperation {
         val resolvedId = resolveMockContact(contactId)?.id ?: contactId
         mutablePhotoShares.update { all ->
             val current = all[resolvedId]?.takeIf { it.id == id && !it.outgoing && it.status == PhotoShareStatus.Invited }
@@ -906,40 +914,37 @@ class MockMsnp18Client(
         }
     }
 
-    override suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = runCatching {
+    override suspend fun stopPhotos(contactId: String, id: String): Result<Unit> = sessionOperation {
         val resolvedId = resolveMockContact(contactId)?.id ?: contactId
-        mockPhotoShareJobs.remove(resolvedId)?.cancel()
-        var stoppedStatus: PhotoShareStatus? = null
+        val current = mutablePhotoShares.value[resolvedId]
+        if (current?.id != id || current.status !in listOf(PhotoShareStatus.Invited, PhotoShareStatus.Active)) {
+            return@sessionOperation
+        }
+        mockPhotoShareJobs.remove(id)?.cancel()
+        val status = if (!current.outgoing && current.status == PhotoShareStatus.Invited) {
+            PhotoShareStatus.Declined
+        } else {
+            PhotoShareStatus.Stopped
+        }
         mutablePhotoShares.update { all ->
-            val current = all[resolvedId]?.takeIf {
-                it.id == id && it.status in listOf(PhotoShareStatus.Invited, PhotoShareStatus.Active)
-            } ?: return@update all
-            val nextStatus = if (!current.outgoing && current.status == PhotoShareStatus.Invited) {
-                PhotoShareStatus.Declined
-            } else {
-                PhotoShareStatus.Stopped
-            }
-            stoppedStatus = nextStatus
-            all + (resolvedId to current.copy(status = nextStatus, pendingBytes = 0L))
+            all + (resolvedId to all.getValue(resolvedId).copy(status = status, pendingBytes = 0L))
         }
-        stoppedStatus?.let { status ->
-            appendMessage(
-                ChatMessage(
-                    id = ids.incrementAndGet(),
-                    contactId = resolvedId,
-                    author = MessageAuthor.System,
-                    text = if (status == PhotoShareStatus.Declined) {
-                        "Photo sharing invitation declined."
-                    } else {
-                        "You stopped sharing photos."
-                    },
-                    timestampMillis = System.currentTimeMillis(),
-                ),
-            )
-        }
+        appendMessage(
+            ChatMessage(
+                id = ids.incrementAndGet(),
+                contactId = resolvedId,
+                author = MessageAuthor.System,
+                text = if (status == PhotoShareStatus.Declined) {
+                    "Photo sharing invitation declined."
+                } else {
+                    "You stopped sharing photos."
+                },
+                timestampMillis = System.currentTimeMillis(),
+            ),
+        )
     }
 
-    override suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = runCatching {
+    override suspend fun selectPhoto(contactId: String, id: String, photoId: String): Result<Unit> = sessionOperation {
         val resolvedId = resolveMockContact(contactId)?.id ?: contactId
         mutablePhotoShares.update { all ->
             val current = all[resolvedId]?.takeIf { it.id == id } ?: return@update all
@@ -976,9 +981,13 @@ class MockMsnp18Client(
         val previewMeta = org.aralozkaya.msngr.protocol.MsnDisplayPicture.create(creator, scopedPreview, 15, "0")
         val previewPath = runCatching {
             val dir = photoCacheDirectory?.apply { mkdirs() }
-            val file = if (dir != null) java.io.File.createTempFile("mock-photo-", ".jpg", dir)
-            else java.io.File.createTempFile("mock-photo-", ".jpg")
-            file.outputStream().use { it.write(scopedPreview) }
+            val file = java.io.File.createTempFile("mock-photo-", ".jpg", dir)
+            try {
+                file.writeBytes(scopedPreview)
+            } catch (error: Exception) {
+                file.delete()
+                throw error
+            }
             mockTempPhotoFiles.add(file)
             file.absolutePath
         }.getOrNull()
@@ -997,10 +1006,10 @@ class MockMsnp18Client(
     }
 
     private fun launchMockPhotoProgress(contactId: String, shareId: String, photoIds: Set<String>, generation: Long) {
-        mockPhotoShareJobs.remove(contactId)?.cancel()
+        mockPhotoShareJobs.remove(shareId)?.cancel()
         val job = sessionScope.launch { stepMockPhotoProgress(contactId, shareId, photoIds, generation) }
-        mockPhotoShareJobs[contactId] = job
-        job.invokeOnCompletion { mockPhotoShareJobs.remove(contactId, job) }
+        mockPhotoShareJobs[shareId] = job
+        job.invokeOnCompletion { mockPhotoShareJobs.remove(shareId, job) }
     }
 
     private suspend fun stepMockPhotoProgress(contactId: String, shareId: String, photoIds: Set<String>, generation: Long) {
@@ -1039,7 +1048,7 @@ class MockMsnp18Client(
         }
     }
 
-    override fun close() {
+    override fun close() = synchronized(sessionLock) {
         mutableContactRequests.value = emptyList()
         mutableGroupInvitations.value = emptyList()
         sessionGeneration++

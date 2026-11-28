@@ -421,14 +421,22 @@ object SessionPrefs {
     /** Called only after remembered credentials have been accepted by the backend. */
     @Synchronized
     fun activateRememberedSession(context: Context, expected: AccountIdentity? = null, password: String? = null): Boolean {
-        val stored = SecureAccountStore.read(context)
-        if (!stored.remember || stored.email.isBlank() || stored.password.isEmpty()) return false
-        if (expected != null && (stored.accountIdentity != expected || wasRemotelySignedOut(context, expected) ||
-                activeAccount()?.let { it != expected } == true)) return false
-        if (password != null && stored.password != password) return false
+        val stored = rememberedForRestore(context, expected, password) ?: return false
         SessionRuntime.activate(context, stored)
         AccountPreferences.reload(context)
         return true
+    }
+
+    @Synchronized
+    internal fun canRestore(context: Context, expected: AccountIdentity, password: String): Boolean =
+        rememberedForRestore(context, expected, password) != null
+
+    private fun rememberedForRestore(context: Context, expected: AccountIdentity?, password: String?): StoredAccountDto? {
+        val stored = SecureAccountStore.read(context)
+        if (!stored.remember || stored.email.isBlank() || stored.password.isEmpty()) return null
+        if (expected != null && (stored.accountIdentity != expected || wasRemotelySignedOut(context, expected) ||
+                activeAccount()?.let { it != expected } == true)) return null
+        return stored.takeIf { password == null || it.password == password }
     }
 
     /** Drops a failed password while retaining the remembered account and its preferences. */
@@ -623,6 +631,7 @@ object SessionPrefs {
     internal fun recordRemoteSignOut(
         context: Context,
         account: AccountIdentity? = preferenceAccount(context),
+        onCurrentAccountSignedOut: () -> Unit = {},
     ): Boolean {
         if (account == null) return false
         AccountPreferences.forAccount(context, "msngr_profile", account).edit(commit = true) {
@@ -631,6 +640,7 @@ object SessionPrefs {
         setAutomaticSignIn(context, false, account = account)
         if (preferenceAccount(context) != account) return false
         SessionRuntime.clear()
+        onCurrentAccountSignedOut()
         return true
     }
 
@@ -820,6 +830,7 @@ private object SecureAccountStore {
     private const val LEGACY_ACCOUNT_PREFIX = "account_"
     private const val KEY_SELECTED_ACCOUNT = "selected_account"
     private const val KEY_MIGRATED = "service_accounts_migrated"
+    private const val KEY_FORGOTTEN_DURING_MIGRATION = "forgotten_during_migration"
     private const val KEYSET_PREFS_NAME = "msngr_session_secure_keyset"
     private const val KEYSET_NAME = "msngr_session_secure_keyset"
     private const val MASTER_KEY_URI = "android-keystore://msngr_session_master_key"
@@ -873,6 +884,10 @@ private object SecureAccountStore {
         prefs.edit {
             remove(KEY_ACCOUNT_PREFIX + key)
             if (prefs.getString(KEY_SELECTED_ACCOUNT, null) == key) remove(KEY_SELECTED_ACCOUNT)
+            if (!prefs.getBoolean(KEY_MIGRATED, false)) {
+                // The service identity inside an unreadable legacy entry is unknown until decryption succeeds.
+                putStringSet(KEY_FORGOTTEN_DURING_MIGRATION, prefs.getStringSet(KEY_FORGOTTEN_DURING_MIGRATION, null).orEmpty() + key)
+            }
         }
     }
 
@@ -916,6 +931,7 @@ private object SecureAccountStore {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KEY_MIGRATED, false)) return prefs
         val legacyEntries = prefs.all.keys.filter { it.startsWith(LEGACY_ACCOUNT_PREFIX) && it != KEY_BLOB }
+        val forgotten = prefs.getStringSet(KEY_FORGOTTEN_DURING_MIGRATION, null).orEmpty()
         var complete = true
         for (entry in legacyEntries) {
             val oldKey = entry.removePrefix(LEGACY_ACCOUNT_PREFIX)
@@ -925,10 +941,12 @@ private object SecureAccountStore {
                 ))
                 require(accountStorageKey(old.email) == oldKey)
                 prefs.edit {
-                    if (old.remember && old.email.isNotBlank()) {
+                    if (old.remember && old.email.isNotBlank() && old.accountIdentity.storageKey !in forgotten) {
                         val key = old.accountIdentity.storageKey
                         if (!prefs.contains(KEY_ACCOUNT_PREFIX + key)) putAccount(context, old)
                         if (prefs.getString(KEY_SELECTED_ACCOUNT, null) == oldKey) putString(KEY_SELECTED_ACCOUNT, key)
+                    } else if (prefs.getString(KEY_SELECTED_ACCOUNT, null) == oldKey) {
+                        remove(KEY_SELECTED_ACCOUNT)
                     }
                     remove(entry)
                 }
@@ -949,12 +967,13 @@ private object SecureAccountStore {
             }
             if (old == null && !complete) return prefs
             val editor = prefs.edit()
-            if (old != null && old.remember && old.email.isNotBlank()) {
+            if (old != null && old.remember && old.email.isNotBlank() && old.accountIdentity.storageKey !in forgotten) {
                 val key = old.accountIdentity.storageKey
                 if (!prefs.contains(KEY_ACCOUNT_PREFIX + key)) editor.putAccount(context, old)
                 if (!prefs.contains(KEY_SELECTED_ACCOUNT)) editor.putString(KEY_SELECTED_ACCOUNT, key)
             }
             // Persist the replacement before clearing credentials stored in the older preference file.
+            if (complete) editor.remove(KEY_FORGOTTEN_DURING_MIGRATION)
             val saved = editor.remove(KEY_BLOB).remove("email").remove("password")
                 .putBoolean("accounts_migrated", true).putBoolean(KEY_MIGRATED, complete).commit()
             if (saved && old != null) {

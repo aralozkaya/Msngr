@@ -22,7 +22,7 @@ data class ConversationHistoryPageState(
 )
 
 interface ConversationHistoryStore {
-    /** Only the pages loaded for the selected account are retained in memory. */
+    /** Messages from the selected account's loaded pages and pending writes. */
     val messages: StateFlow<Map<String, List<ChatMessage>>>
     val pageStates: StateFlow<Map<String, ConversationHistoryPageState>>
 
@@ -114,7 +114,7 @@ internal class InMemoryConversationHistoryStore : ConversationHistoryStore {
 
 /**
  * Stores each account/contact history as fixed-size chronological chunk files.
- * No disk work happens in the constructor, and selecting an account reads no message page.
+ * Selecting an account reads pages only when it has unsaved messages to retry.
  */
 internal class FileConversationHistoryStore(
     private val directory: File,
@@ -125,11 +125,11 @@ internal class FileConversationHistoryStore(
         val messages: List<ChatMessage>,
         val oldestChunkIndex: Int,
         val newestChunkIndex: Int,
-        val unsaved: Map<Long, ChatMessage> = emptyMap(),
     )
 
     private val lock = Any()
     private val loaded = mutableMapOf<String, LoadedConversation>()
+    private val pendingWrites = mutableMapOf<String, MutableMap<String, Map<Long, ChatMessage>>>()
     private val mutableMessages = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
     private val mutablePageStates =
         MutableStateFlow<Map<String, ConversationHistoryPageState>>(emptyMap())
@@ -153,6 +153,7 @@ internal class FileConversationHistoryStore(
         loaded.clear()
         mutableMessages.value = emptyMap()
         mutablePageStates.value = emptyMap()
+        if (normalizedAccount in pendingWrites) merge(emptyMap())
     }
 
     override fun deselectAccount() = synchronized(lock) {
@@ -187,15 +188,29 @@ internal class FileConversationHistoryStore(
     }
 
     override fun merge(messages: Map<String, List<ChatMessage>>) = synchronized(lock) {
-        if (selectedAccount == null) return
-        val contacts = messages.keys + loaded.filterValues { it.unsaved.isNotEmpty() }.keys
-        for (contactId in contacts) {
-            val current = loaded[contactId] ?: readLatestConversation(contactId)
+        val account = selectedAccount ?: return@synchronized
+        val pending = pendingWrites.getOrPut(account) { mutableMapOf() }
+        for (contactId in messages.keys + pending.keys) {
+            val incoming = messages[contactId].orEmpty()
+            val retry = pending[contactId].orEmpty()
+            val current = try {
+                loaded[contactId] ?: readLatestConversation(contactId)
+            } catch (_: Exception) {
+                val unsaved = retry + incoming.associateBy(ChatMessage::id)
+                pending[contactId] = unsaved
+                val visible = mergeMessageLists(mutableMessages.value[contactId].orEmpty(), unsaved.values.toList())
+                mutableMessages.value = mutableMessages.value + (contactId to visible)
+                continue
+            }
             val currentById = current.messages.associateBy(ChatMessage::id)
             val latest = current.messages.lastOrNull()
-            val writes = current.unsaved.toMutableMap()
+            val writes = retry.toMutableMap()
             var containsUpdates = writes.isNotEmpty()
-            for (message in messages[contactId].orEmpty()) {
+            for (message in incoming) {
+                if (message.id in retry) {
+                    writes[message.id] = message
+                    continue
+                }
                 val previous = currentById[message.id]
                 if (previous == message) continue
                 if (previous != null) {
@@ -210,35 +225,45 @@ internal class FileConversationHistoryStore(
             val visible = mergeMessageLists(current.messages, writes.values.toList())
             val updated = try {
                 val remaining = writes.toMutableMap()
-                var newest = current.newestChunkIndex
+                // After a partial write or account switch, a pending ID can be outside the loaded page.
+                val retryChunks = if (retry.isEmpty()) emptyList() else chunkIndices(contactId)
                 if (containsUpdates) {
-                    // A previous attempt may have installed some new chunks before its write failed.
-                    if (current.unsaved.isNotEmpty()) newest = chunkIndices(contactId).lastOrNull() ?: newest
-                    for (index in current.oldestChunkIndex..newest) {
+                    val indices: Iterable<Int> = if (retry.isEmpty()) {
+                        current.oldestChunkIndex..current.newestChunkIndex
+                    } else {
+                        retryChunks
+                    }
+                    for (index in indices) {
                         val chunk = readChunk(contactId, index) ?: continue
                         val replacement = chunk.map { remaining.remove(it.id) ?: it }
                         if (replacement != chunk) writeChunk(contactId, index, replacement)
                     }
                 }
-                newest = appendToLatestChunk(contactId, newest, remaining.values.toList())
-                current.copy(messages = visible, newestChunkIndex = newest, unsaved = emptyMap())
+                val newest = appendToLatestChunk(
+                    contactId, retryChunks.lastOrNull() ?: current.newestChunkIndex, remaining.values.toList(),
+                )
+                pending.remove(contactId)
+                current.copy(messages = visible, newestChunkIndex = newest)
             } catch (_: Exception) {
-                current.copy(messages = visible, unsaved = writes)
+                pending[contactId] = writes
+                current.copy(messages = visible)
             }
             loaded[contactId] = updated
             publish(contactId, updated, isInitialPageLoaded = true)
         }
+        if (pending.isEmpty()) pendingWrites.remove(account)
     }
 
     override fun persistOfflineMessage(message: ChatMessage): Boolean = synchronized(lock) {
-        checkNotNull(selectedAccount)
+        val account = checkNotNull(selectedAccount)
         val contactId = message.contactId
         val destination = contactDirectory(contactId)
         val previous = chunkIndices(contactId).flatMap { index ->
             checkNotNull(readChunk(contactId, index)) { "Conversation history could not be read." }
         }
         if (previous.any { it.id == message.id }) return@synchronized false
-        val combined = mergeMessageLists(previous, loaded[contactId]?.messages.orEmpty() + message)
+        val combined = mergeMessageLists(previous, loaded[contactId]?.messages.orEmpty() +
+            pendingWrites[account]?.get(contactId).orEmpty().values + message)
         // An offline message can predate every loaded page. Replace the complete conversation
         // atomically so a crash while shifting pages cannot drop existing or incoming messages.
         val staging = File(destination.parentFile, "${destination.name}.offline-pending")
@@ -258,6 +283,7 @@ internal class FileConversationHistoryStore(
             backup.deleteRecursively()
         } finally { staging.deleteRecursively() }
         val updated = LoadedConversation(combined, 0, (combined.size - 1) / pageSize)
+        pendingWrites[account]?.remove(contactId)
         loaded[contactId] = updated
         publish(contactId, updated, isInitialPageLoaded = true)
         true
@@ -277,6 +303,7 @@ internal class FileConversationHistoryStore(
             }
         }
         loaded.remove(contactId)
+        pendingWrites[selectedAccount]?.remove(contactId)
         mutableMessages.value = mutableMessages.value - contactId
         mutablePageStates.value = mutablePageStates.value +
             (contactId to ConversationHistoryPageState(isInitialPageLoaded = true))
@@ -294,6 +321,7 @@ internal class FileConversationHistoryStore(
         check(!directory.exists() || directory.deleteRecursively()) { eraseError }
         val openedContacts = mutablePageStates.value.keys
         loaded.clear()
+        pendingWrites.clear()
         mutableMessages.value = emptyMap()
         mutablePageStates.value = openedContacts.associateWith {
             ConversationHistoryPageState(isInitialPageLoaded = true)
@@ -341,12 +369,15 @@ internal class FileConversationHistoryStore(
         isInitialPageLoaded: Boolean,
     ) {
         mutableMessages.value = mutableMessages.value + (contactId to conversation.messages)
-        val oldestAvailable = chunkIndices(contactId).firstOrNull()
+        val canLoadOlder = try {
+            chunkIndices(contactId).any { it < conversation.oldestChunkIndex }
+        } catch (_: Exception) {
+            mutablePageStates.value[contactId]?.canLoadOlder ?: false
+        }
         mutablePageStates.value = mutablePageStates.value +
             (contactId to ConversationHistoryPageState(
                 isInitialPageLoaded = isInitialPageLoaded,
-                canLoadOlder = oldestAvailable != null &&
-                    oldestAvailable < conversation.oldestChunkIndex,
+                canLoadOlder = canLoadOlder,
             ))
     }
 
@@ -384,7 +415,7 @@ internal class FileConversationHistoryStore(
         val result = File(File(directory, account.sha256Hex()), contactId.sha256Hex())
         val backup = File(result.parentFile, "${result.name}.offline-backup")
         if (!result.exists() && backup.exists()) {
-            check(backup.renameTo(result)) { "Could not restore interrupted offline message history." }
+            check(backup.isDirectory && backup.renameTo(result)) { "Could not restore interrupted offline message history." }
         }
         return result
     }

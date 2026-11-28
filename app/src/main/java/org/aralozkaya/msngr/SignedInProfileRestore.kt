@@ -15,7 +15,7 @@ internal suspend fun Context.restoreRememberedRepository(snapshot: LoginSnapshot
     val repository = appContainer.repositoryForRestore(snapshot.useMockServer)
         ?: return Result.failure(SessionUnavailableException("The selected service has changed."))
     val request = SignInRequest(snapshot.email, snapshot.password, snapshot.resolvedServers, snapshot.loginPresence)
-    return repository.signIn(request) {
+    return repository.signIn(request, isRememberedCurrent = { SessionPrefs.canRestore(this, account, snapshot.password) }) {
         SessionPrefs.activateRememberedSession(this, account, snapshot.password)
     }.map { profile ->
         restoreSignedInProfile(repository, profile, profile.presence, account)

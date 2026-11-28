@@ -13,6 +13,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +47,7 @@ import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.MsnVoiceClip
+import org.aralozkaya.msngr.protocol.MessageNotSubmittedException
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
 import org.aralozkaya.msngr.protocol.MsnpCommand
@@ -1283,7 +1286,7 @@ internal class LiveMsnp18Client(
     private suspend fun deliverMessage(message: ChatMessage): Result<Unit> {
         val email = contactEmail(message.contactId)
         val result = runCatching {
-            check(signedInEmail.isNotEmpty()) { "The Messenger session is not connected." }
+            if (signedInEmail.isEmpty()) throw MessageNotSubmittedException("The Messenger session is not connected.")
             checkGroupAvailable(email)
             check(
                 mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.isBlocked != true,
@@ -1384,7 +1387,7 @@ internal class LiveMsnp18Client(
             } else if (mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence == Presence.Offline) {
                 sendOfflineMessage(email, message)
             } else {
-                val board = try { switchboardFor(email) } catch (error: SwitchboardException) {
+                val board = try { switchboardForDelivery(email) } catch (error: SwitchboardException) {
                     // CAL 217 proves no message was submitted to the switchboard. A timeout
                     // or a failure after send must never trigger an automatic duplicate send.
                     if (error.protocolCode != 217) throw error
@@ -1471,7 +1474,7 @@ internal class LiveMsnp18Client(
 
     override suspend fun sendNudgeWithResult(contactId: String): Result<Unit> =
         runCatching {
-            check(signedInEmail.isNotEmpty()) { "The Messenger session is not connected." }
+            if (signedInEmail.isEmpty()) throw MessageNotSubmittedException("The Messenger session is not connected.")
             val email = contactEmail(contactId)
             check(mutableContacts.value.firstOrNull { it.id == email.lowercase() }?.presence != Presence.Offline) {
                 "Nudges cannot be sent to an offline contact."
@@ -1490,7 +1493,7 @@ internal class LiveMsnp18Client(
             try {
                 if (isGroup(email)) {
                     send(MsnpCircles.message(nextTransactionId(), email, signedInEmail, machineGuid, type = "Nudge"))
-                } else switchboardFor(email).sendNudge()
+                } else switchboardForDelivery(email).sendNudge()
                 succeeded = true
             } finally {
                 nudgeLimiter.finishSend(reservation, succeeded)
@@ -3463,6 +3466,14 @@ internal class LiveMsnp18Client(
         return null
     }
 
+    private suspend fun switchboardForDelivery(email: String): MsnpSwitchboardSession = try {
+        switchboardFor(email)
+    } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        if (error is SwitchboardException && error.protocolCode == 217) throw error
+        throw MessageNotSubmittedException(error.message, error)
+    }
+
     private suspend fun switchboardFor(email: String): MsnpSwitchboardSession {
         val id = email.lowercase()
         switchboards[id]?.let { return it }
@@ -4417,13 +4428,13 @@ private object MsnpSsoAuthenticator {
 
         try {
             MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-                val (status, response) = postSoapEnvelope(endpointUrl, SOAP_ACTION, body, HTTP_TIMEOUT_MILLIS)
+                val (status, response, bodyReadFailure) = postSoapEnvelope(endpointUrl, SOAP_ACTION, body, HTTP_TIMEOUT_MILLIS)
                 val responseBody = response.orEmpty()
                 if (status !in 200..299) {
                     val detail = responseBody.xmlText("faultstring")
                         .ifBlank { "The authentication service rejected these credentials." }
-                    if (status == HttpURLConnection.HTTP_UNAUTHORIZED) throw CredentialsRejectedException(detail)
-                    throw LiveMsnpException(detail)
+                    if (status == HttpURLConnection.HTTP_UNAUTHORIZED) throw CredentialsRejectedException(detail, bodyReadFailure)
+                    throw LiveMsnpException(detail, bodyReadFailure)
                 }
 
                 val credentials = parseSsoCredentials(responseBody)
