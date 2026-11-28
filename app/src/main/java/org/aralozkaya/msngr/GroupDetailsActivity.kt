@@ -4,12 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,12 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
-import org.aralozkaya.msngr.data.isFavorite
 import org.aralozkaya.msngr.data.resolveContact
 import org.aralozkaya.msngr.pages.GroupDetailsPage
 import org.aralozkaya.msngr.pages.components.ActionSnackbarHost
-import org.aralozkaya.msngr.pages.components.AddContactDialog
-import org.aralozkaya.msngr.pages.components.ContactCategoriesDialog
+import org.aralozkaya.msngr.pages.components.ContactDetailsDialogs
+import org.aralozkaya.msngr.pages.components.ContactFavoriteButton
 import org.aralozkaya.msngr.pages.components.GroupDetailsMenu
 import org.aralozkaya.msngr.pages.components.GroupBlockingDialog
 import org.aralozkaya.msngr.pages.components.GroupEditorDialog
@@ -49,7 +42,6 @@ class GroupDetailsActivity : MsngrActivity() {
         val repository = appContainer.messengerRepository
         setContent {
             val contacts by repository.contacts.collectAsState()
-            val categories by repository.categories.collectAsState()
             val profile by repository.profile.collectAsState()
             val group = contacts.firstOrNull { it.id == groupId && it.isGroup }
             val members = group?.members.orEmpty().mapNotNull { contacts.resolveContact(it.email, profile) }
@@ -68,43 +60,16 @@ class GroupDetailsActivity : MsngrActivity() {
             }
             MsngrTheme {
                 SecondaryPageScaffold(
-                    title = androidx.compose.ui.res.stringResource(R.string.group_details_title),
+                    title = stringResource(R.string.group_details_title),
                     onBack = ::finish,
                     actions = {
                         if (group != null && !group.isBlocked) {
-                            val isFav = group.isFavorite
-                            IconButton(
-                                onClick = {
-                                    val nextFav = !isFav
-                                    scope.launch {
-                                        val result = repository.setContactFavorite(group.id, nextFav)
-                                        if (result.isSuccess) {
-                                            snackbarHostState.showActionSnackbar(
-                                                getString(
-                                                    if (nextFav) R.string.contact_favorites_added
-                                                    else R.string.contact_favorites_removed,
-                                                ),
-                                            )
-                                        } else {
-                                            snackbarHostState.showActionSnackbar(
-                                                result.exceptionOrNull()?.message
-                                                    ?: getString(R.string.contact_categories_update_failed),
-                                                isError = true,
-                                            )
-                                        }
-                                    }
-                                },
+                            ContactFavoriteButton(
+                                contact = group,
+                                repository = repository,
+                                snackbar = snackbarHostState,
                                 modifier = Modifier.testTag("group_favorite_button"),
-                            ) {
-                                Icon(
-                                    imageVector = if (isFav) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                    contentDescription = stringResource(
-                                        if (isFav) R.string.contact_remove_from_favorites
-                                        else R.string.contact_add_to_favorites,
-                                    ),
-                                    tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                            )
                         }
                         GroupDetailsMenu(
                             group = group,
@@ -142,25 +107,14 @@ class GroupDetailsActivity : MsngrActivity() {
                         onAddContact = { addContactEmail = it.email },
                     )
                 }
-                addContactEmail?.let { email ->
-                    AddContactDialog(
-                        ownEmail = profile.email,
-                        contacts = contacts,
-                        initialEmail = email,
-                        isMock = SessionPrefs.isMockServerActive(),
-                        onAddContact = repository::addContact,
-                        onAdded = {
-                            addContactEmail = null
-                            scope.launch {
-                                snackbarHostState.showActionSnackbar(getString(
-                                    if (SessionPrefs.isMockServerActive()) R.string.contact_add_mock_success
-                                    else R.string.contact_add_success,
-                                ))
-                            }
-                        },
-                        onDismiss = { addContactEmail = null },
-                    )
-                }
+                ContactDetailsDialogs(
+                    repository = repository,
+                    snackbar = snackbarHostState,
+                    addContactEmail = addContactEmail,
+                    dismissAddContact = { addContactEmail = null },
+                    manageCategoriesFor = group.takeIf { showManageCategories },
+                    dismissCategories = { showManageCategories = false },
+                )
                 blockingTarget?.let { blocked ->
                     if (group != null) GroupBlockingDialog(group, blocked,
                         onSetBlocked = { repository.setGroupBlocked(group.id, blocked) },
@@ -174,20 +128,6 @@ class GroupDetailsActivity : MsngrActivity() {
                             snackbarHostState.showActionSnackbar(getString(R.string.group_invitations_sent))
                         }
                     }, onDismiss = { showInvite = false })
-                if (showManageCategories && group != null) {
-                    ContactCategoriesDialog(
-                        contact = group,
-                        categories = categories,
-                        onSave = { next -> repository.setContactCategories(group.id, next) },
-                        onSaved = {
-                            showManageCategories = false
-                            scope.launch {
-                                snackbarHostState.showActionSnackbar(getString(R.string.contact_categories_updated))
-                            }
-                        },
-                        onDismiss = { showManageCategories = false },
-                    )
-                }
                 if (showLeave && group != null) LeaveGroupDialog(
                     groupName = group.displayName.messengerPlusPlainText(),
                     onLeave = { repository.leaveGroup(groupId) },

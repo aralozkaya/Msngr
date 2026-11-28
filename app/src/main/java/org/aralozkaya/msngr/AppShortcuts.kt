@@ -15,7 +15,6 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.notifications.MsngrNotificationManager
 import java.io.File
-import java.security.MessageDigest
 
 internal data class RecentChatShortcut(
     val contactId: String,
@@ -23,6 +22,7 @@ internal data class RecentChatShortcut(
 )
 
 internal data class RecentContactPhoto(
+    val accountKey: String,
     val contactId: String,
     val label: String,
     val avatarUri: String?,
@@ -47,7 +47,7 @@ internal object AppShortcuts {
     private const val ACTION_OPEN_RECENT_CHAT =
         "org.aralozkaya.msngr.action.OPEN_RECENT_CHAT"
     private const val PREFS_NAME = "app_shortcuts"
-    private const val KEY_ACCOUNT = "account"
+    private const val KEY_ACCOUNT = "account_storage_key"
     private const val KEY_RECENT_ID_PREFIX = "recent_id_"
     private const val KEY_RECENT_LABEL_PREFIX = "recent_label_"
     private const val ICON_DIRECTORY = "shortcut_icons_v2"
@@ -67,8 +67,7 @@ internal object AppShortcuts {
     @Synchronized
     fun activateAccount(context: Context, accountEmail: String) {
         val appContext = context.applicationContext
-        val account = accountEmail.trim().lowercase()
-        if (account.isBlank()) return
+        val account = activeAccountKey(accountEmail) ?: return
         val stored = readState(appContext)
         val active = if (stored.account == account) {
             stored
@@ -83,15 +82,16 @@ internal object AppShortcuts {
 
     suspend fun recordRecentChat(
         context: Context,
-        accountEmail: String,
+        owner: AccountIdentity,
         contactId: String,
         displayName: String,
         avatarUri: String?,
     ) {
         val appContext = context.applicationContext
-        val account = accountEmail.trim().lowercase()
+        if (SessionPrefs.activeAccount() != owner) return
+        val account = owner.storageKey
         val normalizedContactId = contactId.trim()
-        if (account.isBlank() || normalizedContactId.isBlank()) return
+        if (normalizedContactId.isBlank()) return
         val opened = RecentChatShortcut(
             contactId = normalizedContactId,
             label = displayName
@@ -104,18 +104,19 @@ internal object AppShortcuts {
             appContext.shortcutAvatarBitmap(opened.label, it)
         }
         withContext(Dispatchers.IO) {
-            writeIcon(iconFile(appContext, account, normalizedContactId), icon)
-        }
-        synchronized(this) {
-            val stored = readState(appContext)
-            val current = stored.recentChats.takeIf { stored.account == account }.orEmpty()
-            val updated = updatedRecentChats(current, opened)
-            val active = ShortcutState(account, updated)
-            if (active != stored) writeState(appContext, active)
-            current.filterNot { old -> updated.any { it.contactId.equals(old.contactId, true) } }
-                .forEach { old -> iconFile(appContext, account, old.contactId).delete() }
-            publish(appContext, active)
-            reportUsed(appContext, chatShortcutId(normalizedContactId))
+            synchronized(this@AppShortcuts) {
+                if (SessionPrefs.activeAccount() != owner) return@synchronized
+                writeIcon(iconFile(appContext, account, normalizedContactId), icon)
+                val stored = readState(appContext)
+                val current = stored.recentChats.takeIf { stored.account == account }.orEmpty()
+                val updated = updatedRecentChats(current, opened)
+                val active = ShortcutState(account, updated)
+                if (active != stored) writeState(appContext, active)
+                current.filterNot { old -> updated.any { it.contactId.equals(old.contactId, true) } }
+                    .forEach { old -> iconFile(appContext, account, old.contactId).delete() }
+                publish(appContext, active)
+                reportUsed(appContext, chatShortcutId(account, normalizedContactId))
+            }
         }
     }
 
@@ -139,10 +140,10 @@ internal object AppShortcuts {
         contacts: List<Contact>,
     ): List<RecentContactPhoto> {
         val state = readState(context.applicationContext)
-        if (state.account != accountEmail.trim().lowercase()) return emptyList()
+        if (state.account != activeAccountKey(accountEmail)) return emptyList()
         return state.recentChats.mapNotNull { recent ->
             contacts.firstOrNull { it.id.equals(recent.contactId, ignoreCase = true) }?.let {
-                RecentContactPhoto(recent.contactId, recent.label, it.avatarUri)
+                RecentContactPhoto(state.account, recent.contactId, recent.label, it.avatarUri)
             }
         }
     }
@@ -154,18 +155,23 @@ internal object AppShortcuts {
     ) {
         if (photos.isEmpty()) return
         val appContext = context.applicationContext
-        val account = accountEmail.trim().lowercase()
+        val account = activeAccountKey(accountEmail) ?: return
         photos.forEach { photo ->
+            if (photo.accountKey != account) return@forEach
             val icon = appContext.loadAvatarBitmap(photo.avatarUri)?.let {
                 appContext.shortcutAvatarBitmap(photo.label, it)
             }
             withContext(Dispatchers.IO) {
-                writeIcon(iconFile(appContext, account, photo.contactId), icon)
+                synchronized(this@AppShortcuts) {
+                    if (activeAccountKey(accountEmail) == account) {
+                        writeIcon(iconFile(appContext, account, photo.contactId), icon)
+                    }
+                }
             }
         }
         synchronized(this) {
             val state = readState(appContext)
-            if (state.account == account && state.recentChats.isNotEmpty()) {
+            if (state.account == account && activeAccountKey(accountEmail) == account && state.recentChats.isNotEmpty()) {
                 publish(appContext, state)
             }
         }
@@ -173,6 +179,7 @@ internal object AppShortcuts {
 
     private fun readState(context: Context): ShortcutState {
         val preferences = preferences(context)
+        val account = preferences.getString(KEY_ACCOUNT, null) ?: return ShortcutState("", emptyList())
         val recentChats = (0 until MAX_RECENT_CHATS).mapNotNull { index ->
             val contactId = preferences.getString("$KEY_RECENT_ID_PREFIX$index", null)
                 ?.takeIf(String::isNotBlank)
@@ -185,7 +192,7 @@ internal object AppShortcuts {
             )
         }
         return ShortcutState(
-            account = preferences.getString(KEY_ACCOUNT, "").orEmpty(),
+            account = account,
             recentChats = recentChats,
         )
     }
@@ -214,7 +221,7 @@ internal object AppShortcuts {
             val bitmap = BitmapFactory.decodeFile(
                 iconFile(context, state.account, recent.contactId).path,
             ) ?: context.shortcutAvatarBitmap(recent.label, null)
-            val shortcutId = chatShortcutId(recent.contactId)
+            val shortcutId = chatShortcutId(state.account, recent.contactId)
             val icon = IconCompat.createWithAdaptiveBitmap(bitmap)
             val person = Person.Builder()
                 .setName(recent.label)
@@ -233,7 +240,7 @@ internal object AppShortcuts {
                 .setIntent(
                     LoginActivity.createRecentChatShortcutIntent(
                         context = context,
-                        accountEmail = state.account,
+                        accountKey = state.account,
                         contact = recent,
                         action = ACTION_OPEN_RECENT_CHAT,
                     ),
@@ -251,8 +258,11 @@ internal object AppShortcuts {
         runCatching { ShortcutManagerCompat.reportShortcutUsed(context, shortcutId) }
     }
 
-    private fun chatShortcutId(contactId: String): String =
-        MsngrNotificationManager.conversationShortcutId(contactId)
+    private fun chatShortcutId(accountKey: String, contactId: String): String =
+        MsngrNotificationManager.conversationShortcutId(accountKey, contactId)
+
+    private fun activeAccountKey(email: String): String? =
+        SessionPrefs.activeAccount()?.takeIf { it.email == email.normalizedAccountEmail() }?.storageKey
 
     private fun preferences(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -260,9 +270,7 @@ internal object AppShortcuts {
     private fun iconDirectory(context: Context) = File(context.filesDir, ICON_DIRECTORY)
 
     private fun iconFile(context: Context, account: String, contactId: String): File {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest("$account:$contactId".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        val digest = "$account:$contactId".sha256Hex()
         return File(iconDirectory(context), "$digest.png")
     }
 

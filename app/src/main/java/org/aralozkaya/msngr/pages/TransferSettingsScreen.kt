@@ -2,7 +2,6 @@
 
 package org.aralozkaya.msngr.pages
 
-import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -35,6 +34,7 @@ import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.TransferPrefs
 import org.aralozkaya.msngr.getNumberSentence
 import org.aralozkaya.msngr.hasDefaultTransferStorageAccess
+import org.aralozkaya.msngr.legacyTransferStoragePermissions
 import org.aralozkaya.msngr.pages.components.PageContentList
 
 @Composable
@@ -44,8 +44,8 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
     val settings by remember(context) { TransferPrefs.state(context) }.collectAsState()
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var permissionAction by rememberSaveable { mutableStateOf<String?>(null) }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        if (allowed) when (permissionAction) {
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (hasDefaultTransferStorageAccess(context)) when (permissionAction) {
             "files" -> TransferPrefs.update(context) { it.copy(autoSaveFiles = true) }
             "photos" -> TransferPrefs.update(context) { it.copy(autoSavePhotos = true) }
             "default" -> TransferPrefs.update(context) { it.copy(fileTree = null, fileTreeName = null) }
@@ -59,7 +59,7 @@ internal fun TransferSettingsScreen(innerPadding: PaddingValues, scrollBehavior:
     }
     fun withDefaultAccess(action: String, change: () -> Unit) {
         if (hasDefaultTransferStorageAccess(context)) change()
-        else { permissionAction = action; permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) }
+        else { permissionAction = action; permission.launch(legacyTransferStoragePermissions) }
     }
     fun authorizeFolder(uri: Uri?, photo: Boolean) {
         if (uri != null) try {

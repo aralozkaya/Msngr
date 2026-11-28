@@ -173,7 +173,7 @@ class ChatMessageListInstrumentedTest {
         val viewportHeight = compose.runOnIdle { state.layoutInfo.viewportSize.height }
         assertTrue("Final step jumped by $lastStep px", lastStep in 0..viewportHeight / 8)
         compose.mainClock.autoAdvance = true
-        compose.waitUntil(5_000) { state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0 }
+        compose.mainClock.advanceTimeUntil(5_000) { state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0 }
         compose.onNodeWithText("Message 999", substring = true).assertIsDisplayed()
         compose.mainClock.autoAdvance = false
         compose.mainClock.advanceTimeBy(500)
@@ -479,7 +479,7 @@ class ChatMessageListInstrumentedTest {
 
             compose.onNodeWithTag(CHAT_SCROLL_TO_LATEST_TAG).performClick()
             compose.mainClock.autoAdvance = true
-            compose.waitUntil(5_000) {
+            compose.mainClock.advanceTimeUntil(5_000) {
                 state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0
             }
             compose.onNodeWithText("Message 1002").assertIsDisplayed()

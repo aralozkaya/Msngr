@@ -34,6 +34,7 @@ internal class SharingNotificationController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     private var attachJob: Job? = null
+    private var attachedRepository: MessengerRepository? = null
     private val activeNotifications = ConcurrentHashMap<String, PostedState>()
     private val assignedIds = ConcurrentHashMap<String, Int>()
 
@@ -62,18 +63,24 @@ internal class SharingNotificationController(
         val lastPostedAtNanos: Long,
     )
 
+    @Synchronized
     fun attach(repository: MessengerRepository) {
         attachJob?.cancel()
+        attachedRepository = repository
         dismissAll()
         attachJob = scope.launch {
             combine(
                 repository.liveTransferMessages,
                 repository.photoShares,
                 repository.contacts,
-            ) { messages, photoShares, contacts ->
-                buildSpecs(messages, photoShares, contacts, repository.profile.value.email)
-            }.collect { specs ->
-                syncNotifications(specs)
+                repository.profile,
+            ) { _, _, _, _ -> Unit }.collect {
+                val owner = repository.signedInAccountIdentity
+                val specs = if (owner == null) emptyList() else buildSpecs(
+                    owner.storageKey, repository.liveTransferMessages.value, repository.photoShares.value, repository.contacts.value,
+                )
+                if (owner != null && context.notificationAccountKey() != owner.storageKey) return@collect
+                syncNotifications(repository, owner?.storageKey, specs)
             }
         }
     }
@@ -93,10 +100,10 @@ internal class SharingNotificationController(
     }
 
     private fun buildSpecs(
+        accountKey: String,
         messages: Map<String, List<org.aralozkaya.msngr.data.ChatMessage>>,
         photoShares: Map<String, org.aralozkaya.msngr.data.PhotoShare>,
         contacts: List<Contact>,
-        ownEmail: String,
     ): List<ShareNotificationSpec> {
         val result = mutableListOf<ShareNotificationSpec>()
         fun contactLabel(contactId: String): String =
@@ -131,7 +138,7 @@ internal class SharingNotificationController(
                     Formatter.formatFileSize(context, remaining),
                 )
                 result += ShareNotificationSpec(
-                    key = "${NotificationShareCancelReceiver.KIND_FILE}:$contactId:${transfer.id}",
+                    key = "$accountKey:${NotificationShareCancelReceiver.KIND_FILE}:$contactId:${transfer.id}",
                     kind = NotificationShareCancelReceiver.KIND_FILE,
                     contactId = contactId,
                     shareId = transfer.id,
@@ -167,7 +174,7 @@ internal class SharingNotificationController(
                 Formatter.formatFileSize(context, remaining),
             )
             result += ShareNotificationSpec(
-                key = "${NotificationShareCancelReceiver.KIND_PHOTO}:$contactId:${share.id}",
+                key = "$accountKey:${NotificationShareCancelReceiver.KIND_PHOTO}:$contactId:${share.id}",
                 kind = NotificationShareCancelReceiver.KIND_PHOTO,
                 contactId = contactId,
                 shareId = share.id,
@@ -187,7 +194,8 @@ internal class SharingNotificationController(
     }
 
     @Synchronized
-    private fun syncNotifications(specs: List<ShareNotificationSpec>) {
+    private fun syncNotifications(repository: MessengerRepository, accountKey: String?, specs: List<ShareNotificationSpec>) {
+        if (attachedRepository !== repository || repository.signedInAccountIdentity?.storageKey != accountKey) return
         val manager = NotificationManagerCompat.from(context)
         val activeKeys = specs.mapTo(hashSetOf()) { it.key }
         val removed = activeNotifications.keys.filter { it !in activeKeys }
@@ -195,7 +203,7 @@ internal class SharingNotificationController(
             activeNotifications.remove(key)?.let { manager.cancel(it.notificationId) }
             assignedIds.remove(key)
         }
-        if (!canPostNotifications()) return
+        if (accountKey == null || !canPostNotifications()) return
         val now = System.nanoTime()
         for (spec in specs) {
             val id = allocateNotificationId(spec.key)
@@ -217,7 +225,7 @@ internal class SharingNotificationController(
                     continue
                 }
             }
-            if (postNotification(manager, id, spec)) {
+            if (postNotification(manager, id, spec, accountKey)) {
                 activeNotifications[spec.key] = PostedState(
                     notificationId = id,
                     statusKey = spec.statusKey,
@@ -236,6 +244,7 @@ internal class SharingNotificationController(
         manager: NotificationManagerCompat,
         notificationId: Int,
         spec: ShareNotificationSpec,
+        accountKey: String,
     ): Boolean {
         val openIntent = ChatActivity.createIntent(
             context = context,
@@ -250,6 +259,7 @@ internal class SharingNotificationController(
                 .appendPath(spec.contactId)
                 .appendPath(spec.shareId)
                 .build()
+            bindNotificationAccount(accountKey)
         }
         val contentIntent = PendingIntent.getActivity(
             context,
@@ -269,6 +279,7 @@ internal class SharingNotificationController(
                 .appendPath(spec.contactId)
                 .appendPath(spec.shareId)
                 .build()
+            bindNotificationAccount(accountKey)
         }
         val cancelPendingIntent = PendingIntent.getBroadcast(
             context,

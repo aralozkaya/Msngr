@@ -7,7 +7,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
 import java.util.zip.Inflater
-import javax.xml.parsers.DocumentBuilderFactory
 
 /** Single-cabinet reader. Never writes archive-controlled paths to the filesystem. */
 object MsnWinkPackage {
@@ -97,15 +96,15 @@ object MsnWinkPackage {
         val cleanName = reference.name.trim().take(120)
         val contentXml = buildString {
             append("<package version=\"1.0\" type=\"theme\">\r\n")
-            append("   <item contentid=\"").append(contentId.escapeXmlAttr())
-            append("\" type=\"wink\" contenttype=\"").append(contentType.escapeXmlAttr())
+            append("   <item contentid=\"").append(contentId.escapeXml())
+            append("\" type=\"wink\" contenttype=\"").append(contentType.escapeXml())
             append("\" mimetype=\"application/messengercontent\" file=\"")
-            append(cabFileName.escapeXmlAttr()).append("\"")
+            append(cabFileName.escapeXml()).append("\"")
             if (cleanName.isNotEmpty()) {
-                append(" name=\"").append(cleanName.escapeXmlAttr()).append("\"")
+                append(" name=\"").append(cleanName.escapeXml()).append("\"")
             }
             if (stamp != null) {
-                append(" stamp=\"").append(stamp.escapeXmlAttr()).append("\"")
+                append(" stamp=\"").append(stamp.escapeXml()).append("\"")
             }
             append("/>\r\n</package>\r\n")
         }.toByteArray(Charsets.UTF_8)
@@ -141,13 +140,6 @@ object MsnWinkPackage {
             .ifBlank { "wink" }
         return "$base.cab"
     }
-
-    private fun String.escapeXmlAttr(): String = this
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&apos;")
 
     private fun buildStoredCabinet(files: List<Pair<String, ByteArray>>): ByteArray {
         require(files.isNotEmpty() && files.size <= MAX_FILES)
@@ -204,19 +196,7 @@ object MsnWinkPackage {
 
     internal fun xml(bytes: ByteArray): Element {
         require(bytes.size <= 64 * 1024)
-        require(!bytes.toString(Charsets.UTF_8).replace("\u0000", "").contains("<!DOCTYPE", ignoreCase = true)) { "DTD is not allowed." }
-        val factory = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-            isExpandEntityReferences = false
-            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-        }
-        val builder = factory.newDocumentBuilder()
-        builder.setEntityResolver { _, _ -> throw org.xml.sax.SAXException("External entities are not allowed.") }
-        val document = builder.parse(bytes.inputStream())
-        require(document.doctype == null)
-        return document.documentElement
+        return parseProtocolXml(bytes).documentElement
     }
 
     private fun safeName(name: String): String {
@@ -313,7 +293,13 @@ object MsnWinkPackage {
                     else -> ByteArray(unpackedSize).also { lzx!!.decompress(packed.copyOf(packed.size + 4), it, packed.size, unpackedSize) }
                 }
                 output.write(decoded)
-                dictionary = (dictionary + decoded).takeLast(32768).toByteArray()
+                if (folder.compression and 15 == 1) {
+                    val retained = minOf(dictionary.size, MAX_BLOCK_BYTES - decoded.size)
+                    dictionary = if (retained == 0) decoded else ByteArray(retained + decoded.size).also {
+                        dictionary.copyInto(it, 0, dictionary.size - retained)
+                        decoded.copyInto(it, retained)
+                    }
+                }
             }
             output.toByteArray()
         }
@@ -325,12 +311,11 @@ object MsnWinkPackage {
     }
 
     private fun cabChecksum(bytes: ByteArray): Int {
-        var result = 0; var i = 0
-        while (i + 4 <= bytes.size) {
-            result = result xor ByteBuffer.wrap(bytes, i, 4).order(ByteOrder.LITTLE_ENDIAN).int; i += 4
-        }
+        val input = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        var result = 0
+        while (input.remaining() >= 4) result = result xor input.int
         var tail = 0
-        while (i < bytes.size) { tail = (tail shl 8) or (bytes[i++].toInt() and 255) }
+        while (input.hasRemaining()) tail = (tail shl 8) or (input.get().toInt() and 255)
         return result xor tail
     }
 }

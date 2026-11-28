@@ -2,16 +2,14 @@ package org.aralozkaya.msngr.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.security.MessageDigest
+import org.aralozkaya.msngr.sha256Hex
 
 /** SharedPreferences.apply queues disk writes immediately and flushes at lifecycle transitions. */
 internal fun persistentConversationDraftStore(context: Context): ConversationDraftStore {
     val appContext = context.applicationContext
     val preferences = mutableMapOf<String, SharedPreferences>()
     fun preferencesFor(account: String): SharedPreferences = preferences.getOrPut(account) {
-        val key = MessageDigest.getInstance("SHA-256")
-            .digest(account.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        val key = account.sha256Hex()
         appContext.getSharedPreferences("conversation_drafts_$key", Context.MODE_PRIVATE)
     }
     return ConversationDraftStore(

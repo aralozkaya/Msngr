@@ -2,7 +2,10 @@ package org.aralozkaya.msngr
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.os.Build
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
@@ -13,12 +16,14 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
@@ -118,12 +123,43 @@ class MockUserJourneyInstrumentedTest {
 
         compose.onNodeWithText(contact.nickname.orEmpty()).performClick()
 
-        waitForText("Start a conversation with ${contact.displayName}.")
+        compose.waitUntil(3_000) { compose.onAllNodesWithTag("chat_composer").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Format text").assertDoesNotExist()
         val messageField = compose.onAllNodes(hasSetTextAction())[0]
         messageField.performTextReplacement("Select this text to style it")
         messageField.assertTextEquals("Select this text to style it")
         compose.onNodeWithTag(MESSENGER_PLUS_COLOR_SHEET_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun reusingChatActivityClosesThePreviousContactsComposerSheet() {
+        val (first, second) = MockServerData.contacts()
+        val repository = context.appContainer.messengerRepository
+        val originalDraft = repository.drafts.value[first.id].orEmpty()
+        try {
+            repository.updateDraft(first.id, "Draft for the first contact")
+            ActivityScenario.launch<ChatActivity>(ChatActivity.createIntent(context, first.id)).use { chat ->
+                compose.onNode(hasSetTextAction()).assertTextEquals("Draft for the first contact")
+                // The IME can move the composer between measuring the button and dispatching a tap.
+                compose.onNodeWithTag(EMOTICON_MODE_BUTTON_TAG).performSemanticsAction(SemanticsActions.OnClick)
+                compose.waitUntil(5_000) {
+                    compose.onAllNodesWithTag(EMOTICON_PICKER_TAG).fetchSemanticsNodes().isNotEmpty()
+                }
+                chat.onActivity {
+                    it.startActivity(ChatActivity.createIntent(it, second.id).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                }
+                waitForText(second.displayName)
+                compose.waitUntil(5_000) {
+                    compose.onAllNodesWithTag(EMOTICON_PICKER_TAG).fetchSemanticsNodes().isEmpty()
+                }
+                val composer = compose.onNode(hasSetTextAction()).fetchSemanticsNode()
+                assertEquals(repository.drafts.value[second.id].orEmpty(), composer.config[SemanticsProperties.EditableText].text)
+                assertEquals("Draft for the first contact", repository.drafts.value[first.id])
+                chat.onActivity { assertEquals(second.id, it.notificationConversationId) }
+            }
+        } finally {
+            repository.updateDraft(first.id, originalDraft)
+        }
     }
 
     @Test
@@ -134,7 +170,7 @@ class MockUserJourneyInstrumentedTest {
 
         compose.onNodeWithText(contact.nickname.orEmpty()).performClick()
 
-        waitForText("Start a conversation with ${contact.displayName}.")
+        compose.waitUntil(3_000) { compose.onAllNodesWithTag("chat_composer").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Format text").assertDoesNotExist()
         val messageField = compose.onAllNodes(hasSetTextAction())[0]
         messageField.performTextReplacement("[b]plain text[/b]")

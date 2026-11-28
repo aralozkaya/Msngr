@@ -4,7 +4,6 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
-import javax.xml.parsers.DocumentBuilderFactory
 
 /** MSNP user-tile metadata advertised in CHG, ILN, and NLN commands. */
 data class MsnDisplayPicture(
@@ -23,17 +22,17 @@ data class MsnDisplayPicture(
         ?: url?.takeIf(String::isNotBlank)
 
     fun toXml(): String = buildString {
-        append("<msnobj Creator=\"").append(creator.escapeMsnObjectXml())
+        append("<msnobj Creator=\"").append(creator.escapeXml())
         append("\" Size=\"").append(size)
-        append("\" Type=\"").append(objectType).append("\" Location=\"").append(location.escapeMsnObjectXml())
-        append("\" Friendly=\"").append(friendly.escapeMsnObjectXml())
-        append("\" SHA1D=\"").append(sha1d.escapeMsnObjectXml())
-        sha1c?.let { append("\" SHA1C=\"").append(it.escapeMsnObjectXml()) }
-        url?.let { append("\" Url=\"").append(it.escapeMsnObjectXml()) }
-        url1?.let { append("\" Url1=\"").append(it.escapeMsnObjectXml()) }
+        append("\" Type=\"").append(objectType).append("\" Location=\"").append(location.escapeXml())
+        append("\" Friendly=\"").append(friendly.escapeXml())
+        append("\" SHA1D=\"").append(sha1d.escapeXml())
+        sha1c?.let { append("\" SHA1C=\"").append(it.escapeXml()) }
+        url?.let { append("\" Url=\"").append(it.escapeXml()) }
+        url1?.let { append("\" Url1=\"").append(it.escapeXml()) }
         extraAttributes.forEach { (name, value) ->
             if (name.matches(Regex("[A-Za-z_][A-Za-z0-9_.:-]*")) && name !in setOf("Creator", "Size", "Type", "Location", "Friendly", "SHA1D", "SHA1C", "Url", "Url1"))
-                append("\" ").append(name).append("=\"").append(value.escapeMsnObjectXml())
+                append("\" ").append(name).append("=\"").append(value.escapeXml())
         }
         append("\"/>")
     }
@@ -79,8 +78,10 @@ data class MsnDisplayPicture(
 
         fun parse(rawValue: String?): MsnDisplayPicture? = parseObject(rawValue, USER_TILE_TYPE)
 
-        /** Voice clips use the same MSNObject envelope, with Type=11. */
-        fun parseObject(rawValue: String?, objectType: Int): MsnDisplayPicture? = runCatching {
+        fun parseObject(rawValue: String?, objectType: Int): MsnDisplayPicture? =
+            parseObject(rawValue)?.takeIf { it.objectType == objectType }
+
+        internal fun parseObject(rawValue: String?): MsnDisplayPicture? = runCatching {
             val raw = rawValue?.trim().orEmpty()
             if (raw.isEmpty() || raw == "0") return null
             val xml = if (raw.startsWith("<msnobj", ignoreCase = true)) {
@@ -88,12 +89,11 @@ data class MsnDisplayPicture(
             } else {
                 URLDecoder.decode(raw, StandardCharsets.UTF_8.name())
             }
-            require(xml.length <= 64 * 1024 && !xml.contains("<!DOCTYPE", ignoreCase = true))
-            val document = secureDocumentBuilderFactory().newDocumentBuilder()
-                .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+            require(xml.length <= 64 * 1024)
+            val document = parseProtocolXml(xml, namespaceAware = false)
             val element = document.documentElement
             if (!element.tagName.equals("msnobj", ignoreCase = true)) return null
-            if (element.getAttribute("Type").toIntOrNull() != objectType) return null
+            val objectType = element.getAttribute("Type").toIntOrNull() ?: return null
             val creator = element.getAttribute("Creator").trim()
             val size = element.getAttribute("Size").toIntOrNull() ?: return null
             val sha1d = element.getAttribute("SHA1D").trim()
@@ -117,19 +117,3 @@ data class MsnDisplayPicture(
 }
 
 private fun ByteArray.sha1(): ByteArray = MessageDigest.getInstance("SHA-1").digest(this)
-
-private fun String.escapeMsnObjectXml(): String = this
-    .replace("&", "&amp;")
-    .replace("<", "&lt;")
-    .replace(">", "&gt;")
-    .replace("\"", "&quot;")
-    .replace("'", "&apos;")
-
-private fun secureDocumentBuilderFactory(): DocumentBuilderFactory =
-    DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = false
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }

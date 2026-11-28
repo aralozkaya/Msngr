@@ -283,7 +283,6 @@ internal fun MsnEmoticonEditor(
                     currentOnFocusChanged(focused)
                 }
                 editor.setOnClickListener {
-                    if (!editor.showSoftInputOnFocus) editor.showKeyboard()
                     currentOnTap()
                 }
                 editor.setOnEditorActionListener { _, actionId, _ ->
@@ -738,12 +737,10 @@ internal class MsnEditText(context: Context) : EditText(context) {
     private val showKeyboardWhenFocused: () -> Unit = {
         if (isAttachedToWindow && hasFocus()) SoftwareKeyboardControllerCompat(this).show()
     }
+    private var focusedAtTouchDown = false
     private val keyboardTapDetector by lazy {
         GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onSingleTapUp(event: MotionEvent): Boolean {
-                showKeyboard()
-                return true
-            }
+            override fun onSingleTapUp(event: MotionEvent): Boolean = true
         })
     }
 
@@ -754,10 +751,19 @@ internal class MsnEditText(context: Context) : EditText(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) focusedAtTouchDown = hasFocus()
         val handled = super.onTouchEvent(event)
-        // The first tap can focus the editor without calling its click listener.
-        if (handled && isEnabled && !showSoftInputOnFocus) keyboardTapDetector.onTouchEvent(event)
+        // TextView consumes the first tap for focus without dispatching a click.
+        if (handled && isEnabled && !showSoftInputOnFocus && !focusedAtTouchDown &&
+            keyboardTapDetector.onTouchEvent(event) && event.actionMasked == MotionEvent.ACTION_UP && hasFocus()) {
+            performClick()
+        }
         return handled
+    }
+
+    override fun performClick(): Boolean {
+        if (isEnabled && !showSoftInputOnFocus) showKeyboard()
+        return super.performClick()
     }
 
     fun setNativeStyle(style: NativeTextStyle) {

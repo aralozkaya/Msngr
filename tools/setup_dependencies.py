@@ -22,12 +22,24 @@ def configure_ruffle_checkout(source):
     git(source, "config", "remote.origin.partialclonefilter", "blob:none")
 
 
+def pinned_commit(root, name):
+    entry = git(root, "ls-files", "--stage", "--", name).split()
+    if len(entry) != 4 or entry[0] != "160000" or entry[2] != "0":
+        raise RuntimeError(f"Resolve the {name} submodule reference before setting up dependencies")
+    return entry[1]
+
+
+def verify_checkout(root, name, expected):
+    directory = root.resolve() / name
+    if directory.resolve() != directory or not (directory / ".git").exists():
+        raise ValueError(f"Missing or linked submodule checkout: {name}")
+    if git(directory, "rev-parse", "HEAD") != expected:
+        raise ValueError(f"Submodule {name} differs from the pinned revision")
+
+
 def prepare_ruffle(root=ROOT):
     root = Path(root).resolve()
-    entry = git(root, "ls-files", "--stage", "--", RUFFLE).split()
-    if len(entry) != 4 or entry[0] != "160000" or entry[2] != "0":
-        raise RuntimeError("Resolve the Ruffle submodule reference before setting up dependencies")
-    commit = entry[1]
+    commit = pinned_commit(root, RUFFLE)
     git(root, "submodule", "init", "--", RUFFLE)
     # Existing clones also need this setting; submodule init does not overwrite it.
     git(root, "config", f"submodule.{RUFFLE}.update", "none")

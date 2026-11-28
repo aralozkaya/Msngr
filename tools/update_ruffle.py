@@ -85,6 +85,7 @@ def latest_release_version():
     except HTTPError as error:
         if not _is_rate_limit_error(error):
             raise
+        error.close()
         request = build_request(LATEST_RELEASE_WEB, method="HEAD")
         with _OPENER.open(request, timeout=60) as response:
             final = urlparse(response.geturl())

@@ -38,8 +38,7 @@ abstract class MsngrActivity : ComponentActivity() {
     private fun observeConnectionLoss() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                val repository = runCatching { appContainer.messengerRepository }.getOrNull()
-                    ?: return@repeatOnLifecycle
+                val repository = appContainer.currentRepository ?: return@repeatOnLifecycle
                 combine(repository.signOutReason, repository.connectionIssue) { signedOut, issue ->
                     signedOut to issue
                 }.collect { (signedOut, issue) ->

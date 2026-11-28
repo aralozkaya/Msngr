@@ -75,7 +75,6 @@ class SceneAppearanceInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private fun isolatedContext() = object : ContextWrapper(compose.activity) {
-        override fun getApplicationContext(): Context = this
         override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
             super.getSharedPreferences("scene_test_$name", mode)
     }.also {
@@ -302,7 +301,7 @@ class SceneAppearanceInstrumentedTest {
             list.performScrollToNode(hasTestTag("color_mode_Default"))
             compose.onNodeWithTag("color_mode_Default").performClick()
             list.performScrollToNode(hasTestTag("custom_main_color"))
-            compose.onNodeWithTag("color_controls_Default").assertExists()
+            compose.onNodeWithTag("color_controls_Default", useUnmergedTree = true).assertExists()
             compose.onNodeWithTag("darken_scenes").assertDoesNotExist()
         } finally {
             AppearancePrefs.reload(compose.activity)

@@ -48,6 +48,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class GameWebViewInstrumentedTest {
@@ -85,6 +86,27 @@ class GameWebViewInstrumentedTest {
             assertTrue("Game callbacks must reach the controller", delivered.await(5, TimeUnit.SECONDS))
             instrumentation.waitForIdleSync()
             assertEquals(listOf("initialize", "move:4", "im:Good game!", "close"), actions.toList())
+        } finally {
+            instrumentation.runOnMainSync { controller.destroy() }
+        }
+    }
+
+    @Test fun opaqueChildFramesHaveNoGameBridgeOrPlayerIdentity() {
+        val controller = createController()
+        try {
+            awaitPage(controller)
+            evaluate(controller, """
+                window.addEventListener('message', function(event) {
+                    if (event.data === 'isolated-game-frame') window.frameIsIsolated = true;
+                });
+                var frame = document.createElement('iframe');
+                frame.setAttribute('sandbox', 'allow-scripts');
+                frame.srcdoc = "<script>var parentHost; try { parentHost = parent.__p4Host; } catch (ignored) {}" +
+                    "if (!parentHost && !window.__p4Host && !window.AndroidP4Bridge && !window.external.Channel)" +
+                    " parent.postMessage('isolated-game-frame', '*');<" + "/script>";
+                document.body.appendChild(frame);
+            """.trimIndent())
+            compose.waitUntil(5_000) { evaluate(controller, "!!window.frameIsIsolated") == "true" }
         } finally {
             instrumentation.runOnMainSync { controller.destroy() }
         }
@@ -1112,6 +1134,10 @@ class GameWebViewInstrumentedTest {
 
     @Test fun arbitraryPlainHttpMsnpServerLoadsCatalogDefaultBlueAndCustomPageBackgroundsAndPlaysEndToEnd() {
         val closed = AtomicBoolean(false)
+        val gamePageRequests = AtomicInteger()
+        val loopRequests = AtomicInteger()
+        val lastAllowedRequest = CountDownLatch(1)
+        val unexpectedRequest = CountDownLatch(1)
         val serverSocket = ServerSocket(0)
         val port = serverSocket.localPort
         val serverThread = Thread {
@@ -1136,6 +1162,25 @@ class GameWebViewInstrumentedTest {
                     val headerText = requestHeaderBytes.toString(StandardCharsets.ISO_8859_1.name())
                     val requestLine = headerText.lineSequence().firstOrNull().orEmpty()
                     val path = requestLine.split(' ').getOrNull(1).orEmpty()
+                    val redirect = when (path) {
+                        "/games/start" -> "http://127.0.0.1:$port/games/unstyled.htm"
+                        "/games/loop-a.htm", "/games/loop-b.htm" -> {
+                            val count = loopRequests.incrementAndGet()
+                            if (count == 11) lastAllowedRequest.countDown()
+                            if (count > 11) {
+                                unexpectedRequest.countDown()
+                                null
+                            } else if (path.endsWith("a.htm")) "loop-b.htm" else "loop-a.htm"
+                        }
+                        else -> null
+                    }
+                    if (redirect != null) {
+                        val response = "HTTP/1.1 302 Found\r\nLocation: $redirect\r\n" +
+                            "Content-Length: 0\r\nConnection: close\r\n\r\n"
+                        socket.getOutputStream().write(response.toByteArray(StandardCharsets.US_ASCII))
+                        continue
+                    }
+                    if (path == "/games/unstyled.htm") gamePageRequests.incrementAndGet()
                     val (contentType, body) = when {
                         path.startsWith("/Config/MsgrConfig.asmx") -> "text/xml; charset=utf-8" to """
                             <?xml version="1.0" encoding="utf-8"?>
@@ -1166,7 +1211,7 @@ class GameWebViewInstrumentedTest {
                                     <CategoryID>700</CategoryID>
                                     <Sequence>1</Sequence>
                                     <Name>Plain Blue Game</Name>
-                                    <URL>http://127.0.0.1:$port/games/unstyled.htm</URL>
+                                    <URL>http://localhost:$port/games/start</URL>
                                     <Width>500</Width>
                                     <Height>500</Height>
                                     <MinUsers>2</MinUsers>
@@ -1271,10 +1316,13 @@ class GameWebViewInstrumentedTest {
             val unstyledEntry = catalog.findEntry(700001)!!
             val customBgEntry = catalog.findEntry(700002)!!
 
-            withLiveP2pGameHost(unstyledEntry, phoneInitiates = true) { webView, pcP2p, _, pcSessionRef, sessionId ->
+            withLiveP2pGameHost(unstyledEntry, phoneInitiates = true) { webView, pcP2p, mobileSession, pcSessionRef, sessionId ->
+                compose.waitUntil(10_000) { mobileSession.value?.localChannelInitialized == true }
                 compose.waitUntil(10_000) {
                     evaluateOnWebView(webView, "String(window.__remoteReady === true)") == "\"true\""
                 }
+                assertEquals("\"http://127.0.0.1:$port/games/unstyled.htm\"", evaluateOnWebView(webView, "location.href"))
+                assertEquals(1, gamePageRequests.get())
                 compose.waitUntil(5_000) {
                     evaluateOnWebView(webView, "getComputedStyle(document.documentElement).backgroundColor") == "\"rgb(81, 108, 161)\""
                 }
@@ -1302,6 +1350,14 @@ class GameWebViewInstrumentedTest {
             } finally {
                 instrumentation.runOnMainSync { customController.destroy() }
             }
+            val loopController = createController(customBgEntry.copy(url = "http://127.0.0.1:$port/games/loop-a.htm"))
+            try {
+                assertTrue("The loop never reached the redirect limit", lastAllowedRequest.await(10, TimeUnit.SECONDS))
+                assertFalse("The loop exceeded the redirect limit", unexpectedRequest.await(1, TimeUnit.SECONDS))
+                assertEquals(11, loopRequests.get())
+            } finally {
+                instrumentation.runOnMainSync { loopController.destroy() }
+            }
         } finally {
             closed.set(true)
             runCatching { serverSocket.close() }
@@ -1310,18 +1366,19 @@ class GameWebViewInstrumentedTest {
     }
 
     private fun createController(
-        entry: GameCatalogEntry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!.copy(url = "about:blank"),
+        entry: GameCatalogEntry? = null,
         onInitialize: () -> Unit = {},
         onSendData: (String) -> Unit = {},
         onSendImAsUser: (String) -> Unit = {},
         onCloseApp: () -> Unit = {},
     ): GameWebViewController {
         lateinit var controller: GameWebViewController
+        val localPage = "http://127.0.0.1:1/game.htm"
         instrumentation.runOnMainSync {
             controller = GameWebViewController(
                 context = instrumentation.targetContext,
                 sessionId = "webview-test",
-                entry = entry,
+                entry = entry ?: MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!.copy(url = localPage),
                 isInviter = true,
                 localName = "Alice",
                 localEmail = "alice@example.test",
@@ -1333,6 +1390,10 @@ class GameWebViewInstrumentedTest {
                 onCloseApp = onCloseApp,
                 onOpenHelpUrl = {},
             )
+            if (entry == null) {
+                controller.webView.stopLoading()
+                controller.webView.loadDataWithBaseURL(localPage, "<html><body></body></html>", "text/html", "utf-8", localPage)
+            }
         }
         return controller
     }

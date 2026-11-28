@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.aralozkaya.msngr.enums.Presence
 
 /** A successful full membership lookup replaces block flags, including blocks outside the forward list. */
@@ -68,6 +69,6 @@ internal fun mergeAddressBookUpdate(
 }
 
 internal fun isAddressBookNotification(payload: ByteArray): Boolean = runCatching {
-    val root = circleDocumentFactory().newDocumentBuilder().parse(payload.inputStream()).documentElement
+    val root = parseProtocolXml(payload).documentElement
     root.localName == "NOTIFICATION" && root.getAttribute("siteid") == "45705"
 }.getOrDefault(false)

@@ -45,7 +45,7 @@ class OfflineContactComposerInstrumentedTest {
         compose.onNodeWithContentDescription("Send nudge").assertIsNotEnabled()
         compose.runOnIdle { draft.value = "Offline text" }
         compose.onNodeWithContentDescription("Send message").assertIsEnabled()
-        compose.onNodeWithText("Peer is offline. Messages you send will be delivered when they sign in.").assertIsDisplayed()
+        compose.onNodeWithText("Peer appears to be offline. Messages you send will be delivered when they sign in.").assertIsDisplayed()
         compose.runOnIdle { draft.value = ""; contact.value = contact.value.copy(presence = Presence.Online) }
         compose.onNodeWithContentDescription("Send nudge").assertIsEnabled()
     }

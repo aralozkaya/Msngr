@@ -3,7 +3,7 @@ package org.aralozkaya.msngr.data
 import android.content.Context
 import android.content.SharedPreferences
 import org.aralozkaya.msngr.NativeTextStyle
-import java.security.MessageDigest
+import org.aralozkaya.msngr.sha256Hex
 
 private const val SIZE_NOTICE_PREFIX = "size_notice_shown:"
 
@@ -11,8 +11,7 @@ internal fun persistentConversationStyleStore(context: Context): ConversationSty
     val appContext = context.applicationContext
     val preferences = mutableMapOf<String, SharedPreferences>()
     fun preferencesFor(account: String) = preferences.getOrPut(account) {
-        val key = MessageDigest.getInstance("SHA-256").digest(account.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        val key = account.sha256Hex()
         appContext.getSharedPreferences("conversation_styles_$key", Context.MODE_PRIVATE)
     }
     return ConversationStyleStore(

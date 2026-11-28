@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -98,7 +99,6 @@ import org.aralozkaya.msngr.updates.RELEASES_PAGE
 import org.aralozkaya.msngr.updates.UpdateInterval
 import org.aralozkaya.msngr.updates.UpdateManager
 import org.aralozkaya.msngr.updates.updateManager
-import org.aralozkaya.msngr.updates.verifyUpdateApk
 import java.util.Date
 
 @Composable
@@ -133,14 +133,15 @@ fun UpdateSettingsScreen(
         scope.launch {
             fileActionBusy = true
             try {
-                val apk = manager.apkFile(target.version.code)
-                withContext(Dispatchers.IO) { verifyUpdateApk(context, apk, target) }
+                val apk = withContext(Dispatchers.IO) { manager.verifiedCachedApk(target) }
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
                 context.startActivity(Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(uri, APK_MIME_TYPE)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     clipData = ClipData.newRawUri(resources.getString(R.string.update_clip_label), uri)
                 })
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 manager.reportError(error.message ?: resources.getString(R.string.update_install_failed))
             } finally { fileActionBusy = false }
@@ -160,13 +161,14 @@ fun UpdateSettingsScreen(
                 fileActionBusy = true
                 try {
                     withContext(Dispatchers.IO) {
-                        val apk = manager.apkFile(target.version.code)
-                        verifyUpdateApk(context, apk, target)
+                        val apk = manager.verifiedCachedApk(target)
                         val output = context.contentResolver.openOutputStream(uri, "w")
                             ?: error(resources.getString(R.string.update_save_failed))
                         output.use { stream -> apk.inputStream().use { it.copyTo(stream) } }
                     }
                     fileMessage = resources.getString(R.string.update_saved_you_singular)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
                     manager.reportError(error.message ?: resources.getString(R.string.update_save_failed))
                 } finally { fileActionBusy = false }

@@ -55,6 +55,7 @@ import org.junit.Test
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 class DisplayPictureSyncInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -111,8 +112,12 @@ class DisplayPictureSyncInstrumentedTest {
         delay(150)
         assertNull(sync.state.value.conflict)
         assertArrayEquals(old, OwnDisplayPictureStore.read(context, account).bytes)
-        sync.setForeground(false)
+        val poll = client.pauseFetches()
+        withTimeout(3_000) { poll.started.await() }
         val fetches = client.fetches
+        sync.setForeground(false)
+        withTimeout(3_000) { poll.finished.await() }
+        assertFalse(poll.release.isCompleted)
         delay(100)
         assertEquals(fetches, client.fetches)
     }
@@ -136,12 +141,11 @@ class DisplayPictureSyncInstrumentedTest {
         sync.restore(repository, connect(IncomingDisplayPicture(old, true)))
         DisplayPictureSyncPrefs.setBehavior(context, DisplayPictureSyncBehavior.AlwaysIncoming)
         client.incoming = IncomingDisplayPicture(null, true)
-        client.fetchStarted = CompletableDeferred()
-        client.fetchGate = CompletableDeferred()
+        val fetch = client.pauseFetches()
         val refresh = async(Dispatchers.IO) { sync.refresh(repository) }
-        client.fetchStarted!!.await()
+        withTimeout(3_000) { fetch.started.await() }
         OwnDisplayPictureStore.write(context, account, new)
-        client.fetchGate!!.complete(Unit)
+        fetch.release.complete(Unit)
         refresh.await()
         assertArrayEquals(new, OwnDisplayPictureStore.read(context, account).bytes)
         assertArrayEquals(new, context.loadDisplayPictureBytes(repository.profile.value.avatarUri))
@@ -331,13 +335,12 @@ class DisplayPictureSyncInstrumentedTest {
         connect(IncomingDisplayPicture(new, true))
         OwnDisplayPictureStore.write(context, account, old)
         DisplayPictureSyncPrefs.setBehavior(context, DisplayPictureSyncBehavior.AlwaysIncoming)
-        client.fetchStarted = CompletableDeferred()
-        client.fetchGate = CompletableDeferred()
+        val fetch = client.pauseFetches()
         val refresh = async(Dispatchers.IO) { sync.refresh(repository) }
-        client.fetchStarted!!.await()
+        withTimeout(3_000) { fetch.started.await() }
         SessionPrefs.completeLogin(context, "other@example.test", "password", true, ProviderOptions.ESCARGOT,
             ServerOverrides(), useMockServer = true)
-        client.fetchGate!!.complete(Unit)
+        fetch.release.complete(Unit)
         refresh.await()
         val other = requireNotNull(SessionPrefs.preferenceAccount(context))
         assertFalse(OwnDisplayPictureStore.read(context, other).initialized)
@@ -571,23 +574,32 @@ class DisplayPictureSyncInstrumentedTest {
             ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
     }
 
+    private class FetchGate {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val finished = CompletableDeferred<Unit>()
+    }
+
     private class PictureClient : MsnpClient by MockMsnp18Client(signInDelayMillis = 0) {
         override val events = MutableSharedFlow<MessengerEvent>(extraBufferCapacity = 16)
-        var incoming = IncomingDisplayPicture()
-        var fetches = 0
+        @Volatile var incoming = IncomingDisplayPicture()
+        private val fetchCount = AtomicInteger()
+        val fetches get() = fetchCount.get()
         var uploadFailure: Exception? = null
         var statusFailure: Exception? = null
-        var fetchStarted: CompletableDeferred<Unit>? = null
-        var fetchGate: CompletableDeferred<Unit>? = null
+        @Volatile private var gate: FetchGate? = null
+        fun pauseFetches() = FetchGate().also { gate = it }
         val published = mutableListOf<ByteArray?>()
         val publishedStatuses = mutableListOf<String>()
         override suspend fun signIn(request: SignInRequest) = Result.success(UserProfileSnapshot("You", request.email,
             request.initialPresence, incoming.bytes?.takeIf { org.aralozkaya.msngr.protocol.DisplayPictureFormat.detect(it) != null }?.displayPictureDataUri(),
             displayPictureFetched = incoming.fetched))
         override suspend fun fetchOwnDisplayPicture(): IncomingDisplayPicture {
-            fetches++
-            fetchStarted?.complete(Unit)
-            fetchGate?.await()
+            fetchCount.incrementAndGet()
+            gate?.let {
+                it.started.complete(Unit)
+                try { it.release.await() } finally { it.finished.complete(Unit) }
+            }
             return incoming
         }
         override suspend fun changeDisplayPicture(image: ByteArray?) {

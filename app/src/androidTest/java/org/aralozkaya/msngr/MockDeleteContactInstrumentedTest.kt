@@ -3,14 +3,14 @@ package org.aralozkaya.msngr
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.longClick
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -36,7 +36,7 @@ class MockDeleteContactInstrumentedTest {
         repository.addContact(peer).getOrThrow()
         try {
             ActivityScenario.launch(MainActivity::class.java).use {
-                compose.onNodeWithText("peer").performScrollTo().performTouchInput { longClick() }
+                compose.onNodeWithTag("contact-row-$peer").performScrollTo().performSemanticsAction(SemanticsActions.OnLongClick)
                 compose.onNodeWithText("Delete contact").performClick()
                 compose.onNodeWithTag("delete-contact-block").assertIsOff()
                 compose.onNodeWithText("Test data only. No connection is made and no packets are sent.").assertIsDisplayed()

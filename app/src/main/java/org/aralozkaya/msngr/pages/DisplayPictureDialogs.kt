@@ -69,9 +69,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -105,6 +106,7 @@ internal fun DisplayPictureOptionsDialog(
     onRemovePicture: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
     BasicAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(24.dp).widthIn(max = 560.dp).fillMaxWidth(),
@@ -112,7 +114,7 @@ internal fun DisplayPictureOptionsDialog(
     ) {
         Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(
-                Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp - 64).coerceAtLeast(200).dp)
+                Modifier.heightIn(max = (windowHeight - 64.dp).coerceAtLeast(200.dp))
                     .verticalScroll(rememberScrollState()).padding(24.dp).testTag("display-picture-options"),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
@@ -191,8 +193,8 @@ private const val DP_FILTER_ALL_KEY = "__all__"
 internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    val screenHeight = LocalConfiguration.current.screenHeightDp
-    val compact = screenHeight < 500
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val compact = windowHeight < 500.dp
     val filterState = rememberLazyListState()
     var pictures by remember { mutableStateOf<List<DefaultDisplayPicture>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -218,7 +220,7 @@ internal fun DefaultDisplayPictureDialog(onSelect: (DefaultDisplayPicture) -> Un
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.height((screenHeight - 64).coerceIn(240, 760).dp)
+            Column(Modifier.height((windowHeight - 64.dp).coerceIn(240.dp, 760.dp))
                 .testTag("default-display-pictures")) {
                 Text(stringResource(R.string.display_picture_defaults_title), style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 8.dp))

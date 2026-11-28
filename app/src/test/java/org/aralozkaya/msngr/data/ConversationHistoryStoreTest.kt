@@ -5,6 +5,8 @@ import org.aralozkaya.msngr.createTestTempDir
 import org.aralozkaya.msngr.MsnEmoticonRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.BufferedOutputStream
@@ -85,6 +87,177 @@ class ConversationHistoryStoreTest {
             restarted.selectAccount(ACCOUNT)
             assertTrue(restarted.persistOfflineMessage(message(-1).copy(timestampMillis = 1L)))
             assertEquals(listOf(-1L, 10L), restarted.loadedIds())
+        }
+    }
+
+    @Test
+    fun failedBackupRecoveryKeepsReceivingMessagesAndRetriesForTheOriginalAccount() {
+        withHistoryDirectory("msngr-history-pending-recovery") { directory ->
+            val store = FileConversationHistoryStore(directory)
+            store.selectAccount(ACCOUNT)
+            store.merge(mapOf(CONTACT to listOf(message(1))))
+            val contact = directory.walkTopDown().first { it.name == "chunk-00000000.bin" }.parentFile!!
+            val original = File(contact.parentFile, "original")
+            val backup = File(contact.parentFile, "${contact.name}.offline-backup")
+            assertTrue(contact.renameTo(original))
+            backup.writeText("invalid backup")
+            store.deselectAccount()
+            store.selectAccount(ACCOUNT)
+
+            val other = message(3).copy(contactId = "another-friend")
+            store.merge(mapOf(CONTACT to listOf(message(2)), other.contactId to listOf(other)))
+            assertEquals(listOf(2L), store.loadedIds())
+            assertEquals(listOf(other), store.messages.value[other.contactId])
+            store.selectAccount("another-account")
+            store.loadLatest(CONTACT)
+            assertTrue(store.loadedIds().isEmpty())
+            assertTrue(backup.delete())
+            assertTrue(original.renameTo(backup))
+            store.selectAccount(ACCOUNT)
+            assertEquals(listOf(1L, 2L), store.loadedIds())
+
+            val restarted = FileConversationHistoryStore(directory)
+            restarted.selectAccount(ACCOUNT)
+            restarted.loadLatest(CONTACT)
+            assertEquals(listOf(1L, 2L), restarted.loadedIds())
+        }
+    }
+
+    @Test
+    fun appendAfterInterruptedChunkReplacementKeepsThePreviousMessages() {
+        withHistoryDirectory("msngr-history-chunk-recovery") { directory ->
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(message(1))))
+            }
+            val chunk = directory.walkTopDown().single { it.extension == "bin" }
+            assertTrue(chunk.renameTo(File(chunk.parentFile, "${chunk.name}.bak")))
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertEquals(listOf(1L), loadedIds())
+                merge(mapOf(CONTACT to listOf(message(2))))
+            }
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertEquals(listOf(1L, 2L), loadedIds())
+            }
+        }
+    }
+
+    @Test
+    fun newMessagesSurviveAnUnreadableLatestChunkWithoutReplacingIt() {
+        withHistoryDirectory("msngr-history-unreadable-tail") { directory ->
+            FileConversationHistoryStore(directory, pageSize = 1).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(message(1), message(2))))
+            }
+            val tail = directory.walkTopDown().single { it.name == "chunk-00000001.bin" }
+            val unreadable = tail.readBytes().apply { this[7] = 99 } // Future chunk version
+            tail.writeBytes(unreadable)
+            FileConversationHistoryStore(directory, pageSize = 1).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(message(3))))
+            }
+            assertArrayEquals(unreadable, tail.readBytes())
+            FileConversationHistoryStore(directory, pageSize = 1).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertEquals(listOf(3L), loadedIds())
+                while (pageState().canLoadOlder) loadOlder(CONTACT)
+                assertEquals(listOf(1L, 3L), loadedIds())
+            }
+        }
+    }
+
+    @Test
+    fun failedGlobalEraseKeepsTheCurrentHistoryAndCanBeRetried() {
+        withHistoryDirectory("msngr-history-erase-failure") { directory ->
+            val legacy = File(directory.parentFile, "conversation_history.bin")
+            val backup = File(directory.parentFile, "${legacy.name}.bak")
+            FileConversationHistoryStore(directory, legacy).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(message(1))))
+                // A nonempty directory cannot be deleted as a legacy backup file on any platform.
+                assertTrue(backup.mkdir())
+                backup.resolve("blocking-file").writeText("fixture")
+                assertThrows(IllegalStateException::class.java) { clearAll() }
+                assertEquals(listOf(1L), loadedIds())
+                assertEquals(1, directory.historyChunkCount())
+                assertTrue(backup.deleteRecursively())
+                clearAll()
+                assertTrue(messages.value.isEmpty())
+            }
+            FileConversationHistoryStore(directory, legacy).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertTrue(loadedIds().isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun erasingHistoryAlsoErasesInterruptedOfflineReplacements() {
+        withHistoryDirectory("msngr-history-erase-recovery") { directory ->
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                merge(mapOf(CONTACT to listOf(message(1))))
+                val conversation = directory.walkTopDown().single { it.extension == "bin" }.parentFile!!
+                for (suffix in listOf("offline-backup", "offline-pending")) {
+                    assertTrue(conversation.copyRecursively(File(conversation.parentFile, "${conversation.name}.$suffix")))
+                }
+                clearContact(CONTACT)
+            }
+            FileConversationHistoryStore(directory).apply {
+                selectAccount(ACCOUNT)
+                loadLatest(CONTACT)
+                assertTrue(loadedIds().isEmpty())
+                assertEquals(0, directory.historyChunkCount())
+            }
+        }
+    }
+
+    @Test
+    fun failedMigrationPreservesTheLegacyFileForRecovery() {
+        withHistoryDirectory("msngr-history-invalid-legacy") { directory ->
+            val legacy = File(directory.parentFile, "conversation_history.bin")
+            legacy.writeText("unrecognized format")
+            FileConversationHistoryStore(directory, legacy).selectAccount(ACCOUNT)
+            assertEquals("unrecognized format", legacy.readText())
+        }
+    }
+
+    @Test
+    fun identicalLiveSnapshotRetriesAPartialWriteWithoutDuplicatingMessages() {
+        withHistoryDirectory("msngr-history-live-retry") { directory ->
+            val store = FileConversationHistoryStore(directory, pageSize = 2)
+            store.selectAccount(ACCOUNT)
+            store.merge(mapOf(CONTACT to listOf(message(1))))
+            val firstChunk = directory.walkTopDown().single { it.name == "chunk-00000000.bin" }
+            val obstruction = File(firstChunk.parentFile, "chunk-00000001.bin.tmp")
+            assertTrue(obstruction.mkdir())
+            File(obstruction, "occupied").writeText("keep the temporary path unavailable")
+
+            val entries = (1L..6L).map(::message)
+            val snapshot = mapOf(CONTACT to entries)
+            store.merge(snapshot)
+            assertEquals(entries, store.messages.value[CONTACT])
+            assertEquals(1, directory.historyChunkCount())
+            store.deselectAccount()
+            store.selectAccount("another-account")
+            assertTrue(store.messages.value.isEmpty())
+            store.selectAccount(ACCOUNT)
+            assertEquals(entries, store.messages.value[CONTACT])
+            assertTrue(obstruction.deleteRecursively())
+
+            store.merge(snapshot)
+            val reopened = FileConversationHistoryStore(directory, pageSize = 2)
+            reopened.selectAccount(ACCOUNT)
+            reopened.loadLatest(CONTACT)
+            while (reopened.pageState().canLoadOlder) reopened.loadOlder(CONTACT)
+            assertEquals(entries, reopened.messages.value[CONTACT])
+            assertEquals(3, directory.historyChunkCount())
         }
     }
 

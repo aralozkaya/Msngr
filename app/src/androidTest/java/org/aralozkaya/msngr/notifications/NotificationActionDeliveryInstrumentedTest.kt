@@ -10,6 +10,8 @@ import androidx.core.app.RemoteInput
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.workDataOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -88,6 +90,77 @@ class NotificationActionDeliveryInstrumentedTest {
         }
     }
 
+    @Test fun queuedActionsCannotUseAnotherAccountWithTheSamePeer() = runBlocking {
+        withAccount(useMockServer = true) {
+            val repository = context.appContainer.repositoryFor(true)
+            val login = SessionPrefs.readLoginSnapshot(context)
+            repository.signIn(SignInRequest(login.email, login.password, login.resolvedServers)).getOrThrow()
+            val peer = repository.contacts.value.first { !it.isGroup && !it.isBlocked }.id
+            val otherService = AccountIdentity.forLogin(login.email, useMockServer = false)
+            val before = repository.conversation(peer).first()
+            val data = workDataOf(
+                NOTIFICATION_ACCOUNT to otherService.storageKey,
+                NOTIFICATION_CONTACT_ID to peer,
+                ReplyMessageWorker.KEY_REPLY_TEXT to "Queued on the other service",
+            )
+            val actions = listOf(
+                OneTimeWorkRequestBuilder<ReplyMessageWorker>().setInputData(data).build(),
+                OneTimeWorkRequestBuilder<NudgeContactWorker>().setInputData(data).build(),
+            )
+            for (action in actions) {
+                requests += action.id
+                work.enqueue(action).result.get()
+                val result = withTimeout(15_000) {
+                    work.getWorkInfoByIdFlow(action.id).first { it?.state?.isFinished == true }
+                }
+                assertEquals(WorkInfo.State.FAILED, result?.state)
+            }
+            assertEquals(before.messages, repository.conversation(peer).first().messages)
+        }
+    }
+
+    @Test fun abandonedActionsDismissOnlyTheirOwnNotification() = runBlocking {
+        withAccount(useMockServer = true) {
+            val owner = requireNotNull(context.notificationAccountKey())
+            val peers = listOf("abandoned@example.test", "replaced@example.test")
+            val actions = peers.map { peer ->
+                val id = MsngrNotificationManager.notificationId(NotificationEventType.Nudge, peer)
+                val data = workDataOf(NOTIFICATION_ACCOUNT to owner, NOTIFICATION_CONTACT_ID to peer, ACTION_NOTIFICATION_ID to id)
+                val action = OneTimeWorkRequestBuilder<NudgeContactWorker>().setInputData(data).build()
+                notifications.markNudging(peer, peer, id, NotificationChannels.NUDGES, owner, action.id)
+                id to action
+            }
+            withTimeout(5_000) {
+                while (actions.any { (id, _) -> manager.activeNotifications.none { it.id == id } }) delay(25)
+            }
+
+            SessionPrefs.completeLogin(context, "replacement@example.test", "", false, ProviderOptions.ESCARGOT,
+                ServerOverrides(), useMockServer = true)
+            val peer = peers.last()
+            notifications.show(NotificationEvent(NotificationEventType.Nudge, peer, "Replacement account"))
+            val replacementId = actions.last().first
+            val replacementAccount = requireNotNull(context.notificationAccountKey())
+            withTimeout(5_000) {
+                while (manager.activeNotifications.none {
+                    it.id == replacementId && it.notification.extras.getString(NOTIFICATION_ACCOUNT) == replacementAccount
+                }) delay(25)
+            }
+            for ((_, action) in actions) {
+                requests += action.id
+                work.enqueue(action).result.get()
+                val result = withTimeout(15_000) {
+                    work.getWorkInfoByIdFlow(action.id).first { it?.state?.isFinished == true }
+                }
+                assertEquals(WorkInfo.State.FAILED, result?.state)
+            }
+            withTimeout(5_000) {
+                while (manager.activeNotifications.any { it.id == actions.first().first }) delay(25)
+            }
+            assertEquals(replacementAccount,
+                manager.activeNotifications.single { it.id == replacementId }.notification.extras.getString(NOTIFICATION_ACCOUNT))
+        }
+    }
+
     @Test fun replyRetriesWhenTheRememberedSessionCannotConnect() = runBlocking {
         checkRestoreRetry(reply = "Reply waiting for reconnection")
     }
@@ -123,11 +196,20 @@ class NotificationActionDeliveryInstrumentedTest {
     private suspend fun submit(type: NotificationEventType, contactId: String, reply: String? = null): WorkInfo {
         val tag = if (reply == null) NudgeContactWorker::class.java.name else ReplyMessageWorker::class.java.name
         val before = work.getWorkInfosByTag(tag).get().map { it.id }.toSet()
-        notifications.show(NotificationEvent(type, contactId, "Action test contact", messageText = "Incoming message"))
         val notificationId = MsngrNotificationManager.notificationId(type, contactId)
+        // A previous action on this peer may still have a delivery-status notification at this ID.
+        manager.cancel(notificationId)
+        withTimeout(10_000) {
+            while (manager.activeNotifications.any { it.id == notificationId }) delay(50)
+        }
+        val event = NotificationEvent(type, contactId, "Action test contact", messageText = "Incoming message")
+        notifications.show(event)
         val notification: Notification = withTimeout(10_000) {
             while (true) {
-                manager.activeNotifications.firstOrNull { it.id == notificationId }?.notification?.let { return@withTimeout it }
+                val current = manager.activeNotifications.firstOrNull { it.id == notificationId }?.notification
+                if (current != null && current.`when` == event.sentAtMillis && !current.actions.isNullOrEmpty()) {
+                    return@withTimeout current
+                }
                 delay(50)
             }
             error("Unreachable")

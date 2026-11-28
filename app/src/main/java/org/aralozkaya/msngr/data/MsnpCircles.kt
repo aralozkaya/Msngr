@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.escapeXml
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
@@ -8,7 +10,6 @@ import org.aralozkaya.msngr.protocol.MsnInkCodec
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
-import javax.xml.parsers.DocumentBuilderFactory
 
 /** MSNP18 circles use the notification connection, not a switchboard. */
 internal object MsnpCircles {
@@ -25,9 +26,9 @@ internal object MsnpCircles {
         buildString {
             append(if (initial) "<ml l=\"1\">" else "<ml>")
             groups.groupBy { it.email.substringAfter('@') }.forEach { (domain, contacts) ->
-                append("<d n=\"").append(domain.circleXml()).append("\">")
+                append("<d n=\"").append(domain.escapeXml()).append("\">")
                 contacts.forEach {
-                    append("<c n=\"").append(it.email.substringBefore('@').circleXml())
+                    append("<c n=\"").append(it.email.substringBefore('@').escapeXml())
                     append("\" t=\"9\" l=\"").append(if (it.isBlocked) 5 else 3).append("\" />")
                 }
                 append("</d>")
@@ -43,8 +44,8 @@ internal object MsnpCircles {
         // Some servers acknowledge that duplicate join without applying the subsequent block.
         val lists = if (blocked) Msnp18Protocol.BLOCK_LIST else
             Msnp18Protocol.FORWARD_LIST or Msnp18Protocol.ALLOW_LIST
-        val body = "<ml><d n=\"${group.email.substringAfter('@').circleXml()}\">" +
-            "<c n=\"${group.email.substringBefore('@').circleXml()}\" t=\"9\" l=\"$lists\" /></d></ml>"
+        val body = "<ml><d n=\"${group.email.substringAfter('@').escapeXml()}\">" +
+            "<c n=\"${group.email.substringBefore('@').escapeXml()}\" t=\"9\" l=\"$lists\" /></d></ml>"
         return payloadCommand("ADL", transactionId, body.toByteArray(Charsets.UTF_8))
     }
 
@@ -324,7 +325,7 @@ internal data class CirclePublication(val name: String?, val roster: List<String
 
 internal fun parseCirclePublication(body: ByteArray): CirclePublication? = runCatching {
     if (body.isEmpty()) return null
-    val document = circleDocumentFactory().newDocumentBuilder().parse(body.inputStream())
+    val document = parseProtocolXml(body)
     val root = document.documentElement
     if (root.tagName != "circle") return null
     val name = root.getElementsByTagName("MFN").item(0)?.textContent?.takeIf(String::isNotBlank)
@@ -337,14 +338,3 @@ internal fun parseCirclePublication(body: ByteArray): CirclePublication? = runCa
     }
     CirclePublication(name, roster)
 }.getOrNull()
-
-internal fun circleDocumentFactory() = DocumentBuilderFactory.newInstance().apply {
-    isNamespaceAware = true
-    isExpandEntityReferences = false
-    runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-    runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-    runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-}
-
-private fun String.circleXml() = replace("&", "&amp;").replace("<", "&lt;")
-    .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")

@@ -30,8 +30,12 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
         try {
             destination.parentFile?.mkdirs()
             if (destination.isFile) {
-                verifyUpdateApk(applicationContext, destination, release)
-                return@withContext Result.success()
+                try {
+                    manager.verifiedCachedApk(release)
+                    return@withContext Result.success()
+                } catch (_: IOException) {
+                    if (destination.exists()) throw IOException(applicationContext.getString(R.string.update_apk_temp_save_failed))
+                }
             }
             val connection = openApkConnection(checkNotNull(release.apkUrl))
             try {
@@ -63,12 +67,11 @@ class UpdateDownloadWorker(context: Context, parameters: WorkerParameters) : Cor
             }
             verifyUpdateApk(applicationContext, partial, release)
             coroutineContext.ensureActive()
-            if (!partial.renameTo(destination)) throw IOException(applicationContext.getString(R.string.update_apk_temp_save_failed))
+            manager.publishDownloadedApk(partial, release)
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            destination.delete()
             Result.failure(workDataOf("error" to (error.message?.let(applicationContext::localizeUserMessage) ?: applicationContext.getString(R.string.update_download_failed_generic))))
         } finally {
             partial.delete()
@@ -110,7 +113,7 @@ internal fun verifyUpdateApk(context: Context, file: File, release: AppRelease) 
                 digest.update(buffer, 0, count)
             }
         }
-        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        val actual = digest.digest().toHexString()
         if (!actual.equals(expected, ignoreCase = true)) throw IOException("The APK checksum does not match GitHub's release asset.")
     }
     val pm = context.packageManager

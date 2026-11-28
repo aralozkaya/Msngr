@@ -35,11 +35,11 @@ object MsnVoiceClip {
             .putShort(FRAME_BYTES.toShort()).putShort(0).putShort(2).putShort(FRAME_SAMPLES.toShort())
         buffer.put("fact".toByteArray()).putInt(4).putInt(samples)
         buffer.put("data".toByteArray()).putInt(frames.size).put(frames)
-        return VoiceClip(buffer.array().toList(), (samples * 1_000 / SAMPLE_RATE).coerceAtLeast(1))
+        return VoiceClip(buffer.array().asList(), (samples * 1_000 / SAMPLE_RATE).coerceAtLeast(1))
     }
 
     fun parse(bytes: ByteArray): VoiceClip? = inspect(bytes)?.let {
-        VoiceClip(bytes.toList(), (it.samples * 1_000 / SAMPLE_RATE).coerceAtLeast(1))
+        VoiceClip(bytes.copyOf().asList(), (it.samples * 1_000 / SAMPLE_RATE).coerceAtLeast(1))
     }
 
     fun decode(clip: VoiceClip): ByteArray {

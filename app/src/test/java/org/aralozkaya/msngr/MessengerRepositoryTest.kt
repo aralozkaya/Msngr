@@ -2,7 +2,11 @@
 
 package org.aralozkaya.msngr
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -14,8 +18,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.ChatMessage
+import org.aralozkaya.msngr.data.ConversationHistoryStore
+import org.aralozkaya.msngr.data.InMemoryConversationHistoryStore
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupMember
+import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerEvent
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.MockMsnp18Client
@@ -29,6 +36,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executor
 
 class MessengerRepositoryTest {
     @Test fun savedNativeStyleAppliesToEverySendAndSurvivesDraftClearingAndLogout() = runBlocking {
@@ -45,8 +54,8 @@ class MessengerRepositoryTest {
             repository.updateDraft("selin", "")
             repository.sendMessageNow("selin", "[b]first[/b]").getOrThrow()
             repository.sendMessage("selin", "second")
-            withTimeout(2_000) { client.messages.first { it["selin"].orEmpty().count { message -> message.author == org.aralozkaya.msngr.data.MessageAuthor.Me } == 2 } }
-            assertTrue(client.messages.value.getValue("selin").filter { it.author == org.aralozkaya.msngr.data.MessageAuthor.Me }
+            withTimeout(2_000) { client.messages.first { it["selin"].orEmpty().count { message -> message.author == MessageAuthor.Me } == 2 } }
+            assertTrue(client.messages.value.getValue("selin").filter { it.author == MessageAuthor.Me }
                 .all { it.nativeStyle == selected })
             assertEquals("first", client.messages.value.getValue("selin").first().text)
             repository.sendMessageNow("mert", "default").getOrThrow()
@@ -188,7 +197,7 @@ class MessengerRepositoryTest {
             mock.logout()
             real.signIn(request).getOrThrow()
             (retiredClient.messages as MutableStateFlow).value = mapOf(friend to listOf(
-                ChatMessage(1L, friend, org.aralozkaya.msngr.data.MessageAuthor.Contact, "Late mock reply", 1L),
+                ChatMessage(1L, friend, MessageAuthor.Contact, "Late mock reply", 1L),
             ))
             real.loadConversation(friend)
             assertTrue(real.conversation(friend).first().messages.isEmpty())
@@ -197,6 +206,213 @@ class MessengerRepositoryTest {
             real.logout()
             mockScope.cancel()
             realScope.cancel()
+        }
+    }
+
+    @Test
+    fun queuedRememberedLoginCannotReplaceAnInteractiveSession() = runBlocking {
+        val backing = RecordingMsnpClient()
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val client = object : MsnpClient by backing {
+            override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> {
+                started.complete(Unit)
+                release.await()
+                return backing.signIn(request)
+            }
+        }
+        val repo = MessengerRepository(client)
+        val chosen = SignInRequest("chosen@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            val interactive = async { repo.signIn(chosen) }
+            started.await()
+            val stale = async(start = CoroutineStart.UNDISPATCHED) {
+                repo.signIn(chosen.copy(email = "previous@example.com"), isRememberedCurrent = { true }) {
+                    error("Stale session was activated")
+                }
+            }
+            release.complete(Unit)
+            interactive.await().getOrThrow()
+            assertTrue(stale.await().isFailure)
+            assertEquals(listOf(chosen), backing.signInRequests)
+            assertEquals(chosen.email, repo.profile.value.email)
+
+            repo.logout()
+            assertTrue(repo.signIn(chosen, isRememberedCurrent = { true }) { false }.isFailure)
+            assertTrue(!repo.hasSignedInSession)
+            assertEquals("", repo.profile.value.email)
+        } finally {
+            release.complete(Unit)
+            repo.retire()
+        }
+    }
+
+    @Test
+    fun changedRememberedSelectionCannotRevokeOtherSessions() = runBlocking {
+        val client = RecordingMsnpClient().apply { sessions.value = listOf(currentSession) + remoteSessions }
+        val repo = MessengerRepository(client, signOutOtherSessionsOnSignIn = { true })
+        val request = SignInRequest("previous@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            var activated = false
+            val result = repo.signIn(request, isRememberedCurrent = { false }) {
+                activated = true
+                true
+            }
+            assertEquals(listOf(request), client.signInRequests)
+            assertTrue(result.isFailure)
+            assertTrue(client.loggedOutSessions.isEmpty())
+            assertTrue(!activated)
+            assertTrue(!repo.hasSignedInSession)
+        } finally { repo.retire() }
+    }
+
+    @Test
+    fun queuedMessageIsDiscardedWhenTheSameClientSignsInAgain() = runBlocking {
+        val tasks = ConcurrentLinkedQueue<Runnable>()
+        val dispatcher = Executor { tasks.add(it) }.asCoroutineDispatcher()
+        val client = MockMsnp18Client(signInDelayMillis = 0)
+        val repo = MessengerRepository(client, scope = CoroutineScope(dispatcher))
+        val request = SignInRequest("first@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            repo.signIn(request).getOrThrow()
+            repo.sendMessage("selin", "previous account")
+            repo.logout()
+            val second = request.copy(email = "second@example.com")
+            repo.signIn(second).getOrThrow()
+            repo.sendMessage("selin", "previous session")
+            repo.logout()
+            repo.signIn(second).getOrThrow()
+            repo.sendMessage("selin", "current account")
+            while (true) (tasks.poll() ?: break).run()
+            val delivered = client.messages.value.getValue("selin").filter { it.author == MessageAuthor.Me }
+            assertEquals(listOf("current account"), delivered.map { it.text })
+        } finally { repo.retire() }
+    }
+
+    @Test
+    fun notificationDeliveryHoldsItsAccountUntilSendCompletesAndRejectsStaleActions() = runBlocking {
+        val backing = RecordingMsnpClient()
+        val sending = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val reads = mutableListOf<String>()
+        val client = object : MsnpClient by backing {
+            override fun markRead(contactId: String) { reads += contactId }
+
+            override suspend fun sendStyledMessage(
+                contactId: String, text: String, renderedEmoticonRanges: List<MsnEmoticonRange>?,
+                style: NativeTextStyle,
+            ): Result<Unit> {
+                sending.complete(Unit)
+                release.await()
+                return Result.success(Unit)
+            }
+        }
+        val repo = MessengerRepository(client)
+        val first = SignInRequest("first@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        val friend = "peer@example.com"
+        try {
+            repo.signIn(first).getOrThrow()
+            backing.contacts.value = listOf(Contact(friend, "Peer", friend, Presence.Online))
+            val owner = requireNotNull(repo.signedInAccountIdentity).storageKey
+            val reply = async { repo.sendNotificationAction(owner, friend, "hello") }
+            sending.await()
+            val switch = async(start = CoroutineStart.UNDISPATCHED) {
+                repo.signIn(first.copy(email = "second@example.com"))
+            }
+            assertEquals(listOf(first), backing.signInRequests)
+            release.complete(Unit)
+            assertEquals(friend, reply.await().getOrThrow()?.id)
+            switch.await().getOrThrow()
+            assertTrue(repo.sendNotificationAction(owner, friend, "stale").isFailure)
+            assertTrue(repo.sendNotificationAction(owner, friend, null).isFailure)
+            assertEquals(listOf(friend), reads)
+        } finally {
+            release.complete(Unit)
+            repo.retire()
+        }
+    }
+
+    @Test
+    fun delayedMockNudgeCannotAppearInTheNextAccountsConversation() = runBlocking {
+        val client = MockMsnp18Client(scope = CoroutineScope(Dispatchers.Unconfined), signInDelayMillis = 0)
+        val first = SignInRequest("first@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            client.signIn(first).getOrThrow()
+            client.sendNudgeWithResult("selin").getOrThrow()
+            client.close()
+            client.signIn(first.copy(email = "second@example.com")).getOrThrow()
+            client.sendMessage("selin", "hello")
+            val replies = withTimeout(5_000) {
+                client.messages.first { entries -> entries["selin"].orEmpty().any { it.author == MessageAuthor.Contact } }
+            }
+            assertTrue(replies["selin"].orEmpty().none(ChatMessage::isNudge))
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun incomingMessagesDuringAccountChangeOnlyReachTheNewHistory() = runBlocking {
+        val backing = RecordingMsnpClient()
+        val message = ChatMessage(1L, "friend@example.com", MessageAuthor.Contact, "Private", 1L)
+        val client = object : MsnpClient by backing {
+            override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> =
+                backing.signIn(request).also {
+                    if (request.email == "second@example.com") backing.publish(message)
+                }
+        }
+        val repository = MessengerRepository(client, scope = CoroutineScope(Dispatchers.Unconfined))
+        val first = SignInRequest("first@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            repository.signIn(first).getOrThrow()
+            repository.signIn(first.copy(email = "second@example.com")).getOrThrow()
+            assertEquals(listOf(message), repository.conversation(message.contactId).first().messages)
+            repository.logout()
+            assertTrue(repository.conversation(message.contactId).first().messages.isEmpty())
+            repository.signIn(first).getOrThrow()
+            assertTrue(repository.conversation(message.contactId).first().messages.isEmpty())
+        } finally {
+            repository.retire()
+        }
+    }
+
+    @Test
+    fun retiringDuringSignInPreventsLatePublicationAndReleasesCollectors() = runBlocking {
+        val backing = RecordingMsnpClient()
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val client = object : MsnpClient by backing {
+            override suspend fun signIn(request: SignInRequest): Result<UserProfileSnapshot> {
+                started.complete(Unit)
+                release.await()
+                return backing.signIn(request)
+            }
+        }
+        val parent = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val repository = MessengerRepository(client, scope = parent)
+        val request = SignInRequest("old@example.com", "password",
+            ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
+        try {
+            val signIn = async { repository.signIn(request) }
+            started.await()
+            repository.retire()
+            release.complete(Unit)
+            assertTrue(signIn.await().isFailure)
+            assertTrue(!repository.hasSignedInSession)
+            assertEquals("", repository.profile.value.email)
+            assertEquals(0, backing.events.subscriptionCount.value)
+            assertTrue(parent.coroutineContext[kotlinx.coroutines.Job]!!.isActive)
+            assertTrue(repository.signIn(request).isFailure)
+        } finally {
+            release.complete(Unit)
+            repository.retire()
+            parent.cancel()
         }
     }
 
@@ -212,21 +428,26 @@ class MessengerRepositoryTest {
         val request = SignInRequest("same@example.com", "password",
             ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))
         val friend = "friend@example.com"
-        val mockMessage = ChatMessage(1L, friend, org.aralozkaya.msngr.data.MessageAuthor.Me,
+        val mockMessage = ChatMessage(1L, friend, MessageAuthor.Me,
             "Mock history", 1L)
         val realMessage = mockMessage.copy(id = 2L, text = "Real history", timestampMillis = 2L)
         try {
             val mock = container.repositoryFor(true)
             mock.signIn(request).getOrThrow()
+            assertNull(container.repositoryForRestore(false))
             mock.updateDraft(friend, "Mock draft")
             history.merge(mapOf(friend to listOf(mockMessage)))
 
-            val real = container.repositoryFor(false)
+            mock.logout()
+            val real = requireNotNull(container.repositoryForRestore(false))
             real.signIn(request).getOrThrow()
             assertTrue(real.drafts.value.isEmpty())
             real.loadConversation(friend)
             assertTrue(real.conversation(friend).first().messages.isEmpty())
             real.updateDraft(friend, "Real draft")
+            mock.updateDraft(friend, "Stale edit")
+            assertTrue(mock.drafts.value.isEmpty())
+            assertEquals("Real draft", real.drafts.value[friend])
             history.merge(mapOf(friend to listOf(realMessage)))
 
             val restoredMock = container.repositoryFor(true)
@@ -254,7 +475,7 @@ class MessengerRepositoryTest {
         val second = first.copy(serverConfig = ServerPresets.resolveForProvider(
             ProviderOptions.CROSSTALK, ServerOverrides()))
         val friend = "friend@example.com"
-        val message = ChatMessage(1L, friend, org.aralozkaya.msngr.data.MessageAuthor.Me, "First service", 1L)
+        val message = ChatMessage(1L, friend, MessageAuthor.Me, "First service", 1L)
         try {
             repository.signIn(first).getOrThrow()
             repository.updateDraft(friend, "First draft")
@@ -519,6 +740,39 @@ class MessengerRepositoryTest {
     }
 
     @Test
+    fun failedHistoryErasePreservesLiveMessagesUntilRetrySucceeds() = runBlocking {
+        val backing = InMemoryConversationHistoryStore()
+        var failErase = true
+        val history = object : ConversationHistoryStore by backing {
+            override fun clearAll() {
+                check(!failErase)
+                backing.clearAll()
+            }
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val client = RecordingMsnpClient()
+            val repository = MessengerRepository(client, scope = scope, historyStore = history)
+            repository.signIn(SignInRequest(MockServerData.ACCOUNT_EMAIL, MockServerData.ACCOUNT_PASSWORD,
+                ServerPresets.resolveForProvider(ProviderOptions.ESCARGOT, ServerOverrides()))).getOrThrow()
+            val message = ChatMessage(1, "friend", MessageAuthor.Contact, "Still here", 123)
+            client.publish(message)
+            withTimeout(2_000) { backing.messages.first { it["friend"] == listOf(message) } }
+
+            assertTrue(runCatching { repository.clearConversationHistory() }.isFailure)
+            assertEquals(listOf(message), client.messages.value["friend"])
+            assertEquals(listOf(message), backing.messages.value["friend"])
+
+            failErase = false
+            repository.clearConversationHistory()
+            assertTrue(client.messages.value.isEmpty())
+            assertTrue(backing.messages.value.isEmpty())
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun conversationHistorySurvivesReconnectAndDeleteAllClearsIt() = runBlocking {
         val client = RecordingMsnpClient()
         val repository = MessengerRepository(client)
@@ -533,7 +787,7 @@ class MessengerRepositoryTest {
         val message = ChatMessage(
             id = 42,
             contactId = "friend@example.com",
-            author = org.aralozkaya.msngr.data.MessageAuthor.Contact,
+            author = MessageAuthor.Contact,
             text = "Still here",
             timestampMillis = 1_234,
         )
@@ -572,7 +826,7 @@ class MessengerRepositoryTest {
             val erased = ChatMessage(
                 id = 41,
                 contactId = "friend@example.com",
-                author = org.aralozkaya.msngr.data.MessageAuthor.Contact,
+                author = MessageAuthor.Contact,
                 text = "Erase me",
                 timestampMillis = 1_000,
             )
@@ -622,7 +876,7 @@ class MessengerRepositoryTest {
         val failed = ChatMessage(
             id = 42L,
             contactId = "friend@example.com",
-            author = org.aralozkaya.msngr.data.MessageAuthor.Me,
+            author = MessageAuthor.Me,
             text = "[b]hello[/b] :-)",
             timestampMillis = 123L,
             renderedEmoticonRanges = emptyList(),

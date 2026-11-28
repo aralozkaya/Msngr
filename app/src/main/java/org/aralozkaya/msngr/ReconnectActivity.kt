@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import org.aralozkaya.msngr.data.CredentialsRejectedException
+import org.aralozkaya.msngr.data.SessionUnavailableException
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
 import org.aralozkaya.msngr.ui.theme.MsngrTheme
 
@@ -42,7 +44,7 @@ class ReconnectActivity : MsngrActivity() {
             return
         }
 
-        val repository = runCatching { appContainer.messengerRepository }.getOrNull()
+        val repository = appContainer.currentRepository
         if (repository == null) {
             openLogin()
             return
@@ -58,17 +60,26 @@ class ReconnectActivity : MsngrActivity() {
                             delay(MOCK_RECONNECT_DELAY_MILLIS)
                             Result.success(repository.profile.value)
                         } else {
-                            repository.reconnect().onSuccess { serverProfile ->
+                            val account = repository.signedInAccountIdentity
+                            repository.reconnect(account).onSuccess { serverProfile ->
+                                if (account == null) return@onSuccess
                                 restoreSignedInProfile(
                                     repository = repository,
                                     serverProfile = serverProfile,
                                     presence = repository.profile.value.presence,
+                                    account = account,
                                 )
                             }
                         }
                     },
                     onConnected = ::openMain,
-                    onSessionUnavailable = ::openLogin,
+                    onSessionUnavailable = { failure ->
+                        if (failure is CredentialsRejectedException) {
+                            repository.signedInAccountIdentity?.let { SessionPrefs.invalidateRememberedCredentials(this, it) }
+                            repository.logout()
+                        }
+                        openLogin(failure as? CredentialsRejectedException)
+                    },
                 )
             }
         }
@@ -83,13 +94,14 @@ class ReconnectActivity : MsngrActivity() {
         finish()
     }
 
-    private fun openLogin() {
+    private fun openLogin(rejected: CredentialsRejectedException? = null) {
         SessionPrefs.logout()
         startActivity(
             LoginActivity.createIntent(
                 context = this,
-                allowAutomaticSignIn = true,
+                allowAutomaticSignIn = rejected == null,
             ).apply {
+                rejected?.message?.let { putExtra(LoginActivity.EXTRA_SIGN_OUT_REASON, it) }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             },
         )
@@ -110,10 +122,10 @@ class ReconnectActivity : MsngrActivity() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ReconnectScreen(
+internal fun ReconnectScreen(
     reconnect: suspend () -> Result<UserProfileSnapshot>,
     onConnected: () -> Unit,
-    onSessionUnavailable: () -> Unit,
+    onSessionUnavailable: (Throwable) -> Unit,
 ) {
     var attempt by remember { mutableIntStateOf(1) }
     BackHandler(enabled = true) {}
@@ -125,11 +137,9 @@ private fun ReconnectScreen(
                 onConnected()
                 return@LaunchedEffect
             }
-            if (
-                result.exceptionOrNull()?.message ==
-                "The previous sign-in session is no longer available."
-            ) {
-                onSessionUnavailable()
+            val failure = result.exceptionOrNull()
+            if (failure is CredentialsRejectedException || failure is SessionUnavailableException) {
+                onSessionUnavailable(failure)
                 return@LaunchedEffect
             }
             delay(retryDelayMillis(attempt))

@@ -63,11 +63,10 @@ class TranslationValidationTest {
         val extra = candidate.keys - baselineKeys
         if (missing.isNotEmpty()) errors += "Missing keys: $missing"
         if (extra.isNotEmpty()) errors += "Extra keys: $extra"
-        // Empty string values ("") are explicitly allowed and must NOT produce an error.
         return errors
     }
 
-    @Test fun allLocalesAndTemplateHaveIdenticalKeysAndAllowEmptyValues() {
+    @Test fun effectiveTranslationsCoverTheTemplateAndAllowEmptyValues() {
         val mainDir = appMainDir()
         val resDir = File(mainDir, "res")
         val templateFile = File(mainDir, "strings.template.xml")
@@ -85,21 +84,25 @@ class TranslationValidationTest {
 
         assertEquals(emptyList<String>(), validateTranslationParity(enMap.keys, tplMap))
 
-        resDir.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("values-") }
-            ?.map { File(it, "strings.xml") }
-            ?.filter { it.isFile && it != enFile && extractAliasTarget(it) == null }
-            ?.forEach { otherFile ->
-                val (otherMap, otherPlurals) = parseStringsXml(otherFile)
-                assertEquals(0, otherPlurals)
-                assertEquals(
-                    "Parity mismatch in ${otherFile.path}",
-                    emptyList<String>(),
-                    validateTranslationParity(enMap.keys, otherMap),
-                )
+        val locales = resDir.listFiles().orEmpty().mapNotNull { dir ->
+            val file = File(dir, "strings.xml")
+            folderToLocaleTag(dir.name)?.takeIf { file.isFile }?.let { it to file }
+        }.toMap()
+        for ((tag, file) in locales) {
+            if (extractAliasTarget(file) != null) continue
+            val (strings, plurals) = parseStringsXml(file)
+            assertEquals(0, plurals)
+            var base = locales[tag.substringBefore('-')]
+            val visited = mutableSetOf<File>()
+            while (base != null) {
+                check(visited.add(base)) { "Circular locale alias at $base" }
+                val alias = extractAliasTarget(base) ?: break
+                base = locales.getValue(alias)
             }
+            val effective = if (base == null || base == file) strings else parseStringsXml(base).first + strings
+            assertEquals("Parity mismatch in $file", emptyList<String>(), validateTranslationParity(enMap.keys, effective))
+        }
 
-        // Every template value must be empty ("")
         tplMap.forEach { (key, value) ->
             assertEquals("Template key '$key' must be empty", "", value)
         }
@@ -191,7 +194,8 @@ class TranslationValidationTest {
                 )
             }
 
-            if (entries.isEmpty()) continue
+            // Regional files can inherit either half of a number sentence from their base locale.
+            if (file.name != "strings.template.xml") continue
             entries.keys.filter { it.endsWith("_before_number") }.forEach { before ->
                 val after = before.removeSuffix("_before_number") + "_after_number"
                 assertTrue("Missing '$after' in ${file.path}", after in entries)

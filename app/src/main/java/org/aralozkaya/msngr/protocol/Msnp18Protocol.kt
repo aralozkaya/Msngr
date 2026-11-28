@@ -9,6 +9,7 @@ import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.enums.Presence
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -475,21 +476,6 @@ object Msnp18Protocol {
         return headers + body
     }
 
-    private fun String.escapeXml(): String = buildString(length) {
-        this@escapeXml.forEach { character ->
-            append(
-                when (character) {
-                    '&' -> "&amp;"
-                    '<' -> "&lt;"
-                    '>' -> "&gt;"
-                    '\"' -> "&quot;"
-                    '\'' -> "&apos;"
-                    else -> character
-                },
-            )
-        }
-    }
-
     // Servers also escape punctuation numerically (for example [c&#x3D;04]). Decode
     // one XML layer only, so escaped literal entity text stays literal.
     private fun String.unescapeXml(): String = XML_ENTITY.replace(this) { match ->
@@ -571,6 +557,7 @@ object MsnpFrameCodec {
             append(command.verb.uppercase())
             command.transactionId?.let { append(' ').append(it) }
             command.parameters.forEach { append(' ').append(it) }
+            require('\r' !in this && '\n' !in this) { "MSNP command header contains a line break." }
             append("\r\n")
         }.toByteArray(StandardCharsets.UTF_8)
         return command.payload?.let(line::plus) ?: line
@@ -595,28 +582,29 @@ object MsnpFrameCodec {
 
     private val NON_TRANSACTIONAL_NUMERIC_VERBS = setOf("RNG", "NOT", "QNG")
 
-    fun expectedPayloadLength(command: MsnpCommand): Int =
-        if (command.verb in setOf(
-                "MSG",
-                "UUM",
-                "UBM",
-                "UUX",
-                "UBX",
-                "UBN",
-                "ADL",
-                "RML",
-                "NOT",
-                "GCF",
-                "SDG",
-                "NFY",
-                "PUT",
-            )
-        ) {
-            command.parameters.lastOrNull()?.toIntOrNull() ?: 0
-        } else {
-            0
+    private val PAYLOAD_VERBS = setOf(
+        "MSG", "UUM", "UBM", "UUX", "UBX", "UBN", "ADL", "RML", "NOT", "GCF", "SDG", "NFY", "PUT",
+    )
+
+    fun expectedPayloadLength(command: MsnpCommand): Int {
+        if (command.verb !in PAYLOAD_VERBS) return 0
+        val field = command.parameters.lastOrNull() ?: return 0
+        // Some responses to payload commands have a status token (e.g. ADL OK).
+        val length = field.toLongOrNull() ?: run {
+            require(field.firstOrNull()?.isDigit() != true && !field.startsWith('-') && !field.startsWith('+')) {
+                "Invalid MSNP payload length."
+            }
+            return 0
         }
+        require(length in 0..MAX_PAYLOAD_BYTES.toLong()) { "Invalid MSNP payload length." }
+        return length.toInt()
+    }
+
+    private const val MAX_PAYLOAD_BYTES = 16 * 1024 * 1024
 }
+
+/** The transport or conversation failed before the outgoing message could be written. */
+internal class MessageNotSubmittedException(message: String?, cause: Throwable? = null) : IllegalStateException(message, cause)
 
 /** Injectable MSNP command transport used by notification and switchboard connections. */
 interface MsnpTransport : Closeable {
@@ -628,41 +616,51 @@ interface MsnpTransport : Closeable {
 
 /** Incremental decoder for TCP reads where headers and payloads can be split arbitrarily. */
 class MsnpFrameDecoder {
-    private var buffer = byteArrayOf()
-    private var pending: Pair<MsnpCommand, Int>? = null
+    private val header = ByteArrayOutputStream()
+    private var lastWasCr = false
+    private var pending: Payload? = null
 
-    fun feed(bytes: ByteArray): List<MsnpCommand> {
-        buffer += bytes
+    private class Payload(val command: MsnpCommand, val length: Int) {
+        val bytes = ByteArrayOutputStream(minOf(length, 8192))
+    }
+
+    fun feed(bytes: ByteArray): List<MsnpCommand> = feed(bytes, bytes.size)
+
+    internal fun feed(bytes: ByteArray, count: Int): List<MsnpCommand> {
+        require(count in 0..bytes.size)
         val result = mutableListOf<MsnpCommand>()
-        while (true) {
-            val waiting = pending
-            if (waiting != null) {
-                if (buffer.size < waiting.second) break
-                result += waiting.first.copy(payload = buffer.copyOfRange(0, waiting.second))
-                buffer = buffer.copyOfRange(waiting.second, buffer.size)
-                pending = null
+        var offset = 0
+        while (offset < count) {
+            val payload = pending
+            if (payload != null) {
+                val take = minOf(count - offset, payload.length - payload.bytes.size())
+                payload.bytes.write(bytes, offset, take)
+                offset += take
+                if (payload.bytes.size() == payload.length) {
+                    result += payload.command.copy(payload = payload.bytes.toByteArray())
+                    pending = null
+                }
                 continue
             }
 
-            val lineEnd = buffer.indexOfCrlf()
-            if (lineEnd < 0) break
-            val line = String(buffer.copyOfRange(0, lineEnd), StandardCharsets.UTF_8)
-            buffer = buffer.copyOfRange(lineEnd + 2, buffer.size)
-            val command = MsnpFrameCodec.decodeHeader(line)
-            val payloadLength = MsnpFrameCodec.expectedPayloadLength(command)
-            if (payloadLength == 0) result += command
-            else pending = command to payloadLength
+            val next = bytes[offset++].toInt()
+            if (lastWasCr && next == '\n'.code) {
+                val command = MsnpFrameCodec.decodeHeader(header.toString(Charsets.UTF_8.name()))
+                header.reset()
+                lastWasCr = false
+                val length = MsnpFrameCodec.expectedPayloadLength(command)
+                if (length == 0) result += command else pending = Payload(command, length)
+            } else {
+                require(header.size() < MAX_HEADER_BYTES) { "MSNP command header is too long." }
+                header.write(next)
+                lastWasCr = next == '\r'.code
+            }
         }
         return result
     }
 
-    private fun ByteArray.indexOfCrlf(): Int {
-        for (index in 0 until size - 1) {
-            if (this[index] == '\r'.code.toByte() && this[index + 1] == '\n'.code.toByte()) {
-                return index
-            }
-        }
-        return -1
+    private companion object {
+        const val MAX_HEADER_BYTES = 64 * 1024
     }
 }
 
@@ -699,7 +697,7 @@ class Msnp18SocketTransport : MsnpTransport {
     }
 
     override suspend fun send(command: MsnpCommand) = withContext(Dispatchers.IO) {
-        val stream = checkNotNull(output) { "MSNP socket is not connected" }
+        val stream = output ?: throw MessageNotSubmittedException("MSNP socket is not connected")
         trace("SEND ${command.verb} payload=${command.payload?.size ?: 0}")
         stream.write(MsnpFrameCodec.encode(command))
         stream.flush()
@@ -715,7 +713,7 @@ class Msnp18SocketTransport : MsnpTransport {
         while (true) {
             val count = stream.read(readBuffer)
             check(count >= 0) { "MSNP socket closed" }
-            val decoded = decoder.feed(readBuffer.copyOf(count))
+            val decoded = decoder.feed(readBuffer, count)
             if (decoded.isNotEmpty()) {
                 decodedQueue.addAll(decoded.drop(1))
                 trace("RECV ${decoded.first().verb} payload=${decoded.first().payload?.size ?: 0}")

@@ -367,9 +367,8 @@ object MsnInkCodec {
         val cursor = MbeCursor(bytes, 0)
         val version = cursor.readMbe()
         if (version != 0) return null
-        val streamLen = cursor.readMbe()
-        val streamEnd = (cursor.pos + streamLen).coerceAtMost(bytes.size)
-        if (streamLen <= 0 || cursor.pos >= streamEnd) return null
+        val streamEnd = cursor.readBlockEnd(bytes.size)
+        if (cursor.pos == streamEnd) return null
 
         data class ParsedDa(
             val colorRgb: Int = 0x000000,
@@ -401,6 +400,7 @@ object MsnInkCodec {
         var headerWidthPx = 0f
         var headerHeightPx = 0f
         val rawStrokes = mutableListOf<RawStroke>()
+        var totalPoints = 0
 
         fun parseDaBlock(endPos: Int): ParsedDa {
             var colorRgb = 0x000000
@@ -424,13 +424,11 @@ object MsnInkCodec {
                     }
                     DA_TAG_RASTER_OPERATION -> {
                         // RasterOperation in ISF is stored as a compressed byte/short block or MBE.
-                        val len = cursor.readMbe()
-                        cursor.pos = (cursor.pos + len).coerceAtMost(endPos)
+                        cursor.pos = cursor.readBlockEnd(endPos)
                     }
                     else -> {
                         if (propTag >= 0x40) {
-                            val len = cursor.readMbe()
-                            cursor.pos = (cursor.pos + len).coerceAtMost(endPos)
+                            cursor.pos = cursor.readBlockEnd(endPos)
                         } else {
                             cursor.readMbe()
                         }
@@ -493,16 +491,13 @@ object MsnInkCodec {
                     inkRectBottom = cursor.readSignedMbe()
                 }
                 TAG_DRAWING_ATTRIBUTES_BLOCK -> {
-                    val blockLen = cursor.readMbe()
-                    val blockEnd = (cursor.pos + blockLen).coerceAtMost(streamEnd)
+                    val blockEnd = cursor.readBlockEnd(streamEnd)
                     daList.add(parseDaBlock(blockEnd))
                 }
                 TAG_DRAWING_ATTRIBUTES_TABLE -> {
-                    val tableLen = cursor.readMbe()
-                    val tableEnd = (cursor.pos + tableLen).coerceAtMost(streamEnd)
+                    val tableEnd = cursor.readBlockEnd(streamEnd)
                     while (cursor.pos < tableEnd) {
-                        val entryLen = cursor.readMbe()
-                        val entryEnd = (cursor.pos + entryLen).coerceAtMost(tableEnd)
+                        val entryEnd = cursor.readBlockEnd(tableEnd)
                         daList.add(parseDaBlock(entryEnd))
                     }
                     cursor.pos = tableEnd
@@ -520,8 +515,7 @@ object MsnInkCodec {
                     currentTransform = t
                 }
                 TAG_TRANSFORM_TABLE -> {
-                    val tableLen = cursor.readMbe()
-                    val tableEnd = (cursor.pos + tableLen).coerceAtMost(streamEnd)
+                    val tableEnd = cursor.readBlockEnd(streamEnd)
                     while (cursor.pos < tableEnd) {
                         val subTag = cursor.readMbe()
                         transforms.add(readTransformTag(subTag))
@@ -546,8 +540,7 @@ object MsnInkCodec {
                 TAG_NO_Y,
                 -> Unit
                 TAG_HIMETRIC_SIZE -> {
-                    val blockLen = cursor.readMbe()
-                    val blockEnd = (cursor.pos + blockLen).coerceAtMost(streamEnd)
+                    val blockEnd = cursor.readBlockEnd(streamEnd)
                     if (cursor.pos < blockEnd) {
                         val w = cursor.readSignedMbe()
                         val h = if (cursor.pos < blockEnd) cursor.readSignedMbe() else 0
@@ -559,10 +552,11 @@ object MsnInkCodec {
                     cursor.pos = blockEnd
                 }
                 TAG_STROKE -> {
-                    val strokeLen = cursor.readMbe()
-                    val strokeEnd = (cursor.pos + strokeLen).coerceAtMost(streamEnd)
+                    val strokeEnd = cursor.readBlockEnd(streamEnd)
                     val numPoints = cursor.readMbe()
                     if (numPoints in 1..100_000 && cursor.pos < strokeEnd) {
+                        totalPoints += numPoints
+                        require(totalPoints <= 250_000) { "Too many points in ISF drawing." }
                         val xs = decompressPacketData(bytes, cursor, strokeEnd, numPoints)
                         val ys = if (cursor.pos < strokeEnd) {
                             decompressPacketData(bytes, cursor, strokeEnd, numPoints)
@@ -574,8 +568,7 @@ object MsnInkCodec {
                     cursor.pos = strokeEnd
                 }
                 else -> {
-                    val blockLen = cursor.readMbe()
-                    cursor.pos = (cursor.pos + blockLen).coerceAtMost(streamEnd)
+                    cursor.pos = cursor.readBlockEnd(streamEnd)
                 }
             }
         }
@@ -770,10 +763,11 @@ object MsnInkCodec {
         reader: BitStreamReader,
         baa: IntArray,
         mins: LongArray,
+        allowEscape: Boolean = true,
     ): Pair<Int, Int> {
         var prefix = 0
-        while (!reader.isAtEnd() && reader.readBit() == 1) {
-            prefix++
+        while (reader.readBit() == 1) {
+            require(++prefix <= baa.size) { "Invalid ISF Huffman prefix." }
         }
         if (prefix == 0) return 0 to 0
         if (prefix < baa.size) {
@@ -783,12 +777,10 @@ object MsnInkCodec {
             val mag = (raw ushr 1) + mins[prefix]
             return (if (neg) -mag.toInt() else mag.toInt()) to 0
         }
-        if (prefix == baa.size) {
-            val (extra, _) = huffDecodeOne(reader, baa, mins)
-            val (data, _) = huffDecodeOne(reader, baa, mins)
-            return data to extra
-        }
-        error("Invalid ISF Huffman prefix length: $prefix")
+        require(allowEscape) { "Nested ISF Huffman escape." }
+        val (extra, _) = huffDecodeOne(reader, baa, mins, allowEscape = false)
+        val (data, _) = huffDecodeOne(reader, baa, mins, allowEscape = false)
+        return data to extra
     }
 
     private fun extractGifCommentExtensions(bytes: ByteArray): List<ByteArray> {
@@ -931,15 +923,21 @@ object MsnInkCodec {
 
     private class MbeCursor(val bytes: ByteArray, var pos: Int) {
         fun readMbe(): Int {
-            var result = 0L
-            var shift = 0
-            while (pos < bytes.size && shift < 35) {
+            var result = 0
+            for (shift in 0..28 step 7) {
+                require(pos < bytes.size) { "Truncated ISF integer." }
                 val b = bytes[pos++].toInt() and 0xFF
-                result = result or ((b and 0x7F).toLong() shl shift)
-                if ((b and 0x80) == 0) break
-                shift += 7
+                require(shift < 28 || b <= 15) { "ISF integer exceeds 32 bits." }
+                result = result or ((b and 0x7F) shl shift)
+                if (b and 0x80 == 0) return result
             }
-            return result.toInt()
+            error("Invalid ISF integer.")
+        }
+
+        fun readBlockEnd(limit: Int): Int {
+            val length = readMbe()
+            require(length in 0..(limit - pos)) { "Invalid ISF block length." }
+            return pos + length
         }
 
         fun readSignedMbe(): Int {
@@ -958,7 +956,7 @@ object MsnInkCodec {
                 ((bytes[pos + 2].toInt() and 0xFF) shl 16) or
                 ((bytes[pos + 3].toInt() and 0xFF) shl 24)
             pos += 4
-            return Float.fromBits(bits)
+            return Float.fromBits(bits).also { require(it.isFinite()) { "Invalid ISF transform." } }
         }
     }
 
@@ -970,10 +968,8 @@ object MsnInkCodec {
         private var bytePos = startPos
         private var bitIdx = 0
 
-        fun isAtEnd(): Boolean = bytePos >= limit
-
         fun readBit(): Int {
-            if (bytePos >= limit) return 0
+            require(bytePos < limit) { "Truncated ISF stroke packet." }
             val bit = (bytes[bytePos].toInt() ushr (7 - bitIdx)) and 1
             bitIdx++
             if (bitIdx == 8) {

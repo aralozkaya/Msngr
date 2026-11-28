@@ -19,6 +19,11 @@ object NotificationChannels {
 
     val userConfigurable = listOf(MESSAGES, NUDGES, CONTACT_SIGNED_IN, OFFLINE_MESSAGES, CONTACT_REQUESTS, GROUP_INVITATIONS, APP_UPDATES)
 
+    internal fun nudgeChannel(id: String?): String = when (id) {
+        NUDGES, CONTACT_SIGNED_IN -> id
+        else -> MESSAGES
+    }
+
     fun createAll(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)

@@ -80,6 +80,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
+import org.aralozkaya.msngr.data.CredentialsRejectedException
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.components.CustomServerDialog
@@ -133,9 +134,8 @@ class LoginActivity : MsngrActivity() {
             },
         )
         val shortcutAccount = intent.getStringExtra(EXTRA_SHORTCUT_ACCOUNT)
-        val activeAccount = runCatching { appContainer.messengerRepository.profile.value.email }
-            .getOrDefault("")
-        if (shortcutAccount == null || shortcutAccount.equals(activeAccount, ignoreCase = true)) {
+        val activeAccount = appContainer.currentRepository?.signedInAccountIdentity
+        if (shortcutAccount != null && shortcutAccount == activeAccount?.storageKey) {
             intent.getStringExtra(EXTRA_OPEN_CONTACT_ID)
                 ?.takeIf(String::isNotBlank)
                 ?.let { contactId -> startActivity(ChatActivity.createIntent(this, contactId)) }
@@ -193,7 +193,11 @@ class LoginActivity : MsngrActivity() {
             context: Context,
             contactId: String,
             contactName: String,
+            accountKey: String?,
         ): Intent = createIntent(context, allowAutomaticSignIn = true).apply {
+            putExtra(EXTRA_SHORTCUT_ACCOUNT, accountKey)
+            data = android.net.Uri.Builder().scheme("msngr").authority("conversation")
+                .appendPath(accountKey.orEmpty()).appendPath(contactId).build()
             putExtra(EXTRA_OPEN_CONTACT_ID, contactId)
             putExtra(EXTRA_OPEN_CONTACT_NAME, contactName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -201,14 +205,14 @@ class LoginActivity : MsngrActivity() {
 
         internal fun createRecentChatShortcutIntent(
             context: Context,
-            accountEmail: String,
+            accountKey: String,
             contact: RecentChatShortcut,
             action: String,
         ): Intent = createIntent(context, allowAutomaticSignIn = true).apply {
             this.action = action
             putExtra(EXTRA_OPEN_CONTACT_ID, contact.contactId)
             putExtra(EXTRA_OPEN_CONTACT_NAME, contact.label)
-            putExtra(EXTRA_SHORTCUT_ACCOUNT, accountEmail)
+            putExtra(EXTRA_SHORTCUT_ACCOUNT, accountKey)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
     }
@@ -333,24 +337,19 @@ private fun LoginReadyRoute(
         val resolved = ServerPresets.resolveForProvider(selectedProvider, customServers)
         val mockServerSelected = useMockServer
         val requestedPresence = loginPresence
+        val identity = AccountIdentity.forServer(normalizedEmail, resolved, mockServerSelected)
+        val password = passwordState.text.toString()
         submitting = true
         scope.launch {
-            val repository = appContainer.repositoryFor(mockServerSelected)
-            repository.signIn(
-                SignInRequest(
-                    email = normalizedEmail,
-                    password = passwordState.text.toString(),
-                    serverConfig = resolved,
-                    initialPresence = requestedPresence,
-                ),
-            ).onSuccess { serverProfile ->
-                if (isAutomatic) {
-                    SessionPrefs.activateRememberedSession(context)
-                } else {
+            val result = if (isAutomatic) {
+                context.restoreRememberedRepository(SessionPrefs.readLoginSnapshot(context, identity)).map { Unit }
+            } else {
+                val repository = appContainer.repositoryFor(mockServerSelected)
+                repository.signIn(SignInRequest(normalizedEmail, password, resolved, requestedPresence)).map { serverProfile ->
                     SessionPrefs.completeLogin(
                         context = context,
                         email = normalizedEmail,
-                        password = passwordState.text.toString(),
+                        password = password,
                         savePassword = rememberCredentials,
                         provider = selectedProvider,
                         customServers = customServers,
@@ -358,16 +357,14 @@ private fun LoginReadyRoute(
                         automaticSignIn = automaticSignInEnabled,
                         loginPresence = requestedPresence,
                     )
+                    context.restoreSignedInProfile(repository, serverProfile, serverProfile.presence, identity)
                 }
-                context.restoreSignedInProfile(
-                    repository = repository,
-                    serverProfile = serverProfile,
-                    presence = serverProfile.presence,
-                )
+            }
+            result.onSuccess {
                 onLoginComplete()
             }.onFailure { error ->
-                if (isAutomatic) {
-                    SessionPrefs.invalidateRememberedCredentials(context)
+                if (isAutomatic && error is CredentialsRejectedException) {
+                    SessionPrefs.invalidateRememberedCredentials(context, identity)
                     passwordState.setTextAndPlaceCursorAtEnd("")
                     automaticSignInEnabled = false
                 }

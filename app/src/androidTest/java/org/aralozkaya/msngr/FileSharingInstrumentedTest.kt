@@ -401,7 +401,7 @@ class FileSharingInstrumentedTest {
         compose.onNodeWithText("Accept").performClick()
         compose.runOnIdle { assertTrue(accepted) }
         compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("File transfer cancelled").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.file_sharing_canceled)).assertIsDisplayed()
         compose.onNodeWithText("Accept").assertDoesNotExist()
     }
 

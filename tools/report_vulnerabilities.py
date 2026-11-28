@@ -1,6 +1,7 @@
 """Make the scanner's artifact readable in the GitHub job summary."""
 import json
 import os
+import tomllib
 from pathlib import Path
 
 report = Path("app/build/reports/dependencies/vulnerabilities.json")
@@ -26,9 +27,10 @@ for result in data.get("results", []):
                 lines.append(f"  - [{identifier}](https://osv.dev/vulnerability/{identifier})")
 lines += ["", f"{found} package(s) have reported advisories.", "",
           "The Ruffle inventory covers the selected WASM target and its build dependencies."]
-inventory = json.loads(Path("third_party/ruffle-build/inventory.json").read_text())
-if any(p["package"].get("name") == "ttf-parser" for group in inventory["results"] for p in group["packages"]):
-    lines += ["", "Maintenance warning: [RUSTSEC-2026-0192](https://rustsec.org/advisories/RUSTSEC-2026-0192.html) marks ttf-parser as unmaintained. This informational notice does not block releases; other advisories still do."]
+policy = tomllib.loads(Path(".github/osv-scanner.toml").read_text(encoding="utf-8"))
+for advisory in policy.get("IgnoredVulns", []):
+    identifier = advisory["id"]
+    lines += ["", f"Configured exception [{identifier}](https://osv.dev/vulnerability/{identifier}) — {advisory['reason']}"]
 summary = "\n".join(lines) + "\n"
 if destination := os.environ.get("GITHUB_STEP_SUMMARY"):
     with Path(destination).open("a", encoding="utf-8") as stream:

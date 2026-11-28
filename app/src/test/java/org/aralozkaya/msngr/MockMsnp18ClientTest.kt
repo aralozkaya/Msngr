@@ -1,15 +1,23 @@
 package org.aralozkaya.msngr
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.aralozkaya.msngr.data.MockMsnp18Client
 import org.aralozkaya.msngr.data.MockServerData
+import org.aralozkaya.msngr.data.PhotoShareStatus
+import org.aralozkaya.msngr.data.PhotoToShare
 import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.enums.Presence
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.Executors
 
 class MockMsnp18ClientTest {
     private val serverConfig = ServerPresets.resolveForProvider(
@@ -147,6 +155,62 @@ class MockMsnp18ClientTest {
         assertEquals("[b][c=4]hello[/c][/b]", sent.text)
         assertEquals("hello", sent.text.messengerPlusPlainText())
         client.close()
+    }
+
+    @Test
+    fun switchingAccountsAsTypingEndsDiscardsTheOldReply() = runBlocking {
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { worker ->
+            val client = MockMsnp18Client(scope = CoroutineScope(worker), signInDelayMillis = 0)
+            try {
+                client.signIn(request("first@example.test", "secret")).getOrThrow()
+                val switched = async(Dispatchers.Unconfined) {
+                    withTimeout(5_000) { client.typing.first { it["selin"] == false } }
+                    client.signIn(request("second@example.test", "secret")).getOrThrow()
+                }
+                client.sendMessage("selin", "First account")
+                switched.await()
+                withContext(worker) {
+                    assertTrue(client.messages.value.isEmpty())
+                    assertTrue(client.typing.value.isEmpty())
+                    assertEquals(MockServerData.contacts(), client.contacts.value)
+                }
+            } finally {
+                client.close()
+            }
+        }
+    }
+
+    @Test
+    fun staleStopAndNewPhotosPreserveProgressForTheActiveShare() = runBlocking {
+        val directory = createTestTempDir("mock-photo-batches")
+        val client = MockMsnp18Client(
+            scope = this, signInDelayMillis = 0, photoCacheDirectory = directory, transferStepDelayMillis = 20,
+        )
+        fun photo(name: String) = PhotoToShare(name, "hash-$name", byteArrayOf(1), byteArrayOf(1, 2, 3))
+        try {
+            client.signIn(request(MockServerData.ACCOUNT_EMAIL, MockServerData.ACCOUNT_PASSWORD)).getOrThrow()
+            client.sharePhotos("selin", listOf(photo("old"))).getOrThrow()
+            val oldId = client.photoShares.value.getValue("selin").id
+            client.stopPhotos("selin", oldId).getOrThrow()
+
+            client.sharePhotos("selin", listOf(photo("first"))).getOrThrow()
+            client.stopPhotos("selin", oldId).getOrThrow()
+            withTimeout(3_000) {
+                client.photoShares.first { it["selin"]?.status == PhotoShareStatus.Active }
+            }
+            assertTrue(!client.photoShares.value.getValue("selin").photos.single().downloadedByPeer)
+            client.sharePhotos("selin", listOf(photo("second"))).getOrThrow()
+            val completed = withTimeout(3_000) {
+                client.photoShares.first { it.getValue("selin").photos.all { photo -> photo.downloadedByPeer } }
+            }.getValue("selin")
+            assertEquals(listOf("first", "second"), completed.photos.map { it.name })
+            assertEquals(completed.totalOutgoingBytes, completed.sharedOutgoingBytes)
+            client.close()
+            assertTrue(directory.listFiles()!!.isEmpty())
+        } finally {
+            client.close()
+            directory.deleteRecursively()
+        }
     }
 
     private fun request(

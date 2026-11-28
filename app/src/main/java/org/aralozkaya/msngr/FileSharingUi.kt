@@ -5,10 +5,8 @@ package org.aralozkaya.msngr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -331,8 +329,8 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
             }
         }
     }
-    val savePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        if (allowed) requestSave() else error = resources.getNumberSentence(R.string.transfer_storage_access_photos_before_number, 9, R.string.transfer_storage_access_photos_after_number)
+    val savePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (hasDefaultTransferStorageAccess(context)) requestSave() else error = resources.getNumberSentence(R.string.transfer_storage_access_photos_before_number, 9, R.string.transfer_storage_access_photos_after_number)
     }
     val requestedOriginal = share?.photos?.firstOrNull { it.id == savePhotoId }
     LaunchedEffect(requestedOriginal?.originalPath, requestedOriginal?.originalError, requestedOriginal?.originalPending, saveRequested, requestingOriginal) {
@@ -493,7 +491,7 @@ internal fun PhotoSharingHost(contactId: String, share: PhotoShare?,
                 if (selected.localPath != null) FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {
                     savePhotoId = selected.id; savedPhotoId = null
                     if (TransferPrefs.read(context).photoTree != null || hasDefaultTransferStorageAccess(context)) requestSave()
-                    else savePermission.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    else savePermission.launch(legacyTransferStoragePermissions)
                 }, enabled = !selected.originalPending && !saveRequested) {
                     Text(stringResource(if (selected.originalPending || saveRequested) R.string.photo_sharing_saving else if (savedPhotoId == selected.id || saveState.uri != null) R.string.file_sharing_saved else R.string.photo_sharing_save_photo))
                 }
@@ -541,9 +539,7 @@ internal fun prepareSharedPhotos(context: Context, uris: List<Uri>): List<PhotoT
 }
 
 internal fun stageSharedFile(context: Context, uri: Uri): Pair<File, String> {
-    val name = runCatching { context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-        if (it.moveToFirst()) it.getString(0) else null
-    } }.getOrNull() ?: uri.lastPathSegment ?: "shared-file"
+    val name = context.queryDocumentDisplayName(uri) ?: "shared-file"
     require(MsnFileContext.validName(name)) { context.getString(R.string.file_sharing_unsupported_name) }
     require(!MsnFileContext.isExecutable(name)) { context.getString(R.string.file_sharing_executable_unsupported) }
     val area = File(context.cacheDir, "outgoing-files").apply { mkdirs() }
@@ -566,12 +562,9 @@ internal fun prepareSharedPhoto(context: Context, uri: Uri): PhotoToShare {
     val (file, name) = stageSharedFile(context, uri)
     var keepOriginal = false
     try {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { context.getString(R.string.photo_sharing_unsupported_image) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
-        val decoded = requireNotNull(BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample }))
+        val decoded = requireNotNull(decodeSharedPreview(file.absolutePath)) {
+            context.getString(R.string.photo_sharing_unsupported_image)
+        }
         val bitmap = try { orientSharedPhoto(file, decoded) } catch (failure: Exception) { decoded.recycle(); throw failure }
         if (bitmap !== decoded) decoded.recycle()
         fun scaled(max: Int): ByteArray {
@@ -580,26 +573,26 @@ internal fun prepareSharedPhoto(context: Context, uri: Uri): PhotoToShare {
             return try { ByteArrayOutputStream().use { output -> check(resized.compress(Bitmap.CompressFormat.JPEG, 85, output)); output.toByteArray() } }
             finally { if (resized !== bitmap) resized.recycle() }
         }
-        val hash = MessageDigest.getInstance("SHA-1").apply { file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024); while (true) { val n = input.read(buffer); if (n < 0) break; update(buffer, 0, n) }
-        } }.digest()
-        return try { PhotoToShare(name, MsnBase64.encode(hash), scaled(96), scaled(1600), file.absolutePath).also { keepOriginal = true } } finally { bitmap.recycle() }
+        try {
+            val digest = MessageDigest.getInstance("SHA-1")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count == -1) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            val photo = PhotoToShare(name, MsnBase64.encode(digest.digest()), scaled(96), scaled(1600), file.absolutePath)
+            keepOriginal = true
+            return photo
+        } finally {
+            bitmap.recycle()
+        }
     } finally { if (!keepOriginal) file.delete() }
 }
 
 private fun orientSharedPhoto(file: File, source: Bitmap): Bitmap {
     val orientation = runCatching { ExifInterface(file.absolutePath).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-    val matrix = Matrix().apply {
-        when (orientation) {
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
-            ExifInterface.ORIENTATION_TRANSPOSE -> { setRotate(90f); postScale(-1f, 1f) }
-            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
-            ExifInterface.ORIENTATION_TRANSVERSE -> { setRotate(270f); postScale(-1f, 1f) }
-            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(270f)
-            else -> return source
-        }
-    }
-    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+    return source.withExifOrientation(orientation)
 }

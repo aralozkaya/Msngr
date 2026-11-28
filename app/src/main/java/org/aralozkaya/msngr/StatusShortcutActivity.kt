@@ -60,11 +60,8 @@ class StatusShortcutActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setFinishOnTouchOutside(true)
         AppShortcuts.reportStatusUsed(this)
-        val initialProfile = runCatching {
-            appContainer.messengerRepository
-                .takeIf { it.hasSignedInSession }
-                ?.profile?.value
-        }.getOrNull() ?: SessionPrefs.readUserProfile(this)
+        val initialProfile = appContainer.currentRepository?.takeIf { it.hasSignedInSession }?.profile?.value
+            ?: SessionPrefs.readUserProfile(this)
         setContent {
             MsngrTheme(fillWindowSurface = false) {
                 var applying by remember { mutableStateOf(false) }

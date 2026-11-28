@@ -30,23 +30,14 @@ internal data class DisplayPictureSelection(
 ) {
     val requiresResize: Boolean get() = bytes.size > DisplayPictureLimits.MAX_BYTES ||
         width.toLong() * height > DisplayPictureLimits.MAX_PIXELS
-    val dataUri: String get() = "data:${format.mimeType};base64,${org.aralozkaya.msngr.protocol.MsnBase64.encode(bytes)}"
+    val dataUri: String get() = bytes.displayPictureDataUri()
 }
 
 internal fun Context.readProfilePictureBytes(uri: String): ByteArray {
     uri.inlineImageBytes()?.let { return it }
     return requireNotNull(openDisplayPictureInputStream(uri)) { getString(R.string.display_picture_select_cant_open) }.use { input ->
-        ByteArrayOutputStream().use { output ->
-            val buffer = ByteArray(8192)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                require(count <= DisplayPictureLimits.MAX_SOURCE_BYTES - output.size()) {
-                    getNumberSentence(R.string.display_picture_select_max_mib_before_number, 32, R.string.display_picture_select_max_mib_after_number)
-                }
-                output.write(buffer, 0, count)
-            }
-            output.toByteArray()
+        input.readBytesBounded(DisplayPictureLimits.MAX_SOURCE_BYTES) {
+            getNumberSentence(R.string.display_picture_select_max_mib_before_number, 32, R.string.display_picture_select_max_mib_after_number)
         }
     }
 }

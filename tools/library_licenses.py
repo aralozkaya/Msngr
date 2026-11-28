@@ -17,7 +17,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
-from ruffle_build import packages_from_metadata
+from ruffle_build import dependency_identities, web_build_packages
+from setup_dependencies import pinned_commit, verify_checkout
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "app/src/main/assets/licenses"
@@ -37,32 +38,23 @@ def notice_files(directory):
                   and p.suffix.lower() not in (".json", ".toml"))
 
 
-def zip_write(archive, name, data):
+def zip_write(archive, name, data, *, mode=0o100644):
     info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
     info.compress_type = zipfile.ZIP_DEFLATED
-    info.external_attr = 0o100644 << 16
+    info.create_system = 3  # Unix file modes are meaningful to extractors on every host.
+    info.external_attr = mode << 16
     archive.writestr(info, data)
 
 
 def generate(android, metadata, ruffle_source, rust_notices, output=ASSETS):
     runtime = json.loads((ROOT / "third_party/ruffle-runtime.json").read_text())
-    lock = tomllib.loads((ROOT / "third_party/ruffle-build/Cargo.lock").read_text())
-    if packages_from_metadata(metadata, lock) != json.loads((ROOT / "third_party/ruffle-build/inventory.json").read_text()):
+    lock_name = "third_party/ruffle-build/Cargo.lock" if runtime.get("sourceBuild") else "third_party/ruffle/Cargo.lock"
+    lock = tomllib.loads((ROOT / lock_name).read_text(encoding="utf-8"))
+    selected = web_build_packages(metadata)
+    if dependency_identities(selected, lock) != json.loads((ROOT / "third_party/ruffle-build/inventory.json").read_text()):
         raise ValueError("Ruffle metadata differs from the pinned inventory")
     if subprocess.check_output(["git", "-C", str(ruffle_source), "rev-parse", "HEAD"], text=True).strip() != runtime["sourceCommit"]:
         raise ValueError("Ruffle source revision mismatch")
-    packages = {p["id"]: p for p in metadata["packages"]}
-    nodes = {n["id"]: n for n in metadata["resolve"]["nodes"]}
-    selected = set()
-    def visit(identifier):
-        if identifier in selected:
-            return
-        selected.add(identifier)
-        for dependency in nodes[identifier]["deps"]:
-            if any(k["kind"] in (None, "build") for k in dependency["dep_kinds"]):
-                visit(dependency["pkg"])
-    visit(next(k for k, p in packages.items() if p["name"] == "ruffle_web"))
-
     documents, components = {}, []
     def document(value):
         key = sha(value.encode("utf-8"))
@@ -104,10 +96,12 @@ def generate(android, metadata, ruffle_source, rust_notices, output=ASSETS):
                   "https://maven.google.com/" if item["group"].startswith("androidx.") else "https://repo.maven.apache.org/maven2/",
                   notices, ecosystem="Maven", variants=sorted(item['variants']), artifactSha256=sha(Path(item["file"]).read_bytes()))
 
+    upstream = ROOT / "third_party/libsiren"
+    siren_commit = pinned_commit(ROOT, "third_party/libsiren")
+    verify_checkout(ROOT, "third_party/libsiren", siren_commit)
     source_buffer = io.BytesIO()
     with zipfile.ZipFile(source_buffer, "w") as sources:
-        for identifier in sorted(selected):
-            package = packages[identifier]
+        for package in selected:
             directory = Path(package["manifest_path"]).parent
             license = package.get("license")
             notices = []
@@ -138,7 +132,6 @@ def generate(android, metadata, ruffle_source, rust_notices, output=ASSETS):
             component(f"{package['name']} {package['version']}", license, source, notices,
                       ecosystem="Cargo", authors=package.get("authors", []))
 
-        upstream = ROOT / "third_party/libsiren"
         for name in subprocess.check_output(["git", "-C", str(upstream), "ls-files"], text=True).splitlines():
             zip_write(sources, "libsiren/" + name, (upstream / name).read_bytes())
         for name in ("third_party/patches/libsiren-hardening.patch", "app/src/main/cpp/siren_jni.c", "app/src/main/cpp/CMakeLists.txt"):
@@ -175,7 +168,7 @@ def generate(android, metadata, ruffle_source, rust_notices, output=ASSETS):
     component('Rust standard library ' + version, 'MIT OR Apache-2.0 (bundled notices retain their terms)',
               'https://github.com/rust-lang/rust/tree/' + version + '/library', [document(''.join(rust.parts))])
     component("Dorkbox CabParser e81fc32929ab7ce3bb995f8c7279101365137d29", "Apache-2.0", "https://github.com/dorkbox/CabParser", [apache, document("Copyright 2012 Dorkbox LLC.\nModified for Msngr: package relocation, local interface and exception shims.\n")])
-    component("libsiren c7724c03d4a6daf4d6dff9e917c14ce5071dce66", "LGPL-2.1-or-later", "https://github.com/kakaroto/libsiren", [document(text(upstream / "COPYING")), document(text(upstream / "AUTHORS"))])
+    component("libsiren " + siren_commit, "LGPL-2.1-or-later", "https://github.com/kakaroto/libsiren", [document(text(upstream / "COPYING")), document(text(upstream / "AUTHORS"))])
     unicode = (ROOT / "app/src/main/java/org/aralozkaya/msngr/UnicodeEmoji.kt").read_text(encoding="utf-8").split("/*\n", 1)[1].split("*/", 1)[0]
     component("Unicode emoji property data 18.0.0", "Unicode-3.0", "https://www.unicode.org/Public/18.0.0/ucd/emoji/emoji-data.txt", [document(unicode)])
 
@@ -216,7 +209,7 @@ Alternative licenses are alternatives, not additional restrictions; self_cell us
     (output / "index.html").write_text(page, encoding="utf-8", newline="\n")
     audit = dict(ruffleSourceCommit=runtime["sourceCommit"],
                  ruffleInventorySha256=sha((ROOT / "third_party/ruffle-build/inventory.json").read_bytes()),
-                 libsirenCommit=subprocess.check_output(["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True).strip(),
+                 libsirenCommit=siren_commit,
                  libsirenPatchSha256=sha((ROOT / "third_party/patches/libsiren-hardening.patch").read_bytes()),
                  inputs={name:sha((ROOT/name).read_bytes().replace(b'\r\n', b'\n')) for name in (
                      'COPYING', 'app/src/main/cpp/CMakeLists.txt', 'app/src/main/cpp/siren_jni.c',

@@ -8,9 +8,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -185,16 +188,24 @@ internal class DisplayPictureSync(private val context: Context, private val poll
     }
 
     fun dismiss(id: String) {
-        if (!state.value.busy && state.value.conflict?.id == id) {
-            dismissedConflict = state.value.conflict
-            mutableState.value = DisplayPictureSyncState()
+        val current = state.value
+        val conflict = current.conflict
+        if (!current.busy && conflict != null && conflict.id == id) {
+            dismissedConflict = conflict
+            mutableState.compareAndSet(current, DisplayPictureSyncState())
         }
         // Keep the local baseline. A later launch will fetch and compare again.
     }
 
-    suspend fun restore(repository: MessengerRepository, serverProfile: UserProfileSnapshot, skipNextRefresh: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun restore(
+        repository: MessengerRepository,
+        serverProfile: UserProfileSnapshot,
+        skipNextRefresh: Boolean = false,
+        expected: AccountIdentity? = null,
+    ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val account = currentAccount(repository) ?: return@withLock
+            if (expected != null && account != expected) return@withLock
             if (!DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(context, account)) {
                 applyLocalOnlyPicture(repository, account)
                 if (skipNextRefresh) foregroundRestore = repository to account
@@ -221,9 +232,11 @@ internal class DisplayPictureSync(private val context: Context, private val poll
                 return@withLock
             }
             val baseline = OwnDisplayPictureStore.read(context, account)
+            currentCoroutineContext().ensureActive()
             val incoming = try { repository.fetchOwnDisplayPicture() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { IncomingDisplayPicture() }
+            currentCoroutineContext().ensureActive()
             if (currentAccount(repository) != account) return@withLock
             val latest = OwnDisplayPictureStore.read(context, account)
             if (latest.initialized != baseline.initialized || !samePicture(latest.bytes, baseline.bytes)) {
@@ -329,12 +342,11 @@ internal class DisplayPictureSync(private val context: Context, private val poll
             }
             DisplayPictureSyncDecision.Ask -> {
                 showLocal(repository, account, local)
-                val dismissed = dismissedConflict
-                if (dismissed?.account == account && samePicture(dismissed.local.bytes, local.bytes) &&
-                    samePicture(dismissed.incoming.bytes, incoming.bytes)) return
-                val existing = state.value.conflict
-                if (existing == null || !samePicture(existing.incoming.bytes, incoming.bytes) || !samePicture(existing.local.bytes, local.bytes)) {
-                    mutableState.value = DisplayPictureSyncState(DisplayPictureConflict(account, local, incoming))
+                mutableState.update { current ->
+                    fun matches(conflict: DisplayPictureConflict?): Boolean = conflict?.account == account &&
+                        samePicture(conflict.local.bytes, local.bytes) && samePicture(conflict.incoming.bytes, incoming.bytes)
+                    if (matches(dismissedConflict) || matches(current.conflict)) current
+                    else DisplayPictureSyncState(DisplayPictureConflict(account, local, incoming))
                 }
             }
             else -> try {

@@ -8,15 +8,16 @@ static pthread_mutex_t codec_lock = PTHREAD_MUTEX_INITIALIZER;
 JNIEXPORT jbyteArray JNICALL
 Java_org_aralozkaya_msngr_protocol_SirenCodec_encode(JNIEnv *env, jobject self, jbyteArray input) {
     (void)self;
+    if (!input) return NULL;
     jsize size = (*env)->GetArrayLength(env, input);
     if (size <= 0 || size > 480000 || size % 640 != 0) return NULL;
     jbyteArray result = (*env)->NewByteArray(env, size / 16);
     if (!result) return NULL;
     jbyte *pcm = (*env)->GetByteArrayElements(env, input, NULL);
+    if (!pcm) return NULL;
     jbyte *encoded = (*env)->GetByteArrayElements(env, result, NULL);
-    if (!pcm || !encoded) {
-        if (pcm) (*env)->ReleaseByteArrayElements(env, input, pcm, JNI_ABORT);
-        if (encoded) (*env)->ReleaseByteArrayElements(env, result, encoded, JNI_ABORT);
+    if (!encoded) {
+        (*env)->ReleaseByteArrayElements(env, input, pcm, JNI_ABORT);
         return NULL;
     }
     pthread_mutex_lock(&codec_lock);
@@ -34,15 +35,16 @@ Java_org_aralozkaya_msngr_protocol_SirenCodec_encode(JNIEnv *env, jobject self, 
 JNIEXPORT jbyteArray JNICALL
 Java_org_aralozkaya_msngr_protocol_SirenCodec_decode(JNIEnv *env, jobject self, jbyteArray input) {
     (void)self;
+    if (!input) return NULL;
     jsize size = (*env)->GetArrayLength(env, input);
     if (size <= 0 || size > 30000 || size % 40 != 0) return NULL;
     jbyteArray result = (*env)->NewByteArray(env, size * 16);
     if (!result) return NULL;
     jbyte *encoded = (*env)->GetByteArrayElements(env, input, NULL);
+    if (!encoded) return NULL;
     jbyte *pcm = (*env)->GetByteArrayElements(env, result, NULL);
-    if (!pcm || !encoded) {
-        if (encoded) (*env)->ReleaseByteArrayElements(env, input, encoded, JNI_ABORT);
-        if (pcm) (*env)->ReleaseByteArrayElements(env, result, pcm, JNI_ABORT);
+    if (!pcm) {
+        (*env)->ReleaseByteArrayElements(env, input, encoded, JNI_ABORT);
         return NULL;
     }
     pthread_mutex_lock(&codec_lock);

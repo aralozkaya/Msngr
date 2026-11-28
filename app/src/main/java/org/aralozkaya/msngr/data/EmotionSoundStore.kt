@@ -4,12 +4,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.readBytesBounded
 import org.aralozkaya.msngr.protocol.EmotionSound
 import org.aralozkaya.msngr.protocol.MsnEmotionSound
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
+import org.aralozkaya.msngr.sha256Hex
 
 fun interface EmotionSoundHttp { fun get(url: String): ByteArray }
 
@@ -29,8 +30,7 @@ internal class EmotionSoundService(private val server: String, private val http:
         MsnEmotionSound.downloaded(bytes) to bytes
     }
     suspend fun popular(): List<EmotionSound> = withContext(Dispatchers.IO) {
-        // The native protocol has local name search and ID downloads, not an invented remote search API.
-        // Escargot and CrossTalk publish discoverable IDs on their public sound pages.
+        // Each provider publishes its catalog as HTML.
         when (base) {
             MsnEmotionSound.DEFAULT_SERVER, "http://msn.bart.escargot.chat/esnd/snd/" -> {
                 parsePopularCatalog(
@@ -87,18 +87,15 @@ internal class EmotionSoundService(private val server: String, private val http:
 
 private fun getSoundResponse(url: String): ByteArray {
     val connection = URL(url).openConnection() as HttpURLConnection
-    connection.connectTimeout = 15_000; connection.readTimeout = 15_000
+    connection.connectTimeout = 15_000
+    connection.readTimeout = 15_000
     connection.instanceFollowRedirects = false
     connection.setRequestProperty("User-Agent", "MessengerPlusLive")
     return try {
         check(connection.responseCode == 200) { "The emotion sounds service returned HTTP ${connection.responseCode}." }
         require(connection.contentLengthLong <= MsnEmotionSound.MAX_BYTES) { "The sound download is too large." }
         connection.inputStream.use { input ->
-            val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
-            while (true) { val count = input.read(buffer); if (count < 0) break
-                require(output.size() + count <= MsnEmotionSound.MAX_BYTES) { "The sound download is too large." }
-                output.write(buffer, 0, count)
-            }; output.toByteArray()
+            input.readBytesBounded(MsnEmotionSound.MAX_BYTES) { "The sound download is too large." }
         }
     } finally { connection.disconnect() }
 }
@@ -109,8 +106,7 @@ internal class EmotionSoundStore(private val root: File) {
     val changes = mutableChanges.asStateFlow()
     private fun folder(account: String, server: String): File {
         val normalizedServer = MsnEmotionSound.server(server).orEmpty()
-        val key = MessageDigest.getInstance("SHA-256").digest((account + "\u0000" + normalizedServer).toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val key = "$account\u0000$normalizedServer".sha256Hex()
         return File(root, key)
     }
     private fun file(account: String, server: String, sound: EmotionSound, saved: Boolean): File {
@@ -120,7 +116,7 @@ internal class EmotionSoundStore(private val root: File) {
     }
     @Synchronized fun bytes(account: String, server: String, sound: EmotionSound): ByteArray? {
         for (saved in listOf(true, false)) {
-            val path = file(account, server, sound, saved)
+            val path = file(account, server, sound, saved).recoverMediaFile()
             if (path.isFile && path.length() in 128..MsnEmotionSound.MAX_BYTES.toLong()) {
                 val bytes = path.readBytes()
                 if (runCatching { MsnEmotionSound.downloaded(bytes, sound) }.isSuccess) { path.setLastModified(System.currentTimeMillis()); return bytes }
@@ -128,27 +124,34 @@ internal class EmotionSoundStore(private val root: File) {
         }
         return null
     }
-    @Synchronized fun isSaved(account: String, server: String, sound: EmotionSound): Boolean = file(account, server, sound, true).isFile
+    @Synchronized fun isSaved(account: String, server: String, sound: EmotionSound): Boolean =
+        file(account, server, sound, true).recoverMediaFile().isFile
     @Synchronized fun catalog(account: String, server: String): List<EmotionSound> =
-        MsnEmotionSound.builtIns + File(folder(account, server), "saved").listFiles().orEmpty().filter { it.isFile && it.length() in 128..MsnEmotionSound.MAX_BYTES.toLong() }
+        MsnEmotionSound.builtIns + File(folder(account, server), "saved").mediaFiles("mp3").filter { it.length() in 128..MsnEmotionSound.MAX_BYTES.toLong() }
             .mapNotNull { path -> runCatching { MsnEmotionSound.downloaded(path.readBytes()) }.getOrNull() }.sortedBy { it.name.lowercase() }
 
     @Synchronized fun put(account: String, server: String, sound: EmotionSound, bytes: ByteArray, save: Boolean = false) {
         MsnEmotionSound.downloaded(bytes, sound)
         val destination = file(account, server, sound, save)
-        destination.parentFile!!.mkdirs()
+        val directory = requireNotNull(destination.parentFile)
+        check(directory.isDirectory || directory.mkdirs()) { "Could not create the sounds directory." }
+        val files = directory.mediaFiles("mp3").filter { it != destination }
         if (save) {
-            val files = destination.parentFile!!.listFiles().orEmpty()
-            check(destination.exists() || (files.size < 256 && files.sumOf { it.length() } + bytes.size <= 32L * 1024 * 1024)) { "Your saved sounds library is full." }
+            check(files.size < MAX_FILES && files.sumOf { it.length() } + bytes.size <= MAX_LIBRARY_BYTES) {
+                "Your saved sounds library is full."
+            }
         }
-        val temp = File(destination.parentFile, destination.name + ".tmp")
-        temp.writeBytes(bytes)
-        check(temp.renameTo(destination) || runCatching { destination.writeBytes(bytes); temp.delete() }.isSuccess) { "The sound could not be saved." }
+        destination.replaceMediaFile { it.write(bytes) }
         if (!save) {
-            val files = destination.parentFile!!.listFiles().orEmpty().filter { it.extension == "mp3" }.sortedBy { it.lastModified() }
-            var total = files.sumOf { it.length() }; var count = files.size
-            for (path in files) { if (total <= 32L * 1024 * 1024 && count <= 256) break
-                val size = path.length(); if (path.delete()) { total -= size; count-- }
+            var total = files.sumOf { it.length() } + bytes.size
+            var count = files.size + 1
+            for (path in files.sortedBy { it.lastModified() }) {
+                if (total <= MAX_LIBRARY_BYTES && count <= MAX_FILES) break
+                val size = path.length()
+                if (path.delete()) {
+                    total -= size
+                    count--
+                }
             }
         }
         if (save) mutableChanges.value++
@@ -158,5 +161,10 @@ internal class EmotionSoundStore(private val root: File) {
         val saved = file(account, server, sound, true)
         check(!saved.exists() || saved.delete()) { "The sound could not be removed." }
         mutableChanges.value++
+    }
+
+    private companion object {
+        const val MAX_FILES = 256
+        const val MAX_LIBRARY_BYTES = 32L * 1024 * 1024
     }
 }

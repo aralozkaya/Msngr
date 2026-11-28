@@ -1,7 +1,5 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
-    // AGP's published classpath still selects vulnerable transitive versions.
-    // Keep build tooling in the same vulnerability gate as app dependencies.
+    // Override transitive versions in AGP until its classpath includes the reviewed fixes.
     configurations.named("classpath") {
         resolutionStrategy.force(
             "com.google.guava:guava:33.8.0-jre",

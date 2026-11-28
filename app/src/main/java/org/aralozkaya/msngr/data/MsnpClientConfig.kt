@@ -6,14 +6,13 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.ServerConfig
+import org.aralozkaya.msngr.protocol.parseProtocolXml
+import org.aralozkaya.msngr.readBytesBounded
 import org.w3c.dom.Element
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
-import java.nio.charset.StandardCharsets
-import javax.xml.parsers.DocumentBuilderFactory
 
 data class MessengerTabSite(
     val id: String,
@@ -70,7 +69,6 @@ internal data class ParsedMsgrConfig(
  */
 object MsnpClientConfigService {
     private const val CLIENT_VERSION = "14.0.8117.0416"
-    private const val USER_AGENT = "MSNMSGR/14.0.8117.0416"
     private const val TIMEOUT_MILLIS = 10_000
     private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
@@ -168,11 +166,11 @@ object MsnpClientConfigService {
                 connectTimeout = TIMEOUT_MILLIS
                 readTimeout = TIMEOUT_MILLIS
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", USER_AGENT)
+                setRequestProperty("User-Agent", MESSENGER_USER_AGENT)
             }
             try {
                 if (connection.responseCode !in 200..299) return@withContext null
-                readBoundedBytes(connection, maxBytes)
+                connection.inputStream.use { it.readBytesBounded(maxBytes) { "Image exceeds $maxBytes bytes." } }
             } finally {
                 connection.disconnect()
             }
@@ -355,7 +353,7 @@ object MsnpClientConfigService {
         val bare = upgraded.trimStart('/')
         return listOfNotNull(
             appendPathIfMissing("https://$bare", normalizedPath),
-            appendPathIfMissing("http://$bare", normalizedPath),
+            appendPathIfMissing(upgradeCommunityHttpsUrl("http://$bare"), normalizedPath),
         ).distinct()
     }
 
@@ -369,6 +367,12 @@ object MsnpClientConfigService {
             try {
                 return block(endpoint)
             } catch (error: IOException) {
+                // A write or response failure can arrive after the server applied the operation.
+                if (error is SoapExchangeException) throw error
+                if (generateSequence<Throwable>(error) { it.cause }.any {
+                        it is java.security.cert.CertificateException ||
+                            it is javax.net.ssl.SSLPeerUnverifiedException
+                    }) throw error
                 lastError = error
                 if (index == endpoints.lastIndex) throw error
             }
@@ -432,14 +436,14 @@ object MsnpClientConfigService {
             connectTimeout = TIMEOUT_MILLIS
             readTimeout = TIMEOUT_MILLIS
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", USER_AGENT)
+            setRequestProperty("User-Agent", MESSENGER_USER_AGENT)
         }
         try {
             val status = connection.responseCode
             if (status !in 200..299) {
                 throw IllegalStateException("Configuration request failed with HTTP $status.")
             }
-            readBoundedBytes(connection, MAX_RESPONSE_BYTES).toString(StandardCharsets.UTF_8)
+            connection.inputStream.use { it.readServiceText(MAX_RESPONSE_BYTES) }
         } finally {
             connection.disconnect()
         }
@@ -464,55 +468,15 @@ object MsnpClientConfigService {
               </soap:Body>
             </soap:Envelope>
         """.trimIndent()
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = TIMEOUT_MILLIS
-            readTimeout = TIMEOUT_MILLIS
-            instanceFollowRedirects = true
-            doOutput = true
-            setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-            setRequestProperty("SOAPAction", "\"http://www.msn.com/webservices/Messenger/Client/GetClientConfig\"")
-            setRequestProperty("User-Agent", USER_AGENT)
-        }
-        try {
-            connection.outputStream.use { it.write(envelope.toByteArray(StandardCharsets.UTF_8)) }
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                throw IllegalStateException("GetClientConfig failed with HTTP $status.")
-            }
-            readBoundedBytes(connection, MAX_RESPONSE_BYTES).toString(StandardCharsets.UTF_8)
-        } finally {
-            connection.disconnect()
-        }
+        val (status, body) = postSoapEnvelope(
+            url, "\"http://www.msn.com/webservices/Messenger/Client/GetClientConfig\"", envelope,
+            TIMEOUT_MILLIS, MAX_RESPONSE_BYTES,
+        )
+        check(status in 200..299) { "GetClientConfig failed with HTTP $status." }
+        body.orEmpty()
     }
 
-    private fun readBoundedBytes(connection: HttpURLConnection, maxBytes: Int): ByteArray {
-        val out = ByteArrayOutputStream()
-        val buffer = ByteArray(8192)
-        connection.inputStream.use { input ->
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                if (out.size() + read > maxBytes) {
-                    throw IllegalStateException("Response exceeded $maxBytes bytes.")
-                }
-                out.write(buffer, 0, read)
-            }
-        }
-        return out.toByteArray()
-    }
-
-    private fun parseXmlDocument(xml: String) = secureXmlFactory().newDocumentBuilder()
-        .parse(xml.trim().byteInputStream(StandardCharsets.UTF_8))
-
-    private fun secureXmlFactory(): DocumentBuilderFactory =
-        DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-            isExpandEntityReferences = false
-            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-        }
+    private fun parseXmlDocument(xml: String) = parseProtocolXml(xml.trim())
 
     private fun Element.firstDescendantText(localName: String): String =
         getElementsByTagNameNS("*", localName).item(0)?.textContent.orEmpty().trim()

@@ -14,6 +14,7 @@ import org.aralozkaya.msngr.NativeTextStyle
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnInkCodec
+import org.aralozkaya.msngr.protocol.MessageNotSubmittedException
 import org.aralozkaya.msngr.protocol.Msnp18Protocol
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
@@ -308,7 +309,7 @@ internal class MsnpSwitchboardSession(
     }
 
     private suspend fun sendPayload(payload: ByteArray, acknowledgement: String) {
-        check(!closed.get()) { "The switchboard is closed." }
+        if (closed.get()) throw MessageNotSubmittedException("The switchboard is closed.")
         require(payload.size <= MAX_SWITCHBOARD_PAYLOAD_BYTES) {
             "The message is too long for an MSNP switchboard."
         }
@@ -569,7 +570,6 @@ internal class MsnpSwitchboardSession(
     private companion object {
         const val DEFAULT_HANDSHAKE_TIMEOUT_MILLIS = 20_000L
         const val P2P_MESSAGE_ACK_TIMEOUT_MILLIS = 20_000L
-        const val MAX_SWITCHBOARD_PAYLOAD_BYTES = 1_664
         const val MAX_PENDING_OWN_MESSAGES = 64
     }
 }
@@ -590,14 +590,7 @@ internal sealed interface SwitchboardMimeMessage {
 internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
     val delimiter = payload.indexOfMimeDelimiter()
     if (delimiter < 0) return SwitchboardMimeMessage.Unsupported
-    val headerText = String(payload, 0, delimiter, StandardCharsets.UTF_8)
-    val headers = headerText.lineSequence()
-        .mapNotNull { line ->
-            val separator = line.indexOf(':')
-            if (separator <= 0) null
-            else line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
-        }
-        .toMap()
+    val headers = payload.mimeHeaders(delimiter)
     val contentType = headers["content-type"]
         ?.substringBefore(';')
         ?.trim()
@@ -636,6 +629,15 @@ internal fun parseSwitchboardMime(payload: ByteArray): SwitchboardMimeMessage {
     }
 }
 
+private fun ByteArray.mimeHeaders(delimiter: Int): Map<String, String> =
+    String(this, 0, delimiter, StandardCharsets.UTF_8).lineSequence()
+        .mapNotNull { line ->
+            val separator = line.indexOf(':')
+            if (separator <= 0) null
+            else line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
+        }
+        .toMap()
+
 private fun ByteArray.indexOfMimeDelimiter(): Int {
     for (index in 0..size - MIME_DELIMITER.size) {
         if (MIME_DELIMITER.indices.all { offset -> this[index + offset] == MIME_DELIMITER[offset] }) {
@@ -648,6 +650,7 @@ private fun ByteArray.indexOfMimeDelimiter(): Int {
 private fun String.normalizedSwitchboardIdentity(): String =
     substringBefore(';').substringAfter(':').trim().lowercase()
 
+private const val MAX_SWITCHBOARD_PAYLOAD_BYTES = 1_664
 private val MIME_DELIMITER = "\r\n\r\n".toByteArray(StandardCharsets.US_ASCII)
 
 internal class SwitchboardChunkAssembler {
@@ -657,27 +660,24 @@ internal class SwitchboardChunkAssembler {
         val chunks: Array<ByteArray?>,
     )
 
-    private val pending = LinkedHashMap<String, PartialChunkedMessage>()
+    private val pending = LinkedHashMap<Pair<String, String>, PartialChunkedMessage>()
 
     fun feed(rawSender: String, payload: ByteArray): ByteArray? {
         val delimiter = payload.indexOfMimeDelimiter()
         if (delimiter < 0) return payload
-        val headerText = String(payload, 0, delimiter, StandardCharsets.UTF_8)
-        val headers = headerText.lineSequence()
-            .mapNotNull { line ->
-                val separator = line.indexOf(':')
-                if (separator <= 0) null
-                else line.substring(0, separator).trim().lowercase() to line.substring(separator + 1).trim()
-            }
-            .toMap()
+        val headers = payload.mimeHeaders(delimiter)
         val messageId = headers["message-id"]?.trim()?.lowercase()
         val totalChunksText = headers["chunks"]?.trim()
         val chunkIndexText = headers["chunk"]?.trim()
         if (messageId.isNullOrEmpty() || (totalChunksText == null && chunkIndexText == null)) {
             return payload
         }
+        val key = rawSender.trim().lowercase() to messageId
+        if (payload.size > MAX_ASSEMBLED_BYTES) {
+            pending.remove(key)
+            return null
+        }
         val body = payload.copyOfRange(delimiter + MIME_DELIMITER.size, payload.size)
-        val key = "${rawSender.trim().lowercase()}|$messageId"
 
         if (totalChunksText != null) {
             val totalChunks = totalChunksText.toIntOrNull() ?: return null
@@ -709,10 +709,14 @@ internal class SwitchboardChunkAssembler {
         return tryFinish(key, state)
     }
 
-    private fun tryFinish(key: String, state: PartialChunkedMessage): ByteArray? {
-        if (state.chunks.any { it == null } || state.headerBlock.isEmpty()) return null
+    private fun tryFinish(key: Pair<String, String>, state: PartialChunkedMessage): ByteArray? {
+        val totalBodySize = state.chunks.sumOf { it?.size ?: 0 }
+        if (totalBodySize + state.headerBlock.size > MAX_ASSEMBLED_BYTES) {
+            pending.remove(key)
+            return null
+        }
+        if (state.chunks.any { it == null }) return null
         pending.remove(key)
-        val totalBodySize = state.chunks.sumOf { it!!.size }
         val result = ByteArray(state.headerBlock.size + totalBodySize)
         System.arraycopy(state.headerBlock, 0, result, 0, state.headerBlock.size)
         var offset = state.headerBlock.size
@@ -725,6 +729,7 @@ internal class SwitchboardChunkAssembler {
     }
 
     private companion object {
+        const val MAX_ASSEMBLED_BYTES = MAX_SWITCHBOARD_PAYLOAD_BYTES * Msnp18Protocol.MAX_INK_CHUNKS
         const val MAX_PARTIAL_CHUNKED_MESSAGES = 16
     }
 }

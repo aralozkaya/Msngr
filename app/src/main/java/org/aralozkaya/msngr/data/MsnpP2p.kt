@@ -53,8 +53,8 @@ internal class MsnpP2pSession(
     }
     private val ids = AtomicInteger(1_000)
     private val incoming = ConcurrentHashMap<Pair<Int, Int>, IncomingP2pMessage>()
-    private val v2Incoming = ConcurrentHashMap<Pair<Long, Int>, IncomingV2Message>()
-    private val pendingCalls = ConcurrentHashMap<Int, PendingDisplayPicture>()
+    private val v2Incoming = V2MessageAssembler()
+    private val pendingCalls = ConcurrentHashMap<Int, PendingObjectRequest>()
 
     private val photoApplicationLazy = lazy {
         MsnpPhotoSession(localEmail, remoteEmail, fileDirectory, onPhotoShare,
@@ -129,7 +129,7 @@ internal class MsnpP2pSession(
         val sessionId = nextId()
         val callId = MsnpP2pUtil.randomGuid()
         val branch = MsnpP2pUtil.randomGuid()
-        pendingCalls[sessionId] = PendingDisplayPicture(callId, picture, now)
+        pendingCalls[sessionId] = PendingObjectRequest(callId, picture, now)
         val content = MsnpP2pUtil.displayPictureRequestContent(sessionId, picture)
         sendMessage(
             sessionId = 0,
@@ -222,10 +222,7 @@ internal class MsnpP2pSession(
     }
 
     private suspend fun handleV2Fallback(packetBytes: ByteArray) {
-        val now = System.nanoTime()
-        v2Incoming.entries
-            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
-            .forEach { v2Incoming.remove(it.key, it.value) }
+        v2Incoming.expire()
         val packet = P2pV2Packet.parse(packetBytes) ?: return
         val ownedFileData = packet.sessionId != 0L && (packet.tfCombination and 6 == 6) &&
             fileApplicationLazy.isInitialized() && files.owns(packet.sessionId)
@@ -261,22 +258,8 @@ internal class MsnpP2pSession(
             }
             return
         }
-        val key = packet.sessionId to baseTf
-        val message = if (packet.tfCombination and 1 != 0) {
-            if (v2Incoming.size >= MAX_INCOMING_MESSAGES) return
-            val total = packet.body.size.toLong() + packet.dataRemaining
-            val max = if (packet.sessionId == 0L) MAX_SLP_BYTES else MsnpP2pUtil.objectByteLimit(pendingCalls[packet.sessionId.toInt()]?.picture)
-            if (total !in 0..max.toLong()) return
-            IncomingV2Message(ByteArray(total.toInt())).also { v2Incoming[key] = it }
-        } else {
-            v2Incoming[key] ?: return
-        }
-        if (!message.add(packet.body, packet.dataRemaining)) {
-            v2Incoming.remove(key, message)
-            return
-        }
-        if (!message.complete) return
-        v2Incoming.remove(key, message)
+        val limit = if (packet.sessionId == 0L) MAX_SLP_BYTES else MsnpP2pUtil.objectByteLimit(pendingCalls[packet.sessionId.toInt()]?.picture)
+        val message = v2Incoming.add(packet, limit) ?: return
         when {
             packet.sessionId == 0L && baseTf == 0 -> handleSlp(message.body)
             packet.sessionId != 0L && photoApplicationLazy.isInitialized() && photos.owns(packet.sessionId) -> photos.receive(message.body)
@@ -299,21 +282,7 @@ internal class MsnpP2pSession(
 
     private suspend fun handleSlp(bytes: ByteArray) {
         val message = SlpMessage.parse(bytes) ?: return
-        if ((photoApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.equals(MsnpPhotoSession.GUID, true) == true) && photos.handle(message)) return
-        if ((gameApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.equals(org.aralozkaya.msngr.protocol.MsnGameProtocol.EUF_GUID, true) == true) && games.handle(message)) return
-        if ((fileApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.uppercase() in setOf(org.aralozkaya.msngr.protocol.MsnFileContext.GUID, MsnpFileSession.ORIGINAL_GUID)) && files.handle(message)) return
-        when {
-            message.firstLine.startsWith("INVITE ", ignoreCase = true) -> handleInvite(message)
-            message.firstLine.equals("MSNSLP/1.0 200 OK", ignoreCase = true) -> Unit
-            message.firstLine.startsWith("MSNSLP/1.0 603", ignoreCase = true) -> {
-                pendingCalls.entries
-                    .filter { it.value.callId == message.callId }
-                    .forEach { pendingCalls.remove(it.key, it.value) }
-            }
-        }
+        MsnpP2pUtil.dispatchSlp(message, photoApplicationLazy, gameApplicationLazy, fileApplicationLazy, pendingCalls, ::handleInvite)
     }
 
     private suspend fun handleInvite(message: SlpMessage) {
@@ -339,26 +308,9 @@ internal class MsnpP2pSession(
             )
         ) return
         val sessionId = message.body.field("SessionID")?.toIntOrNull() ?: return
-        val picture = MsnpP2pUtil.matchingLocalPicture(message.body, localPicture())
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 11)
-                }
-            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localVoiceClip(it.sha1d)) }
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    org.aralozkaya.msngr.protocol.MsnWink.parseOffer(String(it, Charsets.UTF_8).trimEnd('\u0000'))
-                }
-            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localWink(it.sha1d)) }
-
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 15)
-                }
-            }?.let { requested ->
-                MsnpP2pUtil.matchingLocalPicture(message.body,
-                    (if (photoApplicationLazy.isInitialized()) photos.localObject(requested.sha1d) else null) ?: localPhoto(requested.sha1d))
-            }
+        val picture = MsnpP2pUtil.matchingLocalPicture(message.body, localPicture(), localVoiceClip, localWink) { hash ->
+            (if (photoApplicationLazy.isInitialized()) photos.localObject(hash) else null) ?: localPhoto(hash)
+        }
         val accepted = picture != null
         val responseContent = "SessionID: $sessionId\r\n\r\n"
         sendMessage(
@@ -540,11 +492,6 @@ internal class MsnpP2pSession(
 
     private fun nextId(): Int = ids.incrementAndGet()
 
-    private data class PendingDisplayPicture(
-        val callId: String,
-        val picture: MsnDisplayPicture,
-        val createdAtNanos: Long,
-    )
 
     private companion object {
         const val P2P_NO_FLAG = 0

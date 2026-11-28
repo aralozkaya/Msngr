@@ -43,7 +43,10 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import kotlinx.coroutines.CompletableDeferred
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.GroupInvitation
@@ -140,9 +143,14 @@ class GroupManagementInstrumentedTest {
         compose.mainClock.autoAdvance = true
         compose.onNodeWithTag("group-editor-modal").assertDoesNotExist()
         compose.onNodeWithText("Create a group").assertIsDisplayed().performClick()
-        pressBack()
+        pressBackInEditor()
         compose.onNodeWithTag("group-editor-modal").assertDoesNotExist()
         compose.onNodeWithText("Create a group").assertIsDisplayed()
+    }
+
+    private fun pressBackInEditor() {
+        compose.onNodeWithTag("group-editor-modal").assertIsDisplayed()
+        onView(isRoot()).inRoot(isDialog()).perform(ViewActions.pressBack())
     }
 
     private fun saveCreationScreenshot(name: String) {
@@ -194,7 +202,7 @@ class GroupManagementInstrumentedTest {
             assertEquals(compose.activity.window.decorView.width.toFloat(), modal.width, 1f)
             assertEquals(compose.activity.window.decorView.height.toFloat(), modal.height, 1f)
         }
-        compose.onNodeWithText("Invite people to \"Test group\"").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.group_invite_to_heading, "Test group")).assertIsDisplayed()
         compose.onNodeWithTag("group-name").assertDoesNotExist()
         compose.onNodeWithTag("group-editor-submit").assertTextEquals("Send").assertIsNotEnabled()
         saveCreationScreenshot("group-member-invitation.png")
@@ -202,7 +210,7 @@ class GroupManagementInstrumentedTest {
         compose.onNodeWithTag("group-editor-modal").assertDoesNotExist()
         compose.onNodeWithTag("group-invite").assertDoesNotExist()
         openInvitation()
-        pressBack()
+        pressBackInEditor()
         compose.onNodeWithTag("group-editor-modal").assertDoesNotExist()
         compose.onNodeWithTag("group-invite").assertDoesNotExist()
         openInvitation()
@@ -286,7 +294,7 @@ class GroupManagementInstrumentedTest {
         compose.onNodeWithTag("group-editor-submit").performClick()
         compose.waitUntil(5000) { calls == 1 }
         assertBusyIndicator(actionBefore)
-        pressBack()
+        pressBackInEditor()
         compose.onNodeWithTag("group-editor-loading", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("group-remove-$peer").assertIsNotEnabled()
         compose.onNodeWithTag("group-editor-loading", useUnmergedTree = true).performTouchInput { click() }

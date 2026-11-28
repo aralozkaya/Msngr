@@ -44,8 +44,8 @@ internal class MsnpP2pV2Session(
     private val packageNumbers = AtomicInteger(0)
     private val localSynSent = AtomicBoolean(false)
     private val sendMutex = Mutex()
-    private val incoming = ConcurrentHashMap<Pair<Long, Int>, IncomingV2Message>()
-    private val pendingCalls = ConcurrentHashMap<Long, PendingV2Picture>()
+    private val incoming = V2MessageAssembler()
+    private val pendingCalls = ConcurrentHashMap<Long, PendingObjectRequest>()
 
     private val photoApplicationLazy = lazy {
         MsnpPhotoSession(source, destination, fileDirectory, onPhotoShare,
@@ -131,7 +131,7 @@ internal class MsnpP2pV2Session(
         if (pendingCalls.size >= MAX_PENDING_CALLS) return
         val sessionId = nextSessionId()
         val callId = MsnpP2pUtil.randomGuid()
-        pendingCalls[sessionId] = PendingV2Picture(callId, picture, now)
+        pendingCalls[sessionId] = PendingObjectRequest(callId, picture, now)
         val content = MsnpP2pUtil.displayPictureRequestContent(sessionId, picture)
         sendApplicationControl(sipMessage(
                 firstLine = "INVITE MSNMSGR:$destination MSNSLP/1.0",
@@ -146,10 +146,7 @@ internal class MsnpP2pV2Session(
     }
 
     suspend fun handle(bytes: ByteArray) {
-        val now = System.nanoTime()
-        incoming.entries
-            .filter { now - it.value.createdAtNanos >= REQUEST_TIMEOUT_NANOS }
-            .forEach { incoming.remove(it.key, it.value) }
+        incoming.expire()
         val packet = P2pV2Packet.parse(bytes) ?: return
         if (packet.nakIdentifier != null) {
             runCatching {
@@ -180,22 +177,8 @@ internal class MsnpP2pV2Session(
             if (packet.operationCode and OP_RAK != 0) sendAcknowledgement(packet)
             return
         }
-        val key = packet.sessionId to baseTf
-        val message = if (packet.tfCombination and TF_FIRST != 0) {
-            if (incoming.size >= MAX_INCOMING_MESSAGES) return
-            val total = packet.body.size.toLong() + packet.dataRemaining
-            val max = if (packet.sessionId == 0L) MAX_SLP_BYTES else MsnpP2pUtil.objectByteLimit(pendingCalls[packet.sessionId]?.picture)
-            if (total !in 0..max.toLong()) return
-            IncomingV2Message(ByteArray(total.toInt())).also { incoming[key] = it }
-        } else {
-            incoming[key] ?: return
-        }
-        if (!message.add(packet.body, packet.dataRemaining)) {
-            incoming.remove(key, message)
-            return
-        }
-        if (!message.complete) return
-        incoming.remove(key, message)
+        val limit = if (packet.sessionId == 0L) MAX_SLP_BYTES else MsnpP2pUtil.objectByteLimit(pendingCalls[packet.sessionId]?.picture)
+        val message = incoming.add(packet, limit) ?: return
         when {
             packet.sessionId == 0L && baseTf == TF_NONE -> handleSlp(message.body)
             packet.sessionId != 0L && photoApplicationLazy.isInitialized() && photos.owns(packet.sessionId) -> photos.receive(message.body)
@@ -220,20 +203,7 @@ internal class MsnpP2pV2Session(
         val message = SlpMessage.parse(bytes) ?: return
         runCatching { if (org.aralozkaya.msngr.BuildConfig.DEBUG) android.util.Log.i("MsnpP2p",
             "V2 SLP app=${message.body.field("AppID")?.toIntOrNull()} session=${message.body.field("SessionID")?.toLongOrNull()} type=${when(message.contentType) { MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE -> "session"; MsnpP2pUtil.TRANSPORT_REQUEST_CONTENT_TYPE -> "transport-request"; MsnpP2pUtil.TRANSPORT_RESPONSE_CONTENT_TYPE -> "transport-response"; else -> "other" }} response=${message.firstLine.startsWith("MSNSLP/1.0 200")}") }
-        if ((photoApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.equals(MsnpPhotoSession.GUID, true) == true) && photos.handle(message)) return
-        if ((gameApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.equals(org.aralozkaya.msngr.protocol.MsnGameProtocol.EUF_GUID, true) == true) && games.handle(message)) return
-        if ((fileApplicationLazy.isInitialized() || message.body.field("EUF-GUID")?.trim('{', '}')
-                ?.uppercase() in setOf(org.aralozkaya.msngr.protocol.MsnFileContext.GUID, MsnpFileSession.ORIGINAL_GUID)) && files.handle(message)) return
-        when {
-            message.firstLine.startsWith("INVITE ", ignoreCase = true) -> handleInvite(message)
-            message.firstLine.startsWith("MSNSLP/1.0 603", ignoreCase = true) -> {
-                pendingCalls.entries
-                    .filter { it.value.callId == message.callId }
-                    .forEach { pendingCalls.remove(it.key, it.value) }
-            }
-        }
+        MsnpP2pUtil.dispatchSlp(message, photoApplicationLazy, gameApplicationLazy, fileApplicationLazy, pendingCalls, ::handleInvite)
     }
 
     private suspend fun handleInvite(message: SlpMessage) {
@@ -267,26 +237,9 @@ internal class MsnpP2pV2Session(
             return
         }
         val sessionId = message.body.field("SessionID")?.toLongOrNull() ?: return
-        val picture = MsnpP2pUtil.matchingLocalPicture(message.body, localPicture())
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 11)
-                }
-            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localVoiceClip(it.sha1d)) }
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    org.aralozkaya.msngr.protocol.MsnWink.parseOffer(String(it, Charsets.UTF_8).trimEnd('\u0000'))
-                }
-            }?.let { MsnpP2pUtil.matchingLocalPicture(message.body, localWink(it.sha1d)) }
-
-            ?: message.body.field("Context")?.let { context ->
-                org.aralozkaya.msngr.protocol.MsnBase64.decode(context)?.let {
-                    MsnDisplayPicture.parseObject(String(it, Charsets.UTF_8).trimEnd('\u0000'), 15)
-                }
-            }?.let { requested ->
-                MsnpP2pUtil.matchingLocalPicture(message.body,
-                    (if (photoApplicationLazy.isInitialized()) photos.localObject(requested.sha1d) else null) ?: localPhoto(requested.sha1d))
-            }
+        val picture = MsnpP2pUtil.matchingLocalPicture(message.body, localPicture(), localVoiceClip, localWink) { hash ->
+            (if (photoApplicationLazy.isInitialized()) photos.localObject(hash) else null) ?: localPhoto(hash)
+        }
         val accepted = picture != null
         sendSlpResponse(message, sessionId, accepted)
         if (!accepted) return
@@ -508,11 +461,6 @@ internal class MsnpP2pV2Session(
     }
 
     private fun nextSessionId(): Long = (sessionIds.incrementAndGet().toLong() and UINT_MASK)
-    private data class PendingV2Picture(
-        val callId: String,
-        val picture: MsnDisplayPicture,
-        val createdAtNanos: Long,
-    )
 
     private companion object {
         const val OP_NONE = 0
@@ -524,10 +472,35 @@ internal class MsnpP2pV2Session(
         const val MAX_CHUNK_BYTES = 1_100
         const val MAX_SLP_BYTES = 16 * 1024
         const val MAX_PICTURE_BYTES = org.aralozkaya.msngr.protocol.DisplayPictureLimits.MAX_BYTES
-        const val MAX_INCOMING_MESSAGES = 8
         const val MAX_PENDING_CALLS = 8
         const val REQUEST_TIMEOUT_NANOS = 30_000_000_000L
         const val UINT_MASK = 0xffff_ffffL
+    }
+}
+
+internal class V2MessageAssembler {
+    private val incoming = mutableMapOf<Pair<Long, Int>, IncomingV2Message>()
+
+    @Synchronized fun expire() {
+        val now = System.nanoTime()
+        incoming.values.removeAll { now - it.createdAtNanos >= 30_000_000_000L }
+    }
+
+    @Synchronized fun add(packet: P2pV2Packet, limit: Int): IncomingV2Message? {
+        val key = packet.sessionId to (packet.tfCombination and 1.inv())
+        val message = if (packet.tfCombination and 1 != 0) {
+            val total = packet.body.size.toLong() + packet.dataRemaining
+            if (incoming.size >= 8 || total !in 0..limit.toLong()) return null
+            IncomingV2Message(ByteArray(total.toInt())).also { incoming[key] = it }
+        } else {
+            incoming[key] ?: return null
+        }
+        if (!message.add(packet.body, packet.dataRemaining)) {
+            incoming.remove(key)
+            return null
+        }
+        if (!message.complete) return null
+        return incoming.remove(key)
     }
 }
 

@@ -155,21 +155,22 @@ fun ContactsPage(
     val searchBarState = rememberSearchBarState()
     val searchEditorController = remember { MessengerPlusEditorController() }
     var searchFocused by remember { mutableStateOf(false) }
-    var leaveSearchRequested by remember { mutableStateOf(false) }
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val focusManager = LocalFocusManager.current
-    BackHandler(enabled = isCurrentPage && (searchFocused || searchFieldState.text.isNotEmpty())) {
-        leaveSearchRequested = true
-        searchEditorController.hideKeyboard()
+    fun stopSearch() {
+        searchFieldState.edit { replace(0, length, "") }
+        focusManager.clearFocus()
+        searchEditorController.clearFocusAndHideKeyboard()
+        searchFocused = false
     }
-    LaunchedEffect(leaveSearchRequested, keyboardVisible) {
-        if (leaveSearchRequested && !keyboardVisible) {
-            searchFieldState.edit { replace(0, length, "") }
-            focusManager.clearFocus()
-            searchEditorController.clearFocusAndHideKeyboard()
-            searchFocused = false
-            leaveSearchRequested = false
-        }
+    BackHandler(enabled = isCurrentPage && (searchFocused || searchFieldState.text.isNotEmpty())) {
+        stopSearch()
+    }
+    var keyboardWasVisible by remember { mutableStateOf(keyboardVisible) }
+    LaunchedEffect(keyboardVisible) {
+        // The IME can handle Back before the activity's callback sees it.
+        if (isCurrentPage && searchFocused && keyboardWasVisible && !keyboardVisible) stopSearch()
+        keyboardWasVisible = keyboardVisible
     }
     val search = searchFieldState.text.toString().withExpandedMsnMenuTokens().trim()
     val orderedCategoryIds = remember(categoryOrder, categories, hiddenCategoryIds) {

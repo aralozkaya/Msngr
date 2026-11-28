@@ -44,11 +44,9 @@ submodule; build with Android NDK 28.2.13676358 to rebuild or replace the shared
 
 `third_party/ruffle` pins the official source repository at a stable release.
 Normal Android builds use the committed self-hosted JS/WASM runtime and need neither
-Rust nor Node.js. The 0.7.1 runtime is rebuilt from that official source with
-`third_party/patches/ruffle-security.patch`: quick-xml 0.41.0 fixes the two reported XML
-denial-of-service issues, and zip 9.0.5 fixes the ZIP advisories. XML API adaptations
-preserve Flash text/entity handling and retain the new namespace limit. The source
-submodule remains pristine; the patch applies only to a separate production checkout.
+Rust nor Node.js. The 0.8.0 build applies `third_party/patches/ruffle-security.patch`
+in a separate production checkout. It pins the URL crate to 2.5.9 and tests origin
+handling for nested blob URLs.
 
 `third_party/ruffle-runtime.json` records every bundled file's SHA-256, the source
 commit, and hashes of the dependency inventory and source-build manifest. The latter
@@ -60,7 +58,8 @@ The daily **Update Ruffle** workflow checks the latest stable release. It downlo
 the package from the official npm registry, verifies its integrity and embedded
 source commit/version, and updates the submodule, complete asset set, and manifest
 together. It opens or refreshes `codex/update-ruffle`; unchanged releases produce no
-new PR. While 0.7.1 remains the latest stable release, it preserves our patched bundle.
+new PR. When the latest stable release matches the patched bundle's version, the
+updater verifies and preserves the bundled files.
 A newer official release replaces it in a PR and must pass the same tests and security
 gate. The same operation is available locally with Python 3.11+ and Rust/Cargo 1.99.1:
 
@@ -108,10 +107,9 @@ workflow builds and packages APKs in parallel with the scan and requires both jo
 before attaching files to a release. Manual release-validation runs keep the same security
 check and retain packaged APKs as artifacts without publishing them.
 
-The only nonblocking advisory is `RUSTSEC-2026-0192`, explicitly classified by RustSec
-as an informational unmaintained notice for `ttf-parser`. It stays visible as a maintenance
-warning in the job summary. `.github/osv-scanner.toml` accepts that exact record; it does
-not ignore the package or other advisories. Actual vulnerabilities continue to block.
+The job summary lists the exact advisory exceptions and reasons from
+`.github/osv-scanner.toml`. They currently cover maintenance notices for
+`ttf-parser` and `chrono`. Other reported advisories still block the build.
 
 OSV reports known published advisories; it does not audit native code, discover unknown
 bugs, or establish that absence of a finding means safety. The original full upstream

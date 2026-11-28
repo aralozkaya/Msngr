@@ -1,12 +1,11 @@
 package org.aralozkaya.msngr
 
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
 import org.w3c.dom.Node
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.zip.CRC32
-import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -172,11 +171,7 @@ internal class SvgDocument(
 
 internal object SvgCodec {
     fun parse(bytes: ByteArray): SvgDocument {
-        val factory = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = false
-            isValidating = false
-        }
-        val document = factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+        val document = parseProtocolXml(bytes, namespaceAware = false)
         val root = document.documentElement
         require(root != null && root.tagName.substringAfterLast(':').equals("svg", ignoreCase = true)) {
             "Not an SVG document."

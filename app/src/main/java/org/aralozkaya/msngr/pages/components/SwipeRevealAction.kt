@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
@@ -193,9 +194,10 @@ internal fun SwipeRevealAction(
                             }
                             if (abs(totalDx) > touchSlop) {
                                 val directionalDx = if (isRtl) -totalDx else totalDx
-                                // Pass drags away from the reveal side (right in LTR, left in RTL)
-                                // to parent containers like HorizontalPager when the row is closed.
                                 if (startOffset >= -0.5f && directionalDx > 0f) {
+                                    // Let the pager claim the drag first, then cancel the row's pending click.
+                                    awaitPointerEvent(PointerEventPass.Final)
+                                        .changes.firstOrNull { it.id == pointerId }?.consume()
                                     break
                                 }
                                 accepted = true

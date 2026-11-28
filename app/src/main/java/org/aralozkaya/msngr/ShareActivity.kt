@@ -5,14 +5,11 @@
 
 package org.aralozkaya.msngr
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.format.Formatter
@@ -20,7 +17,8 @@ import android.webkit.MimeTypeMap
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,25 +75,18 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
-import androidx.core.content.edit
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.data.MessengerRepository
-import org.aralozkaya.msngr.data.SignInRequest
 import org.aralozkaya.msngr.data.recipientFeatures
 import org.aralozkaya.msngr.enums.Presence
-import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.LoadingButtonContent
 import org.aralozkaya.msngr.pages.components.MsngrCircularWavyProgressIndicator
@@ -105,8 +96,6 @@ import java.io.File
 import java.util.Locale
 
 private const val MAX_PHOTO_SHARE_COUNT = 32
-private const val NOTIFICATION_PERMISSION_PREFS = "notification_permission"
-private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "requested"
 private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif")
 
 internal enum class ExternalShareMode { Files, Photos }
@@ -134,23 +123,8 @@ private data class RecipientEvaluation(
 )
 
 /** Native Android share target for regular single-file transfers; see [SharePhotosActivity] for Photos. */
-open class ShareActivity : MsngrActivity() {
+open class ShareActivity : ExternalDocumentActivity() {
     internal open val shareMode: ExternalShareMode = ExternalShareMode.Files
-
-    private var authReady by mutableStateOf(false)
-    private var authInProgress by mutableStateOf(false)
-
-    private val loginLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == RESULT_OK || SessionPrefs.canOpenAuthenticatedScreens(this)) {
-            authReady = true
-            BackgroundConnectionController.startIfEnabled(this)
-            requestNotificationPermissionOnce()
-        } else {
-            finish()
-        }
-    }
 
     private val notificationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -160,14 +134,12 @@ open class ShareActivity : MsngrActivity() {
         super.onCreate(savedInstanceState)
         val initialText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
         val incomingUris = extractIncomingUris(intent)
-        ensureAuthenticated()
         setContent {
             MsngrTheme {
                 ShareRoute(
                     appContainer = appContainer,
                     shareMode = shareMode,
-                    authReady = authReady,
-                    authInProgress = authInProgress,
+                    authReady = authenticated,
                     incomingUris = incomingUris,
                     initialMessageText = initialText,
                     onFinish = ::finish,
@@ -176,62 +148,8 @@ open class ShareActivity : MsngrActivity() {
         }
     }
 
-    private fun ensureAuthenticated() {
-        if (SessionPrefs.canOpenAuthenticatedScreens(this) && appContainer.currentRepository?.hasSignedInSession == true) {
-            authReady = true
-            BackgroundConnectionController.startIfEnabled(this)
-            requestNotificationPermissionOnce()
-            return
-        }
-        val snapshot = SessionPrefs.readLoginSnapshot(this)
-        val canAutoSignIn = !SessionPrefs.wasRemotelySignedOut(this) &&
-            snapshot.automaticSignIn &&
-            SessionPrefs.hasRememberedCredentials(this)
-        if (!canAutoSignIn) {
-            loginLauncher.launch(LoginActivity.createReturnAfterLoginIntent(this))
-            return
-        }
-        authInProgress = true
-        lifecycleScope.launch {
-            val repository = appContainer.repositoryFor(snapshot.useMockServer)
-            val result = repository.signIn(
-                SignInRequest(
-                    email = snapshot.email,
-                    password = snapshot.password,
-                    serverConfig = snapshot.resolvedServers,
-                    initialPresence = snapshot.loginPresence,
-                ),
-            )
-            authInProgress = false
-            result.onSuccess { serverProfile ->
-                SessionPrefs.activateRememberedSession(this@ShareActivity)
-                restoreSignedInProfile(
-                    repository = repository,
-                    serverProfile = serverProfile,
-                    presence = serverProfile.presence,
-                )
-                authReady = true
-                BackgroundConnectionController.startIfEnabled(this@ShareActivity)
-                requestNotificationPermissionOnce()
-            }.onFailure {
-                SessionPrefs.invalidateRememberedCredentials(this@ShareActivity)
-                loginLauncher.launch(LoginActivity.createReturnAfterLoginIntent(this@ShareActivity))
-            }
-        }
-    }
-
-    private fun requestNotificationPermissionOnce() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val prefs = getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, MODE_PRIVATE)
-        if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) return
-        prefs.edit { putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true) }
-        notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+    override fun onSessionReady() {
+        requestNotificationPermissionOnce(notificationPermissionRequest)
     }
 
     private fun extractIncomingUris(incoming: Intent): List<Uri> {
@@ -261,20 +179,11 @@ class SharePhotosActivity : ShareActivity() {
     override val shareMode: ExternalShareMode = ExternalShareMode.Photos
 }
 
-internal fun Context.isSafeExternalFileUri(uri: Uri): Boolean {
-    if (!uri.scheme.equals("file", ignoreCase = true)) return true
-    val path = uri.path ?: return false
-    val appDataRoot = runCatching { File(applicationInfo.dataDir).canonicalPath }.getOrNull() ?: return true
-    val targetPath = runCatching { File(path).canonicalPath }.getOrNull() ?: return false
-    return targetPath != appDataRoot && !targetPath.startsWith(appDataRoot + File.separator)
-}
-
 @Composable
 private fun ShareRoute(
     appContainer: AppContainer,
     shareMode: ExternalShareMode,
     authReady: Boolean,
-    authInProgress: Boolean,
     incomingUris: List<Uri>,
     initialMessageText: String,
     onFinish: () -> Unit,
@@ -283,7 +192,7 @@ private fun ShareRoute(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
-    if (!authReady || authInProgress) {
+    if (!authReady) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
@@ -577,6 +486,7 @@ private fun ShareRoute(
                             .weight(1f)
                             .fillMaxWidth()
                             .testTag("share_recipients_list")
+                            .selectableGroup()
                             .nestedScroll(scrollBehavior.nestedScrollConnection),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -793,7 +703,6 @@ private fun RecipientRow(
     val displayName = remember(contact.displayName, contact.email) {
         contact.displayName.ifBlank { contact.email }.messengerPlusPlainText()
     }
-    val selectedState = stringResource(R.string.common_selected)
     val rowAlpha = if (evaluation.eligible) 1f else 0.55f
     Surface(
         shape = shape,
@@ -806,11 +715,9 @@ private fun RecipientRow(
             .fillMaxWidth()
             .alpha(rowAlpha)
             .testTag("share_recipient_${contact.id}")
-            .semantics {
-                if (selected) stateDescription = selectedState
-            }
             .clip(shape)
-            .clickable(
+            .selectable(
+                selected = selected,
                 enabled = evaluation.eligible,
                 role = Role.RadioButton,
                 onClick = onClick,
@@ -852,7 +759,7 @@ private fun RecipientRow(
                 if (selected) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.common_selected),
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 } else {
@@ -939,7 +846,6 @@ private fun decodeThumbnailBitmap(context: Context, uri: Uri, maxEdgePx: Int): I
 }.getOrNull()
 
 private fun orientBitmapIfNeeded(context: Context, uri: Uri, source: Bitmap): Bitmap {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return source
     val orientation = runCatching {
         context.contentResolver.openInputStream(uri)?.use { input ->
             android.media.ExifInterface(input).getAttributeInt(
@@ -948,14 +854,5 @@ private fun orientBitmapIfNeeded(context: Context, uri: Uri, source: Bitmap): Bi
             )
         }
     }.getOrNull() ?: return source
-    val matrix = android.graphics.Matrix()
-    when (orientation) {
-        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-        android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
-        android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
-        else -> return source
-    }
-    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+    return source.withExifOrientation(orientation)
 }

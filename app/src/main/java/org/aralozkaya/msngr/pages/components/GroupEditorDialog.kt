@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,7 +45,6 @@ import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -75,7 +73,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.R
@@ -294,33 +291,16 @@ internal fun GroupEditorDialog(
         }
     }
 
-    if (group == null) {
-        ContainerTransformDialog(
-            sourceBounds = sourceBounds,
-            sourceIcon = Icons.Default.GroupAdd,
-            sourceLabel = stringResource(R.string.contacts_action_create_group),
-            closing = closingAction != null,
-            busy = busy,
-            onDismissRequest = ::dismiss,
-            onClosed = { closingAction?.invoke() },
-            content = editorContent,
-        )
-    } else {
-        BasicAlertDialog(
-            modifier = Modifier.fillMaxSize(),
-            onDismissRequest = ::dismiss,
-            properties = DialogProperties(
-                dismissOnBackPress = !busy,
-                dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
-        ) {
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                Box(content = editorContent)
-            }
-        }
-    }
+    ContactEditorDialogFrame(
+        creating = group == null,
+        sourceBounds = sourceBounds,
+        sourceIcon = Icons.Default.GroupAdd,
+        sourceLabel = stringResource(R.string.contacts_action_create_group),
+        closingAction = closingAction,
+        busy = busy,
+        onDismissRequest = ::dismiss,
+        content = editorContent,
+    )
 
     if (showContactPicker) GroupContactPickerDialog(
         contacts = choices,

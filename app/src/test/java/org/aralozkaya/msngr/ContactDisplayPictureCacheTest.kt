@@ -18,6 +18,8 @@ class ContactDisplayPictureCacheTest {
             FileContactDisplayPictureCache(root).store(
                 "owner@example.com", "contact@example.com", picture, original,
             )
+            val record = root.walkTopDown().single { it.extension == "dp" }
+            assertTrue(record.renameTo(java.io.File(record.parentFile, record.name + ".bak")))
             val restored = FileContactDisplayPictureCache(root)
                 .load("owner@example.com", listOf("contact@example.com"))
                 .getValue("contact@example.com")

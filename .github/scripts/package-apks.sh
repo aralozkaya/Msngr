@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-artifact_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set}/release-apks"
 build_tools="${ANDROID_HOME:?ANDROID_HOME must be set}/build-tools/36.0.0"
 unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
 debug_apk="app/build/outputs/apk/debug/app-debug.apk"
@@ -29,7 +28,7 @@ if [[ "$has_signing_secrets" == true ]]; then
   done
 fi
 
-mkdir -p "$artifact_dir"
+artifact_dir="$(mktemp -d "${RUNNER_TEMP:?RUNNER_TEMP must be set}/release-apks-XXXXXXXX")"
 cp "$debug_apk" "$artifact_dir/Msngr-debug.apk"
 cp "$unsigned_apk" "$artifact_dir/Msngr-release-unsigned.apk"
 python3 tools/package_corresponding_source.py --output "$artifact_dir/Msngr-corresponding-source.zip"
@@ -38,17 +37,18 @@ java -jar "$build_tools/lib/apksigner.jar" verify "$artifact_dir/Msngr-debug.apk
 if [[ "$has_signing_secrets" == true ]]; then
   umask 077
   keystore_file="$(mktemp "$RUNNER_TEMP/msngr-release-XXXXXX.jks")"
-  trap 'rm -f -- "$keystore_file"' EXIT
+  aligned_apk="$keystore_file.aligned.apk"
+  trap 'rm -f -- "$keystore_file" "$aligned_apk"' EXIT
   printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_file"
 
-  "$build_tools/zipalign" -P 16 -f 4 "$unsigned_apk" "$RUNNER_TEMP/msngr-release-aligned.apk"
+  "$build_tools/zipalign" -P 16 -f 4 "$unsigned_apk" "$aligned_apk"
   java -jar "$build_tools/lib/apksigner.jar" sign \
     --ks "$keystore_file" \
     --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
     --ks-key-alias "$ANDROID_KEY_ALIAS" \
     --key-pass env:ANDROID_KEY_PASSWORD \
     --out "$artifact_dir/Msngr-release.apk" \
-    "$RUNNER_TEMP/msngr-release-aligned.apk"
+    "$aligned_apk"
   java -jar "$build_tools/lib/apksigner.jar" verify --verbose "$artifact_dir/Msngr-release.apk"
   signing_status="Release APK signed with the configured release key."
 else
@@ -60,6 +60,11 @@ fi
   cd "$artifact_dir"
   sha256sum -- *.apk Msngr-corresponding-source.zip > SHA256SUMS.txt
 )
+
+printf 'Packaged release assets in %s\n' "$artifact_dir"
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  printf 'directory=%s\n' "$artifact_dir" >> "$GITHUB_OUTPUT"
+fi
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   {

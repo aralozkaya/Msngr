@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.escapeXml
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,7 +14,6 @@ import org.aralozkaya.msngr.protocol.MsnDisplayPicture
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import javax.xml.parsers.DocumentBuilderFactory
 
 /** WLM 2009 Photos: MSNSLP AppID 35 plus UTF-16LE MAP commands and type-15 MSNObjects. */
 internal class MsnpPhotoSession(
@@ -196,14 +197,14 @@ internal class MsnpPhotoSession(
     }
 
     private suspend fun advertise(op: String, item: SharedPhoto) = map(op,
-        "guid=\"{${item.id}}\" hash=\"${escape(item.hash)}\" si=\"${item.sortIndex ?: -1}\" tospath=\"${escape(item.thumbnail.toXml())}\" mospath=\"${escape(item.preview.toXml())}\" dispn=\"${escape(item.name)}\"")
+        "guid=\"{${item.id}}\" hash=\"${item.hash.escapeXml()}\" si=\"${item.sortIndex ?: -1}\" tospath=\"${item.thumbnail.toXml().escapeXml()}\" mospath=\"${item.preview.toXml().escapeXml()}\" dispn=\"${item.name.escapeXml()}\"")
 
     suspend fun select(id: String) {
         val current = share ?: return
         if (current.photos.none { it.id.equals(id, true) }) return
         change(current.id) { it.copy(selectedId = id) }
         if (current.status == PhotoShareStatus.Active) {
-            map("CHG", "guid=\"{${escape(id)}}\" seq=\"${++sequence}\" ack=\"$remoteSequence\"")
+            map("CHG", "guid=\"{${id.escapeXml()}}\" seq=\"${++sequence}\" ack=\"$remoteSequence\"")
             if (pendingPreview == null) {
                 change(current.id) { latest -> latest.copy(photos = latest.photos.map {
                     if (it.id.equals(id, true)) it.copy(previewError = null) else it
@@ -217,13 +218,8 @@ internal class MsnpPhotoSession(
         val current = share ?: return
         if (current.status != PhotoShareStatus.Active || bytes.size !in 2..MAX_MAP_BYTES || bytes.size % 2 != 0) return
         val text = bytes.toString(Charsets.UTF_16LE).trimEnd('\u0000', '\r', '\n')
-        if (!text.startsWith("<map>") || text.contains("<!DOCTYPE", true) || text.contains("<!ENTITY", true)) return
-        val document = runCatching { DocumentBuilderFactory.newInstance().apply {
-            isExpandEntityReferences = false
-            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-        }.newDocumentBuilder().parse(text.byteInputStream()) }.getOrNull() ?: return
+        if (!text.startsWith("<map>")) return
+        val document = runCatching { parseProtocolXml(text, namespaceAware = false) }.getOrNull() ?: return
         val header = document.getElementsByTagName("h").item(0) as? org.w3c.dom.Element ?: return
         if (header.getAttribute("aid") != "PS") return
         val item = document.getElementsByTagName("m").item(0) as? org.w3c.dom.Element ?: return
@@ -360,7 +356,5 @@ internal class MsnpPhotoSession(
             require(result.size <= MAX_OBJECT_BYTES)
             return result
         }
-        private fun escape(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
     }
 }

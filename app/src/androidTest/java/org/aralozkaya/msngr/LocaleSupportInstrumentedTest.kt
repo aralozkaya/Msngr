@@ -24,7 +24,6 @@ import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.pages.components.LoggedInUserProfileCard
 import org.aralozkaya.msngr.pages.components.PresenceLabel
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -54,9 +53,7 @@ class LocaleSupportInstrumentedTest {
                 }
             }
         }
-        assertTrue("Expected 'en' in LocaleConfig ($tags)", "en" in tags)
-        assertTrue("Expected 'tr' in LocaleConfig ($tags)", "tr" in tags)
-        assertEquals(setOf("en", "tr"), tags)
+        assertEquals(setOf("en", "en-GB", "tr"), tags)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             assertEquals("en", localeConfig.defaultLocale?.toLanguageTag())
         }
@@ -76,6 +73,8 @@ class LocaleSupportInstrumentedTest {
             assertEquals("Minimize", localized.getString(R.string.game_minimize))
             assertEquals("File transfer canceled", localized.getString(R.string.file_sharing_canceled))
         }
+        assertEquals("Favorites", localizedContext("en").getString(R.string.contacts_section_favorites))
+        assertEquals("Favourites", localizedContext("en-GB").getString(R.string.contacts_section_favorites))
 
         val tr = localizedContext("tr")
         assertEquals("Msngr", tr.getString(R.string.app_name))
@@ -85,6 +84,24 @@ class LocaleSupportInstrumentedTest {
         assertEquals("Kişi", tr.getString(R.string.common_contact_singular))
         assertEquals("Engellenen kişiler", tr.getString(R.string.blocked_contacts_title))
         assertEquals("Kişi istekleri", tr.getString(R.string.contact_requests_title_plural))
+    }
+
+    @Test fun mediaFailuresUseTheSelectedLocale() {
+        val english = localizedContext("en")
+        val turkish = localizedContext("tr")
+        val errors = listOf(
+            R.string.chat_error_emotion_sounds_unavailable,
+            R.string.chat_error_voice_clips_unavailable,
+            R.string.voice_clip_mic_permission,
+            R.string.voice_clip_mic_unavailable,
+            R.string.voice_clip_mic_open_failed,
+            R.string.voice_clip_mic_start_failed,
+            R.string.voice_clip_mic_recording_failed,
+            R.string.voice_clip_audio_playback_failed,
+        )
+        for (error in errors) {
+            assertEquals(turkish.getString(error), turkish.localizeUserMessage(english.getString(error)))
+        }
     }
 
     @Test fun mainScreenStatusDropdownAndPresenceLabelAreTranslatedInTurkish() {

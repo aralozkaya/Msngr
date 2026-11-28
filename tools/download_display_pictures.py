@@ -8,13 +8,10 @@ import hashlib
 from html.parser import HTMLParser
 import json
 from pathlib import Path
-import re
-import time
-from urllib.parse import unquote, urljoin
-from urllib.request import Request, urlopen
+from urllib.parse import urljoin
+from messenger_artwork import SOURCE, fetch, image_data, original_image
 
 
-SOURCE = "https://windowswallpaper.miraheze.org/wiki/Windows_Live_Messenger"
 DESTINATION = Path(__file__).resolve().parents[1] / "app/src/main/assets/display_pictures"
 
 
@@ -47,10 +44,7 @@ class DisplayPictureParser(HTMLParser):
         elif tag == "a" and self.row is not None and attrs.get("href", "").startswith("/wiki/File:"):
             self.file_page = urljoin(SOURCE, attrs["href"])
         elif tag == "img" and self.row is not None:
-            source = urljoin(SOURCE, attrs["src"])
-            if "/thumb/" in source:
-                source = source.replace("/thumb/", "/", 1).rsplit("/", 1)[0]
-            self.image = source
+            self.image = attrs.get("src")
 
     def handle_data(self, data):
         if not self.active:
@@ -70,44 +64,29 @@ class DisplayPictureParser(HTMLParser):
             self.row.append(" ".join("".join(self.cell).split()))
             self.cell = None
         elif tag == "tr" and self.row is not None:
-            if self.image:
-                filename = unquote(self.image.rsplit("/", 1)[1])
-                stem, extension = filename.rsplit(".", 1)
-                identifier = re.sub(r"[^a-z0-9]+", "_", stem.lower()).strip("_")
+            if self.image and len(self.row) > 1:
+                url, _, identifier, filename = original_image(self.image)
                 self.pictures.append({
                     "id": identifier,
                     "name": self.row[1],
                     "group": self.group,
-                    "file": f"{identifier}.{extension.lower()}",
-                    "sourceUrl": self.image,
+                    "file": filename,
+                    "sourceUrl": url,
                     "filePage": self.file_page,
                     "sourceColumns": self.row[1:],
                 })
             self.row = None
 
 
-def fetch(url):
-    for attempt in range(4):
-        try:
-            with urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0 (Msngr display picture importer)"}), timeout=45) as response:
-                return response.read()
-        except Exception:
-            if attempt == 3:
-                raise
-            time.sleep(attempt + 1)
-
-
 def main():
     parser = DisplayPictureParser()
     parser.feed(fetch(SOURCE).decode("utf-8"))
-    assert parser.pictures, "No display pictures found; the wiki structure may have changed."
-    assert len({p["id"] for p in parser.pictures}) == len(parser.pictures), "Duplicate IDs"
+    if not parser.pictures or len({p["id"] for p in parser.pictures}) != len(parser.pictures):
+        raise ValueError("Expected a nonempty display-picture catalog with unique IDs")
     DESTINATION.mkdir(parents=True, exist_ok=True)
     for picture in parser.pictures:
         path = DESTINATION / picture["file"]
-        data = path.read_bytes() if path.exists() else fetch(picture["sourceUrl"])
-        assert data.startswith((b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"\xff\xd8\xff", b"BM")), picture["sourceUrl"]
-        path.write_bytes(data)
+        data = image_data(path, picture["sourceUrl"])
         picture["sha256"] = hashlib.sha256(data).hexdigest()
         picture["bytes"] = len(data)
         # APNG uses a PNG signature, even if its filename ends in .png.

@@ -21,9 +21,10 @@ object MsnWink {
     const val MAX_EXPANDED_BYTES = 8 * 1024 * 1024
     const val MAX_PLAYBACK_MILLIS = 12_000L
 
-    fun parseOffer(xml: String?): MsnDisplayPicture? = MsnDisplayPicture.parseObject(xml, OBJECT_TYPE)?.takeIf {
-        it.size in 36..MAX_CAB_BYTES && MsnBase64.decode(it.sha1d)?.size == 20
-    }
+    fun parseOffer(xml: String?): MsnDisplayPicture? = MsnDisplayPicture.parseObject(xml, OBJECT_TYPE)?.takeIf(::validOffer)
+
+    internal fun validOffer(metadata: MsnDisplayPicture): Boolean =
+        metadata.size in 36..MAX_CAB_BYTES && MsnBase64.decode(metadata.sha1d)?.size == 20
 
     fun payloads(metadata: MsnDisplayPicture): List<ByteArray> {
         require(metadata.objectType == OBJECT_TYPE)

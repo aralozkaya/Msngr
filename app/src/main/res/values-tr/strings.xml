@@ -58,11 +58,8 @@
     <string name="format_italic">İtalik</string>
     <string name="format_strikethrough">Üstü çizili</string>
     <string name="format_underline">Altı çizili</string>
-    <string name="format_clear">Tüm stillemeyi kaldır</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="format_colors_plural">Renkler</string>
     <string name="insert_emoticon">İfadeler</string>
-    <string name="emoticon_backspace">Sil</string>
     <string name="emoticon_search_hint">İfade ara</string>
     <string name="emoticon_search_back">İfadelere geri dön</string>
     <string name="emoticon_search_clear">İfade aramasını temizle</string>
@@ -267,7 +264,6 @@
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="chat_scroll_to_latest_new_messages_plural_after_number">yeni mesaj</string>
     <string name="chat_error_emotion_sounds_unavailable">Duygu sesleri kullanılamıyor.</string>
-    <string name="chat_error_winks_unavailable">Göz kırpmaları kullanılamıyor.</string>
     <string name="chat_error_voice_clips_unavailable">Ses klipleri kullanılamıyor.</string>
     <string name="chat_top_bar_view_group">Grup üyelerini görüntüle</string>
     <string name="chat_top_bar_view_profile">Kişi profilini görüntüle</string>
@@ -463,7 +459,6 @@
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="settings_show_ads_supporting_you_singular">Ana sayfada Messenger hizmetinizden sponsor afişlerini ve metin reklamlarını gösterin.</string>
     <string name="portal_whats_new_title">Yenilikler</string>
-    <string name="portal_whats_new_refresh">Yenilikleri yenile</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="portal_whats_new_empty_you_singular">Kişilerinizin yeni etkinliği yok</string>
     <string name="portal_whats_new_unavailable">Yenilikler, Bugün ve siteleri görmek için canlı bir Messenger hizmetine bağlanın.</string>
@@ -471,10 +466,8 @@
     <string name="portal_today_title">Bugün</string>
     <string name="portal_sites_open">Siteleri ve Bugün\'ü aç</string>
     <string name="portal_sites_close">Siteleri ve Bugün\'ü kapat</string>
-    <string name="portal_sites_empty">Bu sunucu tarafından yapılandırılmış site yok</string>
     <string name="portal_webview_back">Geri</string>
     <string name="portal_webview_open_in_browser">Tarayıcıda aç</string>
-    <string name="portal_webview_refresh">Yenile</string>
     <string name="portal_webview_close">Kapat</string>
     <string name="portal_webview_load_error">Sayfa yüklenemedi.</string>
     <string name="portal_webview_http_error_before_number">HTTP</string>
@@ -630,8 +623,6 @@
     <string name="settings_emoticon_style_wlm_2009_title">WLM 8.1 - 2009</string>
     <string name="settings_emoticon_style_wlm_2012_title">WLM 2011 - 2012</string>
     <string name="settings_emoticon_style_android_title">Android emojileri</string>
-    <string name="settings_original_emoticons_title">Orijinal Messenger ifadelerini kullan</string>
-    <string name="settings_original_emoticons_supporting">Modern Unicode emojiler yerine klasik MSN görsellerini göster.</string>
     <string name="settings_play_winks_auto_title">Göz kırpmalarını otomatik oynat</string>
     <string name="settings_play_winks_auto_supporting">Sohbet açıkken gelen göz kırpmalarını oynat. Azaltılmış hareket ayarında küçük resim gösterilir.</string>
     <string name="settings_wink_sounds_title">Göz kırpması sesleri</string>
@@ -1982,7 +1973,6 @@
     <string name="contact_favorites_added">Favorilere eklendi.</string>
     <string name="contact_favorites_removed">Favorilerden çıkarıldı.</string>
     <string name="contact_categories_update_failed">Kategoriler güncellenemedi. Tekrar deneyin.</string>
-    <string name="contact_category_none">Yok</string>
     <string name="contact_category_select_label">Kategori</string>
     <string name="category_options_description">Kategori seçenekleri</string>
     <string name="category_create_title">Kategori oluştur</string>

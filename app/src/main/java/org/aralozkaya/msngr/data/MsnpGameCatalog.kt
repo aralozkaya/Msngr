@@ -3,14 +3,13 @@ package org.aralozkaya.msngr.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.MsnGameInviteContext
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
-import javax.xml.parsers.DocumentBuilderFactory
 
 data class GameCatalogCategory(
     val categoryId: Int,
@@ -233,8 +232,7 @@ object MsnpGameCatalogService {
     }
 
     internal fun parseDataSetXml(xml: String, defaultAppType: Int = 0): GameCatalog {
-        val document = catalogDocumentBuilderFactory().newDocumentBuilder()
-            .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        val document = parseProtocolXml(xml, namespaceAware = false)
 
         val categoryNodes = document.getElementsByTagName("Category")
         val categories = buildList {
@@ -273,8 +271,7 @@ object MsnpGameCatalogService {
     }
 
     internal fun parseAppEntryXml(xml: String): GameCatalogEntry? {
-        val document = catalogDocumentBuilderFactory().newDocumentBuilder()
-            .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        val document = parseProtocolXml(xml, namespaceAware = false)
         val entry = document.getElementsByTagName("Entry").item(0) as? Element
             ?: (document.documentElement?.takeIf { it.tagName == "Entry" })
             ?: return null
@@ -351,7 +348,7 @@ object MsnpGameCatalogService {
             if (status !in 200..299) {
                 throw IllegalStateException("Game catalog request failed with HTTP $status")
             }
-            connection.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+            connection.inputStream.use { it.readServiceText() }
         } finally {
             connection.disconnect()
         }
@@ -560,12 +557,3 @@ private fun Element.catalogBool(tagName: String): Boolean {
     val raw = catalogText(tagName)
     return raw == "1" || raw.equals("true", ignoreCase = true)
 }
-
-private fun catalogDocumentBuilderFactory(): DocumentBuilderFactory =
-    DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = false
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }

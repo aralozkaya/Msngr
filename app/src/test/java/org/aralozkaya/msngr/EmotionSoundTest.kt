@@ -5,6 +5,9 @@ import org.aralozkaya.msngr.data.*
 import org.aralozkaya.msngr.protocol.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
+import java.io.IOException
+import java.io.RandomAccessFile
 
 class EmotionSoundTest {
     private fun fixture(name: String) = javaClass.getResourceAsStream("/emotion-sounds/$name")!!.use { it.readBytes() }
@@ -148,6 +151,57 @@ class EmotionSoundTest {
             assertArrayEquals(bytes, restart.bytes("account-a", MsnEmotionSound.DEFAULT_SERVER, sound))
         } finally { directory.deleteRecursively() }
     }
+    @Test fun savedSoundReplacementRespectsTheQuotaAndPreservesThePreviousBytes() {
+        val directory = createTestTempDir("sound-replacement")
+        try {
+            val store = EmotionSoundStore(directory)
+            val server = MsnEmotionSound.DEFAULT_SERVER
+            val sound = MsnEmotionSound.builtIns.first()
+            val audio = fixture("hello.mp3")
+            store.put("owner", server, sound, audio, save = true)
+            val saved = directory.walkTopDown().single { it.extension == "mp3" }
+            val library = saved.parentFile!!
+            repeat(32) { i ->
+                RandomAccessFile(File(library, "entry-$i.mp3"), "rw").use {
+                    it.setLength((1024L * 1024) - if (i == 0) audio.size.toLong() else 0L)
+                }
+            }
+            val abandoned = File(library, saved.name + ".tmp")
+            abandoned.writeBytes(audio)
+            store.put("owner", server, sound, audio, save = true)
+            assertFalse(abandoned.exists())
+            assertThrows(IllegalStateException::class.java) {
+                store.put("owner", server, sound, audio + 0.toByte(), save = true)
+            }
+            assertThrows(IOException::class.java) {
+                saved.replaceMediaFile { output ->
+                    output.write(1)
+                    throw IOException("Interrupted write")
+                }
+            }
+            assertArrayEquals(audio, store.bytes("owner", server, sound))
+            assertFalse(abandoned.exists())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun interruptedSoundReplacementIsRecoveredBeforeListingOrRemovingIt() {
+        val directory = createTestTempDir("sound-recovery")
+        try {
+            val server = MsnEmotionSound.DEFAULT_SERVER
+            val bytes = custom()
+            val sound = MsnEmotionSound.downloaded(bytes)
+            EmotionSoundStore(directory).put("owner", server, sound, bytes, save = true)
+            val saved = directory.walkTopDown().single { it.extension == "mp3" }
+            assertTrue(saved.renameTo(File(saved.parentFile, saved.name + ".bak")))
+            File(saved.parentFile, saved.name + ".tmp").writeBytes(byteArrayOf(1))
+            val reopened = EmotionSoundStore(directory)
+            assertTrue(sound in reopened.catalog("owner", server))
+            reopened.remove("owner", server, sound)
+            assertFalse(reopened.isSaved("owner", server, sound))
+            assertArrayEquals(bytes, reopened.bytes("owner", server, sound))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun historyRetainsOriginalStyledTextButNeverRestoresAutoplay() {
         val directory = createTestTempDir("msngr-emotion-history")
         try {

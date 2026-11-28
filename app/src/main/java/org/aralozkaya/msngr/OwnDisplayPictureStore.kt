@@ -6,7 +6,6 @@ import android.util.AtomicFile
 import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 import org.aralozkaya.msngr.protocol.DisplayPictureLimits
 import java.io.File
-import java.security.MessageDigest
 
 internal data class SavedDisplayPicture(val initialized: Boolean, val bytes: ByteArray? = null, val uri: String? = null)
 
@@ -14,9 +13,6 @@ internal data class SavedDisplayPicture(val initialized: Boolean, val bytes: Byt
 internal object OwnDisplayPictureStore {
     private fun directory(context: Context, account: AccountIdentity) =
         File(context.noBackupFilesDir, "own_display_pictures/${account.storageKey}")
-
-    private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it.toInt() and 255) }
 
     private fun selected(context: Context, account: AccountIdentity): String? = runCatching {
         AtomicFile(File(directory(context, account), "selected")).openRead().use {
@@ -43,7 +39,7 @@ internal object OwnDisplayPictureStore {
             val file = File(requireNotNull(Uri.parse(reference.uri).path))
             val bytes = file.readBytes()
             require(bytes.size <= DisplayPictureLimits.MAX_BYTES && DisplayPictureFormat.detect(bytes) != null)
-            require(file.nameWithoutExtension == hash(bytes))
+            require(file.nameWithoutExtension == bytes.sha256Hex())
             reference.copy(bytes = bytes)
         }.getOrElse { SavedDisplayPicture(false) }
     }
@@ -51,7 +47,7 @@ internal object OwnDisplayPictureStore {
     @Synchronized fun write(context: Context, account: AccountIdentity, bytes: ByteArray?): SavedDisplayPicture {
         require(bytes == null || bytes.size <= DisplayPictureLimits.MAX_BYTES && DisplayPictureFormat.detect(bytes) != null)
         val directory = directory(context, account).apply { mkdirs() }
-        val selected = bytes?.let(::hash) ?: "none"
+        val selected = bytes?.sha256Hex() ?: "none"
         val file = bytes?.let { File(directory, "$selected.image") }
         if (file != null) atomicWrite(file, requireNotNull(bytes))
         atomicWrite(File(directory, "selected"), selected.toByteArray(Charsets.US_ASCII))

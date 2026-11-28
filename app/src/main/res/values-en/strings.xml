@@ -58,11 +58,8 @@
     <string name="format_italic">Italic</string>
     <string name="format_strikethrough">Strikeout</string>
     <string name="format_underline">Underline</string>
-    <string name="format_clear">Remove all styling</string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
-    <string name="format_colors_plural">Colors</string>
     <string name="insert_emoticon">Emoticons</string>
-    <string name="emoticon_backspace">Backspace</string>
     <string name="emoticon_search_hint">Search emoticons</string>
     <string name="emoticon_search_back">Back to emoticons</string>
     <string name="emoticon_search_clear">Clear emoticon search</string>
@@ -267,7 +264,6 @@
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <string name="chat_scroll_to_latest_new_messages_plural_after_number">new messages</string>
     <string name="chat_error_emotion_sounds_unavailable">Emotion sounds are unavailable.</string>
-    <string name="chat_error_winks_unavailable">Winks are unavailable.</string>
     <string name="chat_error_voice_clips_unavailable">Voice clips are unavailable.</string>
     <string name="chat_top_bar_view_group">View group members</string>
     <string name="chat_top_bar_view_profile">View contact profile</string>
@@ -463,7 +459,6 @@
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="settings_show_ads_supporting_you_singular">Display sponsor banners and text ads from your Messenger service on the Home feed.</string>
     <string name="portal_whats_new_title">What\'s new</string>
-    <string name="portal_whats_new_refresh">Refresh What\'s new</string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <string name="portal_whats_new_empty_you_singular">No new activities from your contacts</string>
     <string name="portal_whats_new_unavailable">Connect to a live Messenger service to see What\'s new, Today, and sites.</string>
@@ -471,10 +466,8 @@
     <string name="portal_today_title">Today</string>
     <string name="portal_sites_open">Open sites and Today</string>
     <string name="portal_sites_close">Close sites and Today</string>
-    <string name="portal_sites_empty">No sites configured by this server</string>
     <string name="portal_webview_back">Back</string>
     <string name="portal_webview_open_in_browser">Open in browser</string>
-    <string name="portal_webview_refresh">Refresh</string>
     <string name="portal_webview_close">Close</string>
     <string name="portal_webview_load_error">Could not load page.</string>
     <string name="portal_webview_http_error_before_number">HTTP</string>
@@ -630,8 +623,6 @@
     <string name="settings_emoticon_style_wlm_2009_title">WLM 8.1 - 2009</string>
     <string name="settings_emoticon_style_wlm_2012_title">WLM 2011 - 2012</string>
     <string name="settings_emoticon_style_android_title">Android emoji</string>
-    <string name="settings_original_emoticons_title">Use original Messenger emoticons</string>
-    <string name="settings_original_emoticons_supporting">Show the classic MSN artwork instead of modern Unicode emoji.</string>
     <string name="settings_play_winks_auto_title">Play winks automatically</string>
     <string name="settings_play_winks_auto_supporting">Play incoming winks while the chat is open. Reduced motion uses a thumbnail.</string>
     <string name="settings_wink_sounds_title">Wink sounds</string>
@@ -1982,7 +1973,6 @@
     <string name="contact_favorites_added">Added to Favorites.</string>
     <string name="contact_favorites_removed">Removed from Favorites.</string>
     <string name="contact_categories_update_failed">Couldn’t update categories. Try again.</string>
-    <string name="contact_category_none">None</string>
     <string name="contact_category_select_label">Category</string>
     <string name="category_options_description">Category options</string>
     <string name="category_create_title">Create category</string>

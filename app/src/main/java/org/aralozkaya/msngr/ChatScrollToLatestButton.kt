@@ -415,15 +415,7 @@ internal fun LazyListState.isScrolledAwayFromLatest(): Boolean =
     firstVisibleItemIndex > 0 ||
         firstVisibleItemScrollOffset > layoutInfo.viewportSize.height / 3
 
-/**
- * Scrolls to the newest message as one continuous, fast glide instead of a jump.
- *
- * Item sizes are only known for the visible rows, so the remaining distance is re-estimated on
- * every frame instead of animating toward a fixed target. The easing curve is applied to
- * whatever distance is left, and the estimate becomes exact once the newest item is on screen,
- * so the glide always ends precisely at the bottom with no leftover correction. The duration
- * grows with the distance, from 220 ms to 750 ms. A touch on the list interrupts the glide.
- */
+/** Only visible rows have measured heights. Recalculate the distance as new rows enter the viewport. */
 internal suspend fun LazyListState.animateScrollToLatest() {
     val initialDistance = estimatedDistanceToLatest()
     if (initialDistance <= 0f) return
@@ -436,18 +428,14 @@ internal suspend fun LazyListState.animateScrollToLatest() {
             val frame = withFrameNanos { it }
             val progress = ScrollEasing.transform(((frame - start).toFloat() / durationNanos).coerceIn(0f, 1f))
             val remaining = estimatedDistanceToLatest()
-            // Cover this frame's share of the curve out of what is left, capped so that any
-            // underestimated distance near the end still glides in instead of snapping on the
-            // final frame.
+            // Limit the last step when newly measured rows change the estimate.
             val rawShare = if (previousProgress >= 1f) 1f else (progress - previousProgress) / (1f - previousProgress)
             val share = rawShare.coerceAtMost(MAX_FRAME_SHARE)
             previousProgress = progress
-            // Negative moves toward index zero.
             val consumed = -scrollBy(-(remaining * share).coerceAtLeast(1f).coerceAtMost(remaining))
             if (consumed <= 0f) break
         }
     }
-    // Only reachable if the list stopped moving before the bottom, e.g. when its content changed.
     if (canScrollBackward) scrollToItem(0)
 }
 

@@ -11,10 +11,9 @@ import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.DisplayPictureLimits
 import org.aralozkaya.msngr.protocol.GifDisplayPicture
 import org.aralozkaya.msngr.protocol.MsnBase64
-import java.io.ByteArrayOutputStream
+import java.io.SequenceInputStream
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.min
 
 private const val AVATAR_DECODE_TARGET_SIZE = 384
 private const val PROFILE_PICTURE_MAX_PIXELS = 4_194_304L
@@ -54,21 +53,21 @@ internal suspend fun Context.loadAvatarBitmap(uri: String?, highResolution: Bool
     if (uri.isNullOrBlank()) return null
     val cacheKey = avatarCacheKey(uri, highResolution)
     displayPictureBitmapCache.get(cacheKey)?.let { return it }
-    val pending = CompletableDeferred<Bitmap?>()
-    pendingAvatarDecodes.putIfAbsent(cacheKey, pending)?.let { return it.await() }
-    try {
-        val decoded = withContext(Dispatchers.IO) {
-            displayPictureBitmapCache.get(cacheKey) ?: runCatching {
+    return withContext(Dispatchers.IO) {
+        val pending = CompletableDeferred<Bitmap?>()
+        pendingAvatarDecodes.putIfAbsent(cacheKey, pending)?.let { return@withContext it.await() }
+        try {
+            val decoded = displayPictureBitmapCache.get(cacheKey) ?: runCatching {
                 decodeSampledAvatar(uri, highResolution)
             }.getOrNull()?.also { displayPictureBitmapCache.put(cacheKey, it) }
+            pending.complete(decoded)
+            decoded
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            pendingAvatarDecodes.remove(cacheKey, pending)
         }
-        pending.complete(decoded)
-        return decoded
-    } catch (error: Throwable) {
-        pending.completeExceptionally(error)
-        throw error
-    } finally {
-        pendingAvatarDecodes.remove(cacheKey, pending)
     }
 }
 
@@ -89,19 +88,7 @@ private fun Context.decodeSampledAvatar(uri: String, highResolution: Boolean): B
         }
     }
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sampleSize = 1
-    if (highResolution) {
-        // Keep original pixels for profile viewing, with a memory limit for unusually large files.
-        while (bounds.outWidth.toLong() / sampleSize * (bounds.outHeight / sampleSize) > PROFILE_PICTURE_MAX_PIXELS) {
-            sampleSize *= 2
-        }
-    } else {
-        while (
-            min(bounds.outWidth, bounds.outHeight) / (sampleSize * 2) >= AVATAR_DECODE_TARGET_SIZE
-        ) {
-            sampleSize *= 2
-        }
-    }
+    val sampleSize = avatarSampleSize(bounds.outWidth, bounds.outHeight, highResolution)
     val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
     return if (inlineBytes != null) {
         BitmapFactory.decodeByteArray(inlineBytes, 0, inlineBytes.size, options)
@@ -110,6 +97,19 @@ private fun Context.decodeSampledAvatar(uri: String, highResolution: Boolean): B
             BitmapFactory.decodeStream(input, null, options)
         }
     }
+}
+
+internal fun avatarSampleSize(width: Int, height: Int, highResolution: Boolean): Int {
+    require(width > 0 && height > 0)
+    var sample = 1
+    if (!highResolution) {
+        while (minOf(width, height) / sample / 2 >= AVATAR_DECODE_TARGET_SIZE) sample *= 2
+    }
+    // Panoramas can have a tiny short edge and still need a large decode.
+    while (((width - 1L) / sample + 1) * ((height - 1L) / sample + 1) > PROFILE_PICTURE_MAX_PIXELS) {
+        sample *= 2
+    }
+    return sample
 }
 
 internal fun String.inlineImageBytes(): ByteArray? {
@@ -140,16 +140,8 @@ internal fun Context.loadAvatarGifBytes(uri: String?): ByteArray? {
             offset += count
         }
         if (!GifDisplayPicture.hasSignature(header)) return@use null
-        ByteArrayOutputStream().use { output ->
-            output.write(header)
-            val buffer = ByteArray(8192)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                require(count <= GifDisplayPicture.MAX_BYTES - output.size()) { getString(R.string.display_picture_gif_too_large) }
-                output.write(buffer, 0, count)
-            }
-            output.toByteArray()
+        SequenceInputStream(header.inputStream(), input).readBytesBounded(GifDisplayPicture.MAX_BYTES) {
+            getString(R.string.display_picture_gif_too_large)
         }
     }
 }
