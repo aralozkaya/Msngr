@@ -1136,6 +1136,8 @@ class GameWebViewInstrumentedTest {
         val closed = AtomicBoolean(false)
         val gamePageRequests = AtomicInteger()
         val loopRequests = AtomicInteger()
+        val lastAllowedRequest = CountDownLatch(1)
+        val unexpectedRequest = CountDownLatch(1)
         val serverSocket = ServerSocket(0)
         val port = serverSocket.localPort
         val serverThread = Thread {
@@ -1163,8 +1165,12 @@ class GameWebViewInstrumentedTest {
                     val redirect = when (path) {
                         "/games/start" -> "http://127.0.0.1:$port/games/unstyled.htm"
                         "/games/loop-a.htm", "/games/loop-b.htm" -> {
-                            if (loopRequests.incrementAndGet() >= 20) null
-                            else if (path.endsWith("a.htm")) "loop-b.htm" else "loop-a.htm"
+                            val count = loopRequests.incrementAndGet()
+                            if (count == 11) lastAllowedRequest.countDown()
+                            if (count > 11) {
+                                unexpectedRequest.countDown()
+                                null
+                            } else if (path.endsWith("a.htm")) "loop-b.htm" else "loop-a.htm"
                         }
                         else -> null
                     }
@@ -1310,7 +1316,8 @@ class GameWebViewInstrumentedTest {
             val unstyledEntry = catalog.findEntry(700001)!!
             val customBgEntry = catalog.findEntry(700002)!!
 
-            withLiveP2pGameHost(unstyledEntry, phoneInitiates = true) { webView, pcP2p, _, pcSessionRef, sessionId ->
+            withLiveP2pGameHost(unstyledEntry, phoneInitiates = true) { webView, pcP2p, mobileSession, pcSessionRef, sessionId ->
+                compose.waitUntil(10_000) { mobileSession.value?.localChannelInitialized == true }
                 compose.waitUntil(10_000) {
                     evaluateOnWebView(webView, "String(window.__remoteReady === true)") == "\"true\""
                 }
@@ -1345,12 +1352,8 @@ class GameWebViewInstrumentedTest {
             }
             val loopController = createController(customBgEntry.copy(url = "http://127.0.0.1:$port/games/loop-a.htm"))
             try {
-                compose.waitUntil(10_000) {
-                    loopRequests.get() >= 11 && evaluate(loopController, """
-                        document.readyState === 'complete' && location.pathname === '/games/loop-a.htm' &&
-                            !document.getElementById('__p4_redirect')
-                    """.trimIndent()) == "true"
-                }
+                assertTrue("The loop never reached the redirect limit", lastAllowedRequest.await(10, TimeUnit.SECONDS))
+                assertFalse("The loop exceeded the redirect limit", unexpectedRequest.await(1, TimeUnit.SECONDS))
                 assertEquals(11, loopRequests.get())
             } finally {
                 instrumentation.runOnMainSync { loopController.destroy() }

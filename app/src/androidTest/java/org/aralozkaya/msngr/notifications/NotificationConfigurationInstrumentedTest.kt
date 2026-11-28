@@ -360,31 +360,26 @@ class NotificationConfigurationInstrumentedTest {
         }
         NotificationChannels.createAll(context)
         val systemManager = context.getSystemService(NotificationManager::class.java)
-        val renderer = MsngrNotificationManager(context)
-        val contactId = "avatar-fallback@example.com"
-        val shortcutId = shortcutId(contactId)
+        val renderer = MsngrNotificationManager(context) { false }
+        val pictures = mapOf("initial" to null, "missing" to "file:///missing-contact-picture.png", "photo" to profilePictureDataUri())
+        val shortcutIds = mutableListOf<String>()
         systemManager.cancelAll()
         try {
-            for (uri in listOf(null, "file:///missing-contact-picture.png", profilePictureDataUri())) {
+            for ((fixture, uri) in pictures) {
+                val contactId = "avatar-$fixture@example.test"
+                val shortcutId = shortcutId(contactId)
+                shortcutIds += shortcutId
                 for (type in NotificationEventType.entries) {
-                    renderer.show(
-                        NotificationEvent(
-                            type = type,
-                            contactId = contactId,
-                            contactName = "[b]  alice example  [/b]",
-                            contactAvatarUri = uri,
-                            messageText = "Avatar test",
-                        ),
+                    val event = NotificationEvent(
+                        type = type,
+                        contactId = contactId,
+                        contactName = "[b]  alice example  [/b]",
+                        contactAvatarUri = uri,
+                        messageText = "Avatar test",
                     )
+                    renderer.show(event)
                     val notificationId = MsngrNotificationManager.notificationId(type, contactId)
-                    var notification: android.app.Notification? = null
-                    for (attempt in 0 until 20) {
-                        notification = systemManager.activeNotifications
-                            .singleOrNull { it.id == notificationId }?.notification
-                        if (notification != null) break
-                        SystemClock.sleep(100)
-                    }
-                    val posted = requireNotNull(notification)
+                    val posted = awaitNotification(notificationId) { it.`when` == event.sentAtMillis }
                     assertConversationIcon(posted, contactId)
                     val actual = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posted)
                         ?.messages?.single()?.person?.icon?.loadDrawable(context)?.toBitmap(128, 128)
@@ -402,15 +397,10 @@ class NotificationConfigurationInstrumentedTest {
                         .single { it.id == shortcutId }
                     assertEquals("  alice example  ", shortcut.shortLabel.toString())
                     systemManager.cancel(notificationId)
-                    for (attempt in 0 until 20) {
-                        if (systemManager.activeNotifications.none { it.id == notificationId }) break
-                        SystemClock.sleep(100)
-                    }
-                    assertTrue(systemManager.activeNotifications.none { it.id == notificationId })
                 }
             }
         } finally {
-            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId))
+            ShortcutManagerCompat.removeDynamicShortcuts(context, shortcutIds)
             systemManager.cancelAll()
         }
     }
