@@ -5,18 +5,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.BuildConfig
 import org.aralozkaya.msngr.NativeTextStyle
+import org.aralozkaya.msngr.protocol.escapeXml
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnpCommand
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import javax.xml.parsers.DocumentBuilderFactory
 
 internal data class OfflineMessageMetadata(
     val id: String,
@@ -62,7 +61,7 @@ internal object MsnpOfflineMessages : OfflineMessageService {
     }
 
     fun parseMetadata(xml: String): List<OfflineMessageMetadata> {
-        var document = offlineXml(xml)
+        var document = parseProtocolXml(xml)
         checkSoapFault(document.documentElement)
         // RSI returns Mail-Data as an XML-escaped string inside its SOAP response.
         // Notification-server Mail-Data is already XML, so accept both representations.
@@ -70,7 +69,7 @@ internal object MsnpOfflineMessages : OfflineMessageService {
         if (response != null && document.getElementsByTagNameNS("*", "MD").length == 0) {
             val embedded = response.textContent.trim()
             require(embedded.startsWith("<")) { "The offline message metadata response is invalid." }
-            document = offlineXml(embedded)
+            document = parseProtocolXml(embedded)
             checkSoapFault(document.documentElement)
         }
         require(document.getElementsByTagNameNS("*", "MD").length == 1) {
@@ -93,7 +92,7 @@ internal object MsnpOfflineMessages : OfflineMessageService {
     }
 
     fun parseMessage(xml: String, metadata: OfflineMessageMetadata): ChatMessage {
-        val document = offlineXml(xml)
+        val document = parseProtocolXml(xml)
         checkSoapFault(document.documentElement)
         val result = document.getElementsByTagNameNS("*", "GetMessageResult").item(0)
             ?: error("The offline message service returned an invalid message.")
@@ -135,13 +134,13 @@ internal object MsnpOfflineMessages : OfflineMessageService {
             "DeleteMessages" -> "<messageIds><messageId>${validOfflineId(id)}</messageId></messageIds>"
             else -> ""
         }
-        return """<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><PassportCookie xmlns="$NAMESPACE"><t>${token.offlineEscape()}</t><p>${fields["p"].orEmpty().offlineEscape()}</p></PassportCookie></soap:Header><soap:Body><$action xmlns="$NAMESPACE">$argument</$action></soap:Body></soap:Envelope>"""
+        return """<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><PassportCookie xmlns="$NAMESPACE"><t>${token.escapeXml()}</t><p>${fields["p"].orEmpty().escapeXml()}</p></PassportCookie></soap:Header><soap:Body><$action xmlns="$NAMESPACE">$argument</$action></soap:Body></soap:Envelope>"""
     }
 
     override suspend fun metadata(host: String, ticket: String) = parseMetadata(post(host, "GetMetadata", ticket))
     override suspend fun message(host: String, ticket: String, id: String) = post(host, "GetMessage", ticket, id)
     override suspend fun delete(host: String, ticket: String, id: String) {
-        val document = offlineXml(post(host, "DeleteMessages", ticket, id))
+        val document = parseProtocolXml(post(host, "DeleteMessages", ticket, id))
         checkSoapFault(document.documentElement)
         check(document.getElementsByTagNameNS("*", "DeleteMessagesResponse").length == 1) {
             "The offline message acknowledgement is invalid."
@@ -152,36 +151,15 @@ internal object MsnpOfflineMessages : OfflineMessageService {
         val endpoints = MsnpClientConfigService.candidateServiceEndpoints(host, "/rsi/rsi.asmx")
         check(endpoints.isNotEmpty()) { "The offline message service host is not configured." }
         MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-            val connection = URL(endpointUrl).openConnection() as HttpURLConnection
-            try {
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 15_000
-                connection.instanceFollowRedirects = false
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                connection.setRequestProperty("SOAPAction", "$NAMESPACE/$action")
-                connection.setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
-                connection.outputStream.use { it.write(buildRequest(action, ticket, id).toByteArray(Charsets.UTF_8)) }
-                val status = connection.responseCode
-                if (BuildConfig.DEBUG) runCatching { Log.i("MsnpOffline", "$action HTTP $status") }
-                val bytes = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                    ?.use { stream ->
-                        val output = java.io.ByteArrayOutputStream()
-                        val buffer = ByteArray(8192)
-                        while (true) {
-                            val count = stream.read(buffer)
-                            if (count < 0) break
-                            check(output.size() + count <= MAX_RESPONSE_BYTES) { "The offline message response is too large." }
-                            output.write(buffer, 0, count)
-                        }
-                        output.toByteArray()
-                    } ?: error("The offline message service returned no response.")
-                val response = bytes.toString(Charsets.UTF_8)
-                checkSoapFault(offlineXml(response).documentElement)
-                check(status in 200..299) { "The offline message service returned HTTP $status." }
-                response
-            } finally { connection.disconnect() }
+            val (status, response) = postSoapEnvelope(
+                endpointUrl, "$NAMESPACE/$action", buildRequest(action, ticket, id),
+                timeoutMillis = 15_000, maxResponseBytes = MAX_RESPONSE_BYTES, followRedirects = false,
+            )
+            if (BuildConfig.DEBUG) runCatching { Log.i("MsnpOffline", "$action HTTP $status") }
+            checkNotNull(response) { "The offline message service returned no response." }
+            checkSoapFault(parseProtocolXml(response).documentElement)
+            check(status in 200..299) { "The offline message service returned HTTP $status." }
+            response
         }
     }
 }
@@ -198,14 +176,6 @@ internal fun parseOfflineMime(text: String): Pair<Map<String, String>, String> {
     return headers to if (end < 0) "" else normalized.substring(end + 2)
 }
 
-private fun offlineXml(xml: String) = DocumentBuilderFactory.newInstance().apply {
-    isNamespaceAware = true
-    isExpandEntityReferences = false
-    runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-    runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-    runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-}.newDocumentBuilder().parse(xml.byteInputStream(Charsets.UTF_8))
-
 private fun checkSoapFault(root: Element) {
     check(root.getElementsByTagNameNS("*", "Fault").length == 0) {
         "The offline message service rejected the request."
@@ -215,7 +185,6 @@ private fun checkSoapFault(root: Element) {
 private fun Element.offlineText(name: String) = getElementsByTagNameNS("*", name).item(0)?.textContent.orEmpty()
 private val OFFLINE_UUID = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 private fun validOfflineId(id: String?): String = checkNotNull(id).also { require(OFFLINE_UUID.matches(it)) }
-private fun String.offlineEscape() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 internal fun decodeOfflineDisplayName(text: String): String = Regex("=\\?([^?]+)\\?([bBqQ])\\?([^?]*)\\?=")
     .replace(text.replace(Regex("(?<=\\?=)\\s+(?==\\?)"), "")) { match ->

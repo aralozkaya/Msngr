@@ -3,15 +3,12 @@ package org.aralozkaya.msngr
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import java.security.MessageDigest
 import java.util.Locale
 
 internal fun String.normalizedAccountEmail(): String = trim().lowercase(Locale.ROOT)
 
 /** Only used to recognize and retire the old email-only storage format. */
-internal fun accountStorageKey(email: String): String = MessageDigest.getInstance("SHA-256")
-    .digest(email.normalizedAccountEmail().toByteArray(Charsets.UTF_8))
-    .joinToString("") { "%02x".format(it) }
+internal fun accountStorageKey(email: String): String = email.normalizedAccountEmail().sha256Hex()
 
 /** User preferences share the same account boundary as remembered credentials. */
 internal object AccountPreferences {

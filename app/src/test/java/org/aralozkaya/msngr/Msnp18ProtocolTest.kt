@@ -10,6 +10,7 @@ import org.aralozkaya.msngr.protocol.MsnpFrameDecoder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.charset.StandardCharsets
@@ -48,6 +49,39 @@ class Msnp18ProtocolTest {
         assertTrue(first.isEmpty())
         assertEquals(1, second.size)
         assertArrayEquals(payload, second.single().payload)
+    }
+
+    @Test
+    fun fragmentedBinaryFramesPreserveBoundariesAndStatusReplies() {
+        val payload = byteArrayOf(13, 10, 0, -1)
+        val wire = "MSG sender Friend 4\r\n".toByteArray() + payload +
+            "ADL 9 OK\r\nQNG 30\r\n".toByteArray()
+        for (split in 0..wire.size) {
+            val decoder = MsnpFrameDecoder()
+            val commands = decoder.feed(wire.copyOfRange(0, split)) +
+                decoder.feed(wire.copyOfRange(split, wire.size))
+            assertEquals(listOf("MSG", "ADL", "QNG"), commands.map(MsnpCommand::verb))
+            assertArrayEquals(payload, commands.first().payload)
+        }
+    }
+
+    @Test
+    fun decoderRejectsInvalidLengthsAndUnterminatedHeaders() {
+        for (length in listOf("-1", "16777217", "99999999999999999999")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                MsnpFrameDecoder().feed("MSG sender Friend $length\r\n".toByteArray())
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            MsnpFrameDecoder().feed(ByteArray(65537) { 'x'.code.toByte() })
+        }
+    }
+
+    @Test
+    fun encodingRejectsLineBreaksInHeaderFields() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MsnpFrameCodec.encode(MsnpCommand("CAL", parameters = listOf("one\ntwo")))
+        }
     }
 
     @Test

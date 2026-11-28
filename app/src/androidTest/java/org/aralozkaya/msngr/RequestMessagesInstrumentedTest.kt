@@ -89,7 +89,7 @@ class RequestMessagesInstrumentedTest {
         File(compose.activity.filesDir, "request-messages.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
-        compose.onNodeWithTag("accept-request-$peer").performScrollTo().performClick()
+        compose.onNodeWithTag("decline-request-$peer").performScrollTo().performClick()
         compose.onNodeWithTag("contact-request-decision-message").assertIsDisplayed().assertTextEquals(contactText)
     }
 }

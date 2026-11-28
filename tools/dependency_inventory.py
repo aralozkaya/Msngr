@@ -1,20 +1,21 @@
 """Export exact third-party identities in OSV-Scanner's custom lockfile format."""
 import json
-import subprocess
 from pathlib import Path
+from setup_dependencies import pinned_commit, verify_checkout
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def inventory(root=ROOT):
     packages = []
-    for name in ("libsiren", "ruffle"):
-        commit = subprocess.check_output(
-            ["git", "-C", str(root / "third_party" / name), "rev-parse", "HEAD"], text=True).strip()
-        packages.append({"package": {"name": f"github.com/{'kakaroto/libsiren' if name == 'libsiren' else 'ruffle-rs/ruffle'}", "commit": commit}})
     runtime = json.loads((root / "third_party/ruffle-runtime.json").read_text())
-    if packages[1]["package"]["commit"] != runtime["sourceCommit"]:
-        raise ValueError("Ruffle source/runtime mismatch; refusing to scan a misleading inventory")
+    for name, repository in (("libsiren", "kakaroto/libsiren"), ("ruffle", "ruffle-rs/ruffle")):
+        path = "third_party/" + name
+        commit = pinned_commit(root, path)
+        verify_checkout(root, path, commit)
+        if name == "ruffle" and commit != runtime["sourceCommit"]:
+            raise ValueError("Ruffle source/runtime mismatch; refusing to scan a misleading inventory")
+        packages.append({"package": {"name": "github.com/" + repository, "commit": commit}})
     packages.append({"package": {"name": "@ruffle-rs/ruffle", "ecosystem": "npm", "version": runtime["version"]}})
     return {"results": [{"packages": packages}]}
 

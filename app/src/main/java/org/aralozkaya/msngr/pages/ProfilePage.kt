@@ -80,9 +80,9 @@ import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.createDisplayPictureCaptureUri
 import org.aralozkaya.msngr.deleteDisplayPictureCapture
 import org.aralozkaya.msngr.displayPictureSync
+import org.aralozkaya.msngr.displayPictureDataUri
 import org.aralozkaya.msngr.inspectCapturedDisplayPicture
 import org.aralozkaya.msngr.inspectDisplayPicture
-import org.aralozkaya.msngr.loadDisplayPictureBytes
 import org.aralozkaya.msngr.localizeUserMessage
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.nowPlayingController
@@ -169,14 +169,16 @@ internal fun ProfilePage(
     }
     val usernameDraft = usernameEditorValue.text
     val statusMessageDraft = statusMessageEditorValue.text
-    var avatarUri by rememberSaveable { mutableStateOf(initial.avatarUri) }
-    var displayPictureBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var displayPictureBytes by rememberSaveable { mutableStateOf<ByteArray?>(null) }
     var displayPictureChanged by rememberSaveable { mutableStateOf(false) }
+    val avatarUri = remember(initial.avatarUri, displayPictureBytes, displayPictureChanged) {
+        if (displayPictureChanged) displayPictureBytes?.displayPictureDataUri() else initial.avatarUri
+    }
     var avatarImageVersion by remember { mutableIntStateOf(0) }
     var showDisplayPictureOptions by rememberSaveable { mutableStateOf(false) }
     var showDefaultDisplayPictures by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var expandedPictureUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var showPictureViewer by rememberSaveable { mutableStateOf(false) }
     var processingDisplayPicture by remember { mutableStateOf(false) }
     var pendingPictureResize by remember { mutableStateOf<DisplayPictureSelection?>(null) }
     var savingProfile by remember { mutableStateOf(false) }
@@ -211,10 +213,8 @@ internal fun ProfilePage(
         }
     val hasChanges = normalizedUsername != initial.username ||
         normalizedStatusMessage != initial.statusMessage ||
-        avatarUri != initial.avatarUri || displayPictureChanged
+        displayPictureChanged
     fun acceptPicture(picture: DisplayPictureSelection) {
-        // Store the actual upload, so previews, exports and sign-in restoration use identical bytes.
-        avatarUri = picture.dataUri
         displayPictureBytes = picture.bytes
         displayPictureChanged = true
         avatarImageVersion++
@@ -299,9 +299,8 @@ internal fun ProfilePage(
                 }
             },
             onDefaultPhoto = { showDisplayPictureOptions = false; showDefaultDisplayPictures = true },
-            onViewPicture = { expandedPictureUri = avatarUri; showDisplayPictureOptions = false },
+            onViewPicture = { showPictureViewer = true; showDisplayPictureOptions = false },
             onRemovePicture = {
-                avatarUri = null
                 displayPictureBytes = null
                 displayPictureChanged = initial.avatarUri != null
                 avatarImageVersion++
@@ -319,11 +318,11 @@ internal fun ProfilePage(
         )
     }
 
-    expandedPictureUri?.let { uri ->
+    if (showPictureViewer && avatarUri != null) {
         ContactPictureViewer(
-            pictureUri = uri,
+            pictureUri = avatarUri,
             name = usernameDraft.ifBlank { initial.username }.messengerPlusPlainText(),
-            onDismiss = { expandedPictureUri = null },
+            onDismiss = { showPictureViewer = false },
         )
     }
 
@@ -493,22 +492,11 @@ internal fun ProfilePage(
                                 focusManager.clearFocus()
                                 profileSaveError = null
                                 scope.launch {
-                                    val bytesToUpload = if (displayPictureChanged && avatarUri != null) {
-                                        displayPictureBytes
-                                            ?: context.loadDisplayPictureBytes(avatarUri)
-                                    } else {
-                                        null
-                                    }
-                                    if (displayPictureChanged && avatarUri != null && bytesToUpload == null) {
-                                        profileSaveError = ProfileSaveError(R.string.profile_error_read_image)
-                                        savingProfile = false
-                                        return@launch
-                                    }
                                     context.displayPictureSync.saveProfile(
                                         repository = repository,
                                         username = normalizedUsername,
                                         avatarUri = avatarUri,
-                                        pictureBytes = bytesToUpload,
+                                        pictureBytes = displayPictureBytes,
                                         pictureChanged = displayPictureChanged,
                                         statusMessage = normalizedStatusMessage,
                                     ).onSuccess {

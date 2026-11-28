@@ -153,7 +153,7 @@ internal class RealtimeNotificationBridge(
                     }
                     inAppNotifications?.show(InAppNotification(type, notificationEvent.contactName, text,
                         notificationEvent.contactId, notificationEvent.contactAvatarUri))
-                } else notificationManager.show(notificationEvent)
+                } else notificationManager.show(notificationEvent.copy(accountKey = repository.signedInAccountIdentity?.storageKey))
             }
         }
     }

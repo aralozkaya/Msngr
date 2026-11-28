@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
 
 internal const val MSNP_WINDOWS_LIVE_NETWORK_ID = 1
@@ -81,11 +82,11 @@ internal fun parseExtendedCapabilities(value: String?): Long = parseClientCapabi
 internal fun parseEndpointCapabilities(payload: ByteArray): ParsedClientCapabilities? {
     if (payload.isEmpty()) return null
     val text = payload.toString(Charsets.UTF_8)
-    if (!text.contains("<Capabilities", ignoreCase = true) || text.contains("<!DOCTYPE", ignoreCase = true)) {
+    if (!text.contains("<Capabilities", ignoreCase = true)) {
         return null
     }
     return runCatching {
-        val root = circleDocumentFactory().newDocumentBuilder().parse(payload.inputStream()).documentElement
+        val root = parseProtocolXml(payload).documentElement
         val endpointNodes = root.getElementsByTagName("EndpointData")
         val endpoints = mutableListOf<ParsedClientCapabilities>()
         for (i in 0 until endpointNodes.length) {

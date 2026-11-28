@@ -65,7 +65,7 @@ import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
 import org.aralozkaya.msngr.ThemeMode
 import org.aralozkaya.msngr.WinkCatalogActivity
-import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.currentMessengerRepository
 import org.aralozkaya.msngr.displayPictureSync
 import org.aralozkaya.msngr.notifications.BackgroundConnectionController
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
@@ -321,7 +321,7 @@ fun ConnectionSettingsScreen(
                             DisplayPictureSyncPrefs.setUsesSamePictureAndStatusEverywhere(context, enabled, account)
                             usesSamePictureAndStatusEverywhere = enabled
                             if (!enabled) showPictureBehavior = false
-                            runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
+                            context.currentMessengerRepository?.let {
                                 context.displayPictureSync.onRoamingPreferenceChanged(it, enabled)
                             }
                         },
@@ -363,7 +363,7 @@ fun ConnectionSettingsScreen(
                                             DisplayPictureSyncPrefs.setBehavior(context, behavior)
                                             pictureBehavior = behavior
                                             showPictureBehavior = false
-                                            runCatching { context.appContainer.messengerRepository }.getOrNull()?.let {
+                                            context.currentMessengerRepository?.let {
                                                 context.displayPictureSync.requestRefresh(it)
                                             }
                                         },
@@ -574,10 +574,7 @@ fun AppearanceSettingsScreen(
     val savedAppearance by remember(context) { AppearancePrefs.state(context) }.collectAsState()
     val categoryOrder by remember(context) { CategoryPrefs.orderState(context) }.collectAsState()
     val hiddenCategories by remember(context) { CategoryPrefs.hiddenState(context) }.collectAsState()
-    val categoriesFlow = remember(context) {
-        runCatching { context.appContainer.messengerRepository.categories }.getOrNull()
-    }
-    val customCategories = categoriesFlow?.collectAsState()?.value.orEmpty()
+    val customCategories = context.currentMessengerRepository?.categories?.collectAsState()?.value.orEmpty()
     var showCategoryOrderDialog by rememberSaveable { mutableStateOf(false) }
     val appearance = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && savedAppearance.colorMode == ColorMode.Dynamic)
         savedAppearance.copy(colorMode = ColorMode.Default) else savedAppearance

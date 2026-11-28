@@ -3,7 +3,6 @@ package org.aralozkaya.msngr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.content.FileProvider
@@ -36,18 +35,7 @@ internal suspend fun Context.inspectCapturedDisplayPicture(uri: String): Display
     val orientation = selected.bytes.inputStream().use {
         ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
     }
-    val matrix = Matrix().apply {
-        when (orientation) {
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
-            ExifInterface.ORIENTATION_TRANSPOSE -> { setRotate(90f); postScale(-1f, 1f) }
-            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
-            ExifInterface.ORIENTATION_TRANSVERSE -> { setRotate(270f); postScale(-1f, 1f) }
-            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(270f)
-            else -> return@withContext selected
-        }
-    }
+    val matrix = exifOrientationMatrix(orientation) ?: return@withContext selected
     val source = requireNotNull(BitmapFactory.decodeByteArray(selected.bytes, 0, selected.bytes.size))
     var rotated: Bitmap? = null
     try {

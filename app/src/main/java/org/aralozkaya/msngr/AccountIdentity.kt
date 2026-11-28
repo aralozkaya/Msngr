@@ -3,15 +3,13 @@ package org.aralozkaya.msngr
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import java.security.MessageDigest
 import java.util.Locale
 
 /** An email on the mock server and on each real notification server is a separate account. */
 @ConsistentCopyVisibility
 data class AccountIdentity private constructor(val email: String, val service: String) {
     val storageId: String get() = "$email\u0000$service"
-    val storageKey: String get() = MessageDigest.getInstance("SHA-256")
-        .digest(storageId.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    val storageKey: String by lazy { storageId.sha256Hex() }
 
     companion object {
         fun forLogin(

@@ -8,7 +8,7 @@ internal fun ComponentActivity.redirectToLoginIfNeeded(): Boolean {
         return false
     }
 
-    val signOutReason = runCatching { appContainer.messengerRepository.signOutReason.value }.getOrNull()
+    val signOutReason = appContainer.currentRepository?.signOutReason?.value
     startActivity(
         LoginActivity.createIntent(this, allowAutomaticSignIn = signOutReason == null).apply {
             signOutReason?.let { putExtra(LoginActivity.EXTRA_SIGN_OUT_REASON, it) }

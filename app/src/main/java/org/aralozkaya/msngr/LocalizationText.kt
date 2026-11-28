@@ -12,7 +12,7 @@ import org.aralozkaya.msngr.data.MessageAuthor
 import java.text.NumberFormat
 import java.util.Locale
 
-private val NO_SPACE_AFTER_PREFIX = setOf('(', '[', '{', '#', '%', '/', '\u2013', '-', '\u00D7', '$', '\u20AC', '\u00A3')
+private val NO_SPACE_AFTER_PREFIX = setOf('(', '[', '{', '#', '%', '\u2013', '-', '\u00D7', '$', '\u20AC', '\u00A3')
 private val NO_SPACE_BEFORE_SUFFIX = setOf('.', ',', ';', ':', '!', '?', '%', '+', ')', ']', '}', '\u2013', '-', '\u00D7', '\'', '\u2019')
 
 fun formatNumberSentence(before: String, number: Any, after: String): String = buildString {
@@ -39,30 +39,7 @@ fun formatTwoNumbersSentence(
     between: String,
     secondNumber: Any,
     afterSecond: String,
-): String {
-    val withFirst = if (beforeFirst.isNotEmpty() || between.isNotEmpty()) {
-        buildString {
-            if (beforeFirst.isNotEmpty()) {
-                append(beforeFirst)
-                val last = beforeFirst.last()
-                if (!last.isWhitespace() && last !in NO_SPACE_AFTER_PREFIX) {
-                    append(' ')
-                }
-            }
-            append(firstNumber.toString())
-            if (between.isNotEmpty()) {
-                val first = between.first()
-                if (!first.isWhitespace() && first !in NO_SPACE_BEFORE_SUFFIX) {
-                    append(' ')
-                }
-                append(between)
-            }
-        }
-    } else {
-        firstNumber.toString()
-    }
-    return formatNumberSentence(withFirst, secondNumber, afterSecond)
-}
+): String = formatNumberSentence(formatNumberSentence(beforeFirst, firstNumber, between), secondNumber, afterSecond)
 
 private fun Resources.currentAppLocale(): Locale =
     configuration.locales.takeIf { !it.isEmpty }?.get(0) ?: Locale.getDefault()
@@ -773,6 +750,14 @@ private val EXACT_USER_MESSAGE_RES: Map<String, Int> = mapOf(
     "File transfers are unavailable." to R.string.err_client_no_files,
     "Voice clips are not supported." to R.string.err_client_no_voice,
     "Winks are unavailable." to R.string.err_client_no_winks,
+    "Emotion sounds are unavailable." to R.string.chat_error_emotion_sounds_unavailable,
+    "Voice clips are unavailable." to R.string.chat_error_voice_clips_unavailable,
+    "Allow microphone access to record a voice clip." to R.string.voice_clip_mic_permission,
+    "A microphone is not available." to R.string.voice_clip_mic_unavailable,
+    "Microphone could not be opened." to R.string.voice_clip_mic_open_failed,
+    "Microphone could not be started." to R.string.voice_clip_mic_start_failed,
+    "Microphone recording failed." to R.string.voice_clip_mic_recording_failed,
+    "Audio playback failed." to R.string.voice_clip_audio_playback_failed,
     "Adding contacts is not supported by this client." to R.string.err_client_no_add_contact,
     "Deleting contacts is not supported by this client." to R.string.err_client_no_delete_contact,
     "Contact requests are not supported by this client." to R.string.err_client_no_contact_requests,

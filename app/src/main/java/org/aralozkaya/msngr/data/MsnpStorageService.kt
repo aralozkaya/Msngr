@@ -4,11 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.protocol.DisplayPictureFormat
 import org.aralozkaya.msngr.protocol.MsnBase64
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
-import javax.xml.parsers.DocumentBuilderFactory
 
 internal data class StorageProfile(
     val profileResourceId: String? = null,
@@ -234,8 +231,7 @@ internal object MsnpStorageService {
     }
 
     internal fun parseCreatedDocumentResourceId(xml: String): String {
-        val document = storageDocumentBuilderFactory().newDocumentBuilder()
-            .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        val document = parseProtocolXml(xml)
         return document.getElementsByTagNameNS("*", "CreateDocumentResult")
             .item(0)
             ?.textContent
@@ -249,8 +245,7 @@ internal object MsnpStorageService {
     }
 
     internal fun parseProfile(xml: String): StorageProfile {
-        val document = storageDocumentBuilderFactory().newDocumentBuilder()
-            .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        val document = parseProtocolXml(xml)
         val result = document.getElementsByTagNameNS("*", "GetProfileResult")
             .item(0) as? Element
             ?: throw LiveMsnpStorageException("The storage service returned an invalid profile.")
@@ -294,40 +289,18 @@ internal object MsnpStorageService {
             }
             try {
                 MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-                    val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
-                        requestMethod = "POST"
-                        connectTimeout = TIMEOUT_MILLIS
-                        readTimeout = TIMEOUT_MILLIS
-                        instanceFollowRedirects = true
-                        doOutput = true
-                        setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                        setRequestProperty("SOAPAction", "\"$NAMESPACE/$action\"")
-                        setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+                    val (status, responseBody) = postSoapEnvelope(endpointUrl, "\"$NAMESPACE/$action\"", body, TIMEOUT_MILLIS)
+                    val response = responseBody.orEmpty()
+                    if (status !in 200..299) {
+                        val fault = runCatching {
+                            val document = parseProtocolXml(response)
+                            document.documentElement.storageFirstText("faultstring")
+                        }.getOrDefault("")
+                        throw LiveMsnpStorageException(
+                            fault.ifBlank { "Storage $action failed with HTTP $status." },
+                        )
                     }
-                    try {
-                        connection.outputStream.use {
-                            it.write(body.toByteArray(StandardCharsets.UTF_8))
-                        }
-                        val status = connection.responseCode
-                        val response = (if (status in 200..299) {
-                            connection.inputStream
-                        } else {
-                            connection.errorStream
-                        })?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
-                        if (status !in 200..299) {
-                            val fault = runCatching {
-                                val document = storageDocumentBuilderFactory().newDocumentBuilder()
-                                    .parse(response.byteInputStream(StandardCharsets.UTF_8))
-                                document.documentElement.storageFirstText("faultstring")
-                            }.getOrDefault("")
-                            throw LiveMsnpStorageException(
-                                fault.ifBlank { "Storage $action failed with HTTP $status." },
-                            )
-                        }
-                        response
-                    } finally {
-                        connection.disconnect()
-                    }
+                    response
                 }
             } catch (error: LiveMsnpStorageException) {
                 throw error
@@ -382,12 +355,3 @@ private fun Element.storageDirectText(localName: String): String =
         ?.textContent
         .orEmpty()
         .trim()
-
-private fun storageDocumentBuilderFactory(): DocumentBuilderFactory =
-    DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }

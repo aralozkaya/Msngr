@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -42,15 +43,8 @@ class MockContactRequestsInstrumentedTest {
         SessionPrefs.completeLogin(context, profile.email, "mock-only", true, ProviderOptions.ESCARGOT,
             ServerOverrides(), true, false)
         try {
-            ActivityScenario.launch(MainActivity::class.java).use {
-                compose.onNodeWithTag("requests-icon-badge", useUnmergedTree = true).assertIsDisplayed()
-                saveScreen("main")
-                compose.onNodeWithContentDescription("Open menu").performClick()
-                compose.onNodeWithTag("requests-menu-badge", useUnmergedTree = true).assertIsDisplayed()
-                saveScreen("menu")
-                compose.onNodeWithText("Requests & invitations").performClick()
-                compose.onNodeWithTag("contact-request-$peer").assertIsDisplayed()
-                saveScreen("requests")
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.moveToState(Lifecycle.State.CREATED)
                 compose.waitUntil(5000) { manager.activeNotifications.any {
                     it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID } }
                 val notice = manager.activeNotifications.single { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID }.notification
@@ -59,6 +53,15 @@ class MockContactRequestsInstrumentedTest {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     assertTrue(manager.getNotificationChannel(NotificationChannels.CONTACT_REQUESTS).canShowBadge())
                 }
+                scenario.moveToState(Lifecycle.State.RESUMED)
+                compose.onNodeWithTag("requests-icon-badge", useUnmergedTree = true).assertIsDisplayed()
+                saveScreen("main")
+                compose.onNodeWithContentDescription("Open menu").performClick()
+                compose.onNodeWithTag("requests-menu-badge", useUnmergedTree = true).assertIsDisplayed()
+                saveScreen("menu")
+                compose.onNodeWithText("Requests & invitations").performClick()
+                compose.onNodeWithTag("contact-request-$peer").assertIsDisplayed()
+                saveScreen("requests")
                 compose.onNodeWithTag("decline-request-$peer").performClick()
                 compose.onNodeWithTag("contact-request-block").assertIsOff()
                 saveScreen("decision")
@@ -98,15 +101,15 @@ class MockContactRequestsInstrumentedTest {
             ServerOverrides(), true, false)
         val manager = context.getSystemService(NotificationManager::class.java)
         try {
-            ActivityScenario.launch(MainActivity::class.java).use {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.moveToState(Lifecycle.State.CREATED)
                 compose.waitUntil(5000) { manager.activeNotifications.any { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID } }
-                manager.activeNotifications.single { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID }
-                    .notification.contentIntent.send()
+                val open = manager.activeNotifications.single { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID }.notification.contentIntent
+                scenario.moveToState(Lifecycle.State.RESUMED)
+                open.send()
                 compose.waitUntil(5000) { compose.onAllNodesWithTag("contact-request-$peer").fetchSemanticsNodes().isNotEmpty() }
-                assertTrue(manager.activeNotifications.any { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID })
+                compose.waitUntil(5000) { manager.activeNotifications.none { it.id == MsngrNotificationManager.CONTACT_REQUESTS_NOTIFICATION_ID } }
                 compose.onNodeWithTag("accept-request-$peer").performClick()
-                compose.onNodeWithTag("contact-request-block").assertIsNotEnabled()
-                compose.onNodeWithTag("contact-request-submit").performClick()
                 compose.waitUntil(5000) { repository.contactRequests.value.isEmpty() }
                 compose.onNodeWithText("No pending requests or invitations").assertIsDisplayed()
                 assertTrue(repository.contacts.value.single { contact -> contact.id == peer }.isForwardListContact)

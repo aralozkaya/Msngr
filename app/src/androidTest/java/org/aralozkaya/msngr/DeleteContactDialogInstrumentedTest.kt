@@ -21,6 +21,8 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -135,7 +137,8 @@ class DeleteContactDialogInstrumentedTest {
         val before = compose.onNodeWithTag("delete-contact-modal").fetchSemanticsNode().boundsInRoot
         val actionBefore = compose.onNodeWithTag("delete-contact-submit").fetchSemanticsNode().boundsInRoot
         val idleButton = compose.onNodeWithTag("delete-contact-submit").captureToImage().asAndroidBitmap()
-        compose.onNodeWithTag("delete-contact-submit").performClick()
+        // Verify the pending colors independently of the transient press ripple.
+        compose.onNodeWithTag("delete-contact-submit").performSemanticsAction(SemanticsActions.OnClick)
         compose.onNodeWithTag("delete-contact-submit").assertIsEnabled()
         compose.mainClock.advanceTimeBy(1000)
         val loadingButton = compose.onNodeWithTag("delete-contact-submit").captureToImage().asAndroidBitmap()

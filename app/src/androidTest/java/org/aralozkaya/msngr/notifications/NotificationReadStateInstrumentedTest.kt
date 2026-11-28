@@ -121,6 +121,7 @@ class NotificationReadStateInstrumentedTest {
             awaitNotificationIds(systemManager, setOf(messageNotificationId))
 
             val intent = Intent(context, NotificationReplyReceiver::class.java).apply {
+                putExtra(NOTIFICATION_ACCOUNT, repository.signedInAccountIdentity!!.storageKey)
                 putExtra(NotificationReplyReceiver.EXTRA_CONTACT_ID, contact.id)
                 putExtra(NotificationReplyReceiver.EXTRA_CONTACT_NAME, contact.displayName)
                 putExtra(NotificationReplyReceiver.EXTRA_NOTIFICATION_ID, messageNotificationId)

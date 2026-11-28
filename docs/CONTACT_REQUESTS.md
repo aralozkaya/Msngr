@@ -11,18 +11,18 @@ under **Contact requests** and **Group invitations** headings. An empty inbox ce
 both lists, including when the inbox is empty; failures preserve the known items and offer Refresh.
 The page uses the Material 3 Expressive flexible app bar, animated button shapes, wavy response
 progress, and the experimental morphing pull-to-refresh loading indicator.
-Each request offers Accept and Decline. The decision dialog follows WLM 2009's Yes/No choices,
-an optional **Block invitations from this person** checkbox (off initially), and **Decide later**.
-Decide later, back, and dismiss keep the invitation pending. Submission disables the controls and
-shows a centered Material 3 Expressive wavy spinner over the existing modal. Errors retain the choice
-for retry. Group invitations offer Join and Decline on the same page; joining opens group details.
+Accept submits the request immediately. Decline opens a dialog with an optional
+**Block invitations from this person** checkbox (off initially). **Decide later**, Back, and
+dismiss keep the invitation pending. During submission, the action button shows progress and the
+controls are disabled. An error preserves the selected options for retry.
+Group invitations offer Join and Decline on the same page. Joining opens group details.
 Categories, mobile numbers, and Microsoft's spam-reporting feature are outside this implementation.
 
 **Settings → Contact Invitations** stores account- and service-specific default decline actions.
 **Use default decline actions** is off initially. When enabled, Decline immediately uses the saved
 block choice without a modal, with progress and retryable errors on the request card. The page's
 decline options stay visible when the toggle is off, with interaction disabled and saved values retained.
-Disabling the toggle restores the dialog. Accept continues to open the decision dialog.
+Disabling the toggle restores the decline dialog.
 The dialog's **Set as default** checkbox saves the selected decline actions and enables the toggle
 only after a successful decline. Accepting, deciding later, dismissing, or a failed response does
 not save defaults. Removing remembered account data also removes these defaults.
@@ -43,8 +43,9 @@ share the roster mutation mutex and check the session after suspended work. Logo
 late responses cannot populate a replacement account.
 
 The independent Android **Contact requests** channel has badging enabled. One ongoing summary
-notification uses the pending count, opens the requests page through authenticated login, and stays
-until the inbox is resolved or the account logs out. Counts update silently unless there is a new
+notification shows the pending count while the app is in the background and opens the requests
+page through authenticated login. Entering the app clears it. Leaving the app posts it again
+if requests are still pending. Counts update silently unless there is a new
 request. Notifications are scoped to the successfully authenticated account, server, and mock/live
 identity, and a notification from a different account cannot open that account's inbox.
 Granting notification permission after login also posts the pending summary.

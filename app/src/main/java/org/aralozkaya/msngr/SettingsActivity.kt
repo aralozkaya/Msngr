@@ -3,6 +3,7 @@ package org.aralozkaya.msngr
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.CapturedAnimatedVisibility
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.launch
@@ -58,7 +60,13 @@ class SettingsActivity : MsngrActivity() {
                     onBack = ::finish,
                     onDeleteAllChatHistories = {
                         lifecycleScope.launch {
-                            appContainer.messengerRepository.clearConversationHistory()
+                            try {
+                                appContainer.messengerRepository.clearConversationHistory()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                Toast.makeText(this@SettingsActivity, R.string.contact_erase_history_failed, Toast.LENGTH_LONG).show()
+                            }
                         }
                     },
                 )

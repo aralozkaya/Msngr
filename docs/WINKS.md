@@ -37,7 +37,7 @@ matching uses the package content hash rather than the sender or name. Default w
 
 ## Playback and storage
 
-- Ruffle 0.7.1 is bundled locally. No CDN, Flash plugin, or native Flash runtime is required.
+- The app plays winks with the Ruffle runtime bundled in the APK. Its version and source revision are recorded in `third_party/ruffle-runtime.json`.
 - A transparent WebView is created for the active wink and destroyed after playback, dismissal,
   or the activity pausing. The total lifetime is bounded to 18 seconds; playback is capped at 12 seconds.
   There is no prewarming, player pool, wake lock, or background playback. Android may retain its

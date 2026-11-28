@@ -43,6 +43,7 @@ import org.aralozkaya.msngr.ReconnectActivity
 import org.aralozkaya.msngr.UpdateActivity
 import org.aralozkaya.msngr.notifications.NotificationChannels
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class UpdateManager internal constructor(
@@ -50,7 +51,7 @@ class UpdateManager internal constructor(
     supported: Boolean = supportsUpdates(context),
     private val installedCode: Int = BuildConfig.VERSION_CODE,
     installedVersionName: String = BuildConfig.VERSION_NAME,
-    private val releaseSource: () -> List<AppRelease> = { GitHubReleases().fetch() },
+    private val releaseSource: () -> List<AppRelease> = ::fetchGitHubReleases,
 ) {
     private val prefs = context.getSharedPreferences("msngr_updates", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -88,13 +89,12 @@ class UpdateManager internal constructor(
             if (state.value.supported) {
                 schedule()
                 workManager.getWorkInfosForUniqueWorkFlow(DOWNLOAD_WORK).collect { infos ->
-                    val work = infos.firstOrNull { it.id.toString() == prefs.getString("download_work", null) }
-                    val release = state.value.release
-                    val downloaded = release?.let { apkFile(it.version.code) }?.takeIf(File::isFile)
+                    val workId = prefs.getString("download_work", null)
+                    val work = infos.firstOrNull { it.id.toString() == workId }
                     mutableState.update { it.copy(
                         downloading = work?.let { info -> !info.state.isFinished } ?: it.downloading,
                         downloadProgress = work?.progress?.getFloat("progress", 0f) ?: 0f,
-                        downloadedVersion = downloaded?.let { release.version.code },
+                        downloadedVersion = cachedVersion(it.release),
                         error = if (work?.state == WorkInfo.State.FAILED) work.outputData.getString("error")?.let(context::localizeUserMessage) else it.error,
                     ) }
                 }
@@ -121,7 +121,7 @@ class UpdateManager internal constructor(
             putString("skipped", preferences.skippedTag)
         }
         if (!preferences.includePrereleases && state.value.release?.prerelease == true) {
-            mutableState.update { it.copy(release = null) }
+            mutableState.update { it.copy(release = null, downloadedVersion = null) }
             prefs.edit { remove("release") }
         }
         if (!state.value.hasUpdate || !preferences.enabled) dismissNotification()
@@ -148,7 +148,7 @@ class UpdateManager internal constructor(
                 putLong("last_checked", checkedAt)
             }
             mutableState.update { it.copy(release = newest, lastChecked = checkedAt,
-                downloadedVersion = newest?.version?.code?.takeIf { code -> apkFile(code).isFile }) }
+                downloadedVersion = cachedVersion(newest)) }
             if (state.value.hasUpdate && settings.enabled) notifyUpdate(checkNotNull(newest)) else dismissNotification()
             true
         } catch (cancelled: CancellationException) {
@@ -169,20 +169,60 @@ class UpdateManager internal constructor(
             .setConstraints(networkConstraints).build()
         prefs.edit { putString("download_work", request.id.toString()) }
         mutableState.update { it.copy(downloading = true, downloadProgress = 0f, error = null) }
-        workManager.enqueueUniqueWork(DOWNLOAD_WORK, ExistingWorkPolicy.KEEP, request)
+        // The observed ID must belong to the enqueued request, including after process restart.
+        workManager.enqueueUniqueWork(DOWNLOAD_WORK, ExistingWorkPolicy.REPLACE, request)
     }
 
     fun cancelDownload() {
+        prefs.edit { remove("download_work") }
         workManager.cancelUniqueWork(DOWNLOAD_WORK)
-        mutableState.update { it.copy(downloading = false, error = null) }
+        mutableState.update { it.copy(downloading = false, downloadProgress = 0f, error = null) }
     }
 
     fun reportError(message: String?) { mutableState.update { it.copy(error = message) } }
 
     internal fun apkFile(code: Int): File = File(context.cacheDir, "updates/$code.apk")
 
+    private fun cachedVersion(release: AppRelease?): Int? = release?.version?.code?.takeIf { code ->
+        val file = apkFile(code)
+        release.apkUrl != null && file.isFile && file.length() == release.apkSize
+    }
+
+    @Synchronized
+    internal fun verifiedCachedApk(release: AppRelease): File {
+        requireCurrentAsset(release)
+        val file = apkFile(release.version.code)
+        try {
+            verifyUpdateApk(context, file, release)
+        } catch (error: IOException) {
+            file.delete()
+            mutableState.update {
+                if (it.downloadedVersion == release.version.code) it.copy(downloadedVersion = null) else it
+            }
+            throw error
+        }
+        return file
+    }
+
+    @Synchronized
+    internal fun publishDownloadedApk(partial: File, release: AppRelease) {
+        requireCurrentAsset(release)
+        if (!partial.renameTo(apkFile(release.version.code))) {
+            throw IOException(context.getString(R.string.update_apk_temp_save_failed))
+        }
+    }
+
+    private fun requireCurrentAsset(release: AppRelease) {
+        val current = state.value.release
+        if (current?.version != release.version || current.apkUrl != release.apkUrl ||
+            current.apkSize != release.apkSize || current.sha256 != release.sha256) {
+            throw IOException(context.getString(R.string.update_worker_release_changed))
+        }
+    }
+
     fun dismissNotification() { NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID) }
 
+    @Synchronized
     internal fun cleanupInstalledApks() {
         File(context.cacheDir, "updates").listFiles()?.forEach { file ->
             val code = file.name.removeSuffix(".apk").toIntOrNull()
@@ -231,7 +271,7 @@ class UpdateManager internal constructor(
         internal const val CHECK_WORK = "app-update-check"
         internal const val START_WORK = "app-update-start-check"
         internal const val DOWNLOAD_WORK = "app-update-download"
-        private const val NOTIFICATION_ID = 7_100_001
+        internal const val NOTIFICATION_ID = 7_100_001
         private val networkConstraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
         @Suppress("DEPRECATION")
@@ -248,8 +288,11 @@ internal val Context.updateManager: UpdateManager
     get() = (applicationContext as MsngrApplication).updateManager
 
 class UpdateCheckWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
-    override suspend fun doWork(): Result =
-        if (applicationContext.updateManager.check() || runAttemptCount >= 2) Result.success() else Result.retry()
+    override suspend fun doWork(): Result = when {
+        applicationContext.updateManager.check() -> Result.success()
+        runAttemptCount < 2 -> Result.retry()
+        else -> Result.failure()
+    }
 }
 
 class UpdateInstalledReceiver : BroadcastReceiver() {

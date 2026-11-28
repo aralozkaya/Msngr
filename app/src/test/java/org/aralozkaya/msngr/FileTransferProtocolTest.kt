@@ -11,6 +11,35 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class FileTransferProtocolTest {
+    @Test fun bothPeersCanOfferBeforeReceivingTheOtherInvitation() = runBlocking {
+        val directory = createTestTempDir("msngr-crossed-offers")
+        val firstInvites = mutableListOf<SlpMessage>()
+        val secondInvites = mutableListOf<SlpMessage>()
+        val first = MsnpFileSession("first", "second", { directory }, {},
+            { firstInvites.add(requireNotNull(SlpMessage.parse(it))) }, { _, _, _, _ -> })
+        val second = MsnpFileSession("second", "first", { directory }, {},
+            { secondInvites.add(requireNotNull(SlpMessage.parse(it))) }, { _, _, _, _ -> })
+        try {
+            val file = java.io.File(directory, "shared.txt").apply { writeText("hello") }
+            val a = first.offer(file, file.name)
+            val b = second.offer(file, file.name)
+            first.handle(secondInvites.single())
+            second.handle(firstInvites.first())
+            for (peer in listOf(first, second)) {
+                assertTrue(peer.owns(a))
+                assertTrue(peer.owns(b))
+            }
+            first.close()
+            assertTrue(runCatching { first.offer(file, file.name) }.isFailure)
+            assertFalse(first.owns(a))
+            assertFalse(first.owns(b))
+        } finally {
+            first.close()
+            second.close()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun inviterAssignsOneOrderingToPhotosAddedByEitherParticipant() = runBlocking {
         val directory = createTestTempDir("msngr-photo-order")
         val hostChanges = mutableListOf<PhotoShare>()
@@ -193,6 +222,28 @@ class FileTransferProtocolTest {
             assertTrue(replies.last().firstLine.contains("603"))
         } finally { engine.close(); directory.deleteRecursively() }
     }
+    @Test fun storageFailureEndsTheOfferAndNotifiesTheSender() = runBlocking {
+        val directory = createTestTempDir("msngr-file-storage-error")
+        val unavailable = java.io.File(directory, "not-a-directory").apply { createNewFile() }
+        val changes = mutableListOf<FileTransfer>()
+        val responses = mutableListOf<SlpMessage>()
+        val engine = MsnpFileSession("a", "b", { unavailable }, changes::add,
+            { responses.add(requireNotNull(SlpMessage.parse(it))) }, { _, _, _, _ -> })
+        try {
+            val context = org.aralozkaya.msngr.protocol.MsnBase64.encode(MsnFileContext("note.txt", 3).encode())
+            engine.handle(SlpMessage("INVITE MSNMSGR:a MSNSLP/1.0", "branch", "offer",
+                MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE,
+                "EUF-GUID: {${MsnFileContext.GUID}}\r\nSessionID: 11\r\nAppID: 2\r\nContext: $context\r\n"))
+            assertTrue(runCatching { engine.accept("offer") }.isFailure)
+            assertFalse(engine.owns("offer"))
+            assertEquals(FileTransferStatus.Failed, changes.last().status)
+            assertEquals("MSNSLP/1.0 603 Decline", responses.single().firstLine)
+        } finally {
+            engine.close()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun nativeVersionTwoPreviewContextAndUnsafeNames() {
         val context = MsnFileContext("holiday photo.png", 220_754).encode()
         val native = context.copyOf(700)

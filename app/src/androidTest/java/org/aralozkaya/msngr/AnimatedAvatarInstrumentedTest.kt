@@ -23,6 +23,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -37,6 +38,15 @@ class AnimatedAvatarInstrumentedTest {
     private fun gif() = InstrumentationRegistry.getInstrumentation().context.assets
         .open("animated-profile/two-frame.gif").use { it.readBytes() }
     private fun uri(bytes: ByteArray) = "data:image/gif;base64,${MsnBase64.encode(bytes)}"
+
+    @Test fun panoramaSamplingBoundsBothAvatarAndProfileDecodes() {
+        for (highResolution in listOf(false, true)) {
+            assertEquals(512, avatarSampleSize(Int.MAX_VALUE, 1, highResolution))
+            assertEquals(512, avatarSampleSize(1, Int.MAX_VALUE, highResolution))
+        }
+        assertEquals(2, avatarSampleSize(1024, 1024, false))
+        assertEquals(1, avatarSampleSize(1024, 1024, true))
+    }
 
     @Test fun nativeDecoderRendersDifferentFrames() {
         val bytes = gif()

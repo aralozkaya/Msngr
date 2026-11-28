@@ -13,7 +13,7 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.MessageDigest
+import org.aralozkaya.msngr.sha256Hex
 import java.util.Locale
 
 data class ConversationHistoryPageState(
@@ -27,6 +27,7 @@ interface ConversationHistoryStore {
     val pageStates: StateFlow<Map<String, ConversationHistoryPageState>>
 
     fun selectAccount(accountId: String)
+    fun deselectAccount()
     fun loadLatest(contactId: String)
     fun loadOlder(contactId: String)
     fun merge(messages: Map<String, List<ChatMessage>>)
@@ -56,6 +57,12 @@ internal class InMemoryConversationHistoryStore : ConversationHistoryStore {
         mutablePageStates.value = mutableMessages.value.keys.associateWith {
             ConversationHistoryPageState(isInitialPageLoaded = true)
         }
+    }
+
+    override fun deselectAccount() = synchronized(lock) {
+        selectedAccount = null
+        mutableMessages.value = emptyMap()
+        mutablePageStates.value = emptyMap()
     }
 
     override fun loadLatest(contactId: String) = synchronized(lock) {
@@ -118,6 +125,7 @@ internal class FileConversationHistoryStore(
         val messages: List<ChatMessage>,
         val oldestChunkIndex: Int,
         val newestChunkIndex: Int,
+        val unsaved: Map<Long, ChatMessage> = emptyMap(),
     )
 
     private val lock = Any()
@@ -147,6 +155,13 @@ internal class FileConversationHistoryStore(
         mutablePageStates.value = emptyMap()
     }
 
+    override fun deselectAccount() = synchronized(lock) {
+        selectedAccount = null
+        loaded.clear()
+        mutableMessages.value = emptyMap()
+        mutablePageStates.value = emptyMap()
+    }
+
     override fun loadLatest(contactId: String): Unit = synchronized(lock) {
         if (selectedAccount == null) return
         val conversation = loaded[contactId] ?: readLatestConversation(contactId)
@@ -171,47 +186,47 @@ internal class FileConversationHistoryStore(
         publish(contactId, updated, isInitialPageLoaded = true)
     }
 
-    override fun merge(messages: Map<String, List<ChatMessage>>) {
-        if (messages.isEmpty()) return
-        synchronized(lock) {
-            if (selectedAccount == null) return
-            messages.forEach { (contactId, incoming) ->
-                if (incoming.isEmpty()) return@forEach
-                val current = loaded[contactId] ?: readLatestConversation(contactId)
-                val currentById = current.messages.associateBy(ChatMessage::id)
-                val changes = incoming.filter { message ->
-                    currentById[message.id]?.let { it != message } == true
-                }.associateBy(ChatMessage::id)
-                val knownIds = currentById.keys.toMutableSet()
-                val lastPersisted = current.messages.lastOrNull()
-                val additions = incoming
-                    .filter { message ->
-                        knownIds.add(message.id) &&
-                            (lastPersisted == null ||
-                                CHAT_MESSAGE_COMPARATOR.compare(message, lastPersisted) > 0)
-                    }
-                    .sortedWith(CHAT_MESSAGE_COMPARATOR)
-                if (additions.isEmpty() && changes.isEmpty()) return@forEach
-
-                val newestChunkIndex = runCatching {
-                    if (changes.isNotEmpty()) {
-                        // Only rewrite chunks containing a changed delivery status.
-                        for (index in current.oldestChunkIndex..current.newestChunkIndex) {
-                            val chunk = readChunk(contactId, index) ?: continue
-                            if (chunk.any { it.id in changes }) {
-                                writeChunk(contactId, index, chunk.map { changes[it.id] ?: it })
-                            }
-                        }
-                    }
-                    appendToLatestChunk(contactId, current.newestChunkIndex, additions)
-                }.getOrDefault(current.newestChunkIndex)
-                val updated = current.copy(
-                    messages = mergeMessageLists(current.messages, changes.values.toList() + additions),
-                    newestChunkIndex = newestChunkIndex,
-                )
-                loaded[contactId] = updated
-                publish(contactId, updated, isInitialPageLoaded = true)
+    override fun merge(messages: Map<String, List<ChatMessage>>) = synchronized(lock) {
+        if (selectedAccount == null) return
+        val contacts = messages.keys + loaded.filterValues { it.unsaved.isNotEmpty() }.keys
+        for (contactId in contacts) {
+            val current = loaded[contactId] ?: readLatestConversation(contactId)
+            val currentById = current.messages.associateBy(ChatMessage::id)
+            val latest = current.messages.lastOrNull()
+            val writes = current.unsaved.toMutableMap()
+            var containsUpdates = writes.isNotEmpty()
+            for (message in messages[contactId].orEmpty()) {
+                val previous = currentById[message.id]
+                if (previous == message) continue
+                if (previous != null) {
+                    containsUpdates = true
+                } else if (latest != null && CHAT_MESSAGE_COMPARATOR.compare(message, latest) <= 0) {
+                    continue
+                }
+                writes[message.id] = message
             }
+            if (writes.isEmpty()) continue
+
+            val visible = mergeMessageLists(current.messages, writes.values.toList())
+            val updated = try {
+                val remaining = writes.toMutableMap()
+                var newest = current.newestChunkIndex
+                if (containsUpdates) {
+                    // A previous attempt may have installed some new chunks before its write failed.
+                    if (current.unsaved.isNotEmpty()) newest = chunkIndices(contactId).lastOrNull() ?: newest
+                    for (index in current.oldestChunkIndex..newest) {
+                        val chunk = readChunk(contactId, index) ?: continue
+                        val replacement = chunk.map { remaining.remove(it.id) ?: it }
+                        if (replacement != chunk) writeChunk(contactId, index, replacement)
+                    }
+                }
+                newest = appendToLatestChunk(contactId, newest, remaining.values.toList())
+                current.copy(messages = visible, newestChunkIndex = newest, unsaved = emptyMap())
+            } catch (_: Exception) {
+                current.copy(messages = visible, unsaved = writes)
+            }
+            loaded[contactId] = updated
+            publish(contactId, updated, isInitialPageLoaded = true)
         }
     }
 
@@ -251,8 +266,15 @@ internal class FileConversationHistoryStore(
     override fun clearContact(contactId: String): Unit = synchronized(lock) {
         if (selectedAccount == null) return
         val contactDirectory = contactDirectory(contactId)
-        check(!contactDirectory.exists() || contactDirectory.deleteRecursively()) {
-            "Could not erase this contact's saved history. Please try again."
+        val parent = contactDirectory.parentFile
+        for (copy in listOf(
+            File(parent, "${contactDirectory.name}.offline-backup"),
+            File(parent, "${contactDirectory.name}.offline-pending"),
+            contactDirectory,
+        )) {
+            check(!copy.exists() || copy.deleteRecursively()) {
+                "Could not erase this contact's saved history. Please try again."
+            }
         }
         loaded.remove(contactId)
         mutableMessages.value = mutableMessages.value - contactId
@@ -261,17 +283,20 @@ internal class FileConversationHistoryStore(
     }
 
     override fun clearAll() = synchronized(lock) {
+        val eraseError = "Could not erase all saved conversations. Please try again."
+        legacyFile?.let { legacy ->
+            for (file in listOf(legacy.temporaryFile(), legacy.backupFile(), legacy)) {
+                check(!file.exists() || file.delete()) { eraseError }
+            }
+        }
+        val migration = File(directory.parentFile, "${directory.name}.migration")
+        check(!migration.exists() || migration.deleteRecursively()) { eraseError }
+        check(!directory.exists() || directory.deleteRecursively()) { eraseError }
         val openedContacts = mutablePageStates.value.keys
         loaded.clear()
         mutableMessages.value = emptyMap()
         mutablePageStates.value = openedContacts.associateWith {
             ConversationHistoryPageState(isInitialPageLoaded = true)
-        }
-        runCatching { directory.deleteRecursively() }
-        legacyFile?.let { file ->
-            runCatching { file.delete() }
-            runCatching { file.backupFile().delete() }
-            runCatching { file.temporaryFile().delete() }
         }
         storagePrepared = false
         prepareStorage()
@@ -295,10 +320,14 @@ internal class FileConversationHistoryStore(
         additions: List<ChatMessage>,
     ): Int {
         if (additions.isEmpty()) return currentLatestIndex
-        val indices = chunkIndices(contactId)
-        var chunkIndex = indices.lastOrNull() ?: currentLatestIndex
-        val existing = if (indices.isEmpty()) emptyList() else readChunk(contactId, chunkIndex).orEmpty()
-        val combined = mergeMessageLists(existing, additions)
+        val lastIndex = chunkIndices(contactId).lastOrNull()
+        val existing = lastIndex?.let { readChunk(contactId, it) }
+        var chunkIndex = when {
+            lastIndex == null -> currentLatestIndex
+            existing == null -> lastIndex + 1
+            else -> lastIndex
+        }
+        val combined = mergeMessageLists(existing.orEmpty(), additions)
         combined.chunked(pageSize).forEachIndexed { offset, chunk ->
             writeChunk(contactId, chunkIndex + offset, chunk)
         }
@@ -326,8 +355,9 @@ internal class FileConversationHistoryStore(
             .listFiles()
             .orEmpty()
             .mapNotNull { file ->
-                CHUNK_FILE_REGEX.matchEntire(file.name)?.groupValues?.get(1)?.toIntOrNull()
+                CHUNK_FILE_REGEX.matchEntire(file.name.removeSuffix(".bak"))?.groupValues?.get(1)?.toIntOrNull()
             }
+            .distinct()
             .sorted()
 
     private fun readChunk(contactId: String, index: Int): List<ChatMessage>? {
@@ -369,7 +399,7 @@ internal class FileConversationHistoryStore(
             .filter(File::isFile)
         val migrated = legacyCandidates.any { candidate -> migrateLegacy(candidate) }
         if (!migrated) directory.mkdirs()
-        if (directory.isDirectory) {
+        if (migrated) {
             legacyFile?.delete()
             legacyFile?.backupFile()?.delete()
             legacyFile?.temporaryFile()?.delete()
@@ -613,8 +643,7 @@ private fun writeAtomically(file: File, write: (DataOutputStream) -> Unit) {
         output.flush()
         fileOutput.fd.sync()
     }
-    backup.delete()
-    if (file.exists() && !file.renameTo(backup)) {
+    if (file.exists() && ((backup.exists() && !backup.delete()) || !file.renameTo(backup))) {
         temporary.delete()
         error("Could not prepare the existing history chunk for replacement.")
     }
@@ -642,10 +671,6 @@ private fun DataOutputStream.writeSizedString(value: String) {
 }
 
 private fun String.normalizedAccountId(): String = trim().lowercase(Locale.ROOT)
-
-private fun String.sha256Hex(): String = MessageDigest.getInstance("SHA-256")
-    .digest(toByteArray(Charsets.UTF_8))
-    .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
 private fun File.temporaryFile() = File(parentFile, "$name.tmp")
 private fun File.backupFile() = File(parentFile, "$name.bak")

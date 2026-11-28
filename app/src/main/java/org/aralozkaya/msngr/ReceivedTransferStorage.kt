@@ -146,8 +146,11 @@ internal class ReceivedTransferStorage(private val context: Context) {
     }
 }
 
+internal val legacyTransferStoragePermissions: Array<String>
+    get() = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
 internal fun hasDefaultTransferStorageAccess(context: Context): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
-    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    legacyTransferStoragePermissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
 
 internal val Context.receivedTransferStorage: ReceivedTransferStorage
     get() = (applicationContext as MsngrApplication).receivedTransferStorage

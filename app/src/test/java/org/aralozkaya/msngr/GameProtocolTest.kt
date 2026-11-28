@@ -800,6 +800,12 @@ class GameProtocolTest {
         assertTrue(isAllowedGameHost(customEntry, "https://cdn.unrelated.example/index.html"))
         assertTrue(shouldInjectGameBridgeHtml(customEntry, "https://cdn.unrelated.example/index.html", isMainFrame = true))
 
+        assertFalse(shouldInjectGameBridgeHtml(customEntry, "http://games.custom.example:8081/board.html", isMainFrame = false))
+        assertFalse(shouldInjectGameBridgeHtml(customEntry, "https://cdn.unrelated.example/index.html", isMainFrame = false))
+        assertFalse(shouldInjectGameBridgeHtml(customEntry, "https://games.custom.example:8080/board.html", isMainFrame = false))
+        assertFalse(isAllowedGameHost(customEntry, "content://games.custom.example/asset"))
+        assertFalse(isAllowedGameHost(customEntry, "https://user@elsewhere.example/game"))
+
         val crossTalkWordle = MsnpGameCatalogService.defaultCatalog().findEntry(103000)!!.copy(appId = 999999)
         assertEquals(500 to WORDLE_NATIVE_PANE_HEIGHT, nativeGamePaneDimensions(crossTalkWordle))
     }

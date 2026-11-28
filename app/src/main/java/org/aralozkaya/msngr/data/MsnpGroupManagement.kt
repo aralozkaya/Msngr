@@ -1,5 +1,7 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.escapeXml
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
 
 internal const val PERSONAL_ADDRESS_BOOK = "00000000-0000-0000-0000-000000000000"
@@ -10,13 +12,13 @@ internal fun buildCreateGroupRequest(ticket: String, name: String, displayName: 
     <CreateCircle xmlns="http://www.msn.com/webservices/AddressBook"><properties>
       <Domain>1</Domain><HostedDomain>live.com</HostedDomain><Type>2</Type><MembershipAccess>0</MembershipAccess>
       <IsPresenceEnabled>true</IsPresenceEnabled><RequestMembershipOption>2</RequestMembershipOption>
-      <DisplayName>${validateGroupName(name).groupXml()}</DisplayName></properties>
-      <callerInfo><PublicDisplayName>${displayName.groupXml()}</PublicDisplayName></callerInfo>
+      <DisplayName>${validateGroupName(name).escapeXml()}</DisplayName></properties>
+      <callerInfo><PublicDisplayName>${displayName.escapeXml()}</PublicDisplayName></callerInfo>
     </CreateCircle>
 """.trimIndent())
 
 internal fun parseGroupOperationResponse(xml: String, action: String): Element {
-    val document = circleDocumentFactory().newDocumentBuilder().parse(xml.byteInputStream())
+    val document = parseProtocolXml(xml)
     if (document.getElementsByTagNameNS("*", "Fault").length > 0)
         throw IllegalStateException("The server could not ${when(action) {
             "CreateCircle" -> "create this group"
@@ -39,7 +41,7 @@ internal fun buildCreateGroupContactRequest(ticket: String, groupGuid: String, e
     return groupSoap(ticket, "CircleInvite", """
         <CreateContact xmlns="http://www.msn.com/webservices/AddressBook">
           <abHandle><ABId>$groupGuid</ABId><Puid>0</Puid><Cid>0</Cid></abHandle>
-          <contactHandle><Email>${email.groupXml()}</Email><Puid>0</Puid><Cid>0</Cid>
+          <contactHandle><Email>${email.escapeXml()}</Email><Puid>0</Puid><Cid>0</Cid>
             <CircleId>$PERSONAL_ADDRESS_BOOK</CircleId></contactHandle>
         </CreateContact>
     """.trimIndent())
@@ -61,7 +63,7 @@ internal fun buildGroupConnectionRequest(ticket: String, addressBookId: String, 
           <action>${if(accept) 1 else 2}</action><relationshipType>5</relationshipType><relationshipRole>$role</relationshipRole>
         </ManageWLConnection>
     """.trimIndent()).replace("</ManageWLConnection>",
-        (if (message.isBlank()) "" else "<annotations><Annotation><Name>MSN.IM.InviteMessage</Name><Value>${message.groupXml()}</Value></Annotation></annotations>") +
+        (if (message.isBlank()) "" else "<annotations><Annotation><Name>MSN.IM.InviteMessage</Name><Value>${message.escapeXml()}</Value></Annotation></annotations>") +
             "</ManageWLConnection>")
 }
 
@@ -79,15 +81,12 @@ internal fun groupSoap(ticket: String, scenario: String, body: String): String =
     <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <soap:Header><ABApplicationHeader xmlns="http://www.msn.com/webservices/AddressBook">
         <ApplicationId>AAD9B99B-58E6-4F23-B975-D9EC1F9EC24A</ApplicationId><IsMigration>false</IsMigration>
-        <PartnerScenario>${scenario.groupXml()}</PartnerScenario></ABApplicationHeader>
+        <PartnerScenario>${scenario.escapeXml()}</PartnerScenario></ABApplicationHeader>
         <ABAuthHeader xmlns="http://www.msn.com/webservices/AddressBook"><ManagedGroupRequest>false</ManagedGroupRequest>
-          <TicketToken>${ticket.groupXml()}</TicketToken></ABAuthHeader></soap:Header>
+          <TicketToken>${ticket.escapeXml()}</TicketToken></ABAuthHeader></soap:Header>
       <soap:Body>$body</soap:Body>
     </soap:Envelope>
 """.trimIndent()
-
-internal fun String.groupXml(): String = replace("&", "&amp;").replace("<", "&lt;")
-    .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
 
 internal fun parseGroupInvitations(result: Element): List<GroupInvitation> {
     val contactInfo = (0 until result.getElementsByTagNameNS("*", "Contact").length).mapNotNull {
@@ -123,7 +122,7 @@ internal fun Element.groupText(name: String): String = getElementsByTagNameNS("*
 internal data class GroupInviteeRecord(val email: String, val contactGuid: String, val state: String)
 
 internal fun parseGroupInviteeRecords(xml: String): List<GroupInviteeRecord> {
-    val document = circleDocumentFactory().newDocumentBuilder().parse(xml.byteInputStream())
+    val document = parseProtocolXml(xml)
     check(document.getElementsByTagNameNS("*", "Fault").length == 0 &&
         document.getElementsByTagNameNS("*", "ABFindContactsPagedResponse").length > 0) { "Could not load the current group members." }
     val contacts = document.getElementsByTagNameNS("*", "Contact")

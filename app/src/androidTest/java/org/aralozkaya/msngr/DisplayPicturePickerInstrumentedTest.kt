@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -140,7 +141,7 @@ class DisplayPicturePickerInstrumentedTest {
     }
 
     @Test fun defaultSelectionOnlyChangesTheDraftAndRemoveRestoresIt() {
-        showProfile()
+        val restoration = showProfile()
         compose.onNodeWithContentDescription("Change display picture").performClick()
         compose.onNodeWithText("Use a default photo").performClick()
         compose.waitUntil(5_000) {
@@ -162,6 +163,8 @@ class DisplayPicturePickerInstrumentedTest {
         assertNull(context.appContainer.messengerRepository.profile.value.avatarUri)
         compose.onNodeWithContentDescription("Change display picture").performScrollTo().performClick()
         compose.onNodeWithText("View").performClick()
+        compose.onNodeWithText("Display picture").assertExists()
+        restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("Display picture").assertExists()
         compose.onNodeWithContentDescription("Close picture").performClick()
         compose.onNodeWithContentDescription("Change display picture").performClick()
@@ -230,16 +233,18 @@ class DisplayPicturePickerInstrumentedTest {
         assertTrue(runCatching { context.contentResolver.openInputStream(captured)?.close() }.isFailure)
     }
 
-    private fun showProfile(registry: PickerRegistry = PickerRegistry()) {
+    private fun showProfile(registry: PickerRegistry = PickerRegistry()): StateRestorationTester {
         context.appContainer.repositoryFor(useMockServer = true)
             .setLocalProfile(UserProfileSnapshot("You", "you@example.com", Presence.Online))
-        compose.setContent {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner {
                 override val activityResultRegistry = registry
             }) {
                 MsngrTheme { ProfilePage(PaddingValues(), TopAppBarDefaults.exitUntilCollapsedScrollBehavior(), {}) }
             }
         }
+        return restoration
     }
 
     private inner class PickerRegistry : ActivityResultRegistry() {

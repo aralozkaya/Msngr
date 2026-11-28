@@ -90,6 +90,27 @@ class GameWebViewInstrumentedTest {
         }
     }
 
+    @Test fun opaqueChildFramesHaveNoGameBridgeOrPlayerIdentity() {
+        val controller = createController()
+        try {
+            awaitPage(controller)
+            evaluate(controller, """
+                window.addEventListener('message', function(event) {
+                    if (event.data === 'isolated-game-frame') window.frameIsIsolated = true;
+                });
+                var frame = document.createElement('iframe');
+                frame.setAttribute('sandbox', 'allow-scripts');
+                frame.srcdoc = "<script>var parentHost; try { parentHost = parent.__p4Host; } catch (ignored) {}" +
+                    "if (!parentHost && !window.__p4Host && !window.AndroidP4Bridge && !window.external.Channel)" +
+                    " parent.postMessage('isolated-game-frame', '*');<" + "/script>";
+                document.body.appendChild(frame);
+            """.trimIndent())
+            compose.waitUntil(5_000) { evaluate(controller, "!!window.frameIsIsolated") == "true" }
+        } finally {
+            instrumentation.runOnMainSync { controller.destroy() }
+        }
+    }
+
     @Test fun peerEventsReachTheInitializedPageOnce() {
         val initialized = CountDownLatch(1)
         val controller = createController(onInitialize = { initialized.countDown() })
@@ -1310,18 +1331,19 @@ class GameWebViewInstrumentedTest {
     }
 
     private fun createController(
-        entry: GameCatalogEntry = MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!.copy(url = "about:blank"),
+        entry: GameCatalogEntry? = null,
         onInitialize: () -> Unit = {},
         onSendData: (String) -> Unit = {},
         onSendImAsUser: (String) -> Unit = {},
         onCloseApp: () -> Unit = {},
     ): GameWebViewController {
         lateinit var controller: GameWebViewController
+        val localPage = "http://127.0.0.1:1/game.htm"
         instrumentation.runOnMainSync {
             controller = GameWebViewController(
                 context = instrumentation.targetContext,
                 sessionId = "webview-test",
-                entry = entry,
+                entry = entry ?: MsnpGameCatalogService.defaultCatalog().findEntry(101000)!!.copy(url = localPage),
                 isInviter = true,
                 localName = "Alice",
                 localEmail = "alice@example.test",
@@ -1333,6 +1355,10 @@ class GameWebViewInstrumentedTest {
                 onCloseApp = onCloseApp,
                 onOpenHelpUrl = {},
             )
+            if (entry == null) {
+                controller.webView.stopLoading()
+                controller.webView.loadDataWithBaseURL(localPage, "<html><body></body></html>", "text/html", "utf-8", localPage)
+            }
         }
         return controller
     }

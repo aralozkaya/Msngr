@@ -38,6 +38,7 @@ import org.aralozkaya.msngr.ServerConfig
 import org.aralozkaya.msngr.UserProfileSnapshot
 import org.aralozkaya.msngr.deviceEndpointName
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.protocol.escapeXml
 import org.aralozkaya.msngr.protocol.CurrentMedia
 import org.aralozkaya.msngr.protocol.InkDrawing
 import org.aralozkaya.msngr.protocol.MsnBase64
@@ -49,6 +50,8 @@ import org.aralozkaya.msngr.protocol.Msnp18SocketTransport
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.aralozkaya.msngr.protocol.MsnpTransport
 import org.aralozkaya.msngr.protocol.VoiceClip
+import org.aralozkaya.msngr.protocol.parseProtocolXml
+import org.aralozkaya.msngr.sha256Hex
 import org.aralozkaya.msngr.trimMessengerPlusWhitespace
 import org.aralozkaya.msngr.withoutUnicodeEmoji
 import org.w3c.dom.Element
@@ -60,7 +63,6 @@ import java.net.URLDecoder
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -71,7 +73,6 @@ import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Network-backed MSNP18 client. This implementation never substitutes sample contacts, messages,
@@ -448,7 +449,7 @@ internal class LiveMsnp18Client(
         storageExpressionProfileResourceId = storageProfile?.expressionProfileResourceId
         storagePhotoResourceId = storageProfile?.photoResourceId
         storageDisplayPictureAttached = storageProfile?.displayPictureUrl != null
-        storageDisplayPictureHash = storedDisplayPicture?.sha256()
+        storageDisplayPictureHash = storedDisplayPicture?.sha256Hex()
         val initialServerStatus = normalizePersonalStatus(storageProfile?.personalStatus)
         storagePersonalStatus = initialServerStatus
         storagePersonalStatusConfirmed = signInData.storage.available && storageProfile != null
@@ -473,7 +474,7 @@ internal class LiveMsnp18Client(
             notificationServerHost.httpHostOrNull(),
         ).distinct()
         contactTileHashes.putAll(
-            cachedPictures.mapValues { (_, cached) -> cached.bytes.sha256() },
+            cachedPictures.mapValues { (_, cached) -> cached.bytes.sha256Hex() },
         )
         displayedContactDisplayPictureHashes.putAll(
             cachedPictures.mapValues { (_, cached) -> cached.picture.sha1d },
@@ -766,7 +767,7 @@ internal class LiveMsnp18Client(
                     ?: return fetchOwnPictureFromEndpoint()
             }
             if (endpoint != machineGuid || account != signedInStorageAccount) return org.aralozkaya.msngr.IncomingDisplayPicture()
-            storageDisplayPictureHash = bytes?.sha256()
+            storageDisplayPictureHash = bytes?.sha256Hex()
             if (hasRemoteOwnPictureAnnouncement()) fetchOwnPictureFromEndpoint(bytes)
             else org.aralozkaya.msngr.IncomingDisplayPicture(bytes, fetched = true)
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -842,10 +843,10 @@ internal class LiveMsnp18Client(
         check(profile.displayPictureStateKnown) { "The service did not return a complete display picture. Try again." }
         val remoteBytes = profile.displayPictureUrl?.let { fetchDisplayPicture(it, MAX_DISPLAY_PICTURE_BYTES) }
         check(endpoint == machineGuid) { "The signed-in session changed. Please try again." }
-        storageDisplayPictureHash = remoteBytes?.sha256()
+        storageDisplayPictureHash = remoteBytes?.sha256Hex()
         val pictureContentChanged = when {
             normalized == null -> storageDisplayPictureAttached
-            else -> normalized.sha256() != storageDisplayPictureHash
+            else -> normalized.sha256Hex() != storageDisplayPictureHash
         }
         if (pictureContentChanged) {
             if (normalized == null) {
@@ -907,7 +908,7 @@ internal class LiveMsnp18Client(
                 }
                 storageDisplayPictureAttached = true
             }
-            storageDisplayPictureHash = normalized?.sha256()
+            storageDisplayPictureHash = normalized?.sha256Hex()
         }
         check(endpoint == machineGuid) { "The signed-in session changed. Please try again." }
         // A community server can keep advertising the first endpoint's old object after
@@ -1235,8 +1236,7 @@ internal class LiveMsnp18Client(
 
     private fun transferArea(): java.io.File {
         check(signedInStorageAccount.isNotBlank()) { "Sign in before sharing files." }
-        val key = java.security.MessageDigest.getInstance("SHA-256").digest(signedInStorageAccount.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val key = signedInStorageAccount.sha256Hex()
         return java.io.File(requireNotNull(fileTransferDirectory), key)
     }
 
@@ -2982,7 +2982,7 @@ internal class LiveMsnp18Client(
                             false
                         } else {
                             displayedContactDisplayPictureHashes[id] = picture.sha1d
-                            contactTileHashes[id] = bytes.sha256()
+                            contactTileHashes[id] = bytes.sha256Hex()
                             updateContactAvatar(email, bytes.toImageDataUri())
                             true
                         }
@@ -3383,7 +3383,7 @@ internal class LiveMsnp18Client(
         val thumbnail = fetchContactTile(storageId, "small")
         if (signedInEmail != accountEmail || machineGuid != endpointGuid) return false
         if (thumbnail != null) {
-            val thumbnailHash = thumbnail.sha256()
+            val thumbnailHash = thumbnail.sha256Hex()
             val unchanged = synchronized(contactDisplayPictureStateLock) {
                 val previousThumbnailHash =
                     contactTileThumbnailHashes.put(contactId, thumbnailHash)
@@ -3395,7 +3395,7 @@ internal class LiveMsnp18Client(
             }
         }
         val bytes = fetchContactTile(storageId, "static") ?: return false
-        val hash = bytes.sha256()
+        val hash = bytes.sha256Hex()
         val accepted = synchronized(contactDisplayPictureStateLock) {
             if (signedInEmail != accountEmail || machineGuid != endpointGuid) return@synchronized false
             // An exact MSNObject can finish while an older or smaller HTTP fallback is in flight.
@@ -3976,7 +3976,7 @@ internal class LiveMsnp18Client(
                     if (!currentPicture.matches(event.bytes)) return@synchronized null
                     pictureTrace("P2P received bytes=${event.bytes.size}")
                     displayedContactDisplayPictureHashes[contactId] = currentPicture.sha1d
-                    contactTileHashes[contactId] = event.bytes.sha256()
+                    contactTileHashes[contactId] = event.bytes.sha256Hex()
                     updateContactAvatar(event.senderEmail, event.bytes.toImageDataUri())
                     currentPicture
                 } ?: return
@@ -4052,7 +4052,7 @@ internal class LiveMsnp18Client(
         val accountEmail = signedInEmail.takeIf(String::isNotBlank) ?: return
         val storageAccount = signedInStorageAccount
         val contactId = contactEmail.lowercase()
-        val hash = bytes.sha256()
+        val hash = bytes.sha256Hex()
         contactDisplayPictureCacheMutex.withLock {
             val isCurrent = synchronized(contactDisplayPictureStateLock) {
                 signedInEmail == accountEmail &&
@@ -4317,8 +4317,8 @@ internal class LiveMsnp18Client(
         mutableTyping.value = emptyMap()
     }
 
-    private fun MsnpCommand.toProtocolError(): LiveMsnpException = when (verb.toIntOrNull()) {
-        911 -> LiveMsnpException("The community server rejected these credentials.")
+    private fun MsnpCommand.toProtocolError(): Exception = when (verb.toIntOrNull()) {
+        911 -> CredentialsRejectedException("The community server rejected these credentials.")
         500, 601, 910, 921 -> LiveMsnpException("The community server is unavailable.")
         else -> LiveMsnpException("The community server returned MSNP error $verb.")
     }
@@ -4417,64 +4417,48 @@ private object MsnpSsoAuthenticator {
 
         try {
             MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-                val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = HTTP_TIMEOUT_MILLIS
-                    readTimeout = HTTP_TIMEOUT_MILLIS
-                    instanceFollowRedirects = true
-                    doOutput = true
-                    setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                    setRequestProperty("SOAPAction", SOAP_ACTION)
-                    setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
+                val (status, response) = postSoapEnvelope(endpointUrl, SOAP_ACTION, body, HTTP_TIMEOUT_MILLIS)
+                val responseBody = response.orEmpty()
+                if (status !in 200..299) {
+                    val detail = responseBody.xmlText("faultstring")
+                        .ifBlank { "The authentication service rejected these credentials." }
+                    if (status == HttpURLConnection.HTTP_UNAUTHORIZED) throw CredentialsRejectedException(detail)
+                    throw LiveMsnpException(detail)
                 }
 
-                try {
-                    connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
-                    val status = connection.responseCode
-                    val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                        ?.bufferedReader(StandardCharsets.UTF_8)
-                        ?.use { it.readText() }
-                        .orEmpty()
-                    if (status !in 200..299) {
-                        val detail = responseBody.xmlText("faultstring")
-                            .ifBlank { "The authentication service rejected these credentials." }
-                        throw LiveMsnpException(detail)
-                    }
-
-                    val credentials = parseSsoCredentials(responseBody)
-                    val credential = credentials[MESSENGER_DOMAIN]
-                        ?.takeIf { it.ticket.isNotBlank() && it.secret.isNotBlank() }
-                        ?: throw LiveMsnpException(
-                            "The authentication service did not return a Messenger credential.",
-                        )
-                    val contactsTicket = credentials[CONTACTS_DOMAIN]
-                        ?.ticket
-                        ?.takeIf(String::isNotBlank)
-                        ?: throw LiveMsnpException(
-                            "The authentication service did not return an address-book credential.",
-                        )
-                    val storageTicket = credentials[STORAGE_DOMAIN]
-                        ?.ticket
-                        ?.takeIf(String::isNotBlank)
-                        ?: throw LiveMsnpException(
-                            "The authentication service did not return a storage credential.",
-                        )
-                    SsoToken(
-                        ticket = credential.ticket,
-                        response = createRpsResponse(credential.secret, nonce),
-                        contactsTicket = contactsTicket,
-                        storageTicket = storageTicket,
-                        offlineTicket = credentials["messenger.msn.com"]?.ticket
-                            ?.takeIf(String::isNotBlank)
-                            ?: throw LiveMsnpException("The authentication service did not return an offline-message credential."),
-                        socialTicket = credentials["sup.live.com"]?.ticket
-                            ?.takeIf(String::isNotBlank)
-                            ?: contactsTicket,
+                val credentials = parseSsoCredentials(responseBody)
+                val credential = credentials[MESSENGER_DOMAIN]
+                    ?.takeIf { it.ticket.isNotBlank() && it.secret.isNotBlank() }
+                    ?: throw LiveMsnpException(
+                        "The authentication service did not return a Messenger credential.",
                     )
-                } finally {
-                    connection.disconnect()
-                }
+                val contactsTicket = credentials[CONTACTS_DOMAIN]
+                    ?.ticket
+                    ?.takeIf(String::isNotBlank)
+                    ?: throw LiveMsnpException(
+                        "The authentication service did not return an address-book credential.",
+                    )
+                val storageTicket = credentials[STORAGE_DOMAIN]
+                    ?.ticket
+                    ?.takeIf(String::isNotBlank)
+                    ?: throw LiveMsnpException(
+                        "The authentication service did not return a storage credential.",
+                    )
+                SsoToken(
+                    ticket = credential.ticket,
+                    response = createRpsResponse(credential.secret, nonce),
+                    contactsTicket = contactsTicket,
+                    storageTicket = storageTicket,
+                    offlineTicket = credentials["messenger.msn.com"]?.ticket
+                        ?.takeIf(String::isNotBlank)
+                        ?: throw LiveMsnpException("The authentication service did not return an offline-message credential."),
+                    socialTicket = credentials["sup.live.com"]?.ticket
+                        ?.takeIf(String::isNotBlank)
+                        ?: contactsTicket,
+                )
             }
+        } catch (error: CredentialsRejectedException) {
+            throw error
         } catch (error: LiveMsnpException) {
             throw error
         } catch (error: Exception) {
@@ -4534,8 +4518,7 @@ private object MsnpSsoAuthenticator {
         parseSsoCredentials(xml).mapValues { it.value.ticket }
 
     private fun parseSsoCredentials(xml: String): Map<String, MessengerCredential> {
-        val document = secureDocumentBuilderFactory().newDocumentBuilder()
-            .parse(xml.byteInputStream(StandardCharsets.UTF_8))
+        val document = parseProtocolXml(xml)
         val responses = document.getElementsByTagNameNS("*", "RequestSecurityTokenResponse")
         val credentials = mutableMapOf<String, MessengerCredential>()
         for (index in 0 until responses.length) {
@@ -4641,38 +4624,13 @@ private fun String.decodeMsnpValue(): String = runCatching {
     URLDecoder.decode(this, StandardCharsets.UTF_8.name())
 }.getOrDefault(this)
 
-private fun String.escapeXml(): String = buildString(length) {
-    this@escapeXml.forEach { character ->
-        append(
-            when (character) {
-                '&' -> "&amp;"
-                '<' -> "&lt;"
-                '>' -> "&gt;"
-                '"' -> "&quot;"
-                '\'' -> "&apos;"
-                else -> character
-            },
-        )
-    }
-}
-
 private fun Element.firstText(localName: String): String =
     getElementsByTagNameNS("*", localName).item(0)?.textContent.orEmpty().trim()
 
 private fun String.xmlText(localName: String): String = runCatching {
-    val document = secureDocumentBuilderFactory().newDocumentBuilder()
-        .parse(byteInputStream(StandardCharsets.UTF_8))
+    val document = parseProtocolXml(this)
     document.documentElement.firstText(localName)
 }.getOrDefault("")
-
-private fun secureDocumentBuilderFactory(): DocumentBuilderFactory =
-    DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }
 
 internal fun buildMsnpSsoRequest(
     email: String,
@@ -4734,10 +4692,6 @@ private fun ByteArray.hasPngSignature(): Boolean = size >= 8 &&
     this[2] == 0x4E.toByte() && this[3] == 0x47.toByte() &&
     this[4] == 0x0D.toByte() && this[5] == 0x0A.toByte() &&
     this[6] == 0x1A.toByte() && this[7] == 0x0A.toByte()
-
-private fun ByteArray.sha256(): String =
-    MessageDigest.getInstance("SHA-256").digest(this)
-        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
 private fun monotonicMillis(): Long = System.nanoTime() / 1_000_000L
 

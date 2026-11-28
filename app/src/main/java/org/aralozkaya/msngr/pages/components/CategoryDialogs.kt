@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -39,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -68,7 +66,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.aralozkaya.msngr.EmoticonPanel
@@ -357,33 +354,16 @@ internal fun CategoryEditorDialog(
         }
     }
 
-    if (category == null) {
-        ContainerTransformDialog(
-            sourceBounds = sourceBounds,
-            sourceIcon = Icons.Default.CreateNewFolder,
-            sourceLabel = stringResource(R.string.contacts_action_create_category),
-            closing = closingAction != null,
-            busy = busy,
-            onDismissRequest = ::dismiss,
-            onClosed = { closingAction?.invoke() },
-            content = editorContent,
-        )
-    } else {
-        BasicAlertDialog(
-            modifier = Modifier.fillMaxSize(),
-            onDismissRequest = ::dismiss,
-            properties = DialogProperties(
-                dismissOnBackPress = !busy,
-                dismissOnClickOutside = false,
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
-        ) {
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                Box(content = editorContent)
-            }
-        }
-    }
+    ContactEditorDialogFrame(
+        creating = category == null,
+        sourceBounds = sourceBounds,
+        sourceIcon = Icons.Default.CreateNewFolder,
+        sourceLabel = stringResource(R.string.contacts_action_create_category),
+        closingAction = closingAction,
+        busy = busy,
+        onDismissRequest = ::dismiss,
+        content = editorContent,
+    )
 }
 
 @Composable

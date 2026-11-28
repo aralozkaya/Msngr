@@ -2,11 +2,8 @@
 
 package org.aralozkaya.msngr
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -17,7 +14,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -80,6 +76,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
@@ -97,8 +98,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp as lerpDp
 import kotlin.math.abs
-import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -202,7 +201,7 @@ class MainActivity : MsngrActivity() {
         }
         showGroupLeftNotice(intent)
         if (savedInstanceState == null) displayPictureSync.requestRefresh(repository)
-        requestNotificationPermissionOnce()
+        requestNotificationPermissionOnce(notificationPermissionRequest)
         BackgroundConnectionController.startIfEnabled(this)
     }
 
@@ -244,23 +243,7 @@ class MainActivity : MsngrActivity() {
             org.aralozkaya.msngr.data.GroupInvitationInbox(repository.contactRequestAccountId, repository.groupInvitations.value))
     }
 
-    private fun requestNotificationPermissionOnce() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val prefs = getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, MODE_PRIVATE)
-        if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) return
-        prefs.edit { putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true) }
-        notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
-    }
-
     companion object {
-        private const val NOTIFICATION_PERMISSION_PREFS = "notification_permission"
-        private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "requested"
         private const val EXTRA_LEFT_GROUP_NAME = "left_group_name"
 
         internal fun groupLeftIntent(context: Context, groupName: String): Intent =
@@ -821,8 +804,13 @@ private fun HomePagerIndicator(
 ) {
     val homeLabel = stringResource(R.string.portal_pager_home_label)
     val contactsLabel = stringResource(R.string.portal_pager_contacts_label_plural)
-    val currentPosition = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
-        .coerceIn(0f, (pagerState.pageCount - 1).coerceAtLeast(0).toFloat())
+    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val activeColor = MaterialTheme.colorScheme.primary
+    fun activeFraction(page: Int): Float {
+        val position = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
+            .coerceIn(0f, pagerState.pageCount.coerceAtLeast(1) - 1f)
+        return 1f - abs(position - page).coerceIn(0f, 1f)
+    }
 
     Surface(
         modifier = modifier.testTag("main_pager_indicator"),
@@ -836,15 +824,9 @@ private fun HomePagerIndicator(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             for (page in 0 until pagerState.pageCount) {
-                val activeFraction = 1f - abs(currentPosition - page).coerceIn(0f, 1f)
-                val dotWidth = lerpDp(6.dp, 18.dp, activeFraction)
-                val dotColor = lerpColor(
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                    MaterialTheme.colorScheme.primary,
-                    activeFraction,
-                )
                 val pageLabel = if (page == 0) homeLabel else contactsLabel
-                Box(
+                Layout(
+                    content = {},
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable(
@@ -856,14 +838,16 @@ private fun HomePagerIndicator(
                         .semantics {
                             selected = pagerState.currentPage == page
                             contentDescription = pageLabel
+                        }
+                        .drawBehind {
+                            drawRoundRect(
+                                color = lerpColor(inactiveColor, activeColor, activeFraction(page)),
+                                cornerRadius = CornerRadius(size.height / 2f),
+                            )
                         },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = dotWidth, height = 6.dp)
-                            .background(dotColor, CircleShape),
-                    )
+                ) { _, constraints ->
+                    val width = lerpDp(6.dp, 18.dp, activeFraction(page)).roundToPx()
+                    layout(constraints.constrainWidth(width), constraints.constrainHeight(6.dp.roundToPx())) {}
                 }
             }
         }

@@ -34,10 +34,7 @@ def read_runtime():
     return json.loads((ROOT / "third_party/ruffle-runtime.json").read_text())
 
 
-def prepare(runtime):
-    parent = ROOT / "app/build"
-    parent.mkdir(parents=True, exist_ok=True)
-    source = Path(tempfile.mkdtemp(prefix="ruffle-source-", dir=parent))
+def prepare(runtime, source):
     run("git", "clone", "--filter=blob:none", "--no-checkout", "--depth=1",
         "--branch", "v" + runtime["version"], UPSTREAM, str(source), cwd=ROOT)
     subprocess.run(["git", "-C", str(source), "sparse-checkout", "set", "--no-cone", "--stdin"],
@@ -69,10 +66,10 @@ def dependency_inventory(source, *, patched):
     if patched:
         command.append("--locked")
     metadata = json.loads(run(*command, cwd=source, capture=True))
-    return packages_from_metadata(metadata, original_lock)
+    return dependency_identities(web_build_packages(metadata), original_lock)
 
 
-def packages_from_metadata(metadata, original_lock):
+def web_build_packages(metadata):
     packages = {p["id"]: p for p in metadata["packages"]}
     nodes = {n["id"]: n for n in metadata["resolve"]["nodes"]}
     # Include normal AND build/proc-macro dependencies; omit tests and desktop-only code.
@@ -90,15 +87,18 @@ def packages_from_metadata(metadata, original_lock):
     if len(roots) != 1:
         raise ValueError("Expected exactly one Ruffle web package")
     visit(roots[0])
+    return [packages[identifier] for identifier in sorted(selected)]
+
+
+def dependency_identities(packages, original_lock):
     locked = {(p["name"], p["version"], p.get("source")) for p in original_lock["package"]}
     result = {}
-    for identifier in selected:
-        package = packages[identifier]
+    for package in packages:
         source_id = package["source"]
         if not source_id:
             continue
         if (package["name"], package["version"], source_id) not in locked:
-            raise ValueError("Metadata resolved a dependency outside the pinned Cargo.lock: " + identifier)
+            raise ValueError("Metadata resolved a dependency outside the pinned Cargo.lock: " + package["id"])
         if source_id.startswith("registry+"):
             identity = {"name": package["name"], "version": package["version"], "ecosystem": "crates.io"}
         elif source_id.startswith("git+"):
@@ -115,20 +115,22 @@ def packages_from_metadata(metadata, original_lock):
 
 
 def inventory_bytes(runtime, source=None):
-    source = source or prepare(runtime)
+    if source is None:
+        with tempfile.TemporaryDirectory(prefix="msngr-ruffle-") as temporary:
+            return inventory_bytes(runtime, prepare(runtime, Path(temporary)))
     data = dependency_inventory(source, patched=bool(runtime.get("sourceBuild")))
     return (json.dumps(data, indent=2) + "\n").encode("utf-8")
 
 
 def verify_inventory(runtime):
-    source = prepare(runtime)
-    actual = inventory_bytes(runtime, source)
-    if actual != (ROOT / INVENTORY).read_bytes():
-        raise ValueError("Ruffle dependency inventory differs from the selected source/build inputs")
-    print("Verified the pinned WASM and build dependency inventory")
-    if runtime.get("sourceBuild"):
-        run("cargo", "test", "--locked", "--package", "ruffle_common", "--lib",
-            "security_update_tests", cwd=source)
+    with tempfile.TemporaryDirectory(prefix="msngr-ruffle-") as temporary:
+        source = prepare(runtime, Path(temporary))
+        if inventory_bytes(runtime, source) != (ROOT / INVENTORY).read_bytes():
+            raise ValueError("Ruffle dependency inventory differs from the selected source/build inputs")
+        print("Verified the pinned WASM and build dependency inventory")
+        if runtime.get("sourceBuild"):
+            run("cargo", "test", "--locked", "--package", "ruffle_common", "--lib",
+                "security_update_tests", cwd=source)
 
 
 def rebuild(runtime, source):
@@ -151,6 +153,7 @@ def rebuild(runtime, source):
     for workspace in ("ruffle-core", "ruffle-selfhosted"):
         subprocess.run([npm, "run", "build", "--workspace=" + workspace], cwd=web, env=env, check=True)
     print("Built runtime:", web / "packages/selfhosted/dist")
+    print("Source checkout for --install-built:", source)
 
 
 def install_built(source):
@@ -161,10 +164,10 @@ def install_built(source):
         raise ValueError("Built source does not match the selected upstream commit")
     patch = ROOT / "third_party/patches/ruffle-security.patch"
     paths = re.findall(r"^\+\+\+ b/(.+)$", patch.read_text(), flags=re.M)
-    actual_patch = subprocess.check_output(["git", "diff", "--", *paths], cwd=source)
+    actual_patch = subprocess.check_output(["git", "diff", "--no-ext-diff", "HEAD", "--", *paths], cwd=source)
     if actual_patch != patch.read_bytes():
         raise ValueError("Built source differs from the recorded source patch")
-    modified = set(run("git", "diff", "--name-only", cwd=source, capture=True).splitlines())
+    modified = set(run("git", "diff", "--name-only", "HEAD", cwd=source, capture=True).splitlines())
     if modified - set(paths) - {"Cargo.lock"}:
         raise ValueError("Built source contains additional tracked changes")
     for name, expected in info["inputs"].items():
@@ -213,6 +216,9 @@ if __name__ == "__main__":
     elif options.rebuild:
         if not runtime.get("sourceBuild"):
             raise SystemExit("This runtime uses the official package; no local source patch is selected")
-        rebuild(runtime, prepare(runtime))
+        parent = ROOT / "app/build"
+        parent.mkdir(parents=True, exist_ok=True)
+        source = Path(tempfile.mkdtemp(prefix="ruffle-source-", dir=parent))
+        rebuild(runtime, prepare(runtime, source))
     else:
         parser.error("Select --verify-inventory, --rebuild, or --install-built")

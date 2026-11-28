@@ -215,10 +215,8 @@ class PortalPageInstrumentedTest {
         compose.onNodeWithTag("contacts_search_bar").assertIsDisplayed()
         compose.onNodeWithTag("main_pager_dot_1").assertIsSelected()
 
-        // After movement stops, the launcher pagination indicator auto-hides cleanly.
-        compose.waitUntil(timeoutMillis = 3_000) {
-            compose.onAllNodes(hasTestTag("main_pager_indicator")).fetchSemanticsNodes().isEmpty()
-        }
+        compose.mainClock.advanceTimeBy(3_000)
+        compose.waitForIdle()
         compose.onNodeWithTag("main_pager_indicator").assertDoesNotExist()
         }
     }

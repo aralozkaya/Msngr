@@ -11,6 +11,7 @@ import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
+import org.aralozkaya.msngr.data.Contact
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.notifications.BackgroundDeliveryPrefs
 import org.junit.After
@@ -73,6 +74,19 @@ class AccountStorageInstrumentedTest {
         SessionPrefs.setSignOutOtherSessionsOnSignIn(context, true)
         SessionPrefs.disableRememberedCredentials(context, account = aliceAccount)
         assertFalse(SessionPrefs.signsOutOtherSessionsOnSignIn(context, aliceAccount))
+    }
+
+    @Test
+    fun lateRemoteLogoutOnlyRevokesTheDepartedAccount() {
+        login(alice)
+        val departed = requireNotNull(SessionPrefs.activeAccount())
+        login(bob)
+        val current = requireNotNull(SessionPrefs.activeAccount())
+
+        assertFalse(SessionPrefs.recordRemoteSignOut(context, departed))
+        assertTrue(SessionPrefs.wasRemotelySignedOut(context, departed))
+        assertFalse(SessionPrefs.wasRemotelySignedOut(context, current))
+        assertEquals(current, SessionPrefs.activeAccount())
     }
 
     @Test
@@ -359,11 +373,47 @@ class AccountStorageInstrumentedTest {
         val prefs = context.getSharedPreferences("msngr_session_secure", Context.MODE_PRIVATE)
         val aliceKey = "profile_${AccountIdentity.forLogin(alice).storageKey}"
         val bobKey = "profile_${AccountIdentity.forLogin(bob).storageKey}"
+        val original = prefs.getString(aliceKey, null)
         prefs.edit().putString(aliceKey, prefs.getString(bobKey, null)).commit()
 
         assertEquals("", SessionPrefs.readLoginSnapshot(context, alice).password)
         assertEquals("password-$bob", SessionPrefs.readLoginSnapshot(context, bob).password)
         assertEquals(listOf(bob), SessionPrefs.rememberedAccounts(context))
+        assertEquals(prefs.getString(bobKey, null), prefs.getString(aliceKey, null))
+        prefs.edit().putString(aliceKey, original).commit()
+        assertEquals("password-$alice", SessionPrefs.readLoginSnapshot(context, alice).password)
+    }
+
+    @Test
+    fun lateSignInCannotActivateTheNewSelection() {
+        login(alice)
+        val validated = requireNotNull(SessionPrefs.activeAccount())
+        SessionPrefs.logout()
+        login(alice, provider = ProviderOptions.CROSSTALK)
+        val selected = requireNotNull(SessionPrefs.activeAccount())
+        SessionPrefs.logout()
+        assertFalse(SessionPrefs.activateRememberedSession(context, validated))
+        assertFalse(SessionPrefs.canOpenAuthenticatedScreens(context))
+        assertTrue(SessionPrefs.activateRememberedSession(context, selected))
+        assertEquals(selected, SessionPrefs.activeAccount())
+    }
+
+    @Test
+    fun recentShortcutPhotosStayWithTheServiceThatCreatedThem() {
+        login(alice)
+        val prefs = context.getSharedPreferences("app_shortcuts", Context.MODE_PRIVATE)
+        val saved = requireNotNull(SessionPrefs.activeAccount())
+        val contacts = listOf(Contact(bob, "Bob", bob, Presence.Online))
+        prefs.edit().clear().putString("account_storage_key", saved.storageKey)
+            .putString("recent_id_0", bob).putString("recent_label_0", "Bob").commit()
+        try {
+            assertEquals(bob, AppShortcuts.recentContactPhotos(context, alice, contacts).single().contactId)
+            SessionPrefs.logout()
+            login(alice, provider = ProviderOptions.CROSSTALK)
+            assertTrue(AppShortcuts.recentContactPhotos(context, alice, contacts).isEmpty())
+        } finally {
+            prefs.edit().clear().commit()
+        }
     }
 
     @Test
@@ -381,12 +431,17 @@ class AccountStorageInstrumentedTest {
         ), Base64.NO_WRAP)
         val secure = context.getSharedPreferences("msngr_session_secure", Context.MODE_PRIVATE)
         secure.edit().putBoolean("accounts_migrated", true).putString("selected_account", oldKey)
-            .putString("account_$oldKey", encoded).commit()
+            .putString("account_$oldKey", "temporarily unreadable").commit()
         val legacy = context.getSharedPreferences("msngr_profile_$oldKey", Context.MODE_PRIVATE)
         legacy.edit().putString("username", "Mock nickname").putString("status_message", "Mock message").commit()
 
         val mock = AccountIdentity.forLogin(alice, useMockServer = true)
         val real = AccountIdentity.forLogin(alice)
+        assertEquals("", SessionPrefs.readLoginSnapshot(context, mock).password)
+        assertTrue(secure.contains("account_$oldKey"))
+        assertFalse(secure.getBoolean("service_accounts_migrated", false))
+        assertEquals("Mock nickname", legacy.getString("username", null))
+        secure.edit().putString("account_$oldKey", encoded).commit()
         assertEquals("mock-password", SessionPrefs.readLoginSnapshot(context, mock).password)
         assertEquals(mock, SessionPrefs.readLoginSnapshot(context).accountIdentity)
         assertEquals("", SessionPrefs.readLoginSnapshot(context, real).password)

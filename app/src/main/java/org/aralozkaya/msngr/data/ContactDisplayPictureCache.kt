@@ -9,9 +9,8 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import org.aralozkaya.msngr.sha256Hex
 
 internal data class CachedContactDisplayPicture(
     val picture: MsnDisplayPicture,
@@ -75,7 +74,7 @@ internal class FileContactDisplayPictureCache(
                 .map { contact -> contact to "${contact.sha256Hex()}.dp" }
                 .toList()
             val retainedFiles = contacts.mapTo(HashSet(contacts.size)) { it.second }
-            accountDirectory.listFiles()?.forEach { file ->
+            accountDirectory.mediaFiles("dp").forEach { file ->
                 if (file.name !in retainedFiles) file.delete()
             }
             contacts.mapNotNull { (normalizedContact, fileName) ->
@@ -101,26 +100,18 @@ internal class FileContactDisplayPictureCache(
         mutex.withLock {
             val target = recordFile(accountEmail, normalizedContact)
             target.parentFile?.mkdirs()
-            val temporary = File(target.parentFile, "${target.name}.tmp")
             val metadata = picture.toXml().toByteArray(StandardCharsets.UTF_8)
             if (metadata.size > MAX_METADATA_BYTES) return@withLock
-            runCatching {
-                DataOutputStream(FileOutputStream(temporary)).use { output ->
-                    output.writeInt(RECORD_MAGIC)
-                    output.writeInt(RECORD_VERSION)
-                    output.writeInt(metadata.size)
-                    output.write(metadata)
-                    output.writeInt(bytes.size)
-                    output.write(bytes)
-                    output.flush()
+            target.replaceMediaFile { stream ->
+                DataOutputStream(stream).apply {
+                    writeInt(RECORD_MAGIC)
+                    writeInt(RECORD_VERSION)
+                    writeInt(metadata.size)
+                    write(metadata)
+                    writeInt(bytes.size)
+                    write(bytes)
                 }
-                if (!temporary.renameTo(target)) {
-                    FileInputStream(temporary).use { input ->
-                        FileOutputStream(target).use { output -> input.copyTo(output) }
-                    }
-                    temporary.delete()
-                }
-            }.onFailure { temporary.delete() }
+            }
         }
     }
 
@@ -131,7 +122,7 @@ internal class FileContactDisplayPictureCache(
         val normalizedContact = contactEmail.normalizedCacheIdentity()
         if (normalizedContact.isEmpty()) return@withContext
         mutex.withLock {
-            val target = recordFile(accountEmail, normalizedContact)
+            val target = recordFile(accountEmail, normalizedContact).recoverMediaFile()
             target.delete()
             File(target.parentFile, "${target.name}.tmp").delete()
             Unit
@@ -195,17 +186,3 @@ private fun String.normalizedCacheIdentity(): String {
     return (if (prefix.toIntOrNull() != null) withoutEndpoint.substringAfter(':') else withoutEndpoint)
         .lowercase()
 }
-
-private fun String.sha256Hex(): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-        .digest(toByteArray(StandardCharsets.UTF_8))
-    val result = CharArray(digest.size * 2)
-    digest.forEachIndexed { index, byte ->
-        val value = byte.toInt() and 0xff
-        result[index * 2] = HEX_DIGITS[value ushr 4]
-        result[index * 2 + 1] = HEX_DIGITS[value and 0x0f]
-    }
-    return String(result)
-}
-
-private const val HEX_DIGITS = "0123456789abcdef"

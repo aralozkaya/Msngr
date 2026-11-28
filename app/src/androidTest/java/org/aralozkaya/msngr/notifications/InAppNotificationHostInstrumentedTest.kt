@@ -22,7 +22,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -69,7 +69,7 @@ class InAppNotificationHostInstrumentedTest {
                 compose.onAllNodes(isRoot())[0].captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
             }
             // A transparent idle overlay must not swallow typing or touches in the chat.
-            compose.onNode(hasSetTextAction()).performTextInput("Unsent notification test")
+            compose.onNode(hasSetTextAction()).performTextReplacement("Unsent notification test")
             compose.onNode(hasSetTextAction()).assertTextContains("Unsent notification test")
             controller.show(InAppNotification(InAppNotificationType.Message, second.displayName, "A message from another chat", second.id))
             compose.waitUntil(3000) { compose.onAllNodesWithTag("in_app_notification_banner").fetchSemanticsNodes().isNotEmpty() }

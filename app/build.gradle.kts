@@ -1,3 +1,5 @@
+import java.io.OutputStream
+import java.security.DigestInputStream
 import java.security.MessageDigest
 
 plugins {
@@ -13,6 +15,12 @@ val javaOnlyCodeQl = providers.environmentVariable("CODEQL_EXTRACTOR_JAVA_ROOT")
 // NDK for this one task; every APK task still configures and builds the codec.
 val dependencyInventoryOnly = gradle.startParameter.taskNames.isNotEmpty() &&
     gradle.startParameter.taskNames.all { it in setOf(":app:writeDependencyInventory", "writeDependencyInventory") }
+
+fun sha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    DigestInputStream(file.inputStream(), digest).use { it.transferTo(OutputStream.nullOutputStream()) }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
 
 val ruffleSource = rootProject.layout.projectDirectory.dir("third_party/ruffle")
 val ruffleCommit = if (!ruffleSource.file(".git").asFile.exists() && ruffleSource.file("UPSTREAM_COMMIT").asFile.exists()) {
@@ -45,12 +53,14 @@ val verifyBundledRuffle = tasks.register("verifyBundledRuffle") {
         check(actual == hashes.keys) { "Ruffle runtime files differ from the locked file set" }
         hashes.forEach { (name, expected) ->
             check(name.matches(Regex("[a-zA-Z0-9_.-]+"))) { "Invalid Ruffle asset name" }
-            val digest = MessageDigest.getInstance("SHA-256")
-                .digest(assets.file(name).asFile.readBytes()).joinToString("") { "%02x".format(it) }
-            check(digest == expected) { "Ruffle integrity check failed: $name" }
+            check(sha256(assets.file(name).asFile) == expected) { "Ruffle integrity check failed: $name" }
         }
-        fun sha256(file: File) = MessageDigest.getInstance("SHA-256")
-            .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+        val sourcePackage = groovy.json.JsonSlurper().parse(ruffleSource.file("web/packages/selfhosted/package.json").asFile) as Map<*, *>
+        check(sourcePackage["version"] == metadata["version"]) { "Ruffle source/package version mismatch" }
+        val loader = assets.file("ruffle.js").asFile.readText()
+        check("commitHash:\"${ruffleCommit.get()}\"" in loader && "versionNumber:\"${metadata["version"]}\"" in loader) {
+            "Ruffle loader does not match the pinned source"
+        }
         val inventoryFile = rootProject.file("third_party/ruffle-build/inventory.json")
         check(metadata["dependencyInventory"] == sha256(inventoryFile)) {
             "Ruffle dependency inventory hash mismatch"
@@ -124,6 +134,7 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
 
         val docBuilder = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
         }.newDocumentBuilder()
 
         fun parseStringXml(
@@ -214,6 +225,9 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
             }
 
         val byTag = parsedFiles.associateBy { it.tag }
+        if (byTag.size != parsedFiles.size) {
+            throw GradleException("Multiple resource directories declare the same locale")
+        }
         if ("default" !in byTag) {
             throw GradleException("Missing default strings file: app/src/main/res/values/strings.xml")
         }
@@ -239,7 +253,7 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
         }
 
         val rootUntranslatable = byTag.getValue("default").untranslatableKeys
-        for (concrete in concreteFiles) {
+        for (concrete in concreteFiles.filter { it.tag != "default" }) {
             val overlap = concrete.keys.intersect(rootUntranslatable)
             if (overlap.isNotEmpty()) {
                 throw GradleException(
@@ -266,27 +280,22 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
             allowAlias = false,
         )
 
-        val expectedKeys = linkedSetOf<String>()
-        concreteFiles.forEach { expectedKeys.addAll(it.keys) }
-        expectedKeys.addAll(templateParsed.keys)
-
+        val expectedKeys = templateParsed.keys
+        // Aliases copy their source file verbatim, so their sources must be complete.
+        val aliasSources = parsedFiles.filter { it.aliasOf != null }.map { resolvedConcrete.getValue(it.tag).tag }.toSet()
         for (concrete in concreteFiles) {
-            val missing = expectedKeys - concrete.keys
+            val baseTag = concrete.tag.substringBefore('-')
+            val inherited = if (baseTag != concrete.tag && concrete.tag !in aliasSources) {
+                resolvedConcrete.getValue(baseTag).keys
+            } else emptySet()
+            val missing = expectedKeys - concrete.keys - inherited
             if (missing.isNotEmpty()) {
                 throw GradleException("${concrete.file} is missing string keys: ${missing.sorted().joinToString()}")
             }
-        }
-        val missingInTemplate = expectedKeys - templateParsed.keys
-        if (missingInTemplate.isNotEmpty()) {
-            throw GradleException(
-                "${templateParsed.file} is missing string keys: ${missingInTemplate.sorted().joinToString()}",
-            )
-        }
-        val extraInTemplate = templateParsed.keys - concreteFiles.flatMapTo(linkedSetOf()) { it.keys }
-        if (extraInTemplate.isNotEmpty()) {
-            throw GradleException(
-                "${templateParsed.file} has extra string keys not in translations: ${extraInTemplate.sorted().joinToString()}",
-            )
+            val extra = concrete.keys - expectedKeys - rootUntranslatable
+            if (extra.isNotEmpty()) {
+                throw GradleException("${concrete.file} contains keys missing from the template: ${extra.sorted().joinToString()}")
+            }
         }
         val nonEmptyTemplateKeys = templateParsed.entries.filterValues { it.isNotEmpty() }.keys
         if (nonEmptyTemplateKeys.isNotEmpty()) {
@@ -338,7 +347,9 @@ abstract class GenerateLocaleAliasResourcesTask : DefaultTask() {
                 if (name.isEmpty()) {
                     throw GradleException("${localesConfigFile.get().asFile} has <locale> without android:name")
                 }
-                declaredLocales.add(name)
+                if (!declaredLocales.add(name)) {
+                    throw GradleException("${localesConfigFile.get().asFile} repeats locale '$name'")
+                }
             }
         }
         if (defaultLocale !in declaredLocales) {
@@ -452,21 +463,20 @@ val verifyLibraryLicenses = tasks.register("verifyLibraryLicenses") {
         val auditFile = rootProject.file("third_party/library-audit.json")
         @Suppress("UNCHECKED_CAST")
         val audit = groovy.json.JsonSlurper().parse(auditFile) as Map<String, Any>
-        fun digest(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
-            .joinToString("") { "%02x".format(it) }
         @Suppress("UNCHECKED_CAST")
         val components = audit["components"] as List<Map<String, Any>>
+        val artifactHashes = mutableMapOf<File, String>()
         for (variant in listOf("release", "debug")) {
             val reviewed = components.filter { it["ecosystem"] == "Maven" && (it["variants"] as List<*>).contains(variant) }.associate {
                 it["name"].toString() to it["artifactSha256"].toString()
             }
             val resolved = configurations.getByName("${variant}RuntimeClasspath").resolvedConfiguration.resolvedArtifacts
-                .associate { it.moduleVersion.id.toString() to digest(it.file) }
+                .associate { it.moduleVersion.id.toString() to artifactHashes.getOrPut(it.file) { sha256(it.file) } }
             check(resolved == reviewed) { "$variant libraries changed. Regenerate and review tools/library_licenses.py's notices." }
         }
         check(audit["ruffleSourceCommit"] == ruffleCommit.get()) { "Ruffle's license audit is stale" }
-        check(audit["ruffleInventorySha256"] == digest(rootProject.file("third_party/ruffle-build/inventory.json"))) { "Ruffle dependency notices are stale" }
-        check(audit["libsirenPatchSha256"] == digest(rootProject.file("third_party/patches/libsiren-hardening.patch"))) { "libsiren's source copy is stale" }
+        check(audit["ruffleInventorySha256"] == sha256(rootProject.file("third_party/ruffle-build/inventory.json"))) { "Ruffle dependency notices are stale" }
+        check(audit["libsirenPatchSha256"] == sha256(rootProject.file("third_party/patches/libsiren-hardening.patch"))) { "libsiren's source copy is stale" }
         val sirenRoot = rootProject.file("third_party/libsiren")
         val sirenCommit = if (!File(sirenRoot, ".git").exists() && File(sirenRoot, "UPSTREAM_COMMIT").exists()) {
             File(sirenRoot, "UPSTREAM_COMMIT").readText().trim()
@@ -482,7 +492,7 @@ val verifyLibraryLicenses = tasks.register("verifyLibraryLicenses") {
         @Suppress("UNCHECKED_CAST")
         (audit["files"] as Map<String, String>).forEach { (name, expected) ->
             check(name.matches(Regex("[A-Za-z0-9_.-]+"))) { "Invalid license bundle filename" }
-            check(digest(file("src/main/assets/licenses/$name")) == expected) { "Library notice/source bundle changed: $name" }
+            check(sha256(file("src/main/assets/licenses/$name")) == expected) { "Library notice/source bundle changed: $name" }
         }
     }
 }

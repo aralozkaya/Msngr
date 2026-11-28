@@ -232,6 +232,10 @@ class MsnpClientConfigTest {
     @Test
     fun candidateServiceEndpointsAndFallbackHandleHttpsToHttpOnlyOnIoErrors() {
         assertEquals(
+            listOf("https://login.escargot.chat/RST.srf"),
+            MsnpClientConfigService.candidateServiceEndpoints("login.escargot.chat", "/RST.srf"),
+        )
+        assertEquals(
             listOf(
                 "https://custom.example.test:8080/RST.srf",
                 "http://custom.example.test:8080/RST.srf",
@@ -275,5 +279,23 @@ class MsnpClientConfigTest {
         }
         assertTrue(nonIoThrown)
         assertEquals(listOf("https://custom.example.test/RST.srf"), attemptedAuthError)
+    }
+
+    @Test
+    fun certificateRejectionStopsTheCleartextFallback() {
+        val endpoints = listOf("https://custom.example.test", "http://custom.example.test")
+        val attempted = mutableListOf<String>()
+        val failure = runCatching {
+            runBlocking {
+                MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpoint ->
+                    attempted += endpoint
+                    throw javax.net.ssl.SSLHandshakeException("Certificate rejected").apply {
+                        initCause(java.security.cert.CertificateException())
+                    }
+                }
+            }
+        }
+        assertTrue(failure.exceptionOrNull() is javax.net.ssl.SSLHandshakeException)
+        assertEquals(listOf(endpoints.first()), attempted)
     }
 }

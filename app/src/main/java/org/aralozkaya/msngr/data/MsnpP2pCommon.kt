@@ -2,13 +2,19 @@ package org.aralozkaya.msngr.data
 
 import org.aralozkaya.msngr.protocol.MsnBase64
 import org.aralozkaya.msngr.protocol.MsnDisplayPicture
+import org.aralozkaya.msngr.protocol.MsnFileContext
+import org.aralozkaya.msngr.protocol.MsnGameProtocol
+import org.aralozkaya.msngr.protocol.MsnWink
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 internal data class LocalDisplayPicture(
     val metadata: MsnDisplayPicture,
     val bytes: ByteArray,
 )
+
+internal data class PendingObjectRequest(val callId: String, val picture: MsnDisplayPicture, val createdAtNanos: Long)
 
 /** Shared MSNSLP behavior; binary P2Pv1 and P2Pv2 framing stays in its versioned session. */
 internal object MsnpP2pUtil {
@@ -50,22 +56,49 @@ internal object MsnpP2pUtil {
     fun matchingLocalPicture(
         requestBody: String,
         localPicture: LocalDisplayPicture?,
+        localVoiceClip: (String) -> LocalDisplayPicture? = { null },
+        localWink: (String) -> LocalDisplayPicture? = { null },
+        localPhoto: (String) -> LocalDisplayPicture? = { null },
     ): LocalDisplayPicture? {
-        val context = requestBody.field("Context") ?: return null
-        val requestedObject = runCatching {
-            // Native WLM Base64-encodes a NUL-terminated XML string in its Context field.
-            val xml = String(MsnBase64.decode(context) ?: return null, StandardCharsets.UTF_8)
-                .trimEnd('\u0000')
-            MsnDisplayPicture.parseObject(xml, localPicture?.metadata?.objectType ?: 3)
-        }.getOrNull() ?: return null
-        return localPicture?.takeIf { picture ->
-            (picture.metadata.objectType !in listOf(8, 11, 15) ||
-                (acceptsObjectAppId(picture.metadata.objectType, requestBody.field("AppID")) &&
-                    requestBody.field("EUF-GUID")?.trim('{', '}')?.equals(DISPLAY_PICTURE_GUID, true) == true)) &&
-                picture.metadata.sha1d == requestedObject.sha1d &&
-                picture.metadata.creator.equals(requestedObject.creator, true) &&
-                picture.metadata.size == requestedObject.size &&
+        val context = requestBody.field("Context")?.let(MsnBase64::decode) ?: return null
+        val requested = MsnDisplayPicture.parseObject(context.toString(Charsets.UTF_8).trimEnd('\u0000')) ?: return null
+        if (requested.objectType in listOf(8, 11, 15) &&
+            (!acceptsObjectAppId(requested.objectType, requestBody.field("AppID")) ||
+                requestBody.field("EUF-GUID")?.trim('{', '}')?.equals(DISPLAY_PICTURE_GUID, true) != true)) return null
+
+        fun matches(picture: LocalDisplayPicture): Boolean =
+            picture.metadata.objectType == requested.objectType &&
+                picture.metadata.sha1d == requested.sha1d && picture.metadata.size == requested.size &&
+                picture.metadata.creator.equals(requested.creator, true) &&
                 picture.metadata.matches(picture.bytes)
+
+        return localPicture?.takeIf(::matches) ?: when (requested.objectType) {
+            8 -> if (MsnWink.validOffer(requested)) localWink(requested.sha1d) else null
+            11 -> localVoiceClip(requested.sha1d)
+            15 -> localPhoto(requested.sha1d)
+            else -> null
+        }?.takeIf(::matches)
+    }
+
+    suspend fun <K : Any> dispatchSlp(
+        message: SlpMessage,
+        photos: Lazy<MsnpPhotoSession>,
+        games: Lazy<MsnpGameSession>,
+        files: Lazy<MsnpFileSession>,
+        pendingCalls: ConcurrentHashMap<K, PendingObjectRequest>,
+        handleInvite: suspend (SlpMessage) -> Unit,
+    ) {
+        val guid = message.body.field("EUF-GUID")?.trim('{', '}')?.uppercase()
+        if ((photos.isInitialized() || guid == MsnpPhotoSession.GUID) && photos.value.handle(message)) return
+        if ((games.isInitialized() || guid == MsnGameProtocol.EUF_GUID) && games.value.handle(message)) return
+        if ((files.isInitialized() || guid == MsnFileContext.GUID || guid == MsnpFileSession.ORIGINAL_GUID) &&
+            files.value.handle(message)) return
+        when {
+            message.firstLine.startsWith("INVITE ", true) -> handleInvite(message)
+            message.firstLine.startsWith("MSNSLP/1.0 603", true) -> {
+                for ((session, request) in pendingCalls)
+                    if (request.callId == message.callId) pendingCalls.remove(session, request)
+            }
         }
     }
 

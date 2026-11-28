@@ -26,7 +26,10 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import kotlinx.coroutines.CompletableDeferred
 import org.aralozkaya.msngr.pages.components.AddContactDialog
 import org.aralozkaya.msngr.pages.components.ContactsActionMenu
@@ -115,7 +118,7 @@ class AddContactDialogInstrumentedTest {
         compose.mainClock.autoAdvance = true
         compose.onNodeWithTag("add-contact-modal").assertDoesNotExist()
         compose.onNodeWithText("Add a contact").assertIsDisplayed().performClick()
-        pressBack()
+        pressBackInInvitationDialog()
         compose.onNodeWithTag("add-contact-modal").assertDoesNotExist()
         compose.onNodeWithText("Add a contact").assertIsDisplayed()
     }
@@ -157,7 +160,7 @@ class AddContactDialogInstrumentedTest {
                 .compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         assertFalse(dismissed)
-        pressBack()
+        pressBackInInvitationDialog()
         compose.onNodeWithTag("add-contact-spinner", useUnmergedTree = true).assertIsDisplayed()
         compose.runOnIdle { assertFalse(dismissed) }
         response.complete(Result.failure(IllegalStateException("The server could not add this contact.")))
@@ -172,6 +175,11 @@ class AddContactDialogInstrumentedTest {
         compose.onNodeWithTag("add-contact-submit").performClick()
         compose.waitUntil(5000) { added }
         assertEquals(2, calls)
+    }
+
+    private fun pressBackInInvitationDialog() {
+        compose.onNodeWithTag("add-contact-modal").assertIsDisplayed()
+        onView(isRoot()).inRoot(isDialog()).perform(ViewActions.pressBack())
     }
 
     private fun saveInvitationScreenshot(name: String) {

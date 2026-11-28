@@ -7,10 +7,11 @@ import org.aralozkaya.msngr.appContainer
 
 class NotificationMarkReadReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.getStringExtra(NOTIFICATION_ACCOUNT) != context.notificationAccountKey()) return
         val contactId = intent.getStringExtra(EXTRA_CONTACT_ID)?.takeIf(String::isNotBlank) ?: return
         // Unread counts are local to the running repository. If the process was
         // restarted, there is no unread state to clear and no login is needed.
-        val repository = runCatching { context.appContainer.messengerRepository }.getOrNull()
+        val repository = context.appContainer.currentRepository
         repository?.markRead(contactId)
         MsngrNotificationManager(context).dismissConversation(contactId)
     }

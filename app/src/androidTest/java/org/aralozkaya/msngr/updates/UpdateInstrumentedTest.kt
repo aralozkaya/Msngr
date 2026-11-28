@@ -41,6 +41,12 @@ class UpdateInstrumentedTest {
         assertEquals("$RELEASES_PAGE/download/v1.2.3-beta.4/Msngr-release.apk", release.apkUrl)
         assertEquals("a".repeat(64), release.sha256)
         assertEquals(release, storedRelease(release.toJson().toString()))
+        assertEquals(release.pageUrl, storedRelease(release.toJson().put("page", "https://example.test").toString())?.pageUrl)
+
+        val wrongTag = fixture().put("tag_name", "v2.0.0")
+        assertNull(parseGitHubRelease(wrongTag)?.apkUrl)
+        val badDigest = fixture().apply { getJSONArray("assets").getJSONObject(2).put("digest", "sha256:incomplete") }
+        assertNull(parseGitHubRelease(badDigest)?.apkUrl)
 
         val withoutSignedApk = fixture().apply { getJSONArray("assets").remove(2) }
         assertNull(parseGitHubRelease(withoutSignedApk)?.apkUrl)
@@ -167,13 +173,14 @@ class UpdateInstrumentedTest {
         val notifications = context.getSystemService(NotificationManager::class.java)
         val manager = UpdateManager(context, supported = true, installedCode = 1,
             releaseSource = { listOf(checkNotNull(parseGitHubRelease(fixture()))) })
-        fun activeUpdate() = notifications.activeNotifications.firstOrNull { androidx.core.app.NotificationCompat.getChannelId(it.notification) == NotificationChannels.APP_UPDATES }
+        fun activeUpdate() = notifications.activeNotifications.firstOrNull { it.id == UpdateManager.NOTIFICATION_ID }
         try {
             manager.dismissNotification()
             manager.configure(UpdatePreferences(includePrereleases = true))
             assertTrue(manager.check(manual = true))
             for (attempt in 0..30) { if (activeUpdate() != null) break; SystemClock.sleep(50) }
             val notification = checkNotNull(activeUpdate()).notification
+            if (Build.VERSION.SDK_INT >= 26) assertEquals(NotificationChannels.APP_UPDATES, notification.channelId)
             assertEquals("Msngr v1.2.3-beta.4 is available", notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString())
             assertNotNull(notification.contentIntent)
             manager.configure(manager.state.value.preferences.copy(skippedTag = "v1.2.3-beta.4"))
@@ -205,6 +212,36 @@ class UpdateInstrumentedTest {
             rejected(release, "checksum")
             rejected(release.copy(sha256 = null), "valid signed APK")
         } finally { file.delete() }
+    }
+
+    @Test fun corruptCachedApkBecomesDownloadableAgain() = runBlocking {
+        val target = isolatedContext()
+        val cache = File(target.cacheDir, "update_retry_${UUID.randomUUID()}")
+        val context = object : ContextWrapper(target) { override fun getCacheDir() = cache }
+        val release = checkNotNull(parseGitHubRelease(fixture()))
+        val manager = UpdateManager(context, supported = true, installedCode = 1, releaseSource = { listOf(release) })
+        manager.configure(UpdatePreferences(enabled = false, includePrereleases = true))
+        val file = manager.apkFile(release.version.code)
+        try {
+            check(file.parentFile!!.mkdirs())
+            file.writeBytes(ByteArray(release.apkSize.toInt()))
+            assertTrue(manager.check(manual = true))
+            assertEquals(release.version.code, manager.state.value.downloadedVersion)
+            val obsolete = release.copy(sha256 = "b".repeat(64))
+            assertTrue(runCatching { manager.verifiedCachedApk(obsolete) }.exceptionOrNull() is IOException)
+            assertTrue(file.isFile)
+            val failure = runCatching { manager.verifiedCachedApk(release) }.exceptionOrNull()
+            assertTrue(failure is IOException && failure.message.orEmpty().contains("checksum"))
+            assertFalse(file.exists())
+            assertNull(manager.state.value.downloadedVersion)
+            assertTrue(manager.check(manual = true))
+            assertNull(manager.state.value.downloadedVersion)
+        } finally {
+            file.delete()
+            file.parentFile?.delete()
+            cache.delete()
+        }
+        Unit
     }
 
     @Test fun downloadedApkCanBeReadThroughItsProviderAlongsideDisplayPictures() {

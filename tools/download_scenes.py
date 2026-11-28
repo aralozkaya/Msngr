@@ -7,21 +7,17 @@ backgrounds and dynamic backgrounds are excluded.
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import struct
-import time
 import argparse
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
-from urllib.parse import quote, unquote, urljoin
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urljoin
+from messenger_artwork import SOURCE, fetch, image_data, original_image
 
-from PIL import Image
-
-SOURCE = "https://windowswallpaper.miraheze.org/wiki/Windows_Live_Messenger"
 DESTINATION = Path(__file__).resolve().parents[1] / "app/src/main/assets/scenes"
 
 
@@ -53,11 +49,8 @@ class SceneParser(HTMLParser):
             self.row, self.images = [], []
         elif tag == "td" and self.row is not None:
             self.cell = []
-        elif tag == "img" and self.row is not None:
-            source = urljoin(SOURCE, attrs["src"])
-            if "/thumb/" in source:
-                source = source.replace("/thumb/", "/", 1).rsplit("/", 1)[0]
-            self.images.append(source)
+        elif tag == "img" and self.row is not None and attrs.get("src"):
+            self.images.append(attrs["src"])
 
     def handle_data(self, data):
         if self.heading is not None:
@@ -81,29 +74,16 @@ class SceneParser(HTMLParser):
                 if not self.images:
                     self.unavailable.append({"name": self.row[1], "group": self.group,
                                              "section": self.section, "sourceColumns": self.row[1:]})
-                for source in self.images:
-                    filename = unquote(source.rsplit("/", 1)[1])
-                    stem, extension = filename.rsplit(".", 1)
-                    identifier = re.sub(r"[^a-z0-9]+", "_", stem.lower()).strip("_")
+                for src in self.images:
+                    source, filename, identifier, local_name = original_image(src)
                     self.scenes.append({
                         "id": identifier, "name": self.row[1],
                         "group": self.group,
-                        "section": self.section, "file": f"{identifier}.{extension.lower()}",
+                        "section": self.section, "file": local_name,
                         "sourceUrl": source, "filePage": urljoin(SOURCE, "/wiki/File:" + quote(filename.replace(" ", "_"))),
                         "sourceColumns": self.row[1:],
                     })
             self.row = None
-
-
-def fetch(url):
-    for attempt in range(4):
-        try:
-            with urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0 (Msngr scene archive)"}), timeout=45) as response:
-                return response.read()
-        except Exception:
-            if attempt == 3:
-                raise
-            time.sleep(attempt + 1)
 
 
 def png_frame_count(data):
@@ -119,6 +99,7 @@ def png_frame_count(data):
 
 
 def main():
+    from PIL import Image
     from material_color_utilities import prominent_colors_from_image
 
     arguments = argparse.ArgumentParser(description=__doc__)
@@ -128,10 +109,11 @@ def main():
     parser = SceneParser()
     # The MediaWiki API exposes the same page without skin/navigation markup.
     page = json.loads(fetch(SOURCE.split("/wiki/")[0] +
-                            "/w/api.php?action=parse&page=Windows_Live_Messenger&prop=text&format=json"))
+                            "/w/api.php?action=parse&page=Windows_Live_Messenger&prop=text%7Crevid&format=json"))
+    revision = int(page["parse"]["revid"])
     parser.feed(page["parse"]["text"]["*"])
-    assert parser.scenes, "No downloadable artwork found"
-    assert len({s["id"] for s in parser.scenes}) == len(parser.scenes), "Duplicate IDs"
+    if not parser.scenes:
+        raise ValueError("No downloadable artwork found")
     DESTINATION.mkdir(parents=True, exist_ok=True)
     if options.scenex_pack:
         import_scenex_pack(options.scenex_pack, options.seven_zip, parser)
@@ -143,12 +125,14 @@ def main():
         parser.scenes.extend(supplemental)
         restored = {(scene["name"], scene["group"]) for scene in supplemental}
         parser.unavailable = [row for row in parser.unavailable if (row["name"], row["group"]) not in restored]
+    if len({s["id"] for s in parser.scenes}) != len(parser.scenes):
+        raise ValueError("Duplicate scene IDs")
     for scene in parser.scenes:
         scene["name"] = scene_display_name(scene["name"])
         path = DESTINATION / scene["file"]
-        data = path.read_bytes() if path.exists() else fetch(scene["sourceUrl"])
-        assert data.startswith((b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a", b"\xff\xd8\xff", b"BM")), scene["sourceUrl"]
-        path.write_bytes(data)
+        if "sourcePack" in scene and not path.is_file():
+            raise FileNotFoundError(f"Restore {path.name} with --scenex-pack")
+        data = image_data(path, scene["sourceUrl"])
         with Image.open(path) as image:
             scene["width"], scene["height"] = image.size
             scene["frames"] = max(getattr(image, "n_frames", 1), png_frame_count(data))
@@ -163,7 +147,7 @@ def main():
         scene["bytes"] = len(data)
         print(f'{scene["group"]}: {scene["name"]} ({scene["frames"]} frames, {len(data):,} bytes)', flush=True)
     (DESTINATION / "catalog.json").write_text(json.dumps({
-        "source": SOURCE, "revision": int(re.search(r"revision id (\d+)", page["parse"]["text"]["*"]).group(1)),
+        "source": SOURCE, "revision": revision,
         "scenes": parser.scenes, "unavailable": parser.unavailable,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     write_kotlin_catalog(parser.scenes)
@@ -173,14 +157,30 @@ def main():
 def write_kotlin_catalog(scenes):
     """Precomputed Material HCT seeds keep palette extraction off the UI thread."""
     rows = []
+    def kotlin_string(value):
+        if value is None:
+            return "null"
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+        return '"' + re.sub(r"[\x00-\x1f]", lambda match: f"\\u{ord(match[0]):04x}", escaped) + '"'
+
     for scene in scenes:
-        args = ", ".join(json.dumps(scene[key], ensure_ascii=False) for key in ("id", "name", "group", "file"))
+        args = ", ".join(kotlin_string(scene[key]) for key in ("id", "name", "group", "file"))
         rows.append(f'    MessengerScene({args}, 0xFF{scene["seedColor"][1:].upper()}.toInt(), '
-                    f'{str(scene["animated"]).lower()}, {json.dumps(scene.get("wideFile"))}),')
+                    f'{str(scene["animated"]).lower()}, {kotlin_string(scene.get("wideFile"))}),')
     target = DESTINATION.parents[1] / "java/org/aralozkaya/msngr/SceneCatalog.kt"
     target.write_text("// Generated by tools/download_scenes.py. Do not edit by hand.\n"
                       "package org.aralozkaya.msngr\n\n"
                       "internal val MessengerScenes = listOf(\n" + "\n".join(rows) + "\n)\n", encoding="utf-8")
+
+
+def pack_member(directory, name):
+    path = PureWindowsPath(name)
+    if not path.parts or path.anchor or ".." in path.parts or ":" in name:
+        raise ValueError(f"Invalid scene pack member: {name}")
+    member = directory.joinpath(*path.parts)
+    if member.resolve() != member or not member.is_file():
+        raise ValueError(f"Missing or linked scene pack member: {name}")
+    return member
 
 
 def import_scenex_pack(pack, seven_zip, parser):
@@ -189,33 +189,39 @@ def import_scenex_pack(pack, seven_zip, parser):
     The pack is extracted as data. No installer or Messenger code is executed.
     Both original narrow and wide variants are retained byte-for-byte.
     """
+    from PIL import Image
+
+    pack_hash = hashlib.sha256(pack.read_bytes()).hexdigest()
     archive_source = "https://archive.org/download/Ultimate-Windows-Live-Archive/2011%20-%201rewlive4%20-%20wlsetup-all.exe"
     ns = {"m": "http://messenger.msn.com/messengercontent/1.0"}
     scene_ns = "{http://messenger.msn.com/scenex/1.0}"
     with tempfile.TemporaryDirectory(prefix="msngr-scene-import-") as temporary:
         root = Path(temporary)
         subprocess.run([str(seven_zip), "x", str(pack.resolve()), f"-o{root}", "-y"], check=True, capture_output=True)
-        items = ET.parse(root / "content.xml").getroot().findall("m:item", ns)
+        items = ET.parse(pack_member(root, "content.xml")).getroot().findall("m:item", ns)
         for item in items:
-            scene_dir = root / Path(item.attrib["file"]).stem
-            subprocess.run([str(seven_zip), "x", str(root / item.attrib["file"]), f"-o{scene_dir}", "-y"],
+            cab = pack_member(root, item.attrib["file"])
+            scene_dir = Path(tempfile.mkdtemp(dir=root))
+            subprocess.run([str(seven_zip), "x", str(cab), f"-o{scene_dir}", "-y"],
                            check=True, capture_output=True)
-            variants = ET.parse(scene_dir / "content.xml").getroot().findall("m:item", ns)
+            variants = ET.parse(pack_member(scene_dir, "content.xml")).getroot().findall("m:item", ns)
+            if len(variants) not in {1, 2}:
+                raise ValueError(f"Expected one or two scene images in {cab.name}")
             name = item.attrib[scene_ns + "displayname"]
             identifier = "wlm_2011_" + re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
             scene = {"id": identifier, "name": name, "group": "Windows Live Messenger 2011 and 2012",
                      "section": "Scenes", "sourceUrl": archive_source,
                      "sourcePack": "MessengerLang.msi/scenex.mct/" + item.attrib["file"],
-                     "sourcePackSha256": hashlib.sha256(pack.read_bytes()).hexdigest(),
+                     "sourcePackSha256": pack_hash,
                      "filePage": SOURCE + "#Windows_Live_Messenger_2011_and_2012",
                      "sourceColumns": [name, "Microsoft"], "variants": []}
             for index, variant in enumerate(variants):
-                original = scene_dir / variant.attrib["file"]
+                original = pack_member(scene_dir, variant.attrib["file"])
                 filename = identifier + ("_wide" if index else "") + original.suffix.lower()
                 data = original.read_bytes()
-                (DESTINATION / filename).write_bytes(data)
                 with Image.open(original) as image:
                     width, height = image.size
+                (DESTINATION / filename).write_bytes(data)
                 scene["variants"].append({"file": filename, "originalFile": original.name,
                                           "width": width, "height": height, "bytes": len(data),
                                           "sha256": hashlib.sha256(data).hexdigest()})

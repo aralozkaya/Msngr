@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from library_licenses import ROOT, zip_write
-from package_corresponding_source import safe_source_path, source_bytes
+from package_corresponding_source import package, safe_source_path, source_bytes
 
 
 class LibraryDistributionTest(unittest.TestCase):
@@ -44,6 +45,46 @@ class LibraryDistributionTest(unittest.TestCase):
                 zip_write(archive, 'library/source.c', b'original source')
             results.append(data.getvalue())
         self.assertEqual(*results)
+
+    def test_source_package_preserves_wrapper_mode_and_previous_archive_on_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            wrapper = root / "gradlew"
+            wrapper.write_bytes(b"#!/bin/sh\n")
+            subprocess.run(["git", "-C", str(root), "add", "--chmod=+x", "gradlew"], check=True)
+            output = root / "source.zip"
+            package(output, root)
+            with zipfile.ZipFile(output) as archive:
+                entry = archive.getinfo("Msngr/gradlew")
+                self.assertEqual(entry.create_system, 3)
+                self.assertEqual(entry.external_attr >> 16, 0o100755)
+            with self.assertRaisesRegex(ValueError, "overwrite tracked source"):
+                package(wrapper, root)
+            self.assertEqual(wrapper.read_bytes(), b"#!/bin/sh\n")
+            wrapper.unlink()
+            previous = output.read_bytes()
+            with self.assertRaises(FileNotFoundError):
+                package(output, root)
+            self.assertEqual(output.read_bytes(), previous)
+
+    def test_missing_or_wrong_submodule_revision_cannot_be_distributed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            library = root / "library"
+            library.mkdir()
+            gitlink = "160000," + "a" * 40 + ",library"
+            subprocess.run(["git", "-C", str(root), "update-index", "--add", "--cacheinfo", gitlink], check=True)
+            output = root / "source.zip"
+            with self.assertRaisesRegex(ValueError, "Missing or linked"):
+                package(output, root)
+            subprocess.run(["git", "init", "-q", str(library)], check=True)
+            subprocess.run(["git", "-C", str(library), "-c", "user.name=Test", "-c",
+                            "user.email=test@example.invalid", "commit", "-qm", "fixture", "--allow-empty"], check=True)
+            with self.assertRaisesRegex(ValueError, "pinned revision"):
+                package(output, root)
+            self.assertFalse(output.exists())
 
     def test_committed_notices_and_copyleft_sources_match_the_audit(self):
         audit = json.loads((ROOT/'third_party/library-audit.json').read_text(encoding='utf-8'))

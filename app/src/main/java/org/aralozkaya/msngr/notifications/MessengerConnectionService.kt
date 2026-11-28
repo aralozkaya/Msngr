@@ -21,9 +21,9 @@ import org.aralozkaya.msngr.LoginActivity
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.R
 import org.aralozkaya.msngr.SessionPrefs
+import org.aralozkaya.msngr.accountIdentity
 import org.aralozkaya.msngr.data.MessengerRepository
-import org.aralozkaya.msngr.data.SignInRequest
-import org.aralozkaya.msngr.restoreSignedInProfile
+import org.aralozkaya.msngr.restoreRememberedRepository
 
 class MessengerConnectionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -75,26 +75,14 @@ class MessengerConnectionService : Service() {
 
     private suspend fun findOrRestoreRepository(): MessengerRepository? {
         val app = application as MsngrApplication
-        val existing = runCatching { app.container.messengerRepository }.getOrNull()
+        val existing = app.container.currentRepository
         if (existing?.hasSignedInSession == true) return existing
 
         val snapshot = SessionPrefs.readLoginSnapshot(this)
         if (!canRestoreBackgroundConnection(enabled = true, snapshot = snapshot)) {
             return null
         }
-        val restored = app.container.repositoryFor(snapshot.useMockServer)
-        val result = restored.signIn(
-            SignInRequest(
-                email = snapshot.email,
-                password = snapshot.password,
-                serverConfig = snapshot.resolvedServers,
-                initialPresence = snapshot.loginPresence,
-            ),
-        )
-        val serverProfile = result.getOrNull() ?: return null
-        SessionPrefs.activateRememberedSession(this)
-        restoreSignedInProfile(restored, serverProfile, serverProfile.presence)
-        return restored
+        return restoreRememberedRepository(snapshot).getOrNull()
     }
 
     private fun promoteToForeground(status: String) {

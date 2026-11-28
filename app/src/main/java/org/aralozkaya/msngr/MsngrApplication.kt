@@ -55,7 +55,7 @@ class MsngrApplication : Application() {
         } else {
             inAppNotifications.dismiss()
         }
-        runCatching { container.messengerRepository }.getOrNull()?.let { repository ->
+        container.currentRepository?.let { repository ->
             repository.setAppInForeground(isForeground)
             displayPictureSync.setForeground(isForeground)
             if (isForeground && SessionPrefs.canOpenAuthenticatedScreens(this)) displayPictureSync.requestRefresh(repository)
@@ -70,6 +70,7 @@ class MsngrApplication : Application() {
     private val networkMonitor by lazy { NetworkMonitor(this) }
 
     val container: AppContainer by lazy {
+        val contactPictures = FileContactDisplayPictureCache(File(filesDir, "contact_display_pictures"))
         AppContainer(
             clientFactory = { useMockServer ->
                 if (useMockServer) {
@@ -80,9 +81,7 @@ class MsngrApplication : Application() {
                         fileTransferDirectory = File(noBackupFilesDir, "file_transfers"),
                         endpointName = { deviceEndpointName(this) },
                         endpointId = { deviceEndpointId(this) },
-                        contactDisplayPictureCache = FileContactDisplayPictureCache(
-                            File(filesDir, "contact_display_pictures"),
-                        ),
+                        contactDisplayPictureCache = contactPictures,
                         categoryMembershipOverlayStore = CategoryPrefs.overlayStore(this),
                         useRoamingProfile = { account ->
                             DisplayPictureSyncPrefs.usesSamePictureAndStatusEverywhere(this, account)
@@ -111,13 +110,12 @@ class MsngrApplication : Application() {
                 notificationManager.dismissConversation(contactId)
                 inAppNotifications.dismissConversation(contactId)
             },
-            onRemoteSignOut = {
-                // A remote sign-out must survive process restart and background service restore.
-                SessionPrefs.recordRemoteSignOut(this)
-                SessionPrefs.logout()
-                sharingNotifications.dismissAll()
-                BackgroundConnectionController.stop(this)
-                AppShortcuts.clearRecentChats(this)
+            onRemoteSignOut = { account ->
+                if (SessionPrefs.recordRemoteSignOut(this, account)) {
+                    sharingNotifications.dismissAll()
+                    BackgroundConnectionController.stop(this)
+                    AppShortcuts.clearRecentChats(this)
+                }
             },
             signOutOtherSessionsOnSignIn = { account ->
                 SessionPrefs.signsOutOtherSessionsOnSignIn(this, account)
@@ -154,7 +152,7 @@ class AppContainer(
     private val messengerPlusEnabled: () -> Boolean = { true },
     private val conversationDraftStore: ConversationDraftStore = ConversationDraftStore(),
     private val onConversationRead: (String) -> Unit = {},
-    private val onRemoteSignOut: () -> Unit = {},
+    private val onRemoteSignOut: (AccountIdentity) -> Unit = {},
     private val signOutOtherSessionsOnSignIn: (AccountIdentity) -> Boolean = { false },
     private val conversationStyleStore: ConversationStyleStore = ConversationStyleStore(),
     private val onOwnPresenceChanged: (AccountIdentity, org.aralozkaya.msngr.enums.Presence) -> Unit = { _, _ -> },
@@ -167,7 +165,7 @@ class AppContainer(
         val current = repository
         if (current != null && repositoryUsesMockServer == useMockServer) return current
 
-        current?.logout()
+        current?.retire()
         return MessengerRepository(
             client = clientFactory(useMockServer),
             awaitNetworkAccess = awaitNetworkAccess,
@@ -187,6 +185,13 @@ class AppContainer(
         }
     }
 
+    @Synchronized
+    internal fun repositoryForRestore(useMockServer: Boolean): MessengerRepository? {
+        val current = repository
+        if (current != null && repositoryUsesMockServer != useMockServer && !current.retireIfIdle()) return null
+        return repositoryFor(useMockServer)
+    }
+
     internal val currentRepository: MessengerRepository?
         @Synchronized get() = repository
 
@@ -198,3 +203,6 @@ class AppContainer(
 
 val Context.appContainer: AppContainer
     get() = (applicationContext as MsngrApplication).container
+
+internal val Context.currentMessengerRepository: MessengerRepository?
+    get() = (applicationContext as? MsngrApplication)?.container?.currentRepository

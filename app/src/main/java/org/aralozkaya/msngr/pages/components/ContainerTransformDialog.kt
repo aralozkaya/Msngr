@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
@@ -53,6 +54,46 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import kotlin.math.roundToInt
+
+@Composable
+internal fun ContactEditorDialogFrame(
+    creating: Boolean,
+    sourceBounds: Rect?,
+    sourceIcon: ImageVector,
+    sourceLabel: String,
+    closingAction: (() -> Unit)?,
+    busy: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    if (creating) {
+        ContainerTransformDialog(
+            sourceBounds = sourceBounds,
+            sourceIcon = sourceIcon,
+            sourceLabel = sourceLabel,
+            closing = closingAction != null,
+            busy = busy,
+            onDismissRequest = onDismissRequest,
+            onClosed = { closingAction?.invoke() },
+            content = content,
+        )
+    } else {
+        BasicAlertDialog(
+            modifier = Modifier.fillMaxSize(),
+            onDismissRequest = onDismissRequest,
+            properties = DialogProperties(
+                dismissOnBackPress = !busy,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                Box(content = content)
+            }
+        }
+    }
+}
 
 /** A container transform across the activity and BasicAlertDialog's separate windows. */
 @Composable

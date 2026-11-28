@@ -2,14 +2,12 @@ package org.aralozkaya.msngr.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.aralozkaya.msngr.protocol.escapeXml
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import javax.xml.parsers.DocumentBuilderFactory
 
 enum class WhatsNewKind {
     Status,
@@ -42,7 +40,6 @@ object MsnpWhatsNewService {
     private const val SOAP_ACTION =
         "http://www.msn.com/webservices/AddressBook/GetContactsRecentActivity"
     private const val ENDPOINT_PATH = "/whatsnew/whatsnewservice.asmx"
-    private const val USER_AGENT = "MSNMSGR/14.0.8117.0416"
     private const val TIMEOUT_MILLIS = 12_000
 
     suspend fun fetchContactsRecentActivity(
@@ -61,36 +58,17 @@ object MsnpWhatsNewService {
             locale = locale,
         )
         MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-            val connection = (URL(endpointUrl).openConnection() as HttpURLConnection)
-                .apply {
-                    requestMethod = "POST"
-                    connectTimeout = TIMEOUT_MILLIS
-                    readTimeout = TIMEOUT_MILLIS
-                    instanceFollowRedirects = true
-                    doOutput = true
-                    setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                    setRequestProperty("SOAPAction", "\"$SOAP_ACTION\"")
-                    setRequestProperty("User-Agent", USER_AGENT)
-                }
-            try {
-                connection.outputStream.use { it.write(envelope.toByteArray(StandardCharsets.UTF_8)) }
-                val status = connection.responseCode
-                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader(StandardCharsets.UTF_8)
-                    ?.use { it.readText() }
-                    .orEmpty()
-                if (status !in 200..299) {
-                    val fault = runCatching {
-                        parseXml(body).documentElement.firstDescendantText("faultstring")
-                    }.getOrDefault("")
-                    throw IllegalStateException(
-                        fault.ifBlank { "What's New request failed with HTTP $status." },
-                    )
-                }
-                parseActivitiesResponse(body)
-            } finally {
-                connection.disconnect()
+            val (status, response) = postSoapEnvelope(endpointUrl, "\"$SOAP_ACTION\"", envelope, TIMEOUT_MILLIS)
+            val body = response.orEmpty()
+            if (status !in 200..299) {
+                val fault = runCatching {
+                    parseXml(body).documentElement.firstDescendantText("faultstring")
+                }.getOrDefault("")
+                throw IllegalStateException(
+                    fault.ifBlank { "What's New request failed with HTTP $status." },
+                )
             }
+            parseActivitiesResponse(body)
         }
     }
 
@@ -264,29 +242,8 @@ object MsnpWhatsNewService {
         return 0L
     }
 
-    private fun parseXml(xml: String) = DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }.newDocumentBuilder().parse(xml.trim().byteInputStream(StandardCharsets.UTF_8))
+    private fun parseXml(xml: String) = parseProtocolXml(xml.trim())
 
     private fun Element.firstDescendantText(localName: String): String =
         getElementsByTagNameNS("*", localName).item(0)?.textContent.orEmpty().trim()
-
-    private fun String.escapeXml(): String = buildString(length) {
-        this@escapeXml.forEach { character ->
-            append(
-                when (character) {
-                    '&' -> "&amp;"
-                    '<' -> "&lt;"
-                    '>' -> "&gt;"
-                    '"' -> "&quot;"
-                    '\'' -> "&apos;"
-                    else -> character
-                },
-            )
-        }
-    }
 }

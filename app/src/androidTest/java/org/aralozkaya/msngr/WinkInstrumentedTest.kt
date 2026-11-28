@@ -97,8 +97,11 @@ class WinkInstrumentedTest {
         val visible = mutableStateOf(true)
         compose.setContent { MaterialTheme { if (visible.value) WinkOverlay(reference, { visible.value = false }, onPlayerCreated = web::set) } }
         compose.waitUntil(10_000) { web.get() != null }
-        compose.waitUntil(20_000) { web.get().released }
-        assertFalse(visible.value)
+        compose.mainClock.advanceTimeBy(20_000)
+        compose.runOnIdle {
+            assertTrue(web.get().released)
+            assertFalse(visible.value)
+        }
     }
 
     @Test fun leavingTheActivityDestroysTheOverlayPlayer() {

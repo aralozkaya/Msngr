@@ -286,6 +286,7 @@ object SessionPrefs {
         selectLoginAccount(context, accountForEmail(context, email))
     }
 
+    @Synchronized
     fun selectLoginAccount(context: Context, account: AccountIdentity?) {
         SecureAccountStore.select(context, account)
         AccountPreferences.reload(context)
@@ -294,6 +295,8 @@ object SessionPrefs {
     internal fun preferenceAccount(context: Context): AccountIdentity? =
         (SessionRuntime.account() ?: SecureAccountStore.read(context))
             .takeIf { it.email.isNotBlank() }?.accountIdentity
+
+    internal fun activeAccount(): AccountIdentity? = SessionRuntime.account()?.accountIdentity
 
     internal fun accountForEmail(context: Context, email: String): AccountIdentity? {
         val normalized = email.normalizedAccountEmail()
@@ -336,6 +339,7 @@ object SessionPrefs {
         }
     }
 
+    @Synchronized
     fun completeLogin(
         context: Context,
         email: String,
@@ -360,8 +364,7 @@ object SessionPrefs {
             loginPresence = loginPresence,
         )
         val identity = account.accountIdentity
-        val existing = SecureAccountStore.read(context, identity)
-        if (!savePassword || !existing.remember) AccountPreferences.clear(context, identity)
+        val previouslyRemembered = SecureAccountStore.contains(context, identity)
         if (savePassword) {
             SecureAccountStore.write(context, account)
             SecureAccountStore.select(context, identity)
@@ -369,6 +372,7 @@ object SessionPrefs {
             SecureAccountStore.remove(context, identity)
             SecureAccountStore.select(context, null)
         }
+        if (!savePassword || !previouslyRemembered) AccountPreferences.clear(context, identity)
         SessionRuntime.activate(context, account)
         AccountPreferences.forAccount(context, "msngr_profile", identity).edit {
             remove(KEY_REMOTE_SIGN_OUT)
@@ -377,6 +381,7 @@ object SessionPrefs {
     }
 
     /** Forgetting a login removes that account's saved profile and preferences immediately. */
+    @Synchronized
     fun disableRememberedCredentials(
         context: Context,
         email: String = preferenceAccount(context)?.email.orEmpty(),
@@ -414,21 +419,28 @@ object SessionPrefs {
     }
 
     /** Called only after remembered credentials have been accepted by the backend. */
-    fun activateRememberedSession(context: Context) {
+    @Synchronized
+    fun activateRememberedSession(context: Context, expected: AccountIdentity? = null, password: String? = null): Boolean {
         val stored = SecureAccountStore.read(context)
-        check(stored.remember && stored.email.isNotBlank())
+        if (!stored.remember || stored.email.isBlank() || stored.password.isEmpty()) return false
+        if (expected != null && (stored.accountIdentity != expected || wasRemotelySignedOut(context, expected) ||
+                activeAccount()?.let { it != expected } == true)) return false
+        if (password != null && stored.password != password) return false
         SessionRuntime.activate(context, stored)
         AccountPreferences.reload(context)
+        return true
     }
 
     /** Drops a failed password while retaining the remembered account and its preferences. */
-    fun invalidateRememberedCredentials(context: Context) {
-        val stored = SecureAccountStore.read(context)
+    @Synchronized
+    fun invalidateRememberedCredentials(context: Context, account: AccountIdentity? = preferenceAccount(context)) {
+        if (account == null) return
+        val stored = SecureAccountStore.read(context, account)
         // Invalid credentials must not erase the user's profile edits or affect other accounts.
         if (stored.remember) {
             SecureAccountStore.write(context, stored.copy(password = "", automaticSignIn = false))
         }
-        SessionRuntime.clear()
+        if (SessionRuntime.account()?.accountIdentity == account) SessionRuntime.clear()
     }
 
     fun readUserProfile(context: Context): UserProfileSnapshot {
@@ -490,8 +502,9 @@ object SessionPrefs {
         avatarUri: String? = readUserProfile(context).avatarUri,
         statusMessage: String = readUserProfile(context).statusMessage,
         saveDisplayPicture: Boolean = true,
+        account: AccountIdentity? = preferenceAccount(context),
     ) {
-        val account = preferenceAccount(context) ?: return
+        if (account == null) return
         if (saveDisplayPicture) {
             when {
                 avatarUri.isNullOrBlank() -> OwnDisplayPictureStore.write(context, account, null)
@@ -499,7 +512,7 @@ object SessionPrefs {
                 avatarUri != OwnDisplayPictureStore.reference(context, account).uri -> OwnDisplayPictureStore.clear(context, account)
             }
         }
-        AccountPreferences.preferences(context, PROFILE_PREFS).edit {
+        AccountPreferences.forAccount(context, PROFILE_PREFS, account).edit {
             putString(KEY_USERNAME, username.trim())
             putString(KEY_PRESENCE, presence.name)
             putString(
@@ -600,23 +613,32 @@ object SessionPrefs {
         )
     }
 
+    @Synchronized
     fun logout() {
         SessionRuntime.clear()
     }
 
     /** Keep queued notification work from recreating a session after it was revoked remotely. */
-    internal fun recordRemoteSignOut(context: Context) {
-        val account = preferenceAccount(context) ?: return
+    @Synchronized
+    internal fun recordRemoteSignOut(
+        context: Context,
+        account: AccountIdentity? = preferenceAccount(context),
+    ): Boolean {
+        if (account == null) return false
         AccountPreferences.forAccount(context, "msngr_profile", account).edit(commit = true) {
             putBoolean(KEY_REMOTE_SIGN_OUT, true)
         }
         setAutomaticSignIn(context, false, account = account)
+        if (preferenceAccount(context) != account) return false
+        SessionRuntime.clear()
+        return true
     }
 
     internal fun wasRemotelySignedOut(context: Context, account: AccountIdentity? = preferenceAccount(context)): Boolean =
         account != null && AccountPreferences.forAccount(context, "msngr_profile", account)
             .getBoolean(KEY_REMOTE_SIGN_OUT, false)
 
+    @Synchronized
     private fun updateAccount(
         context: Context,
         account: AccountIdentity?,
@@ -820,6 +842,10 @@ private object SecureAccountStore {
     }
 
     @Synchronized
+    fun contains(context: Context, account: AccountIdentity): Boolean =
+        preferences(context).contains(KEY_ACCOUNT_PREFIX + account.storageKey)
+
+    @Synchronized
     fun accounts(context: Context): List<StoredAccountDto> {
         val prefs = preferences(context)
         return prefs.all.keys.filter { it.startsWith(KEY_ACCOUNT_PREFIX) }
@@ -855,16 +881,13 @@ private object SecureAccountStore {
         prefs: SharedPreferences,
         key: String,
     ): StoredAccountDto {
-        val encoded = prefs.getString(KEY_ACCOUNT_PREFIX + key, null) ?: return StoredAccountDto()
         return try {
+            val encoded = prefs.getString(KEY_ACCOUNT_PREFIX + key, null) ?: return StoredAccountDto()
             val encrypted = Base64.decode(encoded, Base64.DEFAULT)
             StoredAccountCodec.decode(aead(context).decrypt(encrypted, accountAssociatedData(key)))
                 .also { require(it.accountIdentity.storageKey == key) }
         } catch (_: Exception) {
-            prefs.edit {
-                remove(KEY_ACCOUNT_PREFIX + key)
-                if (prefs.getString(KEY_SELECTED_ACCOUNT, null) == key) remove(KEY_SELECTED_ACCOUNT)
-            }
+            // A locked or temporarily unavailable keystore can fail a valid read.
             StoredAccountDto()
         }
     }
@@ -872,10 +895,10 @@ private object SecureAccountStore {
     @Synchronized
     fun write(context: Context, value: StoredAccountDto) {
         val prefs = preferences(context)
-        writeAccount(context, prefs, value)
+        prefs.edit { putAccount(context, value) }
     }
 
-    private fun writeAccount(context: Context, prefs: SharedPreferences, value: StoredAccountDto) {
+    private fun SharedPreferences.Editor.putAccount(context: Context, value: StoredAccountDto) {
         require(value.remember && value.email.isNotBlank())
         val normalized = value.copy(email = value.email.normalizedAccountEmail())
         val key = normalized.accountIdentity.storageKey
@@ -883,11 +906,7 @@ private object SecureAccountStore {
             StoredAccountCodec.encode(normalized),
             accountAssociatedData(key),
         )
-        prefs.edit {
-            putString(KEY_ACCOUNT_PREFIX + key, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            remove("email")
-            remove("password")
-        }
+        putString(KEY_ACCOUNT_PREFIX + key, Base64.encodeToString(encrypted, Base64.NO_WRAP))
     }
 
     private fun accountAssociatedData(key: String): ByteArray =
@@ -895,47 +914,55 @@ private object SecureAccountStore {
 
     private fun preferences(context: Context): SharedPreferences {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(KEY_MIGRATED, false)) {
-            val selected = prefs.getString(KEY_SELECTED_ACCOUNT, null)
-            val emailEntries = prefs.all.keys.filter { it.startsWith(LEGACY_ACCOUNT_PREFIX) && it != KEY_BLOB }
-            emailEntries.forEach { entry ->
-                val oldKey = entry.removePrefix(LEGACY_ACCOUNT_PREFIX)
-                val old = runCatching {
-                    StoredAccountCodec.decode(aead(context).decrypt(
-                        Base64.decode(prefs.getString(entry, ""), Base64.DEFAULT),
-                        accountAssociatedData(oldKey),
-                    )).also { require(accountStorageKey(it.email) == oldKey) }
-                }.getOrNull()
-                if (old != null && old.remember && old.email.isNotBlank()) {
-                    writeAccount(context, prefs, old)
-                    AccountPreferences.discardLegacy(context, old.email)
-                    if (selected == oldKey) {
-                        prefs.edit { putString(KEY_SELECTED_ACCOUNT, old.accountIdentity.storageKey) }
+        if (prefs.getBoolean(KEY_MIGRATED, false)) return prefs
+        val legacyEntries = prefs.all.keys.filter { it.startsWith(LEGACY_ACCOUNT_PREFIX) && it != KEY_BLOB }
+        var complete = true
+        for (entry in legacyEntries) {
+            val oldKey = entry.removePrefix(LEGACY_ACCOUNT_PREFIX)
+            try {
+                val old = StoredAccountCodec.decode(aead(context).decrypt(
+                    Base64.decode(prefs.getString(entry, ""), Base64.DEFAULT), accountAssociatedData(oldKey),
+                ))
+                require(accountStorageKey(old.email) == oldKey)
+                prefs.edit {
+                    if (old.remember && old.email.isNotBlank()) {
+                        val key = old.accountIdentity.storageKey
+                        if (!prefs.contains(KEY_ACCOUNT_PREFIX + key)) putAccount(context, old)
+                        if (prefs.getString(KEY_SELECTED_ACCOUNT, null) == oldKey) putString(KEY_SELECTED_ACCOUNT, key)
                     }
+                    remove(entry)
                 }
-                prefs.edit { remove(entry) }
+                if (old.remember) AccountPreferences.discardLegacy(context, old.email)
+            } catch (_: Exception) {
+                complete = false
             }
-            val old = prefs.getString(KEY_BLOB, null)?.let { encoded ->
-                runCatching {
-                    StoredAccountCodec.decode(
-                        aead(context).decrypt(Base64.decode(encoded, Base64.DEFAULT), associatedData),
-                    )
-                }.getOrDefault(StoredAccountDto())
-            } ?: if (!prefs.getBoolean("accounts_migrated", false)) {
-                migrateLegacy(context, prefs)
-            } else {
-                StoredAccountDto()
+        }
+        try {
+            val encoded = prefs.getString(KEY_BLOB, null)
+            val fromLegacy = encoded == null && !prefs.getBoolean("accounts_migrated", false)
+            val old = when {
+                encoded != null -> StoredAccountCodec.decode(
+                    aead(context).decrypt(Base64.decode(encoded, Base64.DEFAULT), associatedData),
+                )
+                fromLegacy -> migrateLegacy(context, prefs)
+                else -> null
             }
-            val owner = old.email.takeIf { old.remember }.orEmpty()
-            if (owner.isNotBlank()) {
-                writeAccount(context, prefs, old)
-                prefs.edit { putString(KEY_SELECTED_ACCOUNT, old.accountIdentity.storageKey) }
+            if (old == null && !complete) return prefs
+            val editor = prefs.edit()
+            if (old != null && old.remember && old.email.isNotBlank()) {
+                val key = old.accountIdentity.storageKey
+                if (!prefs.contains(KEY_ACCOUNT_PREFIX + key)) editor.putAccount(context, old)
+                if (!prefs.contains(KEY_SELECTED_ACCOUNT)) editor.putString(KEY_SELECTED_ACCOUNT, key)
             }
-            AccountPreferences.discardLegacy(context, owner)
-            prefs.edit {
-                remove(KEY_BLOB)
-                putBoolean(KEY_MIGRATED, true)
+            // Persist the replacement before clearing credentials stored in the older preference file.
+            val saved = editor.remove(KEY_BLOB).remove("email").remove("password")
+                .putBoolean("accounts_migrated", true).putBoolean(KEY_MIGRATED, complete).commit()
+            if (saved && old != null) {
+                if (fromLegacy) context.getSharedPreferences("msngr_session", Context.MODE_PRIVATE).edit { clear() }
+                AccountPreferences.discardLegacy(context, old.email.takeIf { old.remember }.orEmpty())
             }
+        } catch (_: Exception) {
+            // Leave the legacy ciphertext and migration marker available for the next read.
         }
         return prefs
     }
@@ -944,8 +971,8 @@ private object SecureAccountStore {
         val legacy = context.getSharedPreferences("msngr_session", Context.MODE_PRIVATE)
         val remember = legacy.getBoolean("save_password", false) &&
             legacy.getBoolean("login_complete", false)
-        val email = readLegacyEncrypted(context, securePrefs, "email")
-        val password = readLegacyEncrypted(context, securePrefs, "password")
+        val email = if (remember) readLegacyEncrypted(context, securePrefs, "email") else ""
+        val password = if (remember) readLegacyEncrypted(context, securePrefs, "password") else ""
         val servers = ServerOverrides(
             mainServer = legacy.getString("main_server", "").orEmpty(),
             configServer = legacy.getString("config_server", "").orEmpty(),
@@ -967,7 +994,6 @@ private object SecureAccountStore {
             provider = legacy.getString("provider", ProviderOptions.ESCARGOT).orEmpty(),
             customServers = servers,
         )
-        legacy.edit { clear() }
         return migrated
     }
 
@@ -977,15 +1003,11 @@ private object SecureAccountStore {
         key: String,
     ): String {
         val encoded = prefs.getString(key, null) ?: return ""
-        return try {
-            val decrypted = aead(context).decrypt(
-                Base64.decode(encoded, Base64.DEFAULT),
-                key.toByteArray(StandardCharsets.UTF_8),
-            )
-            String(decrypted, StandardCharsets.UTF_8)
-        } catch (_: Exception) {
-            ""
-        }
+        val decrypted = aead(context).decrypt(
+            Base64.decode(encoded, Base64.DEFAULT),
+            key.toByteArray(StandardCharsets.UTF_8),
+        )
+        return String(decrypted, StandardCharsets.UTF_8)
     }
 
     private fun aead(context: Context): Aead {

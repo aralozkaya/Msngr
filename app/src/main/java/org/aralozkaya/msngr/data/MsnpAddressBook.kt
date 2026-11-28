@@ -5,14 +5,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.aralozkaya.msngr.enums.Presence
-import org.w3c.dom.Document
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.w3c.dom.Element
-import org.xml.sax.SAXException
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.charset.StandardCharsets
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.parsers.ParserConfigurationException
 
 /** MSNP18-era Address Book SOAP client used to load forward-list contacts after SSO. */
 internal object MsnpAddressBookService {
@@ -257,45 +251,24 @@ internal object MsnpAddressBookService {
             throw AddressBookException("The address-book server is not configured.")
         }
         return MsnpClientConfigService.withServiceEndpointFallback(endpoints) { endpointUrl ->
-            val connection = (URL(endpointUrl).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = HTTP_TIMEOUT_MILLIS
-                readTimeout = HTTP_TIMEOUT_MILLIS
-                instanceFollowRedirects = true
-                doOutput = true
-                setRequestProperty("Content-Type", "text/xml; charset=utf-8")
-                setRequestProperty("SOAPAction", soapAction)
-                setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
-            }
-            try {
-                connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
-                val status = connection.responseCode
-                val responseBody = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader(StandardCharsets.UTF_8)
-                    ?.use { it.readText() }
-                    .orEmpty()
-                if (status !in 200..299) {
-                    if (soapAction.endsWith("/AddMember") || soapAction.endsWith("/DeleteMember"))
-                        parseMembershipChangeResponse(responseBody, soapAction.substringAfterLast('/'))
-                    if (soapAction.endsWith("/ABContactAdd")) parseAddContactResponse(responseBody)
-                    if (soapAction.endsWith("/ABContactUpdate")) parseContactUpdateResponse(responseBody)
-                    if (soapAction.endsWith("/ABGroupAdd")) parseCreateCategoryResponse(responseBody)
-                    if (soapAction.endsWith("/ABGroupUpdate") ||
-                        soapAction.endsWith("/ABGroupDelete") ||
-                        soapAction.endsWith("/ABGroupContactAdd") ||
-                        soapAction.endsWith("/ABGroupContactDelete")
-                    ) {
-                        parseCategoryOperationResponse(responseBody, soapAction.substringAfterLast('/'))
-                    }
-                    val fault = parseAddressBookFault(responseBody)
-                    throw AddressBookException(
-                        fault.ifBlank { "The address-book service returned HTTP $status." },
-                    )
+            val response = postSoapEnvelope(endpointUrl, soapAction, body, HTTP_TIMEOUT_MILLIS)
+            val status = response.status
+            val responseBody = response.body.orEmpty()
+            if (status !in 200..299) {
+                when (val operation = soapAction.substringAfterLast('/')) {
+                    "AddMember", "DeleteMember" -> parseMembershipChangeResponse(responseBody, operation)
+                    "ABContactAdd" -> parseAddContactResponse(responseBody)
+                    "ABContactUpdate" -> parseContactUpdateResponse(responseBody)
+                    "ABGroupAdd" -> parseCreateCategoryResponse(responseBody)
+                    "ABGroupUpdate", "ABGroupDelete", "ABGroupContactAdd", "ABGroupContactDelete" ->
+                        parseCategoryOperationResponse(responseBody, operation)
                 }
-                responseBody
-            } finally {
-                connection.disconnect()
+                val fault = parseAddressBookFault(responseBody)
+                throw AddressBookException(
+                    fault.ifBlank { "The address-book service returned HTTP $status." },
+                )
             }
+            responseBody
         }
     }
 
@@ -349,7 +322,7 @@ internal fun buildAddContactRequest(ticket: String, email: String, displayName: 
 
 internal fun parseAddContactResponse(xml: String): String {
     val document = try {
-        parseAddressBookXml(xml)
+        parseProtocolXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The contact service returned an invalid response.", error)
     }
@@ -399,7 +372,7 @@ internal fun buildContactMessengerUpdateRequest(ticket: String, contactGuid: Str
 
 internal fun parseContactUpdateResponse(xml: String) {
     val document = try {
-        parseAddressBookXml(xml)
+        parseProtocolXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The contact service returned an invalid response.", error)
     }
@@ -508,7 +481,7 @@ internal fun buildCreateCategoryRequest(
 
 internal fun parseCreateCategoryResponse(xml: String): String {
     val document = try {
-        parseAddressBookXml(xml)
+        parseProtocolXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The category service returned an invalid response.", error)
     }
@@ -686,7 +659,7 @@ internal fun buildRemoveContactFromCategoryRequest(
 
 internal fun parseCategoryOperationResponse(xml: String, action: String) {
     val document = try {
-        parseAddressBookXml(xml)
+        parseProtocolXml(xml)
     } catch (error: Exception) {
         throw AddressBookException("The category service returned an invalid response.", error)
     }
@@ -736,7 +709,7 @@ internal fun buildMembershipChangeRequest(ticket: String, email: String, role: S
 }
 
 internal fun parseMembershipChangeResponse(xml: String, action: String) {
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     if (document.getElementsByTagNameNS("*", "Fault").length > 0 ||
         document.getElementsByTagNameNS("*", "${action}Response").length == 0)
         throw AddressBookException("The server could not update this contact request. Please try again.")
@@ -744,7 +717,7 @@ internal fun parseMembershipChangeResponse(xml: String, action: String) {
 
 internal fun parseMessengerMemberships(xml: String, signedInEmail: String): MessengerMemberships {
     val blocked = parseBlockedMemberships(xml, signedInEmail)
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     val requests = document.getElementsByTagNameNS("*", "Membership").asElementSequence()
         .filter { it.descendantText("MemberRole").equals("Pending", true) }
         .filter { membership ->
@@ -823,7 +796,7 @@ internal fun parseAddressBookContacts(xml: String, signedInEmail: String): List<
     parseAddressBook(xml, signedInEmail).contacts
 
 internal fun parseAddressBook(xml: String, signedInEmail: String): AddressBookSnapshot {
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
     if (fault != null) {
         throw AddressBookException(
@@ -982,7 +955,7 @@ private fun parseAddressBookCircles(
         }.distinctBy(Contact::id).toList()
 
 internal fun parseBlockedMemberships(xml: String, signedInEmail: String): List<Contact> {
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     val fault = document.getElementsByTagNameNS("*", "Fault").item(0) as? Element
     if (fault != null) {
         throw AddressBookException(
@@ -1022,7 +995,7 @@ internal fun parseBlockedMemberships(xml: String, signedInEmail: String): List<C
 }
 
 internal fun parseCircleMembers(xml: String): List<GroupMember> {
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     return document.getElementsByTagNameNS("*", "Contact").asElementSequence()
         .filterNot { it.descendantText("fDeleted").equals("true", true) }
         .filter { it.descendantText("contactType") in setOf("Live", "LivePending") }
@@ -1069,7 +1042,7 @@ internal fun mergeMessengerMemberships(addressBook: AddressBookSnapshot, members
 }
 
 private fun parseAddressBookFault(xml: String): String = runCatching {
-    val document = parseAddressBookXml(xml)
+    val document = parseProtocolXml(xml)
     document.documentElement.descendantText("faultstring")
 }.getOrDefault("")
 
@@ -1098,40 +1071,6 @@ private fun String.escapeAddressBookXml(): String = buildString(length) {
             },
         )
     }
-}
-
-private fun parseAddressBookXml(xml: String): Document {
-    val factory = DocumentBuilderFactory.newInstance()
-    factory.isNamespaceAware = true
-    factory.isExpandEntityReferences = false
-    try {
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-    } catch (_: ParserConfigurationException) {
-        // Android's Harmony parser does not support Xerces DTD features.
-    }
-    try {
-        factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-    } catch (_: ParserConfigurationException) {
-        // Unsupported on Android's Harmony parser.
-    }
-    try {
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-    } catch (_: ParserConfigurationException) {
-        // Unsupported on Android's Harmony parser.
-    }
-    try {
-        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-    } catch (_: ParserConfigurationException) {
-        // Unsupported on Android's Harmony parser.
-    }
-    try {
-        factory.isXIncludeAware = false
-    } catch (_: UnsupportedOperationException) {
-        // Unsupported on Android's Harmony parser.
-    }
-    val builder = factory.newDocumentBuilder()
-    builder.setEntityResolver { _, _ -> throw SAXException("External entities are not allowed.") }
-    return builder.parse(xml.byteInputStream(StandardCharsets.UTF_8))
 }
 
 private class AddressBookException(message: String, cause: Throwable? = null) :

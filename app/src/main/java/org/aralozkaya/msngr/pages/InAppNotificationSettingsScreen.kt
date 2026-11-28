@@ -48,7 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.aralozkaya.msngr.ConversationNotificationSettingsActivity
 import org.aralozkaya.msngr.R
-import org.aralozkaya.msngr.appContainer
+import org.aralozkaya.msngr.currentMessengerRepository
 import org.aralozkaya.msngr.messengerPlusPlainText
 import org.aralozkaya.msngr.notifications.InAppNotificationOptions
 import org.aralozkaya.msngr.notifications.InAppNotificationPrefs
@@ -168,7 +168,7 @@ internal fun InAppNotificationSettingsMenu(onCustomizedNotifications: () -> Unit
 internal fun CustomizedNotificationsScreen(innerPadding: PaddingValues, scrollBehavior: TopAppBarScrollBehavior) {
     val context = LocalContext.current
     val settings by remember(context) { InAppNotificationPrefs.state(context) }.collectAsState()
-    val repository = runCatching { context.appContainer.messengerRepository }.getOrNull()
+    val repository = context.currentMessengerRepository
     val contacts = repository?.contacts?.collectAsState()?.value.orEmpty()
     val customizations = settings.conversations.values.sortedBy { it.displayName.lowercase() }
     if (customizations.isEmpty()) {

@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ruffle_build import packages_from_metadata
+from ruffle_build import dependency_identities, web_build_packages
 
 
 class WebInventoryTest(unittest.TestCase):
@@ -26,7 +26,8 @@ class WebInventoryTest(unittest.TestCase):
             graph["packages"].append({"id": name, "name": name, "version": "0.1.0", "source": "registry+unused"})
             graph["resolve"]["nodes"].append({"id": name, "deps": []})
         graph["resolve"]["nodes"][0]["deps"].append({"pkg": "test-only", "dep_kinds": [{"kind": "dev"}]})
-        names = {p["package"]["name"] for p in packages_from_metadata(graph, lock)["results"][0]["packages"]}
+        inventory = dependency_identities(web_build_packages(graph), lock)
+        names = {p["package"]["name"] for p in inventory["results"][0]["packages"]}
         self.assertIn("dependency-100", names)
         self.assertNotIn("desktop-only", names)
         self.assertNotIn("test-only", names)
@@ -35,7 +36,7 @@ class WebInventoryTest(unittest.TestCase):
         graph, lock = self.graph()
         graph["packages"][1]["version"] = "1.1.0"
         with self.assertRaisesRegex(ValueError, "outside the pinned"):
-            packages_from_metadata(graph, lock)
+            dependency_identities(web_build_packages(graph), lock)
 
     def test_git_dependencies_require_an_exact_commit(self):
         graph, lock = self.graph()
@@ -43,7 +44,7 @@ class WebInventoryTest(unittest.TestCase):
             package = next(p for p in collection if p["name"] == "dependency-0")
             package["source"] = "git+https://github.com/example/library#main"
         with self.assertRaisesRegex(ValueError, "Unpinned"):
-            packages_from_metadata(graph, lock)
+            dependency_identities(web_build_packages(graph), lock)
 
 
 if __name__ == "__main__":

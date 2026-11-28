@@ -8,7 +8,6 @@ package org.aralozkaya.msngr
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -86,7 +85,7 @@ internal fun WinkPicker(visible: Boolean, enabled: Boolean, onDismiss: () -> Uni
                     val displayName = context.queryDocumentDisplayName(uri)
                     val fallbackName = MsnWinkPackage.fallbackNameFromFileName(displayName)
                     val rawBytes = context.contentResolver.openInputStream(uri)?.use {
-                        it.readBytesBounded(MsnWink.MAX_CAB_BYTES)
+                        it.readWinkPackageBytes()
                     } ?: error(resources.getString(R.string.wink_import_failed))
                     val items = MsnWinkPackage.install(rawBytes, fallbackName)
                     for ((reference, cab) in items) {
@@ -513,18 +512,4 @@ internal fun WinkMessageSheet(message: ChatMessage, onDismiss: () -> Unit, onRet
         }
     }
     if (play) WinkOverlay(reference, { play = false })
-}
-
-internal fun Context.queryDocumentDisplayName(uri: Uri): String? = runCatching {
-    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-        if (cursor.moveToFirst()) cursor.getString(0) else null
-    }
-}.getOrNull() ?: uri.lastPathSegment
-
-internal fun java.io.InputStream.readBytesBounded(limit: Int): ByteArray {
-    val result = java.io.ByteArrayOutputStream()
-    val buffer = ByteArray(8192)
-    while (true) { val count = read(buffer); if (count < 0) break
-        require(result.size() + count <= limit) { "Wink package is too large." }; result.write(buffer, 0, count) }
-    return result.toByteArray()
 }

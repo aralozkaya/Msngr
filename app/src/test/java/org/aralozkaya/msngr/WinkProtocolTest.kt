@@ -135,6 +135,8 @@ class WinkProtocolTest {
             val bytes = cab(); val reference = WinkReference(MsnDisplayPicture.create("peer", bytes, 8), "Screen Punch")
             store.receive("account", "peer1", reference, bytes)
             store.receive("account", "peer2", reference, bytes)
+            val metadata = directory.walkTopDown().single { it.extension == "properties" }
+            assertTrue(metadata.renameTo(File(metadata.parentFile, metadata.name + ".bak")))
             assertEquals(1, directory.walkTopDown().count { it.extension == "cab" })
             assertNull(store.bytes("other-account", reference.metadata))
             store.clearReceived("account", "peer1")
@@ -144,6 +146,29 @@ class WinkProtocolTest {
             store.install("account", reference, bytes); store.clearReceived("account")
             assertEquals(listOf(reference), store.catalog("account"))
             assertArrayEquals(bytes, store.bytes("account", reference.metadata))
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun reinstallRepairsCachedBytesAndClearingHistoryRemovesOrphans() {
+        val directory = createTestTempDir("wink-repair")
+        try {
+            val store = WinkStore(directory)
+            val bytes = cab()
+            val reference = WinkReference(MsnDisplayPicture.create("peer", bytes, 8), "Screen Punch")
+            store.install("account", reference, bytes)
+            val data = directory.walkTopDown().single { it.extension == "cab" }
+            data.writeBytes(ByteArray(bytes.size))
+            assertNull(store.bytes("account", reference.metadata))
+            store.install("account", reference, bytes)
+            assertArrayEquals(bytes, store.bytes("account", reference.metadata))
+            assertTrue(data.delete())
+            assertTrue(store.catalog("account").isEmpty())
+
+            store.receive("account", "peer", reference, bytes)
+            val received = directory.walkTopDown().single { it.name == "received" }
+            assertTrue(received.listFiles()!!.single { it.extension == "properties" }.delete())
+            store.clearReceived("account")
+            assertNull(store.bytes("account", reference.metadata))
         } finally { directory.deleteRecursively() }
     }
 
@@ -247,6 +272,19 @@ class WinkProtocolTest {
         assertEquals(
             "https://winks.example/files/demo.mco",
             WinkDownloads.trustedPackageUrl("http://winks.example/files/demo.mco", catalogUrl = "https://winks.example/catalog/"),
+        )
+        val custom = "https://winks.example:8443/catalog/index.html"
+        assertNull(WinkDownloads.trustedPackageUrl("https://winks.example/files/demo.mco", custom))
+        assertEquals(
+            "https://winks.example:8443/files/demo.mco?name=a%26b",
+            WinkDownloads.trustedPackageUrl("http://winks.example:8443/files/demo.mco?name=a%26b", custom),
+        )
+        val customCatalog = java.net.URI(custom)
+        assertNull(WinkDownloads.catalogPageUrl("https://winks.example/catalog/item.html", customCatalog))
+        assertNull(WinkDownloads.catalogPageUrl("https://winks.example:8443/other/item.html", customCatalog))
+        assertEquals(
+            "https://winks.example:8443/catalog/item.html#details",
+            WinkDownloads.catalogPageUrl("http://winks.example:8443/catalog/item.html#details", customCatalog),
         )
         assertFalse(WINK_IMPORT_MIME_TYPES.contains("*/*"))
         assertTrue(WINK_IMPORT_MIME_TYPES.contains("application/octet-stream"))

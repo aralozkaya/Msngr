@@ -10,7 +10,8 @@
        <?xml version="1.0" encoding="utf-8"?>
        <!- - alias-of: pt-BR - ->
        <resources />
-  3. Fill in every <string name="..."> entry. Missing keys fail the build and tests.
+  3. Base translations and sources for aliases must define every string. Other regional
+     variants can define only the strings that differ from the base language.
      Empty string values ("") are valid (for example, *_before_number / *_after_number).
   4. Numbers inside sentences are split into paired *_before_number / *_after_number
      (or *_before_first_number / *_between_numbers / *_after_second_number) keys.
@@ -131,14 +132,11 @@
     <!-- Reference (en): Underline -->
     <string name="format_underline"></string>
     <!-- Reference (en): Remove all styling -->
-    <string name="format_clear"></string>
     <!-- Note: plural text variant (identical to singular in Turkish after a number) -->
     <!-- Reference (en): Colors -->
-    <string name="format_colors_plural"></string>
     <!-- Reference (en): Emoticons -->
     <string name="insert_emoticon"></string>
     <!-- Reference (en): Backspace -->
-    <string name="emoticon_backspace"></string>
     <!-- Reference (en): Search emoticons -->
     <string name="emoticon_search_hint"></string>
     <!-- Reference (en): Back to emoticons -->
@@ -494,7 +492,6 @@
     <!-- Reference (en): Emotion sounds are unavailable. -->
     <string name="chat_error_emotion_sounds_unavailable"></string>
     <!-- Reference (en): Winks are unavailable. -->
-    <string name="chat_error_winks_unavailable"></string>
     <!-- Reference (en): Voice clips are unavailable. -->
     <string name="chat_error_voice_clips_unavailable"></string>
     <!-- Reference (en): View group members -->
@@ -852,7 +849,6 @@
     <!-- Reference (en): What\'s new -->
     <string name="portal_whats_new_title"></string>
     <!-- Reference (en): Refresh What\'s new -->
-    <string name="portal_whats_new_refresh"></string>
     <!-- Note: "you/your" is singular (single person; polite "siz" in UI, "sen" in casual chat/games) -->
     <!-- Reference (en): No new activities from your contacts -->
     <string name="portal_whats_new_empty_you_singular"></string>
@@ -867,13 +863,11 @@
     <!-- Reference (en): Close sites and Today -->
     <string name="portal_sites_close"></string>
     <!-- Reference (en): No sites configured by this server -->
-    <string name="portal_sites_empty"></string>
     <!-- Reference (en): Back -->
     <string name="portal_webview_back"></string>
     <!-- Reference (en): Open in browser -->
     <string name="portal_webview_open_in_browser"></string>
     <!-- Reference (en): Refresh -->
-    <string name="portal_webview_refresh"></string>
     <!-- Reference (en): Close -->
     <string name="portal_webview_close"></string>
     <!-- Reference (en): Could not load page. -->
@@ -1167,9 +1161,7 @@
     <!-- Reference (en): Android emoji -->
     <string name="settings_emoticon_style_android_title"></string>
     <!-- Reference (en): Use original Messenger emoticons -->
-    <string name="settings_original_emoticons_title"></string>
     <!-- Reference (en): Show the classic MSN artwork instead of modern Unicode emoji. -->
-    <string name="settings_original_emoticons_supporting"></string>
     <!-- Reference (en): Play winks automatically -->
     <string name="settings_play_winks_auto_title"></string>
     <!-- Reference (en): Play incoming winks while the chat is open. Reduced motion uses a thumbnail. -->
@@ -3731,7 +3723,6 @@
     <!-- Reference (en): Couldn’t update categories. Try again. -->
     <string name="contact_categories_update_failed"></string>
     <!-- Reference (en): None -->
-    <string name="contact_category_none"></string>
     <!-- Reference (en): Category -->
     <string name="contact_category_select_label"></string>
     <!-- Reference (en): Category options -->

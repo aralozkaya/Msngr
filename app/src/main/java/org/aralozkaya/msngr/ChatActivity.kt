@@ -108,7 +108,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -158,8 +160,11 @@ import org.aralozkaya.msngr.data.MessageAuthor
 import org.aralozkaya.msngr.data.MessengerRepository
 import org.aralozkaya.msngr.data.RecipientFeatures
 import org.aralozkaya.msngr.data.recipientFeatures
+import org.aralozkaya.msngr.data.resolveContact
 import org.aralozkaya.msngr.data.nudgeMonotonicMillis
 import org.aralozkaya.msngr.enums.Presence
+import org.aralozkaya.msngr.notifications.MsngrNotificationManager
+import org.aralozkaya.msngr.notifications.NOTIFICATION_ACCOUNT
 import org.aralozkaya.msngr.notifications.otherUnreadCount
 import org.aralozkaya.msngr.pages.components.Avatar
 import org.aralozkaya.msngr.pages.components.KeyboardPickerSheet
@@ -191,54 +196,62 @@ class ChatActivity : MsngrActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (redirectToLoginIfNeeded()) return
-        val contactId = intent.getStringExtra(EXTRA_CONTACT_ID)
-        if (contactId.isNullOrBlank()) {
+        if (!openConversation(intent)) {
             finish()
             return
         }
-        contactIdState = contactId
-        if (intent.getBooleanExtra(EXTRA_OPEN_PHOTO_SHARE, false)) {
-            openPhotoShareRequest++
-            intent.removeExtra(EXTRA_OPEN_PHOTO_SHARE)
-        }
-        updateLocusContext(contactId)
         setContent {
             MsngrTheme {
-                ChatRoute(
-                    repository = appContainer.messengerRepository,
-                    contactId = contactIdState,
-                    openPhotoShareRequest = openPhotoShareRequest,
-                    onBack = {
-                        if (isTaskRoot) {
-                            startActivity(Intent(this@ChatActivity, MainActivity::class.java))
-                        }
-                        finish()
-                    },
-                )
+                key(contactIdState) {
+                    ChatRoute(
+                        repository = appContainer.messengerRepository,
+                        contactId = contactIdState,
+                        openPhotoShareRequest = openPhotoShareRequest,
+                        onBack = {
+                            if (isTaskRoot) {
+                                startActivity(Intent(this@ChatActivity, MainActivity::class.java))
+                            }
+                            finish()
+                        },
+                    )
+                }
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        val newContactId = intent.getStringExtra(EXTRA_CONTACT_ID)
-        if (!newContactId.isNullOrBlank()) {
-            contactIdState = newContactId
-            updateLocusContext(newContactId)
-            (application as MsngrApplication).inAppNotifications.dismissConversation(newContactId)
+        if (openConversation(intent)) {
+            (application as MsngrApplication).inAppNotifications.dismissConversation(contactIdState)
         }
+    }
+
+    private fun openConversation(intent: Intent): Boolean {
+        val contactId = intent.getStringExtra(EXTRA_CONTACT_ID)
+        if (contactId.isNullOrBlank() || !ownsNotification(intent)) return false
+        if (contactId != contactIdState) openPhotoShareRequest = 0
+        contactIdState = contactId
         if (intent.getBooleanExtra(EXTRA_OPEN_PHOTO_SHARE, false)) {
             openPhotoShareRequest++
             intent.removeExtra(EXTRA_OPEN_PHOTO_SHARE)
         }
+        setIntent(intent)
+        updateLocusContext(contactId)
+        return true
     }
+
+    private fun ownsNotification(intent: Intent): Boolean =
+        !intent.hasExtra(NOTIFICATION_ACCOUNT) || intent.getStringExtra(NOTIFICATION_ACCOUNT)?.let {
+            it == appContainer.currentRepository?.signedInAccountIdentity?.storageKey
+        } == true
 
     private fun updateLocusContext(contactId: String) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             setLocusContext(
                 android.content.LocusId(
-                    org.aralozkaya.msngr.notifications.MsngrNotificationManager.conversationShortcutId(contactId),
+                    MsngrNotificationManager.conversationShortcutId(
+                        appContainer.currentRepository?.signedInAccountIdentity?.storageKey, contactId,
+                    ),
                 ),
                 null,
             )
@@ -270,12 +283,13 @@ private fun ChatRoute(
     val drafts by repository.drafts.collectAsState()
     val textStyles by repository.textStyles.collectAsState()
     val profile by repository.profile.collectAsState()
-    val contact by repository.contact(contactId).collectAsState(initial = null)
+    val contacts by repository.contacts.collectAsState()
+    val contact = remember(contacts, profile, contactId) { contacts.resolveContact(contactId, profile) }
     var lastKnownContact by remember(contactId) { mutableStateOf<Contact?>(null) }
     LaunchedEffect(contact) { if (contact != null) lastKnownContact = contact }
-    val conversation by repository.conversation(contactId).collectAsState(initial = null)
+    val conversation by remember(repository, contactId) { repository.conversation(contactId) }
+        .collectAsState(initial = null)
     val lifecycleOwner = LocalLifecycleOwner.current
-    val contacts by repository.contacts.collectAsState()
     val nudgeCooldowns by repository.nudgeCooldowns.collectAsState()
     val nudgeDeadline = nudgeCooldowns[contactId.lowercase(java.util.Locale.ROOT)]
     fun remainingNudgeCooldown(): Long = when (nudgeDeadline) {
@@ -283,7 +297,7 @@ private fun ChatRoute(
         Long.MAX_VALUE -> Long.MAX_VALUE
         else -> (nudgeDeadline - nudgeMonotonicMillis()).coerceAtLeast(0L)
     }
-    var nudgeCooldownMillis by remember(nudgeDeadline) { mutableStateOf(remainingNudgeCooldown()) }
+    var nudgeCooldownMillis by remember(nudgeDeadline) { mutableLongStateOf(remainingNudgeCooldown()) }
     LaunchedEffect(nudgeDeadline) {
         do {
             nudgeCooldownMillis = remainingNudgeCooldown()
@@ -1755,7 +1769,8 @@ internal fun MessageBubble(
     val deliveryError = message.deliveryError
     val winkTransferFailed = message.wink != null && !message.isWinkPending && message.winkTransferError != null
     val localizedEmotionSoundText = emotionSound?.let {
-        stringResource(R.string.chat_emotion_sound_message, localizedEmotionSoundName(it.sound.name))
+        if (it.sound.builtInCode != null) it.displayText
+        else stringResource(R.string.chat_emotion_sound_message, localizedEmotionSoundName(it.sound.name))
     }
     val containerInteractionModifier = if (containerInteractionEnabled) {
         val interactionSource = remember { MutableInteractionSource() }

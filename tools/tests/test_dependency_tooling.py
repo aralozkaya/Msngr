@@ -2,7 +2,6 @@ import base64
 import hashlib
 import io
 import json
-import os
 import sys
 import tarfile
 import unittest
@@ -87,7 +86,7 @@ class RuffleArchiveTest(unittest.TestCase):
 
 class RuffleReleaseLookupTest(unittest.TestCase):
     def test_github_api_requests_attach_token_only_to_https_api_github(self):
-        with patch.dict(os.environ, {"GH_TOKEN": "gh-secret", "GITHUB_TOKEN": "fallback"}, clear=True):
+        with patch.object(update_ruffle.os, "environ", {"GH_TOKEN": "gh-secret", "GITHUB_TOKEN": "fallback"}):
             api_req = update_ruffle.build_request(update_ruffle.LATEST_RELEASE_API)
             npm_req = update_ruffle.build_request("https://registry.npmjs.org/@ruffle-rs/ruffle/0.7.1")
             http_req = update_ruffle.build_request("http://api.github.com/repos/ruffle-rs/ruffle/releases/latest")
@@ -98,7 +97,7 @@ class RuffleReleaseLookupTest(unittest.TestCase):
 
     def test_redirect_strips_authorization_when_leaving_github_api(self):
         handler = update_ruffle._StripAuthOnRedirectHandler()
-        with patch.dict(os.environ, {"GITHUB_TOKEN": "token-value"}, clear=True):
+        with patch.object(update_ruffle.os, "environ", {"GITHUB_TOKEN": "token-value"}):
             api_req = update_ruffle.build_request(update_ruffle.LATEST_RELEASE_API)
             external = handler.redirect_request(
                 api_req, None, 302, "Found", Message(), "https://objects.githubusercontent.com/asset"
@@ -127,6 +126,7 @@ class RuffleReleaseLookupTest(unittest.TestCase):
         headers = Message()
         headers["X-RateLimit-Remaining"] = "0"
         rate_limited = HTTPError(update_ruffle.LATEST_RELEASE_API, 403, "rate limit exceeded", headers, None)
+        self.addCleanup(rate_limited.close)
 
         class _Response:
             def __init__(self, url):
@@ -154,6 +154,7 @@ class RuffleReleaseLookupTest(unittest.TestCase):
                     update_ruffle.latest_release_version()
 
         forbidden = HTTPError(update_ruffle.LATEST_RELEASE_API, 403, "Forbidden", Message(), None)
+        self.addCleanup(forbidden.close)
         with patch.object(update_ruffle, "download", side_effect=forbidden):
             with self.assertRaises(HTTPError):
                 update_ruffle.latest_release_version()

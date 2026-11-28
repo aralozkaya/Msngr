@@ -17,4 +17,5 @@ internal data class NotificationEvent(
     val senderName: String? = null,
     val senderEmail: String? = null,
     val senderAvatarUri: String? = null,
+    val accountKey: String? = null,
 )

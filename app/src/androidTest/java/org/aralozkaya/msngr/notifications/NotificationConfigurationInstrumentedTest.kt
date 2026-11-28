@@ -175,7 +175,7 @@ class NotificationConfigurationInstrumentedTest {
         assertEquals("Test contact", signedInStyle?.messages?.single()?.person?.name?.toString())
         assertNotNull(signedInStyle?.messages?.single()?.person?.icon)
         assertEquals(
-            MsngrNotificationManager.conversationShortcutId("signed-in-event@example.com"),
+            shortcutId("signed-in-event@example.com"),
             NotificationCompat.getShortcutId(signedInNotification),
         )
         val signedInNudgeAction = signedInNotification.actions.orEmpty().single()
@@ -193,7 +193,7 @@ class NotificationConfigurationInstrumentedTest {
         assertEquals("You received a nudge!", receivedNudgeStyle?.messages?.single()?.text?.toString())
         assertNotNull(receivedNudgeStyle?.messages?.single()?.person?.icon)
         assertEquals(
-            MsngrNotificationManager.conversationShortcutId("nudge-event@example.com"),
+            shortcutId("nudge-event@example.com"),
             NotificationCompat.getShortcutId(receivedNudgeNotification),
         )
         val nudgeBackAction = receivedNudgeNotification.actions.orEmpty().single()
@@ -320,7 +320,7 @@ class NotificationConfigurationInstrumentedTest {
             ?.single()
             ?.person
         assertNotNull(sender?.icon)
-        val shortcutId = MsngrNotificationManager.conversationShortcutId(contactPictureId)
+        val shortcutId = shortcutId(contactPictureId)
         assertEquals(shortcutId, NotificationCompat.getShortcutId(contactPictureNotification))
         assertEquals(shortcutId, NotificationCompat.getLocusId(contactPictureNotification)?.id)
         val publishedShortcut = ShortcutManagerCompat.getDynamicShortcuts(context)
@@ -362,7 +362,7 @@ class NotificationConfigurationInstrumentedTest {
         val systemManager = context.getSystemService(NotificationManager::class.java)
         val renderer = MsngrNotificationManager(context)
         val contactId = "avatar-fallback@example.com"
-        val shortcutId = MsngrNotificationManager.conversationShortcutId(contactId)
+        val shortcutId = shortcutId(contactId)
         systemManager.cancelAll()
         try {
             for (uri in listOf(null, "file:///missing-contact-picture.png", profilePictureDataUri())) {
@@ -472,8 +472,8 @@ class NotificationConfigurationInstrumentedTest {
             assertConversationIcon(awaitNotification(fallbackId) { true }, "missing")
         } finally {
             ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(
-                MsngrNotificationManager.conversationShortcutId(contactId),
-                MsngrNotificationManager.conversationShortcutId("missing"),
+                shortcutId(contactId),
+                shortcutId("missing"),
             ))
             systemManager.cancelAll()
         }
@@ -505,13 +505,13 @@ class NotificationConfigurationInstrumentedTest {
             assertEquals("Group with picture", style.conversationTitle.toString())
             assertEquals("Alice", style.messages.single().person?.name.toString())
             assertNotNull(style.messages.single().person?.icon)
-            val shortcutId = MsngrNotificationManager.conversationShortcutId(contactId)
+            val shortcutId = shortcutId(contactId)
             assertEquals(shortcutId, NotificationCompat.getLocusId(notification)?.id)
             val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == shortcutId }
             assertEquals(shortcutId, shortcut.locusId?.id)
         } finally {
             manager.cancel(id)
-            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(MsngrNotificationManager.conversationShortcutId(contactId)))
+            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId(contactId)))
         }
     }
 
@@ -539,7 +539,7 @@ class NotificationConfigurationInstrumentedTest {
         }
         assertNull(notification.getLargeIcon())
         assertFalse(notification.extras.containsKey(android.app.Notification.EXTRA_PICTURE))
-        assertEquals(MsngrNotificationManager.conversationShortcutId(contactId), NotificationCompat.getShortcutId(notification))
+        assertEquals(shortcutId(contactId), NotificationCompat.getShortcutId(notification))
         val style = requireNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
         assertNull(style.messages.single().dataUri)
     }
@@ -625,15 +625,18 @@ class NotificationConfigurationInstrumentedTest {
                 if (systemManager.activeNotifications.isEmpty()) break
                 SystemClock.sleep(50)
             }
-            renderer.show(
+            // This matrix posts 42 alerts. Pace it below Android's per-package enqueue limit.
+            suspend fun post(action: suspend () -> Unit) {
+                kotlinx.coroutines.delay(350)
+                action()
+            }
+            val events = listOf(
                 NotificationEvent(
                     type = NotificationEventType.Message,
                     contactId = contactChatId,
                     contactName = "Contact peer",
                     messageText = "Hello $round",
                 ),
-            )
-            renderer.show(
                 NotificationEvent(
                     type = NotificationEventType.Message,
                     contactId = groupChatId,
@@ -643,34 +646,35 @@ class NotificationConfigurationInstrumentedTest {
                     senderName = "Alice",
                     senderEmail = "alice@example.test",
                 ),
-            )
-            renderer.show(
                 NotificationEvent(
                     type = NotificationEventType.Nudge,
                     contactId = nudgeContactId,
                     contactName = "Nudge peer",
                 ),
-            )
-            renderer.show(
                 NotificationEvent(
                     type = NotificationEventType.ContactSignedIn,
                     contactId = signedInContactId,
                     contactName = "Signed in peer",
                 ),
             )
-            renderer.showOfflineMessagesReceived()
-            renderer.syncContactRequests(
-                org.aralozkaya.msngr.data.ContactRequestInbox(
-                    "account-$round",
-                    listOf(org.aralozkaya.msngr.data.ContactRequest("req-$round@example.test", "Pending/$round")),
-                ),
-            )
-            renderer.syncGroupInvitations(
-                org.aralozkaya.msngr.data.GroupInvitationInbox(
-                    "account-$round",
-                    listOf(org.aralozkaya.msngr.data.GroupInvitation("group-$round@live.com", "Invite $round")),
-                ),
-            )
+            for (event in events) post { renderer.show(event) }
+            post { renderer.showOfflineMessagesReceived() }
+            post {
+                renderer.syncContactRequests(
+                    org.aralozkaya.msngr.data.ContactRequestInbox(
+                        "account-$round",
+                        listOf(org.aralozkaya.msngr.data.ContactRequest("req-$round@example.test", "Pending/$round")),
+                    ),
+                )
+            }
+            post {
+                renderer.syncGroupInvitations(
+                    org.aralozkaya.msngr.data.GroupInvitationInbox(
+                        "account-$round",
+                        listOf(org.aralozkaya.msngr.data.GroupInvitation("group-$round@live.com", "Invite $round")),
+                    ),
+                )
+            }
         }
 
         InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
@@ -739,11 +743,16 @@ class NotificationConfigurationInstrumentedTest {
             ShortcutManagerCompat.removeDynamicShortcuts(
                 target,
                 listOf(contactChatId, groupChatId, nudgeContactId, signedInContactId)
-                    .map(MsngrNotificationManager::conversationShortcutId),
+                    .map(::shortcutId),
             )
             InAppNotificationPrefs.update(context) { InAppNotificationSettings() }
             InAppNotificationPrefs.reload(target)
         }
+    }
+
+    private fun shortcutId(contactId: String): String {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        return MsngrNotificationManager.conversationShortcutId(context.notificationAccountKey(), contactId)
     }
 
     private fun event(

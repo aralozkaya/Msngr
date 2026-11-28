@@ -237,6 +237,7 @@ internal class SharingNotificationController(
         notificationId: Int,
         spec: ShareNotificationSpec,
     ): Boolean {
+        val accountKey = context.notificationAccountKey()
         val openIntent = ChatActivity.createIntent(
             context = context,
             contactId = spec.contactId,
@@ -250,6 +251,7 @@ internal class SharingNotificationController(
                 .appendPath(spec.contactId)
                 .appendPath(spec.shareId)
                 .build()
+            bindNotificationAccount(accountKey)
         }
         val contentIntent = PendingIntent.getActivity(
             context,
@@ -269,6 +271,7 @@ internal class SharingNotificationController(
                 .appendPath(spec.contactId)
                 .appendPath(spec.shareId)
                 .build()
+            bindNotificationAccount(accountKey)
         }
         val cancelPendingIntent = PendingIntent.getBroadcast(
             context,

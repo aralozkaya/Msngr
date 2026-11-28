@@ -1,10 +1,10 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import org.aralozkaya.msngr.enums.Presence
 import org.aralozkaya.msngr.protocol.MsnpCommand
 import org.w3c.dom.Element
 import java.util.UUID
-import javax.xml.parsers.DocumentBuilderFactory
 
 data class AccountSession(
     val id: String,
@@ -17,14 +17,7 @@ data class AccountSession(
 internal fun parseAccountSessions(payload: ByteArray, current: AccountSession,
     previous: List<AccountSession>): List<AccountSession>? = runCatching {
     if (payload.isEmpty()) return@runCatching listOf(current)
-    if (payload.toString(Charsets.UTF_8).contains("<!DOCTYPE", ignoreCase = true)) return@runCatching null
-    val factory = DocumentBuilderFactory.newInstance().apply {
-        isExpandEntityReferences = false
-        runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
-        runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
-        runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
-    }
-    val root = factory.newDocumentBuilder().parse(payload.inputStream()).documentElement
+    val root = parseProtocolXml(payload, namespaceAware = false).documentElement
     if (root.tagName != "Data") return@runCatching null
     val sessions = linkedMapOf(current.id to current)
     val known = previous.associateBy(AccountSession::id)

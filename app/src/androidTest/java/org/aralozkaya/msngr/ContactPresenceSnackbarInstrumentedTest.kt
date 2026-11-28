@@ -23,6 +23,11 @@ class ContactPresenceSnackbarInstrumentedTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
+    private val busyNotice get() = compose.activity.getString(R.string.chat_contact_unavailable, "Alex", "busy")
+    private val awayNotice get() = compose.activity.getString(R.string.chat_contact_unavailable, "Alex", "away")
+    private val offlineNotice get() = compose.activity.getString(R.string.chat_contact_offline_you_singular, "Alex")
+
+
     @Test
     fun busyNoticePersistsUntilDismissedAndDoesNotReappearOnProfileUpdates() {
         val contact = mutableStateOf(contact(Presence.Busy))
@@ -33,15 +38,15 @@ class ContactPresenceSnackbarInstrumentedTest {
                 }
             }
         }
-        compose.onNodeWithText("Alex is busy and may not respond").assertIsDisplayed()
+        compose.onNodeWithText(busyNotice).assertIsDisplayed()
         compose.mainClock.advanceTimeBy(60_000)
-        compose.onNodeWithText("Alex is busy and may not respond").assertIsDisplayed()
+        compose.onNodeWithText(busyNotice).assertIsDisplayed()
         compose.onNodeWithText("Dismiss").performClick()
-        compose.onNodeWithText("Alex is busy and may not respond").assertDoesNotExist()
+        compose.onNodeWithText(busyNotice).assertDoesNotExist()
         compose.runOnIdle { contact.value = contact.value.copy(nickname = "Alex Updated") }
-        compose.onNodeWithText("Alex Updated is busy and may not respond").assertDoesNotExist()
+        compose.onNodeWithText(compose.activity.getString(R.string.chat_contact_unavailable, "Alex Updated", "busy")).assertDoesNotExist()
         compose.runOnIdle { contact.value = contact.value.copy(presence = Presence.Away) }
-        compose.onNodeWithText("Alex Updated is away and may not respond").assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.chat_contact_unavailable, "Alex Updated", "away")).assertIsDisplayed()
     }
 
     @Test
@@ -56,11 +61,11 @@ class ContactPresenceSnackbarInstrumentedTest {
         }
         compose.onNodeWithText("Dismiss").assertDoesNotExist()
         compose.runOnIdle { contact.value = contact(Presence.Away) }
-        compose.onNodeWithText("Alex is away and may not respond").assertIsDisplayed()
+        compose.onNodeWithText(awayNotice).assertIsDisplayed()
         compose.runOnIdle { contact.value = contact(Presence.Offline) }
-        val offline = "Alex is offline. Messages you send will be delivered when they sign in."
+        val offline = offlineNotice
         compose.onNodeWithText(offline).assertIsDisplayed()
-        compose.onNodeWithText("Alex is away and may not respond").assertDoesNotExist()
+        compose.onNodeWithText(awayNotice).assertDoesNotExist()
         compose.mainClock.advanceTimeBy(60_000)
         compose.onNodeWithText(offline).assertIsDisplayed()
         compose.runOnIdle { contact.value = contact(Presence.Online) }
@@ -114,12 +119,12 @@ class ContactPresenceSnackbarInstrumentedTest {
         for (presence in listOf(Presence.Online, Presence.Busy, Presence.Away)) {
             compose.runOnIdle { contact.value = contact(presence) }
             compose.onNodeWithText(appearOfflineNotice).assertIsDisplayed()
-            compose.onNodeWithText("Alex is busy and may not respond").assertDoesNotExist()
-            compose.onNodeWithText("Alex is away and may not respond").assertDoesNotExist()
+            compose.onNodeWithText(busyNotice).assertDoesNotExist()
+            compose.onNodeWithText(awayNotice).assertDoesNotExist()
         }
         compose.runOnIdle { contact.value = contact(Presence.Offline) }
         compose.onNodeWithText(appearOfflineNotice).assertDoesNotExist()
-        compose.onNodeWithText("Alex is offline. Messages you send will be delivered when they sign in.")
+        compose.onNodeWithText(offlineNotice)
             .assertIsDisplayed()
         compose.runOnIdle { contact.value = null }
         compose.onNodeWithText("Dismiss").assertDoesNotExist()

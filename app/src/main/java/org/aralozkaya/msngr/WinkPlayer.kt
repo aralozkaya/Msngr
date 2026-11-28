@@ -57,7 +57,13 @@ internal class WinkWebView(context: Context, private val movie: ByteArray, muted
         <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}ruffle-player{position:absolute;inset:0;display:block;width:100vw;height:100vh}</style>
         <script>window.RufflePlayer={config:{publicPath:'/ruffle/',autoplay:'off',unmuteOverlay:'hidden',splashScreen:false,
         contextMenu:'off',allowScriptAccess:false,allowNetworking:'none',openUrlMode:'deny',wmode:'transparent',
-        maxExecutionDuration:1,logLevel:'error',polyfills:false}};</script><script src="/ruffle/ruffle.js"></script>
+        maxExecutionDuration:1,logLevel:'error',polyfills:false}};
+        // Ruffle's wgpu shaders exceed the uniform limit on some mobile WebGL drivers.
+        const gl=document.createElement('canvas').getContext('webgl2');
+        if(gl){
+          if(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)<=256)window.RufflePlayer.config.preferredRenderer='webgl';
+          gl.getExtension('WEBGL_lose_context')?.loseContext();
+        }</script><script src="/ruffle/ruffle.js"></script>
         <script>addEventListener('DOMContentLoaded',async()=>{try{
           const p=window.RufflePlayer.newest().createPlayer();document.body.appendChild(p);window.winkPlayer=p;
           const api=p.ruffle();window.winkMuted=${if (muted) "true" else "false"};

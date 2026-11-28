@@ -21,6 +21,21 @@ import kotlin.math.abs
 class MsnInkCodecTest {
 
     @Test
+    fun rejectsTruncatedInk() {
+        val capture = requireNotNull(MsnBase64.decode(CAPTURED_MSG1_3STROKES_ISF))
+        assertNull(MsnInkCodec.decodeIsf(capture.copyOf(capture.size / 2)))
+    }
+
+    @Test
+    fun oversizedChunkedMessagesReleaseTheirPartialData() {
+        val assembler = SwitchboardChunkAssembler()
+        val body = ByteArray(55_000)
+        assertNull(assembler.feed("sender", "Message-ID: a\r\nChunks: 2\r\n\r\n".toByteArray() + body))
+        assertNull(assembler.feed("sender", "Message-ID: a\r\nChunk: 1\r\n\r\n".toByteArray() + body))
+        assertNull(assembler.feed("sender", "Message-ID: a\r\nChunk: 1\r\n\r\nretry".toByteArray()))
+    }
+
+    @Test
     fun decodesCapturedWlmThreeStrokeFineNormalBoldIsfPacket() {
         val bytes = requireNotNull(MsnBase64.decode(CAPTURED_MSG1_3STROKES_ISF))
         val drawing = requireNotNull(MsnInkCodec.decodeIsf(bytes))

@@ -6,7 +6,7 @@
   "inputs": {
     "COPYING": "f213d017b94146d62e8336dbfd13f9fd082a5ba09d2164110aa2a27fe76db8c6",
     "app/src/main/cpp/CMakeLists.txt": "fc2a219a4ab19418739bd8128d68a3278a06d224197ea963f2be5d702198020a",
-    "app/src/main/cpp/siren_jni.c": "07e7345effd7a7f59aaf1ac9383faef94b6fa2e672cb0c3703517ba51d96080d",
+    "app/src/main/cpp/siren_jni.c": "08049d9053ecc3faf513cf012321f3016bd96154ee0bd6df76e727f9048eae6a",
     "app/src/main/java/org/aralozkaya/msngr/UnicodeEmoji.kt": "fb1708d92ba19e8dac01bbbfa8b89303caeca62c89b7d38ef3c79d03f90f933f"
   },
   "components": [
@@ -5660,7 +5660,7 @@
   ],
   "files": {
     "index.html": "80527e12d402d9fedd1022f265fe85149f4a5e964f935f6ade1a646ee285b96d",
-    "library-sources.zip": "316668aba25d1ae48cb6981e798aaf44fee76e00f7beebe83207a9cfb387ea81",
+    "library-sources.zip": "d2129bf5bde3bcdfd99b59c6f9c24bf239fe020004ae91426d6a2157ea08f9d1",
     "THIRD_PARTY_NOTICES.txt": "befc3c60eb533ba3ccda8e4fac45d0d44a1fa64222059cb7b38c22e3ba17567a"
   }
 }

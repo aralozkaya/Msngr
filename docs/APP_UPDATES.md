@@ -7,7 +7,7 @@ version tag, publication date, and release notes. Updates work only in installed
 ## Checking and notifications
 
 - Automatic checking defaults to every **24 hours**, plus each fresh app launch. Choose
-  6 hours, 12 hours, 24 hours, 2 days, a week, or app launches only.
+  6 hours, 12 hours, 24 hours, a week, or app launches only.
 - Android WorkManager schedules background checks with a network constraint. Android can
   delay these jobs for battery or network reasons; the interval is not an exact alarm.
 - A new activity session triggers a startup check. Navigation, configuration changes,

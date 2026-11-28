@@ -12,6 +12,8 @@ import android.graphics.drawable.AnimationDrawable
 import android.net.Uri
 import android.os.Build
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -24,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -66,6 +69,18 @@ class ExternalShareInstrumentedTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val createdFiles = mutableListOf<File>()
+
+    @Test
+    fun legacyFileUrisAreLimitedToSharedStorage() {
+        val external = requireNotNull(context.getExternalFilesDir(null))
+        assertFalse(context.isSafeExternalFileUri(Uri.fromFile(File(external, "private.txt"))))
+        assertFalse(context.isSafeExternalFileUri(Uri.fromFile(File(context.filesDir, "private.txt"))))
+        assertFalse(context.isSafeExternalFileUri(Uri.fromFile(File(context.createDeviceProtectedStorageContext().filesDir, "private.txt"))))
+        @Suppress("DEPRECATION")
+        val downloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        assertTrue(context.isSafeExternalFileUri(Uri.fromFile(File(downloads, "document.txt"))))
+        assertTrue(context.isSafeExternalFileUri(Uri.parse("content://documents.example/book")))
+    }
 
     @Before
     fun setUp() {
@@ -192,11 +207,14 @@ class ExternalShareInstrumentedTest {
             compose.onNodeWithTag("share_recipients_list").performScrollToNode(hasTestTag("share_recipient_can"))
             compose.onNodeWithTag("share_recipient_can").assertIsNotEnabled()
             compose.onNodeWithTag("share_recipients_list").performScrollToNode(hasTestTag("share_recipient_selin"))
-            compose.onNodeWithTag("share_recipient_selin").assertIsEnabled().performClick()
+            val recipient = compose.onNodeWithTag("share_recipient_selin").assertIsEnabled()
+            recipient.performSemanticsAction(SemanticsActions.OnClick)
+            recipient.assertIsSelected()
 
             compose.onNodeWithTag("share_optional_message_input").assertIsDisplayed()
             compose.onNodeWithTag("share_optional_message_input").performTextInput("Here is the document!")
-            compose.onNodeWithTag("share_send_button").assertIsEnabled().performClick()
+            // The IME moves the footer while the note field is focused.
+            compose.onNodeWithTag("share_send_button").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
 
             compose.waitUntil(8_000) {
                 repository.liveTransferMessages.value["selin"].orEmpty().any {
@@ -261,8 +279,11 @@ class ExternalShareInstrumentedTest {
             compose.onNodeWithTag("wink_import_preview_dialog").assertDoesNotExist()
             compose.onNodeWithTag("share_optional_message_input").performTextInput("Install this wink")
             compose.onNodeWithTag("share_recipients_list").performScrollToNode(hasTestTag("share_recipient_selin"))
-            compose.onNodeWithTag("share_recipient_selin").assertIsEnabled().performClick()
-            compose.onNodeWithTag("share_send_button").assertIsEnabled().performClick()
+            val recipient = compose.onNodeWithTag("share_recipient_selin").assertIsEnabled()
+            recipient.performSemanticsAction(SemanticsActions.OnClick)
+            recipient.assertIsSelected()
+            // The IME moves the footer while the note field is focused.
+            compose.onNodeWithTag("share_send_button").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
 
             compose.waitUntil(8_000) {
                 repository.liveTransferMessages.value["selin"].orEmpty().any {

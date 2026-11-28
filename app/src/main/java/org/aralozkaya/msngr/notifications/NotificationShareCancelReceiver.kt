@@ -12,6 +12,9 @@ import org.aralozkaya.msngr.appContainer
 
 internal class NotificationShareCancelReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val accountKey = intent.getStringExtra(NOTIFICATION_ACCOUNT) ?: return
+        val repository = context.appContainer.currentRepository ?: return
+        if (repository.signedInAccountIdentity?.storageKey != accountKey) return
         val kind = intent.getStringExtra(EXTRA_KIND) ?: return
         val contactId = intent.getStringExtra(EXTRA_CONTACT_ID) ?: return
         val shareId = intent.getStringExtra(EXTRA_SHARE_ID) ?: return
@@ -19,10 +22,10 @@ internal class NotificationShareCancelReceiver : BroadcastReceiver() {
         if (notificationId >= 0) {
             NotificationManagerCompat.from(context).cancel(notificationId)
         }
-        val repository = context.applicationContext.appContainer.currentRepository ?: return
         val pendingResult = goAsync()
         scope.launch {
             try {
+                if (repository.signedInAccountIdentity?.storageKey != accountKey) return@launch
                 when (kind) {
                     KIND_FILE -> repository.cancelFile(contactId, shareId)
                     KIND_PHOTO -> repository.stopPhotos(contactId, shareId)

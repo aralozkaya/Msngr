@@ -1,5 +1,6 @@
 package org.aralozkaya.msngr.data
 
+import org.aralozkaya.msngr.protocol.parseProtocolXml
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,7 +13,7 @@ import org.aralozkaya.msngr.protocol.MsnFileContext
 import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
 
 /** File application shared by both P2P framings. Data is streamed only after acceptance. */
 internal class MsnpFileSession(
@@ -28,8 +29,10 @@ internal class MsnpFileSession(
     private val expiryCheckMillis: Long = 10_000,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val ids = AtomicInteger(100_000)
     private val calls = ConcurrentHashMap<Long, Call>()
+    // Endpoints choose opposite parities so crossed invitations cannot share an ID.
+    private val sessionParity = if (source.compareTo(destination, ignoreCase = true) < 0) 0 else 1
+    private var closed = false
     private class Call(val session: Long, val invite: SlpMessage, @Volatile var transfer: FileTransfer,
         val file: File? = null, var unknownSize: Boolean = false, val expectedHash: String? = null) {
         var output: OutputStream? = null
@@ -45,12 +48,14 @@ internal class MsnpFileSession(
         scope.launch {
             while (true) {
                 delay(expiryCheckMillis)
-                calls.values.filter { System.nanoTime() - it.lastActivity >
-                    (if (it.transfer.status == FileTransferStatus.Offered) offerTimeoutMillis else idleTimeoutMillis) * 1_000_000L }
-                    .forEach {
-                        finish(it, FileTransferStatus.Failed, "File transfer timed out.")
-                        runCatching { bye(it) }
+                for (call in calls.values) {
+                    val expired = synchronized(call) {
+                        val timeout = if (call.transfer.status == FileTransferStatus.Offered) offerTimeoutMillis else idleTimeoutMillis
+                        System.nanoTime() - call.lastActivity > timeout * 1_000_000L &&
+                            finish(call, FileTransferStatus.Failed, "File transfer timed out.")
                     }
+                    if (expired) runCatching { bye(call) }
+                }
             }
         }
     }
@@ -60,16 +65,14 @@ internal class MsnpFileSession(
         require(!MsnFileContext.isExecutable(name)) { "Executable files cannot be shared." }
         val context = MsnFileContext(name, file.length())
         val encoded = context.encode()
-        check(calls.size < 8) { "Too many active file transfers." }
-        val session = ids.incrementAndGet().toLong()
+        val session = nextSessionId()
         val id = MsnpP2pUtil.randomGuid()
         val content = "EUF-GUID: {${MsnFileContext.GUID}}\r\nSessionID: $session\r\nAppID: 2\r\nRequestFlags: 16\r\nContext: ${MsnBase64.encode(encoded)}\r\n\r\n"
         val bytes = sipMessage("INVITE MSNMSGR:$destination MSNSLP/1.0", destination, source,
             MsnpP2pUtil.randomGuid(), id, 0, MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE, content)
         val call = Call(session, requireNotNull(SlpMessage.parse(bytes)), FileTransfer(id, name,
-            file.length(), true, localPath = file.absolutePath), file)
-        calls[session] = call
-        publish(call.transfer)
+            context.size, true, localPath = file.absolutePath), file)
+        check(register(call)) { "The conversation has ended or cannot accept another file transfer." }
         try { sendControl(bytes) } catch (error: Exception) {
             finish(call, FileTransferStatus.Failed, "File invitation could not be sent.")
             throw error
@@ -85,13 +88,19 @@ internal class MsnpFileSession(
             val original = id?.let(originalPhoto)
             val file = original?.let { File(it.path) }
             if (message.body.field("AppID") != "36" || id == null || original == null || file?.isFile != true ||
-                file.length() !in 1..MsnFileContext.MAX_FILE_BYTES || calls.size >= 8 || calls.containsKey(session)) {
+                file.length() !in 1..MsnFileContext.MAX_FILE_BYTES) {
                 respond(message, session, "603 Decline"); return true
             }
             val call = Call(session, message, FileTransfer(message.callId, original.name, file.length(), true,
                 FileTransferStatus.Transferring, localPath = file.absolutePath, photoId = id), file)
-            calls[session] = call; publish(call.transfer)
-            respond(message, session, "200 OK")
+            if (!register(call)) {
+                if (!owns(message.callId)) respond(message, session, "603 Decline")
+                return true
+            }
+            try { respond(message, session, "200 OK") } catch (error: Exception) {
+                finish(call, FileTransferStatus.Failed, "The original photo could not be sent.")
+                throw error
+            }
             startSending(call)
             return true
         }
@@ -104,13 +113,12 @@ internal class MsnpFileSession(
             if (calls.values.any { it.invite.callId.equals(message.callId, true) }) return true
             val context = message.body.field("Context")?.let(MsnBase64::decode)?.let(MsnFileContext::parse)
             if (context == null || message.body.field("AppID") != "2" || directory == null ||
-                MsnFileContext.isExecutable(context.name) || calls.size >= 8 || calls.containsKey(session)) {
+                MsnFileContext.isExecutable(context.name)) {
                 respond(message, session, "603 Decline")
                 return true
             }
             val call = Call(session, message, FileTransfer(message.callId, context.name, context.size, false))
-            calls[session] = call
-            publish(call.transfer)
+            if (!register(call) && !owns(message.callId)) respond(message, session, "603 Decline")
             return true
         }
         val call = calls.values.firstOrNull { it.invite.callId.equals(message.callId, true) } ?: return false
@@ -123,9 +131,11 @@ internal class MsnpFileSession(
             }
             message.firstLine.startsWith("MSNSLP/1.0 200", true) &&
                 message.contentType.equals(MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE, true) -> {
-                if (call.transfer.outgoing && call.transfer.status == FileTransferStatus.Offered) {
-                    update(call, call.transfer.copy(status = FileTransferStatus.Transferring))
-                    startSending(call)
+                synchronized(call) {
+                    if (call.transfer.outgoing && call.transfer.status == FileTransferStatus.Offered) {
+                        update(call, call.transfer.copy(status = FileTransferStatus.Transferring))
+                        startSending(call)
+                    }
                 }
             }
             message.firstLine.startsWith("MSNSLP/1.0 603", true) -> finish(call, FileTransferStatus.Declined)
@@ -137,15 +147,35 @@ internal class MsnpFileSession(
         return true
     }
 
-    fun owns(id: String): Boolean = calls.values.any { it.transfer.id == id }
+    private fun nextSessionId(): Long {
+        var session: Long
+        do { session = Random.nextInt(1, Int.MAX_VALUE / 2) * 2L + sessionParity } while (calls.containsKey(session))
+        return session
+    }
+
+    private fun register(call: Call, prepare: () -> Unit = {}): Boolean = synchronized(call) {
+        synchronized(calls) {
+            if (closed || calls.size >= 8 || calls.containsKey(call.session) || owns(call.transfer.id)) return false
+            calls[call.session] = call
+        }
+        try {
+            prepare()
+            publish(call.transfer)
+        } catch (error: Exception) {
+            finish(call, FileTransferStatus.Failed, "File transfer could not be started.")
+            throw error
+        }
+        true
+    }
+
+    fun owns(id: String): Boolean = calls.values.any { it.transfer.id.equals(id, true) }
     fun owns(session: Long): Boolean = calls.containsKey(session)
     fun applicationId(session: Long): Int = if (calls[session]?.transfer?.photoId != null) 36 else 2
 
     suspend fun requestOriginal(photo: SharedPhoto): String {
-        check(calls.size < 8)
         require(MsnFileContext.validName(photo.name) && !MsnFileContext.isExecutable(photo.name)) { "This original photo cannot be saved." }
         require(MsnBase64.decode(photo.hash)?.size == 20) { "Invalid original photo hash." }
-        val session = ids.incrementAndGet().toLong()
+        val session = nextSessionId()
         val id = MsnpP2pUtil.randomGuid()
         val context = "<map><h aid=\"PS\" op=\"REQUESTORIGINAL\" ver=\"1\"></h><m guid=\"{${java.util.UUID.fromString(photo.id)}}\"/></map>\r\n\u0000"
         val body = "EUF-GUID: {$ORIGINAL_GUID}\r\nSessionID: $session\r\nAppID: 36\r\nRequestFlags: 16\r\nContext: ${MsnBase64.encode(context.toByteArray(Charsets.UTF_16LE))}\r\n\r\n"
@@ -153,17 +183,22 @@ internal class MsnpFileSession(
             MsnpP2pUtil.randomGuid(), id, 0, MsnpP2pUtil.SESSION_REQUEST_CONTENT_TYPE, body)
         val call = Call(session, requireNotNull(SlpMessage.parse(bytes)), FileTransfer(id, photo.name, 0, false,
             FileTransferStatus.Transferring, photoId = photo.id), unknownSize = true, expectedHash = photo.hash)
-        prepareOutput(call)
-        calls[session] = call; publish(call.transfer)
+        check(register(call) { prepareOutput(call) }) { "The conversation has ended or cannot accept another file transfer." }
         try { sendControl(bytes) } catch (error: Exception) { finish(call, FileTransferStatus.Failed, "The original photo could not be requested."); throw error }
         return id
     }
 
-    private fun startSending(call: Call) {
+    private fun startSending(call: Call): Unit = synchronized(call) {
+        if (calls[call.session] !== call) return
         call.job = scope.launch {
             try {
                 sendFile(call.session, requireNotNull(call.file), { calls[call.session] === call }) {
-                    call.lastActivity = System.nanoTime(); update(call, call.transfer.copy(transferred = it))
+                    synchronized(call) {
+                        if (calls[call.session] === call) {
+                            call.lastActivity = System.nanoTime()
+                            update(call, call.transfer.copy(transferred = it))
+                        }
+                    }
                 }
             } catch (_: Exception) { finish(call, FileTransferStatus.Failed, "File could not be sent.") }
         }
@@ -179,17 +214,24 @@ internal class MsnpFileSession(
     suspend fun acknowledged(identifier: Long) {
         val call = calls.values.firstOrNull { it.completionAck == identifier && it.transfer.outgoing &&
             it.transfer.status == FileTransferStatus.Transferring && it.transfer.transferred == it.transfer.size } ?: return
-        finish(call, FileTransferStatus.Complete)
-        bye(call)
+        if (finish(call, FileTransferStatus.Complete)) bye(call)
     }
 
     suspend fun accept(id: String) {
         val call = calls.values.firstOrNull { it.transfer.id == id } ?: error("This file offer has ended.")
-        synchronized(call) {
+        val storageFailure = synchronized(call) {
             check(!call.transfer.outgoing && call.transfer.status == FileTransferStatus.Offered)
-            prepareOutput(call)
+            try { prepareOutput(call) } catch (error: Exception) {
+                finish(call, FileTransferStatus.Failed, "File could not be saved.")
+                return@synchronized error
+            }
             call.lastActivity = System.nanoTime()
             update(call, call.transfer.copy(status = FileTransferStatus.Transferring))
+            null
+        }
+        if (storageFailure != null) {
+            runCatching { respond(call.invite, call.session, "603 Decline") }
+            throw storageFailure
         }
         try {
             respond(call.invite, call.session, "200 OK")
@@ -202,8 +244,11 @@ internal class MsnpFileSession(
 
     suspend fun cancel(id: String) {
         val call = calls.values.firstOrNull { it.transfer.id == id } ?: return
-        val declined = !call.transfer.outgoing && call.transfer.status == FileTransferStatus.Offered
-        finish(call, if (declined) FileTransferStatus.Declined else FileTransferStatus.Cancelled)
+        val declined = synchronized(call) {
+            val offered = !call.transfer.outgoing && call.transfer.status == FileTransferStatus.Offered
+            if (!finish(call, if (offered) FileTransferStatus.Declined else FileTransferStatus.Cancelled)) return
+            offered
+        }
         if (declined) respond(call.invite, call.session, "603 Decline") else bye(call)
     }
 
@@ -216,6 +261,7 @@ internal class MsnpFileSession(
                 if (call.transfer.outgoing || call.transfer.status != FileTransferStatus.Transferring) return
                 if (call.unknownSize) {
                     check(offset == 0L && total in 1..MsnFileContext.MAX_FILE_BYTES)
+                    check(requireNotNull(call.partial).usableSpace > total + 1024 * 1024) { "Not enough storage space." }
                     call.unknownSize = false; update(call, call.transfer.copy(size = total))
                 }
                 check(total == call.transfer.size && offset == call.transfer.transferred &&
@@ -232,15 +278,14 @@ internal class MsnpFileSession(
                     val saved = File(partial.parentFile, partial.name.removeSuffix(".part") + ".bin")
                     check(partial.renameTo(saved))
                     call.partial = null
-                    update(call, call.transfer.copy(localPath = saved.absolutePath))
+                    finish(call, FileTransferStatus.Complete, localPath = saved.absolutePath)
                     completed = true
                 }
             }
-            if (completed) { finish(call, FileTransferStatus.Complete); bye(call) }
         } catch (_: Exception) {
-            finish(call, FileTransferStatus.Failed, "The received file was incomplete or invalid.")
-            runCatching { bye(call) }
+            if (finish(call, FileTransferStatus.Failed, "The received file was incomplete or invalid.")) runCatching { bye(call) }
         }
+        if (completed) runCatching { bye(call) }
     }
 
     fun received(session: Long): Long = calls[session]?.transfer?.transferred ?: 0
@@ -255,13 +300,14 @@ internal class MsnpFileSession(
             publish(transfer)
         }
     }
-    private fun finish(call: Call, status: FileTransferStatus, error: String? = null) {
-        if (!calls.remove(call.session, call)) return
+    private fun finish(call: Call, status: FileTransferStatus, error: String? = null, localPath: String? = null): Boolean {
         synchronized(call) {
+            synchronized(calls) { if (!calls.remove(call.session, call)) return false }
             if (status != FileTransferStatus.Complete) call.job?.cancel()
             runCatching { call.output?.close() }; call.output = null
             call.partial?.delete(); call.partial = null
-            update(call, call.transfer.copy(status = status, error = error))
+            update(call, call.transfer.copy(status = status, error = error, localPath = localPath ?: call.transfer.localPath))
+            return true
         }
     }
     private suspend fun respond(invite: SlpMessage, session: Long, status: String) = sendControl(sipMessage(
@@ -272,7 +318,11 @@ internal class MsnpFileSession(
         "application/x-msnmsgr-sessionclosebody", "SessionID: ${call.session}\r\n\r\n"))
 
     override fun close() {
-        calls.values.toList().forEach { finish(it, FileTransferStatus.Failed, "The conversation disconnected.") }
+        val active = synchronized(calls) {
+            closed = true
+            calls.values.toList()
+        }
+        active.forEach { finish(it, FileTransferStatus.Failed, "The conversation disconnected.") }
         scope.cancel()
     }
     companion object {
@@ -281,8 +331,7 @@ internal class MsnpFileSession(
             val bytes = context?.let(MsnBase64::decode) ?: return null
             require(bytes.size <= 4096 && bytes.size % 2 == 0)
             val xml = bytes.toString(Charsets.UTF_16LE).trimEnd('\u0000', '\r', '\n')
-            require(!xml.contains("<!DOCTYPE", true) && !xml.contains("<!ENTITY", true))
-            val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
+            val doc = parseProtocolXml(xml, namespaceAware = false)
             val h = doc.getElementsByTagName("h").item(0) as org.w3c.dom.Element
             require(h.getAttribute("aid") == "PS" && h.getAttribute("op") == "REQUESTORIGINAL")
             java.util.UUID.fromString((doc.getElementsByTagName("m").item(0) as org.w3c.dom.Element).getAttribute("guid").trim('{', '}')).toString().uppercase()

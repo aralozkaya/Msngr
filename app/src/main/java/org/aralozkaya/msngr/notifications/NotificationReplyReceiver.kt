@@ -4,13 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
-import androidx.work.Constraints
 import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
 import org.aralozkaya.msngr.MsngrApplication
 import org.aralozkaya.msngr.appContainer
 import org.aralozkaya.msngr.messengerPlusPlainText
@@ -18,6 +12,8 @@ import org.aralozkaya.msngr.withoutUnicodeEmoji
 
 class NotificationReplyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val accountKey = intent.getStringExtra(NOTIFICATION_ACCOUNT) ?: return
+        if (context.notificationAccountKey() != accountKey) return
         val reply = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(KEY_TEXT_REPLY)
             ?.toString()
@@ -27,7 +23,7 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             ?.take(MAX_REPLY_LENGTH)
             ?: return
         val contactId = intent.getStringExtra(EXTRA_CONTACT_ID)?.takeIf(String::isNotBlank) ?: return
-        val repository = runCatching { context.appContainer.messengerRepository }.getOrNull()
+        val repository = context.appContainer.currentRepository
         val contactSnapshot = repository?.contactSnapshot(contactId)
         val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
             ?.takeIf(String::isNotBlank)
@@ -39,10 +35,20 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             MsngrNotificationManager.notificationId(NotificationEventType.Message, contactId),
         )
         val notifications = MsngrNotificationManager(context)
-        val previousNotification = notifications.activeNotification(notificationId)
-        // Mark the conversation read when the reply is submitted without cancelling
-        // the active conversation notification, so the expanded shade and connected
-        // smart watches continue showing the incoming message, our reply, and follow-ups.
+        val input = try {
+            Data.Builder()
+                .putString(NOTIFICATION_ACCOUNT, accountKey)
+                .putString(NOTIFICATION_CONTACT_ID, contactId)
+                .putString(NOTIFICATION_CONTACT_NAME, contactName)
+                .putString(ReplyMessageWorker.KEY_REPLY_TEXT, reply)
+                .putInt(ACTION_NOTIFICATION_ID, notificationId)
+                .putBoolean(ReplyMessageWorker.KEY_IS_GROUP, isGroup)
+                .build()
+        } catch (_: IllegalStateException) {
+            // WorkManager limits serialized bytes. A multibyte reply may exceed its budget.
+            notifications.markReplyFailed(contactId, contactName, notificationId)
+            return
+        }
         repository?.markRead(contactId, dismissNotification = false)
         notifications.dismiss(MsngrNotificationManager.notificationId(NotificationEventType.Nudge, contactId))
         (context.applicationContext as? MsngrApplication)?.inAppNotifications?.dismissConversation(contactId)
@@ -51,26 +57,9 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             contactName = contactName,
             replyText = reply,
             notificationId = notificationId,
-            previousNotification = previousNotification,
             isGroup = isGroup,
         )
-        val input = Data.Builder()
-            .putString(ReplyMessageWorker.KEY_CONTACT_ID, contactId)
-            .putString(ReplyMessageWorker.KEY_CONTACT_NAME, contactName)
-            .putString(ReplyMessageWorker.KEY_REPLY_TEXT, reply)
-            .putInt(ReplyMessageWorker.KEY_NOTIFICATION_ID, notificationId)
-            .putBoolean(ReplyMessageWorker.KEY_IS_GROUP, isGroup)
-            .build()
-        val request = OneTimeWorkRequestBuilder<ReplyMessageWorker>()
-            .setInputData(input)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "reply:$contactId:${System.currentTimeMillis()}",
-            ExistingWorkPolicy.KEEP,
-            request,
-        )
+        context.enqueueNotificationAction<ReplyMessageWorker>(input)
     }
 
     companion object {

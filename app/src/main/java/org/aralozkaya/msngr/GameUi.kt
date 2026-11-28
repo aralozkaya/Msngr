@@ -16,7 +16,9 @@ import android.util.LruCache
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
+import android.net.Uri
+import android.webkit.WebMessage
+import android.webkit.WebMessagePort
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
@@ -74,7 +76,9 @@ import org.aralozkaya.msngr.pages.components.DestructiveOutlinedButton
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
+import java.util.UUID
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
@@ -86,7 +90,7 @@ private fun Context.gameRepository() =
 private val gameIconCache = object : LruCache<String, Bitmap>(32) {}
 
 private suspend fun fetchGameIconBitmap(url: String): Bitmap? {
-    if (url.isBlank()) return null
+    if (gameOrigin(url) == null) return null
     val normalized = MsnpGameCatalogService.upgradeKnownHttpsUrl(url)
     gameIconCache.get(normalized)?.let { return it }
     return withContext(Dispatchers.IO) {
@@ -100,8 +104,15 @@ private suspend fun fetchGameIconBitmap(url: String): Bitmap? {
             }
             try {
                 if (connection.responseCode !in 200..299) return@runCatching null
-                val bytes = connection.inputStream.use { it.readBytes() }
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also {
+                val bytes = connection.inputStream.use { it.readBytesBounded(2 * 1024 * 1024) { "Game icon is too large." } }
+                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                if (options.outWidth <= 0 || options.outHeight <= 0) return@runCatching null
+                options.inJustDecodeBounds = false
+                while (maxOf(options.outWidth, options.outHeight) / options.inSampleSize.coerceAtLeast(1) > 256) {
+                    options.inSampleSize = options.inSampleSize.coerceAtLeast(1) * 2
+                }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.also {
                     gameIconCache.put(normalized, it)
                 }
             } finally {
@@ -162,7 +173,7 @@ internal fun GameCatalogDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val portalStateFlow = remember(context) {
-        (context.applicationContext as? MsngrApplication)?.container?.messengerRepository?.portalState
+        context.currentMessengerRepository?.portalState
     }
     val portalState by portalStateFlow?.collectAsState() ?: remember { mutableStateOf(PortalState()) }
     val discoveredActivitiesServer = portalState.config.appDirServiceUrl
@@ -444,18 +455,19 @@ internal fun nativeGamePaneDimensions(entry: GameCatalogEntry): Pair<Int, Int> {
     return width to height
 }
 
-internal fun isAllowedGameHost(entryUrl: String, requestUrl: String): Boolean {
-    val upgradedEntry = MsnpGameCatalogService.upgradeKnownHttpsUrl(entryUrl)
-    val parsedEntry = runCatching { URL(upgradedEntry) }.getOrNull() ?: return false
-    val entryProtocol = parsedEntry.protocol.lowercase()
-    if ((entryProtocol != "http" && entryProtocol != "https") || parsedEntry.host.isNullOrBlank()) {
-        return false
-    }
-    val upgradedReq = MsnpGameCatalogService.upgradeKnownHttpsUrl(requestUrl)
-    val parsedReq = runCatching { URL(upgradedReq) }.getOrNull() ?: return false
-    val reqProtocol = parsedReq.protocol.lowercase()
-    return (reqProtocol == "http" || reqProtocol == "https") && !parsedReq.host.isNullOrBlank()
+private fun gameOrigin(url: String?): String? {
+    val uri = url?.let { runCatching { URI(it) }.getOrNull() } ?: return null
+    val scheme = uri.scheme?.lowercase()
+    if (scheme != "http" && scheme != "https") return null
+    val host = uri.host?.lowercase() ?: return null
+    if (uri.rawUserInfo != null || uri.port !in -1..65535 || uri.port == 0) return null
+    val defaultPort = if (scheme == "https") 443 else 80
+    val port = if (uri.port == -1 || uri.port == defaultPort) "" else ":${uri.port}"
+    return "$scheme://$host$port"
 }
+
+internal fun isAllowedGameHost(entryUrl: String, requestUrl: String): Boolean =
+    gameOrigin(entryUrl) != null && gameOrigin(requestUrl) != null
 
 internal fun shouldInjectGameBridgeHtml(
     entryUrl: String,
@@ -463,10 +475,10 @@ internal fun shouldInjectGameBridgeHtml(
     isMainFrame: Boolean,
 ): Boolean {
     if (!isAllowedGameHost(entryUrl, requestUrl)) return false
-    val upgradedReq = MsnpGameCatalogService.upgradeKnownHttpsUrl(requestUrl)
-    val path = runCatching { URL(upgradedReq).path.orEmpty().lowercase() }.getOrDefault("")
+    val path = URI(requestUrl).path.orEmpty().lowercase()
     if (path.contains("help")) return false
-    return isMainFrame || path.endsWith(".htm") || path.endsWith(".html")
+    if (isMainFrame) return true
+    return gameOrigin(entryUrl) == gameOrigin(requestUrl) && (path.endsWith(".htm") || path.endsWith(".html"))
 }
 
 internal const val DEFAULT_GAME_PANE_BG_HEX = "#516CA1"
@@ -704,14 +716,44 @@ internal class GameWebViewController(
         activeJsDialog = null
     }
 
-    private val bridgeScript: String = buildP4PolyfillScript(
-        isInviter = isInviter,
-        localName = localName,
-        localEmail = localEmail,
-        peerName = peerName,
-        peerEmail = peerEmail,
-        targetWidth = paneWidth,
-    )
+    private val channelId = UUID.randomUUID().toString()
+    private var messagePort: WebMessagePort? = null
+    private var navigation = 0L
+    @Volatile private var topPageUrl = entry.url
+    private val gameScript = buildP4PolyfillScript(paneWidth)
+    private val hostScript = """
+        if (window === window.top && !window.__p4Host) {
+            (function () {
+                var port = null, pending = [];
+                var host = ${JSONObject().apply {
+                    put("localName", localName.ifBlank { localEmail.substringBefore('@') })
+                    put("localEmail", localEmail)
+                    put("peerName", peerName.ifBlank { peerEmail.substringBefore('@') })
+                    put("peerEmail", peerEmail)
+                    put("isInviter", isInviter)
+                }.toString().replace("<", "\\u003c")};
+                host.send = function(action, value) {
+                    var data = JSON.stringify([action, value || '']);
+                    if (port) port.postMessage(data);
+                    else if (pending.length < 128) pending.push(data);
+                };
+                window.addEventListener('message', function(event) {
+                    if (event.data !== '$channelId' || event.ports.length !== 1) return;
+                    port = event.ports[0];
+                    port.onmessage = function(message) {
+                        var data = JSON.parse(message.data);
+                        if (data[0] === 'data') window.__p4OnDataReceived(data[1]);
+                        if (data[0] === 'loaded') window.__p4OnRemoteAppLoaded();
+                        if (data[0] === 'closed') window.__p4OnRemoteAppClosed();
+                    };
+                    pending.forEach(function(data) { port.postMessage(data); });
+                    pending = [];
+                });
+                window.__p4Host = host;
+            })();
+        }
+    """.trimIndent()
+    private val mainFrameScript = "$hostScript\n$gameScript"
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     val webView: WebView = WebView(context.applicationContext).apply {
@@ -722,6 +764,8 @@ internal class GameWebViewController(
         setBackgroundColor(DEFAULT_GAME_PANE_BG_COLOR_INT)
         settings.apply {
             javaScriptEnabled = true
+            allowFileAccess = false
+            allowContentAccess = false
             domStorageEnabled = true
             loadsImagesAutomatically = true
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
@@ -747,22 +791,27 @@ internal class GameWebViewController(
             }
             false
         }
-        addJavascriptInterface(BridgeInterface(), "AndroidP4Bridge")
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val rawTarget = request.url.toString()
+                if (!isAllowedGameHost(entry.url, rawTarget)) return true
                 val target = MsnpGameCatalogService.upgradeKnownHttpsUrl(rawTarget)
-                if (target.contains("help", ignoreCase = true) &&
+                if (request.isForMainFrame && target.contains("help", ignoreCase = true) &&
                     (target.endsWith(".htm", ignoreCase = true) || target.endsWith(".html", ignoreCase = true))
                 ) {
                     mainHandler.post { onOpenHelpUrl(target) }
                     return true
                 }
-                if (isAllowedGameHost(entry.url, rawTarget)) {
-                    return false
-                }
-                // Never delegate to an external browser.
-                return true
+                return false
+            }
+
+            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                navigation++
+                pageFinished = false
+                topPageUrl = url.orEmpty()
+                messagePort?.close()
+                messagePort = null
             }
 
             override fun shouldInterceptRequest(
@@ -771,21 +820,36 @@ internal class GameWebViewController(
             ): WebResourceResponse? {
                 val rawUrl = request.url.toString()
                 val upgraded = MsnpGameCatalogService.upgradeKnownHttpsUrl(rawUrl)
-                if (shouldInjectGameBridgeHtml(entry.url, rawUrl, request.isForMainFrame)) {
-                    return runCatching {
-                        fetchAndInjectHtml(upgraded, bridgeScript)
-                    }.getOrNull()
+                val mainFrame = request.isForMainFrame
+                if (mainFrame) topPageUrl = rawUrl
+                if (request.method == "GET" && shouldInjectGameBridgeHtml(topPageUrl, rawUrl, mainFrame)) {
+                    return fetchGameResource(upgraded, if (mainFrame) mainFrameScript else gameScript)
                 }
-                if (rawUrl.startsWith("http://", ignoreCase = true) && upgraded.startsWith("https://")) {
-                    return runCatching { fetchSubresource(upgraded) }.getOrNull()
+                if (request.method == "GET" && rawUrl != upgraded && gameOrigin(upgraded) != null) {
+                    return fetchGameResource(upgraded, script = null)
                 }
                 return super.shouldInterceptRequest(view, request)
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
-                view.evaluateJavascript(bridgeScript, null)
-                pageFinished = true
+                if (url == null) return
+                val origin = gameOrigin(url) ?: return
+                if (url != view.url || !shouldInjectGameBridgeHtml(entry.url, url, true)) return
+                val generation = navigation
+                val script = "if (window.location.origin === ${JSONObject.quote(origin)}) { $mainFrameScript }"
+                view.evaluateJavascript(script) {
+                    if (generation != navigation || url != view.url || messagePort != null) return@evaluateJavascript
+                    val ports = view.createWebMessageChannel()
+                    messagePort = ports[0]
+                    ports[0].setWebMessageCallback(object : WebMessagePort.WebMessageCallback() {
+                        override fun onMessage(port: WebMessagePort, message: WebMessage) {
+                            if (port === messagePort) handleGameAction(message.data)
+                        }
+                    })
+                    view.postWebMessage(WebMessage(channelId, arrayOf(ports[1])), Uri.parse(origin))
+                    pageFinished = true
+                }
             }
         }
         webChromeClient = object : WebChromeClient() {
@@ -848,33 +912,26 @@ internal class GameWebViewController(
                 return true
             }
         }
-        loadUrl(MsnpGameCatalogService.upgradeKnownHttpsUrl(entry.url))
+        if (gameOrigin(entry.url) != null) loadUrl(MsnpGameCatalogService.upgradeKnownHttpsUrl(entry.url))
     }
 
     fun dispatchRemoteAppLoaded() {
         if (remoteLoadedDispatched) return
         remoteLoadedDispatched = true
-        webView.evaluateJavascript(
-            "if (window.__p4OnRemoteAppLoaded) window.__p4OnRemoteAppLoaded();",
-            null,
-        )
+        postGameEvent("loaded")
     }
 
-    fun dispatchDataReceived(payload: String) {
-        val escaped = JSONObject.quote(payload)
-        webView.evaluateJavascript(
-            "if (window.__p4OnDataReceived) window.__p4OnDataReceived($escaped);",
-            null,
-        )
-    }
+    fun dispatchDataReceived(payload: String) = postGameEvent("data", payload)
 
     fun dispatchRemoteAppClosed() {
         if (remoteClosedDispatched) return
         remoteClosedDispatched = true
-        webView.evaluateJavascript(
-            "if (window.__p4OnRemoteAppClosed) window.__p4OnRemoteAppClosed();",
-            null,
-        )
+        postGameEvent("closed")
+    }
+
+    private fun postGameEvent(action: String, value: String = "") {
+        val data = org.json.JSONArray().put(action).put(value)
+        messagePort?.postMessage(WebMessage(data.toString()))
     }
 
     fun sendKey(eventType: String, keyCode: Int, keyChar: String = "") {
@@ -900,39 +957,24 @@ internal class GameWebViewController(
     }
 
     fun destroy() {
+        navigation++
+        messagePort?.close()
+        messagePort = null
         dismissAllJsDialogs()
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
     }
 
-    private inner class BridgeInterface {
-        // These JavaScript API names also name controller callbacks; qualify the
-        // receiver so the posted work does not recursively call the bridge.
-        @JavascriptInterface
-        fun onInitialize() {
-            mainHandler.post { this@GameWebViewController.onInitialize() }
-        }
-
-        @JavascriptInterface
-        fun onSendData(payload: String) {
-            mainHandler.post { this@GameWebViewController.onSendData(payload) }
-        }
-
-        @JavascriptInterface
-        fun onSendImAsUser(message: String) {
-            mainHandler.post { this@GameWebViewController.onSendImAsUser(message) }
-        }
-
-        @JavascriptInterface
-        fun onCloseApp() {
-            mainHandler.post { this@GameWebViewController.onCloseApp() }
-        }
-
-        @JavascriptInterface
-        fun onOpenHelp(url: String) {
-            mainHandler.post {
-                onOpenHelpUrl(MsnpGameCatalogService.upgradeKnownHttpsUrl(url))
-            }
+    private fun handleGameAction(data: String?) {
+        if (data == null || data.length > 256 * 1024) return
+        val request = runCatching { org.json.JSONArray(data) }.getOrNull() ?: return
+        val value = request.opt(1) as? String ?: return
+        when (request.opt(0)) {
+            "initialize" -> onInitialize()
+            "data" -> onSendData(value)
+            "im" -> onSendImAsUser(value)
+            "close" -> onCloseApp()
+            "help" -> if (gameOrigin(value) != null) onOpenHelpUrl(MsnpGameCatalogService.upgradeKnownHttpsUrl(value))
         }
     }
 }
@@ -1015,83 +1057,59 @@ private fun resolveHtmlCharset(contentType: String?, bytes: ByteArray): Charset 
     } ?: StandardCharsets.UTF_8
 }
 
-private fun fetchAndInjectHtml(url: String, script: String): WebResourceResponse {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
+private val gameHeadTag = Regex("<head\\b[^>]*>", RegexOption.IGNORE_CASE)
+
+private fun fetchGameResource(url: String, script: String?): WebResourceResponse? {
+    val target = URL(url)
+    val connection = (target.openConnection() as HttpURLConnection).apply {
         connectTimeout = 10_000
         readTimeout = 10_000
-        instanceFollowRedirects = true
+        instanceFollowRedirects = false
         setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
     }
     try {
-        check(connection.responseCode in 200..299) {
-            "Game HTML request failed with HTTP ${connection.responseCode}"
+        val status = connection.responseCode
+        if (status in 300..399) {
+            val location = connection.getHeaderField("Location")
+            val redirect = location?.let { URL(target, it).toString() }
+            if (gameOrigin(redirect) == null) return unavailableGameResource()
+            // Let WebView follow redirects so the final document gets its actual security origin.
+            return null
         }
-        val bytes = connection.inputStream.use { it.readBytes() }
-        val html = normalizeLegacyGameHtml(String(bytes, resolveHtmlCharset(connection.contentType, bytes)))
+        if (status !in 200..299) return unavailableGameResource()
+        val limit = if (script != null) 2 * 1024 * 1024 else 16 * 1024 * 1024
+        val bytes = connection.inputStream.use { it.readBytesBounded(limit) { "Game resource is too large." } }
+        val contentType = connection.contentType
+        if (script == null) {
+            val mime = contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
+                ?: java.net.URLConnection.guessContentTypeFromName(target.path)
+                ?: "application/octet-stream"
+            return WebResourceResponse(mime, "utf-8", bytes.inputStream())
+        }
+        val html = normalizeLegacyGameHtml(String(bytes, resolveHtmlCharset(contentType, bytes)))
         val injection = "<style id=\"__p4_base_style\">$P4_BASE_CSS</style><script>$script</script>"
-        val headRegex = Regex("<head[^>]*>", RegexOption.IGNORE_CASE)
-        val match = headRegex.find(html)
-        val modified = if (match != null) {
-            html.substring(0, match.range.last + 1) + injection + html.substring(match.range.last + 1)
-        } else {
-            injection + html
-        }
-        return WebResourceResponse(
-            "text/html",
-            "utf-8",
-            ByteArrayInputStream(modified.toByteArray(StandardCharsets.UTF_8)),
-        )
+        val offset = gameHeadTag.find(html)?.range?.last?.plus(1) ?: 0
+        val modified = StringBuilder(html).insert(offset, injection).toString()
+        return WebResourceResponse("text/html", "utf-8", modified.byteInputStream())
+    } catch (_: Exception) {
+        return unavailableGameResource()
     } finally {
         connection.disconnect()
     }
 }
 
-private fun fetchSubresource(url: String): WebResourceResponse {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
-        connectTimeout = 10_000
-        readTimeout = 10_000
-        instanceFollowRedirects = true
-        setRequestProperty("User-Agent", "MSNMSGR/14.0.8117.0416")
-    }
-    val contentType = connection.contentType?.substringBefore(';')?.trim().orEmpty().ifBlank {
-        when {
-            url.endsWith(".js", true) -> "application/javascript"
-            url.endsWith(".css", true) -> "text/css"
-            url.endsWith(".xml", true) -> "application/xml"
-            url.endsWith(".png", true) -> "image/png"
-            url.endsWith(".gif", true) -> "image/gif"
-            url.endsWith(".jpg", true) || url.endsWith(".jpeg", true) -> "image/jpeg"
-            url.endsWith(".wav", true) -> "audio/wav"
-            else -> "application/octet-stream"
-        }
-    }
-    val bytes = try {
-        connection.inputStream.use { it.readBytes() }
-    } finally {
-        connection.disconnect()
-    }
-    return WebResourceResponse(contentType, "utf-8", ByteArrayInputStream(bytes))
-}
+private fun unavailableGameResource() = WebResourceResponse(
+    "text/plain", "utf-8", 502, "Game resource unavailable", emptyMap(), ByteArrayInputStream(byteArrayOf()),
+)
 
-internal fun buildP4PolyfillScript(
-    isInviter: Boolean,
-    localName: String,
-    localEmail: String,
-    peerName: String,
-    peerEmail: String,
-    targetWidth: Int,
-): String {
-    val safeLocalName = JSONObject.quote(localName.ifBlank { localEmail.substringBefore('@') })
-    val safeLocalEmail = JSONObject.quote(localEmail)
-    val safePeerName = JSONObject.quote(peerName.ifBlank { peerEmail.substringBefore('@') })
-    val safePeerEmail = JSONObject.quote(peerEmail)
-    val inviterLiteral = if (isInviter) "true" else "false"
+private fun buildP4PolyfillScript(targetWidth: Int): String {
     val baseCssLiteral = JSONObject.quote(P4_BASE_CSS)
 
     return """
 (function() {
+    var host;
+    try { host = window.top.__p4Host; } catch (e) { return; }
+    if (!host) return;
     if (window.__p4SyncDefaultBg) {
         try { window.__p4SyncDefaultBg(); } catch (e) {}
     }
@@ -1360,9 +1378,9 @@ internal fun buildP4PolyfillScript(
     } catch (e) {}
 
     window.open = function(url) {
-        if (url && window.AndroidP4Bridge && window.AndroidP4Bridge.onOpenHelp) {
+        if (url) {
             try {
-                window.AndroidP4Bridge.onOpenHelp(new URL(url, window.location.href).href);
+                host.send('help', new URL(url, window.location.href).href);
             } catch (e) {}
         }
         return null;
@@ -1381,9 +1399,9 @@ internal fun buildP4PolyfillScript(
             CID: '0'
         };
     };
-    var meUser = makeUser($safeLocalName, $safeLocalEmail);
-    var peerUser = makeUser($safePeerName, $safePeerEmail);
-    var isInviter = $inviterLiteral;
+    var meUser = makeUser(host.localName, host.localEmail);
+    var peerUser = makeUser(host.peerName, host.peerEmail);
+    var isInviter = host.isInviter;
     var inviterUser = isInviter ? meUser : peerUser;
     var user0 = isInviter ? meUser : peerUser;
     var user1 = isInviter ? peerUser : meUser;
@@ -1427,23 +1445,17 @@ internal fun buildP4PolyfillScript(
         error: { Type: 0, Data: null },
         Initialize: function() {
             localInitialized = true;
-            if (window.AndroidP4Bridge && window.AndroidP4Bridge.onInitialize) {
-                window.AndroidP4Bridge.onInitialize();
-            }
+            host.send('initialize');
             fireRemoteLoadedIfReady();
         },
         initialize: function() { this.Initialize(); },
         SendData: function(v) {
             var payload = (v === null || v === undefined) ? '' : String(v);
-            if (window.AndroidP4Bridge && window.AndroidP4Bridge.onSendData) {
-                window.AndroidP4Bridge.onSendData(payload);
-            }
+            host.send('data', payload);
         },
         sendData: function(v) { this.SendData(v); },
         SendIM: function(msg) {
-            if (window.AndroidP4Bridge && window.AndroidP4Bridge.onSendImAsUser) {
-                window.AndroidP4Bridge.onSendImAsUser(String(msg || ''));
-            }
+            host.send('im', String(msg || ''));
         },
         EnterIM: function(msg) { this.SendIM(msg); },
         SendIMAsUser: function(msg) { this.SendIM(msg); }
@@ -1457,9 +1469,7 @@ internal fun buildP4PolyfillScript(
         Messenger: { Options: {}, Phone: {} },
         messenger: { Options: {}, Phone: {} },
         CloseApp: function() {
-            if (window.AndroidP4Bridge && window.AndroidP4Bridge.onCloseApp) {
-                window.AndroidP4Bridge.onCloseApp();
-            }
+            host.send('close');
         },
         closeApp: function() { this.CloseApp(); }
     };
@@ -2055,6 +2065,8 @@ internal fun GameHost(
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
                             WebView(ctx).apply {
+                                settings.allowFileAccess = false
+                                settings.allowContentAccess = false
                                 setBackgroundColor(AndroidColor.WHITE)
                                 settings.loadsImagesAutomatically = true
                                 webViewClient = object : WebViewClient() {

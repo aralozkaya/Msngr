@@ -3,6 +3,8 @@ package org.aralozkaya.msngr.notifications
 import android.Manifest
 import android.app.NotificationManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
@@ -10,6 +12,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -78,6 +81,50 @@ class ContactSignedInNotificationInstrumentedTest {
             }
         } finally {
             manager.cancelAll()
+        }
+    }
+
+    @Test
+    fun delayedForegroundCleanupPreservesAReplacementWithTheSameId() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+        NotificationChannels.createAll(context)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val poster = MsngrNotificationManager(context) { false }
+        val event = NotificationEvent(NotificationEventType.ContactSignedIn, "replacement@example.test", "First sign-in")
+        val id = MsngrNotificationManager.notificationId(event.type, event.contactId)
+        val marker = NotificationEvent(NotificationEventType.Nudge, "replacement-marker", "Marker")
+        val markerId = MsngrNotificationManager.notificationId(marker.type, marker.contactId)
+        fun active() = manager.activeNotifications.singleOrNull { it.id == id }
+        try {
+            poster.show(event)
+            val first = withTimeout(3000) {
+                while (active() == null) delay(25)
+                requireNotNull(active())
+            }
+            val recheckFinished = CompletableDeferred<Unit>()
+            instrumentation.runOnMainSync {
+                MsngrNotificationManager(context).dismissContactSignedInNotifications()
+                Handler(Looper.getMainLooper()).postDelayed(
+                    { recheckFinished.complete(Unit) }, MsngrNotificationManager.SIGN_IN_CANCEL_RECHECK_MILLIS,
+                )
+            }
+            poster.show(event.copy(contactName = "Second sign-in"))
+            val replacement = withTimeout(3000) {
+                while (active()?.postTime == null || active()?.postTime == first.postTime) delay(25)
+                requireNotNull(active())
+            }
+            withTimeout(3000) { recheckFinished.await() }
+            // Wait for Android to process a subsequent notification before observing the replacement.
+            poster.show(marker)
+            withTimeout(3000) { while (manager.activeNotifications.none { it.id == markerId }) delay(25) }
+            assertEquals(replacement.postTime, active()?.postTime)
+        } finally {
+            manager.cancel(id)
+            manager.cancel(markerId)
         }
     }
 
